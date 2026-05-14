@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronRight, Wrench, Check, X, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Wrench } from 'lucide-react'
 import type { ToolCall } from '../../store/agent-store'
 
 interface ToolCallDisplayProps {
@@ -9,43 +9,75 @@ interface ToolCallDisplayProps {
 function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement {
   const [expanded, setExpanded] = useState(false)
 
-  const inputSummary = (() => {
-    const input = toolCall.input
-    if (input.file_path) return String(input.file_path).split('/').pop()
-    if (input.path) return String(input.path).split('/').pop()
-    if (input.command) return String(input.command).slice(0, 40)
-    if (input.query) return String(input.query).slice(0, 40)
-    return ''
-  })()
+  const statusIcon = {
+    running: <Loader2 size={12} className="tool-call-spinner" />,
+    completed: <Check size={12} className="tool-call-success" />,
+    error: <X size={12} className="tool-call-error" />
+  }[toolCall.status]
 
-  const statusIcon = toolCall.status === 'running' ? '⏳' : toolCall.status === 'error' ? '✕' : '✓'
-  const statusClass = `tool-call-status tool-call-status-${toolCall.status}`
+  const inputSummary = summarizeInput(toolCall.toolName, toolCall.input)
+  const resultPreview = toolCall.result
+    ? toolCall.result.length > 200
+      ? toolCall.result.slice(0, 200) + '...'
+      : toolCall.result
+    : null
 
   return (
-    <div className="tool-call-card">
+    <div className="tool-call-display">
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <Wrench size={12} />
+        <span className="tool-call-chevron">
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </span>
+        <Wrench size={12} className="tool-call-icon" />
         <span className="tool-call-name">{toolCall.toolName}</span>
-        {inputSummary && <span className="tool-call-summary">{inputSummary}</span>}
-        <span className={statusClass}>{statusIcon}</span>
+        <span className="tool-call-summary">{inputSummary}</span>
+        <span className="tool-call-status">{statusIcon}</span>
       </div>
       {expanded && (
-        <div className="tool-call-detail">
-          <div className="tool-call-section">
-            <span className="tool-call-label">Input:</span>
-            <pre className="tool-call-pre">{JSON.stringify(toolCall.input, null, 2)}</pre>
+        <div className="tool-call-details">
+          <div className="tool-call-input">
+            <div className="tool-call-label">Input</div>
+            <pre>{JSON.stringify(toolCall.input, null, 2)}</pre>
           </div>
-          {toolCall.result && (
-            <div className="tool-call-section">
-              <span className="tool-call-label">Result:</span>
-              <pre className="tool-call-pre">{toolCall.result.slice(0, 500)}</pre>
+          {resultPreview && (
+            <div className="tool-call-result">
+              <div className="tool-call-label">Result</div>
+              <pre>{resultPreview}</pre>
             </div>
           )}
         </div>
       )}
     </div>
   )
+}
+
+function summarizeInput(toolName: string, input: Record<string, unknown>): string {
+  switch (toolName) {
+    case 'Read':
+      return String(input.file_path || '').split('/').pop() || ''
+    case 'Write':
+      return String(input.file_path || '').split('/').pop() || ''
+    case 'Edit':
+      return String(input.file_path || '').split('/').pop() || ''
+    case 'Bash':
+      const cmd = String(input.command || '')
+      return cmd.length > 40 ? cmd.slice(0, 40) + '...' : cmd
+    case 'Grep':
+      return String(input.pattern || '')
+    case 'Glob':
+      return String(input.pattern || '')
+    case 'WebSearch':
+      return String(input.query || '')
+    case 'WebFetch':
+      return String(input.url || '')
+    default:
+      const vals = Object.values(input)
+      if (vals.length > 0) {
+        const s = String(vals[0])
+        return s.length > 30 ? s.slice(0, 30) + '...' : s
+      }
+      return ''
+  }
 }
 
 export default ToolCallDisplay

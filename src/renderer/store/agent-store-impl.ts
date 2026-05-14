@@ -1,10 +1,12 @@
 import { create } from 'zustand'
-import type { ChatMessage, ToolCall, AgentState } from './agent-store'
+import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo } from './agent-store'
 
-const useAgentStore = create<AgentState>((set) => ({
+export const useAgentStore = create<AgentState>((set) => ({
   messages: [],
   isStreaming: false,
   currentSessionId: null,
+  agentStatus: 'idle',
+  usageInfo: null,
 
   addMessage: (message: ChatMessage) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -12,28 +14,61 @@ const useAgentStore = create<AgentState>((set) => ({
   updateLastAssistantMessage: (content: string) =>
     set((state) => {
       const messages = [...state.messages]
-      const lastIdx = messages.length - 1
-      if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
-        messages[lastIdx] = { ...messages[lastIdx], content }
+      const lastIdx = messages.findLastIndex((m) => m.role === 'assistant')
+      if (lastIdx >= 0) {
+        messages[lastIdx] = { ...messages[lastIdx], content, isStreaming: true }
       }
       return { messages }
+    }),
+
+  appendToLastAssistantMessage: (chunk: string) =>
+    set((state) => {
+      const messages = [...state.messages]
+      const lastIdx = messages.findLastIndex((m) => m.role === 'assistant')
+      if (lastIdx >= 0) {
+        messages[lastIdx] = {
+          ...messages[lastIdx],
+          content: messages[lastIdx].content + chunk,
+          isStreaming: true
+        }
+      }
+      return { messages }
+    }),
+
+  finishStreaming: () =>
+    set((state) => {
+      const messages = state.messages.map((m) =>
+        m.isStreaming ? { ...m, isStreaming: false } : m
+      )
+      return { messages, isStreaming: false, agentStatus: 'idle' }
     }),
 
   setToolCall: (messageId: string, toolCall: ToolCall) =>
     set((state) => {
       const messages = [...state.messages]
-      const msg = messages.find((m) => m.id === messageId)
-      if (msg) {
-        const toolCalls = [...(msg.toolCalls || [])]
-        const existingIdx = toolCalls.findIndex(
-          (tc) => tc.toolName === toolCall.toolName
+      const idx = messages.findIndex((m) => m.id === messageId)
+      if (idx >= 0) {
+        const existing = messages[idx].toolCalls || []
+        const updated = existing.map((tc) =>
+          tc.toolUseId === toolCall.toolUseId ? toolCall : tc
         )
-        if (existingIdx >= 0) {
-          toolCalls[existingIdx] = toolCall
-        } else {
-          toolCalls.push(toolCall)
+        if (!existing.some((tc) => tc.toolUseId === toolCall.toolUseId)) {
+          updated.push(toolCall)
         }
-        msg.toolCalls = toolCalls
+        messages[idx] = { ...messages[idx], toolCalls: updated }
+      }
+      return { messages }
+    }),
+
+  updateToolCallResult: (messageId: string, toolUseId: string, result: string, status: 'completed' | 'error') =>
+    set((state) => {
+      const messages = [...state.messages]
+      const idx = messages.findIndex((m) => m.id === messageId)
+      if (idx >= 0) {
+        const toolCalls = (messages[idx].toolCalls || []).map((tc) =>
+          tc.toolUseId === toolUseId ? { ...tc, result, status } : tc
+        )
+        messages[idx] = { ...messages[idx], toolCalls }
       }
       return { messages }
     }),
@@ -42,7 +77,10 @@ const useAgentStore = create<AgentState>((set) => ({
 
   setSessionId: (id: string | null) => set({ currentSessionId: id }),
 
-  clearMessages: () => set({ messages: [], currentSessionId: null })
-}))
+  setAgentStatus: (status: AgentStatus) => set({ agentStatus: status }),
 
-export default useAgentStore
+  setUsageInfo: (info: UsageInfo | null) => set({ usageInfo: info }),
+
+  clearMessages: () =>
+    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null })
+}))

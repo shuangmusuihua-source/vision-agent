@@ -18,8 +18,8 @@ function MessageBubble({ message }: MessageBubbleProps): React.ReactElement {
         <div className="message-assistant-content">
           {message.toolCalls && message.toolCalls.length > 0 && (
             <div className="message-tool-calls">
-              {message.toolCalls.map((tc, i) => (
-                <ToolCallDisplay key={`${tc.toolName}-${i}`} toolCall={tc} />
+              {message.toolCalls.map((tc) => (
+                <ToolCallDisplay key={tc.toolUseId} toolCall={tc} />
               ))}
             </div>
           )}
@@ -28,7 +28,7 @@ function MessageBubble({ message }: MessageBubbleProps): React.ReactElement {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
             </div>
           )}
-          {message.isStreaming && !message.content && (
+          {message.isStreaming && !message.content && !message.toolCalls?.length && (
             <span className="message-streaming-dots">· · ·</span>
           )}
         </div>

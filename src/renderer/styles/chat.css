@@ -106,11 +106,12 @@
 
 /* --- Tool Call Card --- */
 
-.tool-call-card {
+.tool-call-display {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   font-size: 12px;
+  margin-bottom: 4px;
 }
 
 .tool-call-header {
@@ -126,6 +127,16 @@
   background: var(--bg-tertiary);
 }
 
+.tool-call-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-tertiary);
+}
+
+.tool-call-icon {
+  color: var(--text-secondary);
+}
+
 .tool-call-name {
   font-weight: 500;
   color: var(--text-primary);
@@ -136,49 +147,55 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
 
 .tool-call-status {
+  display: flex;
+  align-items: center;
   margin-left: auto;
-  font-size: 10px;
 }
 
-.tool-call-status-running {
+.tool-call-spinner {
+  animation: spin 1s linear infinite;
   color: var(--accent-color);
 }
 
-.tool-call-status-completed {
+.tool-call-success {
   color: #50a14f;
 }
 
-.tool-call-status-error {
+.tool-call-error {
   color: #e45649;
 }
 
-.tool-call-detail {
-  padding: 6px 8px;
+.tool-call-details {
+  padding: 8px;
   border-top: 1px solid var(--border-color);
 }
 
-.tool-call-section {
-  margin-bottom: 4px;
+.tool-call-input,
+.tool-call-result {
+  margin-bottom: 6px;
 }
 
 .tool-call-label {
   font-weight: 500;
   color: var(--text-secondary);
   font-size: 11px;
+  margin-bottom: 2px;
 }
 
-.tool-call-pre {
+.tool-call-input pre,
+.tool-call-result pre {
   background: var(--bg-primary);
   padding: 6px;
   border-radius: 3px;
   font-size: 11px;
   overflow-x: auto;
-  margin-top: 2px;
   white-space: pre-wrap;
   word-wrap: break-word;
+  margin: 0;
 }
 
 /* --- Chat Input --- */
