@@ -34,14 +34,15 @@ const sessions = new Map<string, SessionInfo>()
 // Pending permission requests waiting for user response
 const pendingPermissions = new Map<string, {
   resolve: (result: PermissionResult) => void
+  input: Record<string, unknown>
 }>()
 
-export function resolvePermission(requestId: string, behavior: 'allow' | 'deny', alwaysAllow?: boolean): void {
+export function resolvePermission(requestId: string, behavior: 'allow' | 'deny'): void {
   const pending = pendingPermissions.get(requestId)
   if (!pending) return
   pendingPermissions.delete(requestId)
   if (behavior === 'allow') {
-    pending.resolve({ behavior: 'allow', updatedInput: undefined })
+    pending.resolve({ behavior: 'allow', updatedInput: pending.input })
   } else {
     pending.resolve({ behavior: 'deny', message: 'User denied permission' })
   }
@@ -69,7 +70,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     model,
     cwd,
     allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
-    permissionMode: 'dontAsk',
+    permissionMode: 'default',
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     canUseTool: async (
@@ -94,6 +95,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
       }
 
       // All other tools (Bash, Write, Edit) require user approval
+      console.log('[AgentManager] canUseTool called for:', toolName, JSON.stringify(input).substring(0, 200))
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,
@@ -102,7 +104,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
       })
 
       return new Promise<PermissionResult>((resolve) => {
-        pendingPermissions.set(requestId, { resolve })
+        pendingPermissions.set(requestId, { resolve, input })
 
         // Timeout after 5 minutes — auto-deny
         setTimeout(() => {
