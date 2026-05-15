@@ -176,7 +176,6 @@ function useAgent() {
 
       // --- result: success ---
       if (type === 'result' && subtype === 'success') {
-        const resultText = (msg.result as string) || ''
         const sessionId = msg.session_id as string
         const costUsd = (msg.total_cost_usd as number) || 0
         const durationMs = (msg.duration_ms as number) || 0
@@ -189,22 +188,8 @@ function useAgent() {
           durationMs
         })
 
-        // If there's a result text and no assistant message captured it,
-        // add as final assistant message
-        if (resultText) {
-          const lastMsg = messages[messages.length - 1]
-          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-            updateLastAssistantMessage(resultText)
-          } else if (!lastMsg || lastMsg.role !== 'assistant') {
-            addMessage({
-              id: `assistant-${Date.now()}`,
-              role: 'assistant',
-              content: resultText,
-              isStreaming: false
-            })
-          }
-        }
-
+        // Mark last streaming message as complete — don't add result text
+        // (assistant messages already captured the content)
         finishStreaming()
         return
       }

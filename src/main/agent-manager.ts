@@ -77,21 +77,23 @@ function buildOptions(mainWindow: BrowserWindow): Options {
       input: Record<string, unknown>,
       options: { signal: AbortSignal; suggestions?: unknown[] }
     ): Promise<PermissionResult> => {
-      // Auto-allow safe tools
+      // Auto-allow safe read-only tools
       if (toolName === 'WebSearch' || toolName === 'WebFetch' || toolName === 'Glob' || toolName === 'Grep') {
         return { behavior: 'allow', updatedInput: input }
       }
 
-      // Auto-allow reads/writes within authorized directories
-      const pathToCheck = extractPathFromToolInput(toolName, input)
-      if (pathToCheck) {
-        const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(dir))
-        if (isAuthorized) {
-          return { behavior: 'allow', updatedInput: input }
+      // Auto-allow Read within authorized directories
+      if (toolName === 'Read') {
+        const pathToCheck = extractPathFromToolInput(toolName, input)
+        if (pathToCheck) {
+          const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(dir))
+          if (isAuthorized) {
+            return { behavior: 'allow', updatedInput: input }
+          }
         }
       }
 
-      // Ask user via IPC
+      // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,
