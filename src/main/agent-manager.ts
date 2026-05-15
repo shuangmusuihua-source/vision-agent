@@ -69,7 +69,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     model,
     cwd,
     allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
-    permissionMode: 'default',
+    permissionMode: 'dontAsk',
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     canUseTool: async (
