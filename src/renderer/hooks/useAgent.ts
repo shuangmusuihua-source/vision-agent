@@ -20,6 +20,7 @@ function useAgent() {
     currentSessionId,
     agentStatus,
     usageInfo,
+    permissionRequest,
     addMessage,
     updateLastAssistantMessage,
     appendToLastAssistantMessage,
@@ -30,6 +31,7 @@ function useAgent() {
     setSessionId,
     setAgentStatus,
     setUsageInfo,
+    setPermissionRequest,
     clearMessages
   } = useAgentStore()
 
@@ -62,11 +64,21 @@ function useAgent() {
       setAgentStatus('error')
     })
 
+    const unsubPermission = window.api.agent.onPermissionRequest((data) => {
+      const req = data as { id: string; toolName: string; input: Record<string, unknown> }
+      setPermissionRequest({
+        id: req.id,
+        toolName: req.toolName,
+        input: req.input
+      })
+    })
+
     return () => {
       unsubMessage()
       unsubSession()
       unsubComplete()
       unsubError()
+      unsubPermission()
     }
   }, [])
 
@@ -298,12 +310,22 @@ function useAgent() {
     [currentSessionId, addMessage, setStreaming, setAgentStatus]
   )
 
+  const respondPermission = useCallback(
+    async (requestId: string, behavior: 'allow' | 'deny') => {
+      setPermissionRequest(null)
+      await window.api.agent.respondPermission(requestId, behavior)
+    },
+    [setPermissionRequest]
+  )
+
   return {
     messages,
     isStreaming,
     agentStatus,
     usageInfo,
+    permissionRequest,
     sendMessage,
+    respondPermission,
     clearMessages
   }
 }

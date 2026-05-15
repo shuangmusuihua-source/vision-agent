@@ -336,3 +336,118 @@
   color: var(--accent-color);
   border-top: 1px solid var(--border-color);
 }
+
+/* --- Permission Dialog --- */
+
+.permission-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.permission-dialog {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.permission-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.permission-icon {
+  color: #e45649;
+}
+
+.permission-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.permission-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.permission-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.permission-tool {
+  display: flex;
+  flex-direction: column;
+}
+
+.permission-tool-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.permission-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.permission-detail-code {
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  word-break: break-all;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.permission-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.permission-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.permission-btn:hover {
+  opacity: 0.9;
+}
+
+.permission-btn-allow {
+  background: #50a14f;
+  color: #fff;
+  border-color: #50a14f;
+}
+
+.permission-btn-deny {
+  background: #e45649;
+  color: #fff;
+  border-color: #e45649;
+}

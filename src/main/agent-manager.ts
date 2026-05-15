@@ -1,7 +1,27 @@
 import { BrowserWindow } from 'electron'
+import { createRequire } from 'module'
+import { existsSync } from 'fs'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKMessage, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
+
+function resolveClaudeCodeExecutable(): string | undefined {
+  const require = createRequire(import.meta.url)
+
+  // 优先使用平台原生二进制
+  try {
+    const nativeBinary = require.resolve('@anthropic-ai/claude-agent-sdk-darwin-arm64/claude')
+    if (existsSync(nativeBinary)) return nativeBinary
+  } catch {}
+
+  // 回退到 cli.js
+  try {
+    const cliJs = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js')
+    if (existsSync(cliJs)) return cliJs
+  } catch {}
+
+  return undefined
+}
 
 interface SessionInfo {
   id: string
@@ -11,7 +31,23 @@ interface SessionInfo {
 
 const sessions = new Map<string, SessionInfo>()
 
-function buildOptions(): Options {
+// Pending permission requests waiting for user response
+const pendingPermissions = new Map<string, {
+  resolve: (result: PermissionResult) => void
+}>()
+
+export function resolvePermission(requestId: string, behavior: 'allow' | 'deny', alwaysAllow?: boolean): void {
+  const pending = pendingPermissions.get(requestId)
+  if (!pending) return
+  pendingPermissions.delete(requestId)
+  if (behavior === 'allow') {
+    pending.resolve({ behavior: 'allow', updatedInput: undefined })
+  } else {
+    pending.resolve({ behavior: 'deny', message: 'User denied permission' })
+  }
+}
+
+function buildOptions(mainWindow: BrowserWindow): Options {
   const apiKey = getApiKey()
   const model = getModel()
   const baseUrl = getBaseUrl()
@@ -27,44 +63,54 @@ function buildOptions(): Options {
     env.ANTHROPIC_BASE_URL = baseUrl
   }
 
+  const cliPath = resolveClaudeCodeExecutable()
+
   return {
     model,
     cwd,
     allowedTools: ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'],
     permissionMode: 'default',
     env,
+    ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     canUseTool: async (
       toolName: string,
       input: Record<string, unknown>,
       options: { signal: AbortSignal; suggestions?: unknown[] }
     ): Promise<PermissionResult> => {
-      return checkToolPermission(toolName, input, dirs)
+      // Auto-allow safe tools
+      if (toolName === 'WebSearch' || toolName === 'WebFetch' || toolName === 'Glob' || toolName === 'Grep') {
+        return { behavior: 'allow', updatedInput: input }
+      }
+
+      // Auto-allow reads/writes within authorized directories
+      const pathToCheck = extractPathFromToolInput(toolName, input)
+      if (pathToCheck) {
+        const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(dir))
+        if (isAuthorized) {
+          return { behavior: 'allow', updatedInput: input }
+        }
+      }
+
+      // Ask user via IPC
+      const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      mainWindow.webContents.send('agent:permissionRequest', {
+        id: requestId,
+        toolName,
+        input
+      })
+
+      return new Promise<PermissionResult>((resolve) => {
+        pendingPermissions.set(requestId, { resolve })
+
+        // Timeout after 5 minutes — auto-deny
+        setTimeout(() => {
+          if (pendingPermissions.has(requestId)) {
+            pendingPermissions.delete(requestId)
+            resolve({ behavior: 'deny', message: 'Permission request timed out' })
+          }
+        }, 300000)
+      })
     }
-  }
-}
-
-function checkToolPermission(
-  toolName: string,
-  input: Record<string, unknown>,
-  authorizedDirs: string[]
-): PermissionResult {
-  if (toolName === 'WebSearch' || toolName === 'WebFetch') {
-    return { behavior: 'allow', updatedInput: input }
-  }
-
-  const pathToCheck = extractPathFromToolInput(toolName, input)
-  if (!pathToCheck) {
-    return { behavior: 'allow', updatedInput: input }
-  }
-
-  const isAuthorized = authorizedDirs.some((dir) => pathToCheck.startsWith(dir))
-  if (isAuthorized) {
-    return { behavior: 'allow', updatedInput: input }
-  }
-
-  return {
-    behavior: 'deny',
-    message: `Path "${pathToCheck}" is outside authorized directories`
   }
 }
 
@@ -100,7 +146,7 @@ export async function sendMessage(
   prompt: string,
   sessionId?: string
 ): Promise<void> {
-  const options = buildOptions()
+  const options = buildOptions(mainWindow)
   let currentSessionId = sessionId
 
   console.log('[AgentManager] Sending message')

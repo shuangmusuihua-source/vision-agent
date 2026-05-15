@@ -46,7 +46,14 @@ const api = {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:error', handler)
       return () => ipcRenderer.removeListener('agent:error', handler)
-    }
+    },
+    onPermissionRequest: (callback: (request: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: unknown) => callback(request)
+      ipcRenderer.on('agent:permissionRequest', handler)
+      return () => ipcRenderer.removeListener('agent:permissionRequest', handler)
+    },
+    respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
+      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior)
   }
 }
 

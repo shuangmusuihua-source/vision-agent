@@ -23,12 +23,19 @@ interface UsageInfo {
   durationMs: number
 }
 
+interface PermissionRequest {
+  id: string
+  toolName: string
+  input: Record<string, unknown>
+}
+
 interface AgentState {
   messages: ChatMessage[]
   isStreaming: boolean
   currentSessionId: string | null
   agentStatus: AgentStatus
   usageInfo: UsageInfo | null
+  permissionRequest: PermissionRequest | null
   addMessage: (message: ChatMessage) => void
   updateLastAssistantMessage: (content: string) => void
   appendToLastAssistantMessage: (chunk: string) => void
@@ -39,7 +46,8 @@ interface AgentState {
   setSessionId: (id: string | null) => void
   setAgentStatus: (status: AgentStatus) => void
   setUsageInfo: (info: UsageInfo | null) => void
+  setPermissionRequest: (request: PermissionRequest | null) => void
   clearMessages: () => void
 }
 
-export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo }
+export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest }

@@ -19,7 +19,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [currentFile, setCurrentFile] = useState('')
   const [currentContent, setCurrentContent] = useState('')
 
-  const { messages, isStreaming, agentStatus, usageInfo, sendMessage } = useAgent()
+  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sendMessage, respondPermission } = useAgent()
 
   const handleOpenDirectory = async () => {
     const path = await window.api.workspace.openDirectoryDialog()
@@ -72,6 +72,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onOpenSettings={onOpenSettings}
         agentStatus={agentStatus}
         usageInfo={usageInfo}
+        permissionRequest={permissionRequest}
+        onPermissionRespond={respondPermission}
       >
         <ChatView messages={messages} />
         <ChatInput onSend={sendMessage} disabled={isStreaming} />

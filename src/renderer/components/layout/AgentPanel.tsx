@@ -1,6 +1,7 @@
 import { MessageSquare, X, Loader2 } from 'lucide-react'
-import type { AgentStatus, UsageInfo } from '../../store/agent-store'
+import type { AgentStatus, UsageInfo, PermissionRequest } from '../../store/agent-store'
 import ProfileSwitcher from '../chat/ProfileSwitcher'
+import PermissionDialog from '../chat/PermissionDialog'
 
 interface AgentPanelProps {
   collapsed: boolean
@@ -8,6 +9,8 @@ interface AgentPanelProps {
   onOpenSettings: () => void
   agentStatus: AgentStatus
   usageInfo: UsageInfo | null
+  permissionRequest: PermissionRequest | null
+  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
   children: React.ReactNode
 }
 
@@ -19,7 +22,7 @@ const STATUS_LABELS: Record<AgentStatus, string> = {
   error: 'Error'
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, usageInfo, children }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, usageInfo, permissionRequest, onPermissionRespond, children }: AgentPanelProps): React.ReactElement {
   if (collapsed) {
     return (
       <div className="agent-panel agent-panel-collapsed">
@@ -50,6 +53,12 @@ function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, 
       </div>
       <div className="agent-panel-content">
         <ProfileSwitcher onOpenSettings={onOpenSettings} />
+        {permissionRequest && (
+          <PermissionDialog
+            request={permissionRequest}
+            onRespond={onPermissionRespond}
+          />
+        )}
         <div className="agent-panel-messages">
           {children}
         </div>
