@@ -68,7 +68,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
   return {
     model,
     cwd,
-    allowedTools: ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'],
+    allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
     permissionMode: 'default',
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
