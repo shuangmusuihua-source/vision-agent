@@ -465,13 +465,24 @@
   padding: 4px 0;
 }
 
-.session-history-title {
+.session-history-toggle {
   display: flex;
   align-items: center;
   gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+}
+
+.session-history-toggle:hover {
+  color: var(--text-primary);
+}
+
+.session-history-title {
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
