@@ -1,10 +1,16 @@
-import { useState, useCallback } from 'react'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2 } from 'lucide-react'
 import type { FileEntry } from '../lib/ipc'
+
+interface MemoryEntry {
+  name: string
+  path: string
+}
 
 interface SidebarProps {
   files: FileEntry[]
   workspacePath: string
+  memoryRefreshKey: number
   onFileSelect: (path: string) => void
   onOpenDirectory: () => void
   onOpenSettings: () => void
@@ -15,6 +21,7 @@ interface SidebarProps {
 function Sidebar({
   files,
   workspacePath,
+  memoryRefreshKey,
   onFileSelect,
   onOpenDirectory,
   onOpenSettings,
@@ -22,6 +29,21 @@ function Sidebar({
   onToggleCollapse
 }: SidebarProps): React.ReactElement {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
+  const [memoryExpanded, setMemoryExpanded] = useState(true)
+  const [memoryFiles, setMemoryFiles] = useState<MemoryEntry[]>([])
+
+  const refreshMemory = useCallback(() => {
+    window.api.memory.list().then(setMemoryFiles).catch(() => setMemoryFiles([]))
+  }, [])
+
+  useEffect(() => {
+    refreshMemory()
+  }, [workspacePath, memoryRefreshKey, refreshMemory])
+
+  const handleDeleteMemory = useCallback(async (filePath: string) => {
+    await window.api.memory.delete(filePath)
+    refreshMemory()
+  }, [refreshMemory])
 
   const toggleDir = useCallback((path: string) => {
     setExpandedDirs((prev) => {
@@ -93,6 +115,40 @@ function Sidebar({
           <button className="sidebar-open-dir-btn" onClick={onOpenDirectory}>
             Open Workspace
           </button>
+        )}
+
+        {memoryFiles.length > 0 && (
+          <div className="sidebar-memory-section">
+            <div
+              className="sidebar-entry sidebar-folder"
+              style={{ paddingLeft: 8 }}
+              onClick={() => setMemoryExpanded((v) => !v)}
+            >
+              {memoryExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <Brain size={14} />
+              <span>Memory</span>
+            </div>
+            {memoryExpanded && memoryFiles.map((file) => (
+              <div
+                key={file.path}
+                className="sidebar-entry sidebar-file sidebar-memory-entry"
+                style={{ paddingLeft: 24 }}
+                onClick={() => onFileSelect(file.path)}
+              >
+                <File size={14} />
+                <span className="sidebar-memory-name">{file.name}</span>
+                <button
+                  className="sidebar-memory-delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteMemory(file.path)
+                  }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

@@ -62,6 +62,13 @@ const api = {
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
     listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
     loadSessionMessages: (sessionId: string) => ipcRenderer.invoke('agent:loadSessionMessages', sessionId)
+  },
+
+  memory: {
+    list: () => ipcRenderer.invoke('memory:list'),
+    read: (filePath: string) => ipcRenderer.invoke('memory:read', filePath),
+    write: (filePath: string, content: string) => ipcRenderer.invoke('memory:write', filePath, content),
+    delete: (filePath: string) => ipcRenderer.invoke('memory:delete', filePath)
   }
 }
 

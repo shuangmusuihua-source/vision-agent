@@ -21,6 +21,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<string>('')
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
   const [prefillText, setPrefillText] = useState<string | null>(null)
+  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
 
   const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
 
@@ -28,6 +29,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const path = await window.api.workspace.openDirectoryDialog()
     if (path) {
       setWorkspacePath(path)
+      await window.api.settings.addDirectory(path)
       const entries = await window.api.workspace.listFiles(path)
       setFiles(entries)
     }
@@ -76,22 +78,25 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     setTabContents((prev) => ({ ...prev, [filePath]: content }))
   }, [])
 
-  // Auto-reload editor when Agent finishes (may have edited the current file)
+  // Auto-reload editor and memory when Agent finishes
   useEffect(() => {
-    if (!isStreaming && activeTab && messages.length > 0) {
-      const timer = setTimeout(() => {
-        window.api.workspace.readFile(activeTab).then((result) => {
-          if (result.success && result.content) {
-            setTabContents((prev) => {
-              if (prev[activeTab] !== result.content) {
-                return { ...prev, [activeTab]: result.content! }
-              }
-              return prev
-            })
-          }
-        }).catch(() => {})
-      }, 500)
-      return () => clearTimeout(timer)
+    if (!isStreaming && messages.length > 0) {
+      setMemoryRefreshKey((k) => k + 1)
+      if (activeTab) {
+        const timer = setTimeout(() => {
+          window.api.workspace.readFile(activeTab).then((result) => {
+            if (result.success && result.content) {
+              setTabContents((prev) => {
+                if (prev[activeTab] !== result.content) {
+                  return { ...prev, [activeTab]: result.content! }
+                }
+                return prev
+              })
+            }
+          }).catch(() => {})
+        }, 500)
+        return () => clearTimeout(timer)
+      }
     }
   }, [isStreaming, activeTab])
 
@@ -121,6 +126,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <Sidebar
         files={files}
         workspacePath={workspacePath}
+        memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
         onOpenDirectory={handleOpenDirectory}
         onOpenSettings={onOpenSettings}

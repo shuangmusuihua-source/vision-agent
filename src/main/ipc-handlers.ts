@@ -1,6 +1,7 @@
 import { ipcMain, dialog } from 'electron'
-import { readFile, writeFile, readdir } from 'fs/promises'
+import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
 import { join, extname, relative } from 'path'
+import { existsSync } from 'fs'
 import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import {
@@ -10,7 +11,8 @@ import {
   removeProfile,
   setActiveProfile,
   addAuthorizedDirectory,
-  removeAuthorizedDirectory
+  removeAuthorizedDirectory,
+  getAuthorizedDirectories
 } from './store'
 
 // --- Workspace ---
@@ -170,5 +172,55 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:loadSessionMessages', async (_event, sessionId: string) => {
     return await loadSdkSessionMessages(sessionId)
+  })
+
+  // --- Memory ---
+  ipcMain.handle('memory:list', async () => {
+    const dirs = getAuthorizedDirectories()
+    const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+    const memoryDir = join(cwd, '.vision', 'memory')
+    if (!existsSync(memoryDir)) return []
+    try {
+      const entries = await readdir(memoryDir, { withFileTypes: true })
+      return entries
+        .filter((e) => e.isFile() && extname(e.name) === '.md' && e.name !== 'MEMORY.md')
+        .map((e) => ({
+          name: e.name.replace(/\.md$/, ''),
+          path: join(memoryDir, e.name)
+        }))
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('memory:read', async (_event, filePath: string) => {
+    try {
+      const content = await readFile(filePath, 'utf-8')
+      return { success: true, content }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('memory:write', async (_event, filePath: string, content: string) => {
+    try {
+      const dir = join(filePath, '..')
+      if (!existsSync(dir)) {
+        await mkdir(dir, { recursive: true })
+      }
+      await writeFile(filePath, content, 'utf-8')
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('memory:delete', async (_event, filePath: string) => {
+    try {
+      await unlink(filePath)
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
   })
 }

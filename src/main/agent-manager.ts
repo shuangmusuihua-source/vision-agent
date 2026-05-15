@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { appendFile } from 'fs/promises'
+import { join } from 'path'
 import { query, listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
@@ -123,6 +124,13 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     permissionMode: 'default',
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
+    systemPrompt: {
+      type: 'preset' as const,
+      preset: 'claude_code' as const
+    },
+    settings: {
+      autoMemoryDirectory: join(cwd, '.vision', 'memory')
+    },
     hooks: buildHooks(mainWindow),
     canUseTool: async (
       toolName: string,

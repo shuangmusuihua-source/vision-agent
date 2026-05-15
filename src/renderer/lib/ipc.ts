@@ -52,6 +52,14 @@ interface WindowApi {
   workspace: WorkspaceApi
   settings: SettingsApi
   agent: AgentApi
+  memory: MemoryApi
+}
+
+interface MemoryApi {
+  list: () => Promise<Array<{ name: string; path: string }>>
+  read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
+  write: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
+  delete: (filePath: string) => Promise<{ success: boolean; error?: string }>
 }
 
 interface SessionInfo {
@@ -76,6 +84,7 @@ export type {
   WorkspaceApi,
   SettingsApi,
   AgentApi,
+  MemoryApi,
   FileEntry,
   ModelProfile,
   AppSettings,
