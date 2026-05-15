@@ -50,35 +50,40 @@ async function writeAuditLog(entry: Record<string, unknown>): Promise<void> {
   }
 }
 
-function buildHooks(mainWindow: BrowserWindow): HookCallbackMatcher {
+function buildHooks(mainWindow: BrowserWindow): Partial<Record<string, HookCallbackMatcher[]>> {
+  const auditPreToolUse: HookCallback = async (input, _toolUseID, _options) => {
+    await writeAuditLog({
+      event: 'PreToolUse',
+      tool: (input as Record<string, unknown>).tool_name,
+      input: JSON.stringify((input as Record<string, unknown>).tool_input).substring(0, 500)
+    })
+    return {}
+  }
+
+  const auditPostToolUse: HookCallback = async (input, _toolUseID, _options) => {
+    await writeAuditLog({
+      event: 'PostToolUse',
+      tool: (input as Record<string, unknown>).tool_name,
+      result: JSON.stringify((input as Record<string, unknown>).tool_result).substring(0, 500)
+    })
+    return {}
+  }
+
+  const notificationHook: HookCallback = async (input, _toolUseID, _options) => {
+    const msg = (input as Record<string, unknown>).message as string || ''
+    const title = (input as Record<string, unknown>).title as string || ''
+    mainWindow.webContents.send('agent:notification', {
+      type: (input as Record<string, unknown>).notification_type || 'info',
+      message: msg,
+      title
+    })
+    return {}
+  }
+
   return {
-    PreToolUse: (async (input) => {
-      await writeAuditLog({
-        event: 'PreToolUse',
-        tool: input.tool_name,
-        input: JSON.stringify(input.tool_input).substring(0, 500)
-      })
-      return { decision: 'approve' }
-    }) as HookCallback,
-
-    PostToolUse: (async (input) => {
-      await writeAuditLog({
-        event: 'PostToolUse',
-        tool: input.tool_name,
-        result: typeof input.tool_result === 'string'
-          ? input.tool_result.substring(0, 500)
-          : JSON.stringify(input.tool_result).substring(0, 500)
-      })
-      return { decision: 'approve' }
-    }) as HookCallback,
-
-    Notification: (async (input) => {
-      mainWindow.webContents.send('agent:notification', {
-        type: input.notification_type || 'info',
-        message: input.message || ''
-      })
-      return { decision: 'approve' }
-    }) as HookCallback
+    PreToolUse: [{ hooks: [auditPreToolUse] }],
+    PostToolUse: [{ hooks: [auditPostToolUse] }],
+    Notification: [{ hooks: [notificationHook] }]
   }
 }
 
@@ -118,11 +123,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     permissionMode: 'default',
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
-    hooks: {
-      PreToolUse: [{ hooks: [buildHooks(mainWindow).PreToolUse] }],
-      PostToolUse: [{ hooks: [buildHooks(mainWindow).PostToolUse] }],
-      Notification: [{ hooks: [buildHooks(mainWindow).Notification] }]
-    },
+    hooks: buildHooks(mainWindow),
     canUseTool: async (
       toolName: string,
       input: Record<string, unknown>,
