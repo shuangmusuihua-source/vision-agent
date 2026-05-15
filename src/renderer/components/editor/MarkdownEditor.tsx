@@ -1,6 +1,14 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
+import { TaskList } from '@tiptap/extension-task-list'
+import { TaskItem } from '@tiptap/extension-task-item'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { Highlight } from '@tiptap/extension-highlight'
+import { Typography } from '@tiptap/extension-typography'
 import { common, createLowlight } from 'lowlight'
 import { useEffect, useCallback } from 'react'
 
@@ -20,7 +28,19 @@ function MarkdownEditor({ content, filePath, onSave }: MarkdownEditorProps): Rea
       }),
       CodeBlockLowlight.configure({
         lowlight
-      })
+      }),
+      TaskList,
+      TaskItem.configure({
+        nested: true
+      }),
+      Table.configure({
+        resizable: true
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      Highlight,
+      Typography
     ],
     content,
     editorProps: {
@@ -30,14 +50,12 @@ function MarkdownEditor({ content, filePath, onSave }: MarkdownEditorProps): Rea
     }
   })
 
-  // Update editor content when a new file is opened
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content)
     }
   }, [content, editor])
 
-  // Cmd+S save handler
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {

@@ -1,53 +1,61 @@
-/* --- Markdown Editor --- */
+/* --- Editor Wrapper --- */
 
 .editor-wrapper {
-  padding: 48px 64px;
-  max-width: 800px;
-  margin: 0 auto;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-tertiary);
+  font-size: 14px;
 }
 
 .editor-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
   color: var(--text-tertiary);
+  font-size: 14px;
 }
 
-/* --- Tiptap ProseMirror styles --- */
+/* --- Tiptap Editor --- */
 
 .markdown-editor {
   outline: none;
-  min-height: 200px;
+  min-height: 100%;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-primary);
 }
 
 .markdown-editor h1 {
   font-size: 28px;
   font-weight: 700;
+  margin: 24px 0 12px;
   line-height: 1.3;
-  margin-bottom: 8px;
-  margin-top: 24px;
 }
 
 .markdown-editor h2 {
   font-size: 22px;
   font-weight: 600;
+  margin: 20px 0 10px;
   line-height: 1.3;
-  margin-bottom: 6px;
-  margin-top: 20px;
 }
 
 .markdown-editor h3 {
   font-size: 18px;
   font-weight: 600;
+  margin: 16px 0 8px;
   line-height: 1.4;
-  margin-bottom: 4px;
-  margin-top: 16px;
 }
 
 .markdown-editor p {
-  font-size: 15px;
-  line-height: 1.7;
   margin-bottom: 8px;
 }
 
@@ -57,41 +65,62 @@
   margin-bottom: 8px;
 }
 
-.markdown-editor li {
-  font-size: 15px;
-  line-height: 1.7;
-  margin-bottom: 2px;
-}
-
 .markdown-editor blockquote {
   border-left: 3px solid var(--border-color);
   padding-left: 16px;
+  margin: 8px 0;
   color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.markdown-editor pre {
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 12px;
-  overflow-x: auto;
-  font-size: 13px;
-  line-height: 1.5;
 }
 
 .markdown-editor code {
   font-family: 'SF Mono', Menlo, monospace;
   font-size: 13px;
   background: var(--bg-tertiary);
-  padding: 2px 4px;
+  padding: 2px 5px;
   border-radius: 3px;
+}
+
+.markdown-editor pre {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  margin: 8px 0;
 }
 
 .markdown-editor pre code {
   background: none;
   padding: 0;
+  font-size: 13px;
 }
+
+/* Code block syntax highlighting */
+.markdown-editor pre .hljs-keyword,
+.markdown-editor pre .hljs-selector-tag,
+.markdown-editor pre .hljs-literal { color: #a626a4; }
+
+.markdown-editor pre .hljs-string,
+.markdown-editor pre .hljs-doctag,
+.markdown-editor pre .hljs-template-variable { color: #50a14f; }
+
+.markdown-editor pre .hljs-number,
+.markdown-editor pre .hljs-built_in { color: #986801; }
+
+.markdown-editor pre .hljs-comment,
+.markdown-editor pre .hljs-quote { color: #a0a1a7; font-style: italic; }
+
+.markdown-editor pre .hljs-function .hljs-title,
+.markdown-editor pre .hljs-title { color: #4078f2; }
+
+.markdown-editor pre .hljs-type,
+.markdown-editor pre .hljs-class { color: #c18401; }
+
+.markdown-editor pre .hljs-variable,
+.markdown-editor pre .hljs-attr { color: #e45649; }
+
+.markdown-editor pre .hljs-params { color: #383a42; }
 
 .markdown-editor hr {
   border: none;
@@ -99,75 +128,93 @@
   margin: 16px 0;
 }
 
-.markdown-editor strong {
-  font-weight: 600;
+.markdown-editor a {
+  color: var(--accent-color);
+  text-decoration: none;
 }
 
-.markdown-editor em {
-  font-style: italic;
+.markdown-editor a:hover {
+  text-decoration: underline;
 }
+
+.markdown-editor img {
+  max-width: 100%;
+  border-radius: var(--radius);
+}
+
+/* --- Task List --- */
+
+.markdown-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.markdown-editor ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.markdown-editor ul[data-type="taskList"] li > label {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.markdown-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.markdown-editor ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+/* --- Table --- */
 
 .markdown-editor table {
   border-collapse: collapse;
   width: 100%;
-  margin-bottom: 12px;
+  margin: 8px 0;
+  overflow: hidden;
 }
 
-.markdown-editor th,
-.markdown-editor td {
+.markdown-editor table td,
+.markdown-editor table th {
   border: 1px solid var(--border-color);
-  padding: 8px 12px;
+  padding: 6px 10px;
+  min-width: 80px;
+  vertical-align: top;
   text-align: left;
-  font-size: 14px;
 }
 
-.markdown-editor th {
+.markdown-editor table th {
   background: var(--bg-secondary);
   font-weight: 600;
 }
 
-/* --- hljs syntax highlighting in code blocks --- */
-
-.markdown-editor .hljs {
-  background: none;
+.markdown-editor table .selectedCell {
+  background: var(--bg-tertiary);
 }
 
-.markdown-editor .hljs-keyword,
-.markdown-editor .hljs-selector-tag,
-.markdown-editor .hljs-title {
-  color: #a626a4;
+.markdown-editor table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: var(--accent-color);
+  pointer-events: none;
 }
 
-.markdown-editor .hljs-string,
-.markdown-editor .hljs-addition {
-  color: #50a14f;
-}
+/* --- Highlight --- */
 
-.markdown-editor .hljs-comment,
-.markdown-editor .hljs-quote {
-  color: #a0a1a7;
-  font-style: italic;
-}
-
-.markdown-editor .hljs-number,
-.markdown-editor .hljs-literal {
-  color: #986801;
-}
-
-.markdown-editor .hljs-built_in {
-  color: #c18401;
-}
-
-.markdown-editor .hljs-function .hljs-title {
-  color: #4078f2;
-}
-
-.markdown-editor .hljs-type,
-.markdown-editor .hljs-class .hljs-title {
-  color: #c18401;
-}
-
-.markdown-editor .hljs-variable,
-.markdown-editor .hljs-attr {
-  color: #e45649;
+.markdown-editor mark {
+  background: #ffeaa7;
+  padding: 1px 3px;
+  border-radius: 2px;
 }
