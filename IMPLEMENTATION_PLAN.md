@@ -358,9 +358,23 @@
 
 ---
 
-## Phase 5：打磨 + 高级功能（4 步）
+## Phase 5：打磨 + 高级功能（6 步）
 
-### 5.1 暗色主题
+### 5.1 侧边栏工作区 ↔ Settings 工作区同步
+
+**目标**：侧边栏打开的目录和 Settings 中配置的授权目录保持同步
+
+**改动**：
+- `AppShell.tsx`：`handleOpenDirectory` 在 `setWorkspacePath` 的同时调用 `addAuthorizedDirectory` 写入 store
+- `AppShell.tsx`：应用启动时从 `getAuthorizedDirectories()` 读取第一个目录作为默认工作区
+- Settings 添加/删除目录时，通过 IPC 通知 renderer 刷新 `workspacePath` 和文件树
+- `agent-manager.ts`：Agent 的 `cwd` 始终使用 `authorizedDirectories[0]`（已实现，确保与侧边栏一致）
+
+**验证**：侧边栏打开目录后 Settings 中出现该目录；Settings 添加目录后侧边栏文件树更新
+
+---
+
+### 5.2 暗色主题
 
 **目标**：Notion 风格明暗切换
 
@@ -374,7 +388,7 @@
 
 ---
 
-### 5.2 全局搜索
+### 5.3 全局搜索
 
 **目标**：跨文档全文搜索
 
@@ -389,7 +403,19 @@
 
 ---
 
-### 5.3 性能优化
+### 5.4 ToolCall 状态回填
+
+**目标**：ToolCall 的 spinner 在工具执行完成后变为 ✓
+
+**改动**：
+- `useAgent.ts`：调试 SDK 实际的 tool_result 消息流，确保 `updateToolCallResult` 被正确调用
+- `ToolCallItem.tsx`：确保 status='completed' 时显示 ✓，status='error' 时显示 ✗
+
+**验证**：Agent 执行工具后，ToolCall 图标从 spinner 变为 ✓
+
+---
+
+### 5.5 性能优化
 
 **目标**：大文件虚拟滚动、Agent 响应缓存
 
@@ -402,7 +428,7 @@
 
 ---
 
-### 5.4 macOS 打包 + 自动更新
+### 5.6 macOS 打包 + 自动更新
 
 **目标**：可分发的 macOS 应用
 

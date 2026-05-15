@@ -58,6 +58,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <MarkdownEditor
             content={currentContent}
             filePath={currentFile}
+            workspacePath={workspacePath}
+            onOpenFile={handleFileSelect}
             onSave={handleSave}
           />
         ) : (
