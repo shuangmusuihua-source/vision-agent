@@ -29,6 +29,13 @@ interface PermissionRequest {
   input: Record<string, unknown>
 }
 
+interface SdkSessionInfo {
+  id: string
+  title?: string
+  createdAt?: string
+  mtime?: string
+}
+
 interface AgentState {
   messages: ChatMessage[]
   isStreaming: boolean
@@ -36,6 +43,7 @@ interface AgentState {
   agentStatus: AgentStatus
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
+  sessionList: SdkSessionInfo[]
   addMessage: (message: ChatMessage) => void
   updateLastAssistantMessage: (content: string) => void
   appendToLastAssistantMessage: (chunk: string) => void
@@ -47,7 +55,8 @@ interface AgentState {
   setAgentStatus: (status: AgentStatus) => void
   setUsageInfo: (info: UsageInfo | null) => void
   setPermissionRequest: (request: PermissionRequest | null) => void
+  setSessionList: (sessions: SdkSessionInfo[]) => void
   clearMessages: () => void
 }
 
-export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest }
+export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo }

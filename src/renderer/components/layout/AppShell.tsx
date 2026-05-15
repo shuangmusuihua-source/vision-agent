@@ -19,7 +19,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [currentFile, setCurrentFile] = useState('')
   const [currentContent, setCurrentContent] = useState('')
 
-  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sendMessage, respondPermission } = useAgent()
+  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
 
   const handleOpenDirectory = async () => {
     const path = await window.api.workspace.openDirectoryDialog()
@@ -74,6 +74,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         usageInfo={usageInfo}
         permissionRequest={permissionRequest}
         onPermissionRespond={respondPermission}
+        sessionList={sessionList}
+        currentSessionId={currentSessionId}
+        onSelectSession={resumeSession}
+        onNewSession={newSession}
+        onRefreshSessions={loadSessions}
       >
         <ChatView messages={messages} />
         <ChatInput onSend={sendMessage} disabled={isStreaming} />

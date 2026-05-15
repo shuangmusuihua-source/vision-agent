@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest } from './agent-store'
+import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from './agent-store'
 
 export const useAgentStore = create<AgentState>((set) => ({
   messages: [],
@@ -8,6 +8,7 @@ export const useAgentStore = create<AgentState>((set) => ({
   agentStatus: 'idle',
   usageInfo: null,
   permissionRequest: null,
+  sessionList: [],
 
   addMessage: (message: ChatMessage) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -83,6 +84,8 @@ export const useAgentStore = create<AgentState>((set) => ({
   setUsageInfo: (info: UsageInfo | null) => set({ usageInfo: info }),
 
   setPermissionRequest: (request: PermissionRequest | null) => set({ permissionRequest: request }),
+
+  setSessionList: (sessions: SdkSessionInfo[]) => set({ sessionList: sessions }),
 
   clearMessages: () =>
     set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null })

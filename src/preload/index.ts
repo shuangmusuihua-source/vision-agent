@@ -53,7 +53,9 @@ const api = {
       return () => ipcRenderer.removeListener('agent:permissionRequest', handler)
     },
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
-      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior)
+      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
+    listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
+    loadSessionMessages: (sessionId: string) => ipcRenderer.invoke('agent:loadSessionMessages', sessionId)
   }
 }
 

@@ -2,7 +2,7 @@ import { ipcMain, dialog } from 'electron'
 import { readFile, writeFile, readdir } from 'fs/promises'
 import { join, extname } from 'path'
 import { getMainWindow } from './index'
-import { sendMessage, getSessionList, resolvePermission } from './agent-manager'
+import { sendMessage, getSessionList, resolvePermission, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import {
   getSettings,
   addProfile,
@@ -133,5 +133,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('agent:permissionResponse', (_event, requestId: string, behavior: 'allow' | 'deny') => {
     resolvePermission(requestId, behavior)
     return { success: true }
+  })
+
+  ipcMain.handle('agent:listSdkSessions', async () => {
+    return await listSdkSessions()
+  })
+
+  ipcMain.handle('agent:loadSessionMessages', async (_event, sessionId: string) => {
+    return await loadSdkSessionMessages(sessionId)
   })
 }

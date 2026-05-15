@@ -1,7 +1,8 @@
 import { MessageSquare, X, Loader2 } from 'lucide-react'
-import type { AgentStatus, UsageInfo, PermissionRequest } from '../../store/agent-store'
+import type { AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
 import ProfileSwitcher from '../chat/ProfileSwitcher'
 import PermissionDialog from '../chat/PermissionDialog'
+import SessionHistory from '../chat/SessionHistory'
 
 interface AgentPanelProps {
   collapsed: boolean
@@ -11,6 +12,11 @@ interface AgentPanelProps {
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
+  sessionList: SdkSessionInfo[]
+  currentSessionId: string | null
+  onSelectSession: (sessionId: string) => void
+  onNewSession: () => void
+  onRefreshSessions: () => void
   children: React.ReactNode
 }
 
@@ -22,7 +28,7 @@ const STATUS_LABELS: Record<AgentStatus, string> = {
   error: 'Error'
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, usageInfo, permissionRequest, onPermissionRespond, children }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children }: AgentPanelProps): React.ReactElement {
   if (collapsed) {
     return (
       <div className="agent-panel agent-panel-collapsed">
@@ -53,6 +59,13 @@ function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, 
       </div>
       <div className="agent-panel-content">
         <ProfileSwitcher onOpenSettings={onOpenSettings} />
+        <SessionHistory
+          sessions={sessionList}
+          currentSessionId={currentSessionId}
+          onSelectSession={onSelectSession}
+          onNewSession={onNewSession}
+          onRefresh={onRefreshSessions}
+        />
         {permissionRequest && (
           <PermissionDialog
             request={permissionRequest}

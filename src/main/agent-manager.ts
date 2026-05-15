@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
-import { query } from '@anthropic-ai/claude-agent-sdk'
+import { query, listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKMessage, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 
@@ -213,4 +213,31 @@ export function getSessionList(): SessionInfo[] {
 
 export function getSessionInfo(id: string): SessionInfo | undefined {
   return sessions.get(id)
+}
+
+export async function listSdkSessions(): Promise<Array<{ id: string; title?: string; createdAt?: string; mtime?: string }>> {
+  const dirs = getAuthorizedDirectories()
+  const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+  try {
+    const result = await listSessions({ dir: cwd })
+    return result.map((s) => ({
+      id: s.session_id,
+      title: s.title,
+      createdAt: s.created_at,
+      mtime: s.mtime
+    }))
+  } catch (err) {
+    console.error('[AgentManager] listSessions error:', err)
+    return []
+  }
+}
+
+export async function loadSdkSessionMessages(sessionId: string): Promise<Array<Record<string, unknown>>> {
+  try {
+    const messages = await getSessionMessages(sessionId)
+    return messages.map((m) => JSON.parse(JSON.stringify(m)))
+  } catch (err) {
+    console.error('[AgentManager] getSessionMessages error:', err)
+    return []
+  }
 }

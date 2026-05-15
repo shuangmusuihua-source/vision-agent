@@ -21,6 +21,7 @@ function useAgent() {
     agentStatus,
     usageInfo,
     permissionRequest,
+    sessionList,
     addMessage,
     updateLastAssistantMessage,
     appendToLastAssistantMessage,
@@ -32,6 +33,7 @@ function useAgent() {
     setAgentStatus,
     setUsageInfo,
     setPermissionRequest,
+    setSessionList,
     clearMessages
   } = useAgentStore()
 
@@ -303,14 +305,37 @@ function useAgent() {
     [setPermissionRequest]
   )
 
+  const loadSessions = useCallback(async () => {
+    const sessions = await window.api.agent.listSdkSessions()
+    setSessionList(sessions as Array<{ id: string; title?: string; createdAt?: string; mtime?: string }>)
+  }, [setSessionList])
+
+  const resumeSession = useCallback(async (sessionId: string) => {
+    clearMessages()
+    setSessionId(sessionId)
+    const msgs = await window.api.agent.loadSessionMessages(sessionId)
+    for (const msg of msgs) {
+      handleAgentMessage(msg as SDKMsg)
+    }
+  }, [clearMessages, setSessionId, handleAgentMessage])
+
+  const newSession = useCallback(() => {
+    clearMessages()
+    setSessionId(null)
+  }, [clearMessages, setSessionId])
+
   return {
     messages,
     isStreaming,
     agentStatus,
     usageInfo,
     permissionRequest,
+    sessionList,
     sendMessage,
     respondPermission,
+    loadSessions,
+    resumeSession,
+    newSession,
     clearMessages
   }
 }
