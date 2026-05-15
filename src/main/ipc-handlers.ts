@@ -1,6 +1,6 @@
 import { ipcMain, dialog } from 'electron'
 import { readFile, writeFile, readdir } from 'fs/promises'
-import { join, extname } from 'path'
+import { join, extname, relative } from 'path'
 import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import {
@@ -37,6 +37,27 @@ async function scanDirectory(dirPath: string, maxDepth = 3, depth = 0): Promise<
     }
   }
   return result
+}
+
+async function listMarkdownFiles(dirPath: string): Promise<Array<{ label: string; path: string }>> {
+  const results: Array<{ label: string; path: string }> = []
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const fullPath = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        await walk(fullPath)
+      } else if (extname(entry.name) === '.md') {
+        results.push({
+          label: entry.name.replace(/\.md$/, ''),
+          path: fullPath
+        })
+      }
+    }
+  }
+  await walk(dirPath)
+  return results
 }
 
 // --- Register all handlers ---
@@ -84,6 +105,14 @@ export function registerIpcHandlers(): void {
     } catch (err) {
       console.error('Failed to open directory dialog:', err)
       return null
+    }
+  })
+
+  ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {
+    try {
+      return await listMarkdownFiles(dirPath)
+    } catch {
+      return []
     }
   })
 

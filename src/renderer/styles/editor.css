@@ -218,3 +218,64 @@
   padding: 1px 3px;
   border-radius: 2px;
 }
+
+/* --- Wikilink --- */
+
+.markdown-editor .wikilink {
+  color: var(--accent-color);
+  background: rgba(99, 102, 241, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.markdown-editor .wikilink:hover {
+  background: rgba(99, 102, 241, 0.16);
+  text-decoration: none;
+}
+
+/* --- Wikilink Suggestion --- */
+
+.wikilink-suggestion-list {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 4px 0;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 13px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.wikilink-suggestion-empty {
+  padding: 8px 12px;
+  color: var(--text-tertiary);
+}
+
+.wikilink-suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.wikilink-suggestion-item:hover,
+.wikilink-suggestion-selected {
+  background: var(--bg-tertiary);
+}
+
+.wikilink-suggestion-label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.wikilink-suggestion-path {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

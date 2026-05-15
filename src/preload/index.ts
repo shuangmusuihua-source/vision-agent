@@ -8,6 +8,7 @@ const api = {
     readFile: (filePath: string) => ipcRenderer.invoke('workspace:readFile', filePath),
     writeFile: (filePath: string, content: string) =>
       ipcRenderer.invoke('workspace:writeFile', filePath, content),
+    listMarkdownFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listMarkdownFiles', dirPath),
     openDirectoryDialog: () => ipcRenderer.invoke('workspace:openDirectoryDialog')
   },
 

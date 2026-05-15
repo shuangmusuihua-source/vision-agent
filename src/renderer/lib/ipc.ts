@@ -25,6 +25,7 @@ interface WorkspaceApi {
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   openDirectoryDialog: () => Promise<string | null>
+  listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
 }
 
 interface SettingsApi {
