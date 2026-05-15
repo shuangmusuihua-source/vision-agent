@@ -112,14 +112,17 @@ function useAgent() {
         // Extract tool_use blocks
         const toolUses = content.filter((c) => c.type === 'tool_use')
 
+        // Extract tool_result blocks
+        const toolResults = content.filter((c) => c.type === 'tool_result')
+
         // Handle text content
         if (textParts.length > 0) {
           const textContent = textParts.join('')
           const lastMsg = messages[messages.length - 1]
 
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-            // Update existing streaming message
-            updateLastAssistantMessage(textContent)
+            // Append to existing streaming message
+            appendToLastAssistantMessage(textContent)
           } else {
             // New assistant message
             const msgId = `assistant-${Date.now()}`
@@ -166,6 +169,23 @@ function useAgent() {
           }
 
           setAgentStatus('running')
+        }
+
+        // Handle tool_result blocks — update existing tool calls
+        if (toolResults.length > 0) {
+          const targetMsgId = lastAssistantMsgIdRef.current
+          if (targetMsgId) {
+            for (const tr of toolResults) {
+              const toolUseId = (tr.tool_use_id as string) || ''
+              const resultContent = typeof tr.content === 'string'
+                ? tr.content
+                : Array.isArray(tr.content)
+                  ? tr.content.map((c: SDKMsg) => c.text || '').join('')
+                  : JSON.stringify(tr.content)
+              const isError = tr.is_error === true
+              updateToolCallResult(targetMsgId, toolUseId, resultContent, isError ? 'error' : 'completed')
+            }
+          }
         }
 
         // If no text and no tool_use, just mark as thinking
