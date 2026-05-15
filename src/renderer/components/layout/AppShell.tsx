@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -18,6 +18,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [workspacePath, setWorkspacePath] = useState('')
   const [currentFile, setCurrentFile] = useState('')
   const [currentContent, setCurrentContent] = useState('')
+  const [prefillText, setPrefillText] = useState<string | null>(null)
 
   const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
 
@@ -42,6 +43,40 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     await window.api.workspace.writeFile(filePath, content)
   }, [])
 
+  // Auto-reload editor when Agent finishes (may have edited the current file)
+  useEffect(() => {
+    if (!isStreaming && currentFile && messages.length > 0) {
+      // Small delay to ensure file write is complete
+      const timer = setTimeout(() => {
+        window.api.workspace.readFile(currentFile).then((result) => {
+          if (result.success && result.content && result.content !== currentContent) {
+            setCurrentContent(result.content)
+          }
+        }).catch(() => {})
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isStreaming, currentFile])
+
+  const handleAskAgent = useCallback(
+    (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => {
+      const context = `文件：${filePath}\n\n选中内容：\n${selection}`
+      const prompts: Record<string, string> = {
+        explain: `${context}\n\n请解释以上选中内容。`,
+        edit: `${context}\n\n请修改以上选中内容。`,
+        review: `${context}\n\n请检查以上选中内容是否有问题。`,
+        ask: `${context}\n\n`
+      }
+
+      if (action === 'ask') {
+        setPrefillText(prompts.ask)
+      } else {
+        sendMessage(prompts[action])
+      }
+    },
+    [sendMessage]
+  )
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -61,6 +96,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             workspacePath={workspacePath}
             onOpenFile={handleFileSelect}
             onSave={handleSave}
+            onAskAgent={handleAskAgent}
           />
         ) : (
           <div className="editor-empty">
@@ -83,7 +119,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onRefreshSessions={loadSessions}
       >
         <ChatView messages={messages} />
-        <ChatInput onSend={sendMessage} disabled={isStreaming} />
+        <ChatInput onSend={sendMessage} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />
       </AgentPanel>
     </div>
   )

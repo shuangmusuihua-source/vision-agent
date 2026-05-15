@@ -9,6 +9,8 @@ export const useAgentStore = create<AgentState>((set) => ({
   usageInfo: null,
   permissionRequest: null,
   sessionList: [],
+  lastEditedFile: null,
+  lastEditedFileTime: 0,
 
   addMessage: (message: ChatMessage) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -87,6 +89,8 @@ export const useAgentStore = create<AgentState>((set) => ({
 
   setSessionList: (sessions: SdkSessionInfo[]) => set({ sessionList: sessions }),
 
+  setLastEditedFile: (path: string | null) => set({ lastEditedFile: path, lastEditedFileTime: Date.now() }),
+
   clearMessages: () =>
-    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null })
+    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, lastEditedFile: null, lastEditedFileTime: 0 })
 }))

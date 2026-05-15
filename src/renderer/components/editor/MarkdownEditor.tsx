@@ -29,6 +29,7 @@ interface MarkdownEditorProps {
   workspacePath: string | null
   onOpenFile: (filePath: string) => void
   onSave: (filePath: string, content: string) => void
+  onAskAgent: (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => void
 }
 
 function SuggestionList({ items, command, selectedIndex }: {
@@ -56,7 +57,7 @@ function SuggestionList({ items, command, selectedIndex }: {
   )
 }
 
-function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave }: MarkdownEditorProps): React.ReactElement {
+function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, onAskAgent }: MarkdownEditorProps): React.ReactElement {
   const [markdownFiles, setMarkdownFiles] = useState<MarkdownFile[]>([])
   const filesRef = useRef<MarkdownFile[]>([])
 
@@ -225,12 +226,57 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave }
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!editor) return
+      const { from, to } = editor.state.selection
+      if (from === to) return
+
+      const selectedText = editor.state.doc.textBetween(from, to)
+      if (!selectedText.trim()) return
+
+      e.preventDefault()
+
+      const menu = document.createElement('div')
+      menu.className = 'editor-context-menu'
+
+      const items = [
+        { label: 'Explain', action: 'explain' as const },
+        { label: 'Edit', action: 'edit' as const },
+        { label: 'Review', action: 'review' as const },
+        { label: 'Ask...', action: 'ask' as const }
+      ]
+
+      for (const item of items) {
+        const el = document.createElement('div')
+        el.className = 'editor-context-menu-item'
+        el.textContent = item.label
+        el.onclick = () => {
+          onAskAgent(item.action, selectedText, filePath)
+          menu.remove()
+        }
+        menu.appendChild(el)
+      }
+
+      menu.style.left = `${e.clientX}px`
+      menu.style.top = `${e.clientY}px`
+      document.body.appendChild(menu)
+
+      const removeMenu = () => {
+        menu.remove()
+        document.removeEventListener('click', removeMenu)
+      }
+      setTimeout(() => document.addEventListener('click', removeMenu), 0)
+    },
+    [editor, filePath, onAskAgent]
+  )
+
   if (!editor) {
     return <div className="editor-loading">Loading editor...</div>
   }
 
   return (
-    <div className="editor-wrapper">
+    <div className="editor-wrapper" onContextMenu={handleContextMenu}>
       <EditorContent editor={editor} />
     </div>
   )

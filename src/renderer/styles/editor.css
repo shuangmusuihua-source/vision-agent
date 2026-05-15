@@ -279,3 +279,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* --- Editor Context Menu --- */
+
+.editor-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.editor-context-menu-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.editor-context-menu-item:hover {
+  background: var(--bg-tertiary);
+}

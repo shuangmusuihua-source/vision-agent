@@ -4,11 +4,25 @@ import { Send } from 'lucide-react'
 interface ChatInputProps {
   onSend: (message: string) => void
   disabled: boolean
+  prefill: string | null
+  onPrefillConsumed: () => void
 }
 
-function ChatInput({ onSend, disabled }: ChatInputProps): React.ReactElement {
+function ChatInput({ onSend, disabled, prefill, onPrefillConsumed }: ChatInputProps): React.ReactElement {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (prefill) {
+      setInput(prefill)
+      onPrefillConsumed()
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+        textareaRef.current.style.height = 'auto'
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
+      }
+    }
+  }, [prefill, onPrefillConsumed])
 
   const handleSend = useCallback(() => {
     const trimmed = input.trim()

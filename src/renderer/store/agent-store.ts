@@ -44,6 +44,8 @@ interface AgentState {
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   sessionList: SdkSessionInfo[]
+  lastEditedFile: string | null
+  lastEditedFileTime: number
   addMessage: (message: ChatMessage) => void
   updateLastAssistantMessage: (content: string) => void
   appendToLastAssistantMessage: (chunk: string) => void
@@ -56,6 +58,7 @@ interface AgentState {
   setUsageInfo: (info: UsageInfo | null) => void
   setPermissionRequest: (request: PermissionRequest | null) => void
   setSessionList: (sessions: SdkSessionInfo[]) => void
+  setLastEditedFile: (path: string | null) => void
   clearMessages: () => void
 }
 

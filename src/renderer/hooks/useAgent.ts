@@ -22,6 +22,8 @@ function useAgent() {
     usageInfo,
     permissionRequest,
     sessionList,
+    lastEditedFile,
+    lastEditedFileTime,
     addMessage,
     updateLastAssistantMessage,
     appendToLastAssistantMessage,
@@ -34,6 +36,7 @@ function useAgent() {
     setUsageInfo,
     setPermissionRequest,
     setSessionList,
+    setLastEditedFile,
     clearMessages
   } = useAgentStore()
 
@@ -159,13 +162,22 @@ function useAgent() {
           }
 
           for (const tu of toolUses) {
+            const toolName = (tu.name as string) || 'unknown'
             const toolCall: ToolCall = {
-              toolName: (tu.name as string) || 'unknown',
+              toolName,
               toolUseId: (tu.id as string) || `tu-${Date.now()}`,
               input: (tu.input as Record<string, unknown>) || {},
               status: 'running'
             }
             setToolCall(targetMsgId, toolCall)
+
+            // Track file edits for editor sync
+            if (toolName === 'Write' || toolName === 'Edit') {
+              const editedPath = (toolCall.input as Record<string, unknown>).file_path as string
+              if (editedPath) {
+                setLastEditedFile(editedPath)
+              }
+            }
           }
 
           setAgentStatus('running')
@@ -360,6 +372,8 @@ function useAgent() {
     usageInfo,
     permissionRequest,
     sessionList,
+    lastEditedFile,
+    lastEditedFileTime,
     sendMessage,
     respondPermission,
     loadSessions,
