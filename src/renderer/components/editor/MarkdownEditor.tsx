@@ -209,22 +209,29 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
     }
   }, [content, editor])
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        if (editor && filePath) {
-          onSave(filePath, editor.getHTML())
-        }
-      }
-    },
-    [editor, filePath, onSave]
-  )
-
+  // Auto-save with debounce
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
+    if (!editor || !filePath) return
+
+    const handleUpdate = () => {
+      const saveTimer = setTimeout(() => {
+        onSave(filePath, editor.getHTML())
+      }, 1500)
+      return () => clearTimeout(saveTimer)
+    }
+
+    let cleanup: (() => void) | undefined
+    const handler = () => {
+      cleanup?.()
+      cleanup = handleUpdate()
+    }
+
+    editor.on('update', handler)
+    return () => {
+      editor.off('update', handler)
+      cleanup?.()
+    }
+  }, [editor, filePath, onSave])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {

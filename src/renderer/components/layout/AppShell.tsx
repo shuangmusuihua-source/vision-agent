@@ -4,6 +4,7 @@ import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
+import EditorTabs from '../editor/EditorTabs'
 import useAgent from '../../hooks/useAgent'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -16,8 +17,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [agentCollapsed, setAgentCollapsed] = useState(false)
   const [files, setFiles] = useState<FileEntry[]>([])
   const [workspacePath, setWorkspacePath] = useState('')
-  const [currentFile, setCurrentFile] = useState('')
-  const [currentContent, setCurrentContent] = useState('')
+  const [openTabs, setOpenTabs] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState<string>('')
+  const [tabContents, setTabContents] = useState<Record<string, string>>({})
   const [prefillText, setPrefillText] = useState<string | null>(null)
 
   const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
@@ -32,31 +34,66 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }
 
   const handleFileSelect = async (path: string) => {
+    // If file is already open, just switch to it
+    if (openTabs.includes(path)) {
+      setActiveTab(path)
+      return
+    }
+
+    // Read file content and add to tabs
     const result = await window.api.workspace.readFile(path)
     if (result.success && result.content) {
-      setCurrentFile(path)
-      setCurrentContent(result.content)
+      setOpenTabs((prev) => [...prev, path])
+      setActiveTab(path)
+      setTabContents((prev) => ({ ...prev, [path]: result.content! }))
     }
   }
 
+  const handleTabClose = useCallback((path: string) => {
+    setOpenTabs((prev) => {
+      const next = prev.filter((t) => t !== path)
+      // Switch to adjacent tab
+      if (activeTab === path) {
+        const closedIdx = prev.indexOf(path)
+        const newActive = next[Math.min(closedIdx, next.length - 1)] || ''
+        setActiveTab(newActive)
+      }
+      return next
+    })
+    setTabContents((prev) => {
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+  }, [activeTab])
+
+  const handleTabSwitch = useCallback((path: string) => {
+    setActiveTab(path)
+  }, [])
+
   const handleSave = useCallback(async (filePath: string, content: string) => {
     await window.api.workspace.writeFile(filePath, content)
+    setTabContents((prev) => ({ ...prev, [filePath]: content }))
   }, [])
 
   // Auto-reload editor when Agent finishes (may have edited the current file)
   useEffect(() => {
-    if (!isStreaming && currentFile && messages.length > 0) {
-      // Small delay to ensure file write is complete
+    if (!isStreaming && activeTab && messages.length > 0) {
       const timer = setTimeout(() => {
-        window.api.workspace.readFile(currentFile).then((result) => {
-          if (result.success && result.content && result.content !== currentContent) {
-            setCurrentContent(result.content)
+        window.api.workspace.readFile(activeTab).then((result) => {
+          if (result.success && result.content) {
+            setTabContents((prev) => {
+              if (prev[activeTab] !== result.content) {
+                return { ...prev, [activeTab]: result.content! }
+              }
+              return prev
+            })
           }
         }).catch(() => {})
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isStreaming, currentFile])
+  }, [isStreaming, activeTab])
 
   const handleAskAgent = useCallback(
     (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => {
@@ -77,6 +114,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     [sendMessage]
   )
 
+  const activeContent = activeTab ? tabContents[activeTab] || '' : ''
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -89,10 +128,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       <div className="main-content">
-        {currentFile ? (
+        {openTabs.length > 0 && (
+          <EditorTabs
+            tabs={openTabs}
+            activeTab={activeTab}
+            onTabSwitch={handleTabSwitch}
+            onTabClose={handleTabClose}
+          />
+        )}
+        {activeTab ? (
           <MarkdownEditor
-            content={currentContent}
-            filePath={currentFile}
+            content={activeContent}
+            filePath={activeTab}
             workspacePath={workspacePath}
             onOpenFile={handleFileSelect}
             onSave={handleSave}
