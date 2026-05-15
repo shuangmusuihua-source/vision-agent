@@ -52,6 +52,11 @@ const api = {
       ipcRenderer.on('agent:permissionRequest', handler)
       return () => ipcRenderer.removeListener('agent:permissionRequest', handler)
     },
+    onNotification: (callback: (data: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+      ipcRenderer.on('agent:notification', handler)
+      return () => ipcRenderer.removeListener('agent:notification', handler)
+    },
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
     listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),

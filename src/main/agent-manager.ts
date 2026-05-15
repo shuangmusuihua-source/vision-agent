@@ -1,8 +1,9 @@
 import { BrowserWindow } from 'electron'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
+import { appendFile } from 'fs/promises'
 import { query, listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk'
-import type { Options, SDKMessage, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 
 function resolveClaudeCodeExecutable(): string | undefined {
@@ -36,6 +37,50 @@ const pendingPermissions = new Map<string, {
   resolve: (result: PermissionResult) => void
   input: Record<string, unknown>
 }>()
+
+// Audit log path
+const AUDIT_LOG_PATH = `${process.env.HOME || '/tmp'}/.vision-agent/audit.log`
+
+async function writeAuditLog(entry: Record<string, unknown>): Promise<void> {
+  try {
+    const line = JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + '\n'
+    await appendFile(AUDIT_LOG_PATH, line, { encoding: 'utf-8' })
+  } catch {
+    // Audit log write failure should not block agent
+  }
+}
+
+function buildHooks(mainWindow: BrowserWindow): HookCallbackMatcher {
+  return {
+    PreToolUse: (async (input) => {
+      await writeAuditLog({
+        event: 'PreToolUse',
+        tool: input.tool_name,
+        input: JSON.stringify(input.tool_input).substring(0, 500)
+      })
+      return { decision: 'approve' }
+    }) as HookCallback,
+
+    PostToolUse: (async (input) => {
+      await writeAuditLog({
+        event: 'PostToolUse',
+        tool: input.tool_name,
+        result: typeof input.tool_result === 'string'
+          ? input.tool_result.substring(0, 500)
+          : JSON.stringify(input.tool_result).substring(0, 500)
+      })
+      return { decision: 'approve' }
+    }) as HookCallback,
+
+    Notification: (async (input) => {
+      mainWindow.webContents.send('agent:notification', {
+        type: input.notification_type || 'info',
+        message: input.message || ''
+      })
+      return { decision: 'approve' }
+    }) as HookCallback
+  }
+}
 
 export function resolvePermission(requestId: string, behavior: 'allow' | 'deny'): void {
   const pending = pendingPermissions.get(requestId)
@@ -73,6 +118,11 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     permissionMode: 'default',
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
+    hooks: {
+      PreToolUse: [{ hooks: [buildHooks(mainWindow).PreToolUse] }],
+      PostToolUse: [{ hooks: [buildHooks(mainWindow).PostToolUse] }],
+      Notification: [{ hooks: [buildHooks(mainWindow).Notification] }]
+    },
     canUseTool: async (
       toolName: string,
       input: Record<string, unknown>,
