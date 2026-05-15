@@ -215,16 +215,16 @@ export function getSessionInfo(id: string): SessionInfo | undefined {
   return sessions.get(id)
 }
 
-export async function listSdkSessions(): Promise<Array<{ id: string; title?: string; createdAt?: string; mtime?: string }>> {
+export async function listSdkSessions(): Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number }>> {
   const dirs = getAuthorizedDirectories()
   const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
   try {
     const result = await listSessions({ dir: cwd })
     return result.map((s) => ({
-      id: s.session_id,
-      title: s.title,
-      createdAt: s.created_at,
-      mtime: s.mtime
+      id: s.sessionId,
+      title: s.customTitle || s.summary || s.firstPrompt,
+      createdAt: s.createdAt,
+      lastModified: s.lastModified
     }))
   } catch (err) {
     console.error('[AgentManager] listSessions error:', err)

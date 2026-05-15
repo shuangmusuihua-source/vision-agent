@@ -32,8 +32,8 @@ interface PermissionRequest {
 interface SdkSessionInfo {
   id: string
   title?: string
-  createdAt?: string
-  mtime?: string
+  createdAt?: number
+  lastModified?: number
 }
 
 interface AgentState {

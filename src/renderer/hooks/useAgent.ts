@@ -306,16 +306,25 @@ function useAgent() {
   )
 
   const loadSessions = useCallback(async () => {
-    const sessions = await window.api.agent.listSdkSessions()
-    setSessionList(sessions as Array<{ id: string; title?: string; createdAt?: string; mtime?: string }>)
+    try {
+      const sessions = await window.api.agent.listSdkSessions()
+      setSessionList(sessions as Array<{ id: string; title?: string; createdAt?: string; mtime?: string }>)
+    } catch (err) {
+      console.error('[useAgent] loadSessions error:', err)
+      setSessionList([])
+    }
   }, [setSessionList])
 
   const resumeSession = useCallback(async (sessionId: string) => {
-    clearMessages()
-    setSessionId(sessionId)
-    const msgs = await window.api.agent.loadSessionMessages(sessionId)
-    for (const msg of msgs) {
-      handleAgentMessage(msg as SDKMsg)
+    try {
+      clearMessages()
+      setSessionId(sessionId)
+      const msgs = await window.api.agent.loadSessionMessages(sessionId)
+      for (const msg of msgs) {
+        handleAgentMessage(msg as SDKMsg)
+      }
+    } catch (err) {
+      console.error('[useAgent] resumeSession error:', err)
     }
   }, [clearMessages, setSessionId, handleAgentMessage])
 
