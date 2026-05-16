@@ -7,10 +7,58 @@
   --text-tertiary: #9b9a97;
   --border-color: #e3e2e0;
   --accent-color: #2383e2;
+  --color-success: #50a14f;
+  --color-error: #e45649;
+  --color-danger: #ef4444;
+  --color-mark: #ffeaa7;
+  --color-wikilink-bg: rgba(99, 102, 241, 0.08);
+  --color-wikilink-bg-hover: rgba(99, 102, 241, 0.16);
+  --color-profile-active-bg: rgba(35, 131, 226, 0.05);
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-shadow-heavy: rgba(0, 0, 0, 0.15);
+  --color-shadow-medium: rgba(0, 0, 0, 0.12);
+  --hl-keyword: #a626a4;
+  --hl-string: #50a14f;
+  --hl-number: #986801;
+  --hl-comment: #a0a1a7;
+  --hl-function: #4078f2;
+  --hl-type: #c18401;
+  --hl-variable: #e45649;
+  --hl-params: #383a42;
   --radius: 4px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   --sidebar-width: 240px;
   --agent-panel-width: 360px;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #181818;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #262626;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #707070;
+  --border-color: #3d3d3d;
+  --accent-color: #4a9eff;
+  --color-success: #6db877;
+  --color-error: #e06c75;
+  --color-danger: #f87171;
+  --color-mark: #b8860b;
+  --color-wikilink-bg: rgba(99, 102, 241, 0.15);
+  --color-wikilink-bg-hover: rgba(99, 102, 241, 0.25);
+  --color-profile-active-bg: rgba(74, 158, 255, 0.08);
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-shadow-heavy: rgba(0, 0, 0, 0.4);
+  --color-shadow-medium: rgba(0, 0, 0, 0.3);
+  --hl-keyword: #c678dd;
+  --hl-string: #98c379;
+  --hl-number: #d19a66;
+  --hl-comment: #5c6370;
+  --hl-function: #61afef;
+  --hl-type: #e5c07b;
+  --hl-variable: #e06c75;
+  --hl-params: #abb2bf;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 * {

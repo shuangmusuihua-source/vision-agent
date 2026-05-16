@@ -3,11 +3,12 @@ import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { appendFile } from 'fs/promises'
 import { join } from 'path'
-import { query, listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk'
+import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
+import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 
-function resolveClaudeCodeExecutable(): string | undefined {
+export function resolveClaudeCodeExecutable(): string | undefined {
   const require = createRequire(import.meta.url)
 
   // 优先使用平台原生二进制
@@ -92,6 +93,7 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
   const pending = pendingPermissions.get(requestId)
   if (!pending) return
   pendingPermissions.delete(requestId)
+  cancelPermissionNotification(requestId)
   if (behavior === 'allow') {
     pending.resolve({ behavior: 'allow', updatedInput: pending.input })
   } else {
@@ -107,7 +109,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
   const dirs = getAuthorizedDirectories()
   const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
 
-  const env: Record<string, string> = {}
+  const env: Record<string, string | undefined> = { ...process.env }
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey
   }
@@ -131,6 +133,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     settings: {
       autoMemoryDirectory: join(cwd, '.vision', 'memory')
     },
+    skills: 'all',
     hooks: buildHooks(mainWindow),
     canUseTool: async (
       toolName: string,
@@ -161,6 +164,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
         toolName,
         input
       })
+      schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
         pendingPermissions.set(requestId, { resolve, input })
@@ -169,6 +173,7 @@ function buildOptions(mainWindow: BrowserWindow): Options {
         setTimeout(() => {
           if (pendingPermissions.has(requestId)) {
             pendingPermissions.delete(requestId)
+            cancelPermissionNotification(requestId)
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
@@ -254,6 +259,7 @@ export async function sendMessage(
     }
 
     mainWindow.webContents.send('agent:complete', { sessionId: currentSessionId })
+    notifyAgentComplete(currentSessionId)
   } catch (err) {
     mainWindow.webContents.send('agent:error', {
       sessionId: currentSessionId,
@@ -297,6 +303,48 @@ export async function loadSdkSessionMessages(sessionId: string): Promise<Array<R
     return messages.map((m) => JSON.parse(JSON.stringify(m)))
   } catch (err) {
     console.error('[AgentManager] getSessionMessages error:', err)
+    return []
+  }
+}
+
+export async function listSkills(): Promise<Array<{ name: string; description: string; argumentHint: string; aliases?: string[] }>> {
+  const dirs = getAuthorizedDirectories()
+  const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+  const apiKey = getApiKey()
+  const baseUrl = getBaseUrl()
+  const profile = getActiveProfile()
+  const cliPath = resolveClaudeCodeExecutable()
+
+  const env: Record<string, string> = {}
+  if (apiKey) env.ANTHROPIC_API_KEY = apiKey
+  if (baseUrl && profile?.apiProvider === 'custom') env.ANTHROPIC_BASE_URL = baseUrl
+
+  try {
+    const messageStream = query({
+      prompt: '__skill_discovery_probe__',
+      options: {
+        model: getModel(),
+        cwd,
+        skills: 'all',
+        env,
+        ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
+        settings: {
+          autoMemoryDirectory: join(cwd, '.vision', 'memory')
+        }
+      }
+    })
+
+    const skills = await (messageStream as Query).supportedCommands()
+    // Abort the probe query — we only needed the skill list
+    try { (messageStream as Query).abort() } catch {}
+    return skills.map(s => ({
+      name: s.name,
+      description: s.description,
+      argumentHint: s.argumentHint,
+      aliases: s.aliases
+    }))
+  } catch (err) {
+    console.error('[AgentManager] listSkills error:', err)
     return []
   }
 }

@@ -268,6 +268,24 @@
 
 ---
 
+### 3.6 语义图谱 — LLM 自动发现文件关联
+
+**目标**：通过 LLM 分析文件内容，自动推断文件之间的语义关联，补充 `[[链接]]` 无法覆盖的隐含关系
+
+**改动**：
+- 新建 `src/main/semantic-graph-builder.ts`：
+  - 扫描工作区所有 `.md` 文件内容
+  - 将文件内容摘要发送给 LLM，请求分析文件间的语义关联
+  - 输出语义边（source, target, reason, strength）
+  - 增量更新：文件变更时只重新分析变更文件
+- `ipc-handlers.ts`：新增 `graph:getSemanticEdges` IPC
+- `GraphView.tsx`：语义边用虚线样式区分显式链接边
+- 用户可手动确认/删除 LLM 推断的语义边
+
+**验证**：创建几个无 [[链接]] 但语义相关的 Markdown 文件，LLM 能发现关联并在图谱中用虚线显示
+
+---
+
 ## Phase 4：调度 + Skill + MCP（5 步）
 
 ### 4.1 Cron 调度 — 自然语言解析 + 任务注册

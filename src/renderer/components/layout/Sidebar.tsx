@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2 } from 'lucide-react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2, X, Search } from 'lucide-react'
 import type { FileEntry } from '../lib/ipc'
 
 interface MemoryEntry {
@@ -8,23 +8,27 @@ interface MemoryEntry {
 }
 
 interface SidebarProps {
-  files: FileEntry[]
-  workspacePath: string
+  files: Record<string, FileEntry[]>
+  workspacePaths: string[]
   memoryRefreshKey: number
   onFileSelect: (path: string) => void
   onOpenDirectory: () => void
+  onRemoveWorkspace: (path: string) => void
   onOpenSettings: () => void
+  onOpenSearch: () => void
   collapsed: boolean
   onToggleCollapse: () => void
 }
 
 function Sidebar({
   files,
-  workspacePath,
+  workspacePaths,
   memoryRefreshKey,
   onFileSelect,
   onOpenDirectory,
+  onRemoveWorkspace,
   onOpenSettings,
+  onOpenSearch,
   collapsed,
   onToggleCollapse
 }: SidebarProps): React.ReactElement {
@@ -38,7 +42,7 @@ function Sidebar({
 
   useEffect(() => {
     refreshMemory()
-  }, [workspacePath, memoryRefreshKey, refreshMemory])
+  }, [memoryRefreshKey, refreshMemory])
 
   const handleDeleteMemory = useCallback(async (filePath: string) => {
     await window.api.memory.delete(filePath)
@@ -54,15 +58,17 @@ function Sidebar({
     })
   }, [])
 
-  const renderTree = (entries: FileEntry[], depth: number): React.ReactNode => {
+  const renderTree = (entries: FileEntry[], depth: number): React.ReactElement[] => {
     return entries.map((entry) => {
+      const isExpanded = expandedDirs.has(entry.path)
+      const paddingLeft = 8 + depth * 16
+
       if (entry.isDirectory) {
-        const isExpanded = expandedDirs.has(entry.path)
         return (
           <div key={entry.path}>
             <div
               className="sidebar-entry sidebar-folder"
-              style={{ paddingLeft: depth * 16 + 8 }}
+              style={{ paddingLeft }}
               onClick={() => toggleDir(entry.path)}
             >
               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -73,11 +79,12 @@ function Sidebar({
           </div>
         )
       }
+
       return (
         <div
           key={entry.path}
           className="sidebar-entry sidebar-file"
-          style={{ paddingLeft: depth * 16 + 24 }}
+          style={{ paddingLeft: paddingLeft + 14 }}
           onClick={() => onFileSelect(entry.path)}
         >
           <File size={14} />
@@ -90,31 +97,56 @@ function Sidebar({
   if (collapsed) {
     return (
       <div className="sidebar sidebar-collapsed">
-        <button className="sidebar-toggle-btn" onClick={onToggleCollapse}>
+        <button className="sidebar-toggle" onClick={onToggleCollapse}>
           <ChevronRight size={16} />
         </button>
       </div>
     )
   }
 
+  const workspaceName = (path: string) => path.split('/').pop() || path
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-title">
-          {workspacePath ? workspacePath.split('/').pop() : 'Vision Agent'}
-        </span>
-        <button className="sidebar-toggle-btn" onClick={onToggleCollapse}>
-          <ChevronRight size={16} />
-        </button>
+        <span className="sidebar-title">Explorer</span>
+        <div className="sidebar-header-actions">
+          <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
+            <Search size={16} />
+          </button>
+          <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="Open workspace">
+            <FolderOpen size={16} />
+          </button>
+          <button className="sidebar-icon-btn" onClick={onOpenSettings} title="Settings">
+            <ChevronRight size={16} />
+          </button>
+          <button className="sidebar-toggle" onClick={onToggleCollapse}>
+            <ChevronDown size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-content">
-        {workspacePath ? (
-          renderTree(files, 0)
-        ) : (
+        {workspacePaths.length === 0 ? (
           <button className="sidebar-open-dir-btn" onClick={onOpenDirectory}>
             Open Workspace
           </button>
+        ) : (
+          workspacePaths.map((wsPath) => (
+            <div key={wsPath} className="sidebar-workspace-section">
+              <div className="sidebar-workspace-header">
+                <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
+                <button
+                  className="sidebar-workspace-remove"
+                  onClick={() => onRemoveWorkspace(wsPath)}
+                  title="Remove workspace"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              {renderTree(files[wsPath] || [], 0)}
+            </div>
+          ))
         )}
 
         {memoryFiles.length > 0 && (
@@ -150,12 +182,6 @@ function Sidebar({
             ))}
           </div>
         )}
-      </div>
-
-      <div className="sidebar-footer">
-        <button className="sidebar-settings-btn" onClick={onOpenSettings}>
-          Settings
-        </button>
       </div>
     </div>
   )

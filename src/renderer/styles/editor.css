@@ -160,28 +160,28 @@
 /* Code block syntax highlighting */
 .markdown-editor pre .hljs-keyword,
 .markdown-editor pre .hljs-selector-tag,
-.markdown-editor pre .hljs-literal { color: #a626a4; }
+.markdown-editor pre .hljs-literal { color: var(--hl-keyword); }
 
 .markdown-editor pre .hljs-string,
 .markdown-editor pre .hljs-doctag,
-.markdown-editor pre .hljs-template-variable { color: #50a14f; }
+.markdown-editor pre .hljs-template-variable { color: var(--hl-string); }
 
 .markdown-editor pre .hljs-number,
-.markdown-editor pre .hljs-built_in { color: #986801; }
+.markdown-editor pre .hljs-built_in { color: var(--hl-number); }
 
 .markdown-editor pre .hljs-comment,
-.markdown-editor pre .hljs-quote { color: #a0a1a7; font-style: italic; }
+.markdown-editor pre .hljs-quote { color: var(--hl-comment); font-style: italic; }
 
 .markdown-editor pre .hljs-function .hljs-title,
-.markdown-editor pre .hljs-title { color: #4078f2; }
+.markdown-editor pre .hljs-title { color: var(--hl-function); }
 
 .markdown-editor pre .hljs-type,
-.markdown-editor pre .hljs-class { color: #c18401; }
+.markdown-editor pre .hljs-class { color: var(--hl-type); }
 
 .markdown-editor pre .hljs-variable,
-.markdown-editor pre .hljs-attr { color: #e45649; }
+.markdown-editor pre .hljs-attr { color: var(--hl-variable); }
 
-.markdown-editor pre .hljs-params { color: #383a42; }
+.markdown-editor pre .hljs-params { color: var(--hl-params); }
 
 .markdown-editor hr {
   border: none;
@@ -275,7 +275,7 @@
 /* --- Highlight --- */
 
 .markdown-editor mark {
-  background: #ffeaa7;
+  background: var(--color-mark);
   padding: 1px 3px;
   border-radius: 2px;
 }
@@ -284,7 +284,7 @@
 
 .markdown-editor .wikilink {
   color: var(--accent-color);
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--color-wikilink-bg);
   padding: 1px 4px;
   border-radius: 3px;
   cursor: pointer;
@@ -292,7 +292,7 @@
 }
 
 .markdown-editor .wikilink:hover {
-  background: rgba(99, 102, 241, 0.16);
+  background: var(--color-wikilink-bg-hover);
   text-decoration: none;
 }
 

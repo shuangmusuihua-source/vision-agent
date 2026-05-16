@@ -13,13 +13,15 @@ interface AppSettings {
   profiles: ModelProfile[]
   activeProfileId: string | null
   authorizedDirectories: string[]
+  theme: 'light' | 'dark' | 'system'
 }
 
 const store = new Store<AppSettings>({
   defaults: {
     profiles: [],
     activeProfileId: null,
-    authorizedDirectories: []
+    authorizedDirectories: [],
+    theme: 'system'
   }
 })
 
@@ -90,6 +92,14 @@ export function addAuthorizedDirectory(dir: string): void {
 export function removeAuthorizedDirectory(dir: string): void {
   const dirs = store.get('authorizedDirectories')
   store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
+}
+
+export function getTheme(): 'light' | 'dark' | 'system' {
+  return store.get('theme')
+}
+
+export function setTheme(theme: 'light' | 'dark' | 'system'): void {
+  store.set('theme', theme)
 }
 
 export type { ModelProfile, AppSettings }

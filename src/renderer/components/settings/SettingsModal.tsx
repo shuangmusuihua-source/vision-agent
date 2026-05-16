@@ -1,279 +1,248 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit3, Check, X } from 'lucide-react'
-import type { ModelProfile, AppSettings } from '../../lib/ipc'
-
-const PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'bedrock', label: 'Amazon Bedrock' },
-  { value: 'vertex', label: 'Google Vertex AI' },
-  { value: 'azure', label: 'Microsoft Azure' },
-  { value: 'custom', label: 'Custom' }
-]
-
-const PRESET_MODELS = [
-  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
-  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' }
-]
+import { useState, useEffect, useCallback } from 'react'
+import { X, Sun, Moon, Monitor } from 'lucide-react'
 
 interface SettingsModalProps {
   onClose: () => void
 }
 
 function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
-  const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  const [profiles, setProfiles] = useState<Array<{
+    id: string
+    name: string
+    apiKey: string
+    apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'azure' | 'custom'
+    baseUrl: string
+    model: string
+  }>>([])
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
+  const [showProfileForm, setShowProfileForm] = useState(false)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Partial<ModelProfile>>({})
-  const [customModelId, setCustomModelId] = useState('')
+  const [formName, setFormName] = useState('')
+  const [formApiKey, setFormApiKey] = useState('')
+  const [formProvider, setFormProvider] = useState<'anthropic' | 'bedrock' | 'vertex' | 'azure' | 'custom'>('anthropic')
+  const [formBaseUrl, setFormBaseUrl] = useState('')
+  const [formModel, setFormModel] = useState('claude-sonnet-4-6')
 
   useEffect(() => {
-    window.api.settings.get().then(setSettings)
+    window.api.settings.get().then((settings) => {
+      setProfiles(settings.profiles)
+      setActiveProfileId(settings.activeProfileId)
+      setTheme(settings.theme)
+    })
   }, [])
 
-  const refreshSettings = async () => {
-    const s = await window.api.settings.get()
-    setSettings(s)
-  }
-
-  const handleAddProfile = async () => {
-    const id = `profile-${Date.now()}`
-    const newProfile: ModelProfile = {
-      id,
-      name: '',
-      apiKey: '',
-      apiProvider: 'custom',
-      baseUrl: '',
-      model: ''
+  const handleThemeChange = useCallback(async (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme)
+    await window.api.settings.setTheme(newTheme)
+    // Apply immediately
+    let effective: 'light' | 'dark'
+    if (newTheme === 'system') {
+      effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    } else {
+      effective = newTheme
     }
-    await window.api.settings.addProfile(newProfile)
-    await refreshSettings()
-    setEditingProfileId(id)
-    setEditForm(newProfile)
-    setCustomModelId('')
-  }
+    document.documentElement.setAttribute('data-theme', effective)
+  }, [])
 
-  const handleSaveProfile = async () => {
-    if (editingProfileId && editForm) {
-      const updates = { ...editForm }
-      // If custom model ID was entered, use it
-      if (customModelId) {
-        updates.model = customModelId
-      }
-      await window.api.settings.updateProfile(editingProfileId, updates)
-      await refreshSettings()
-      setEditingProfileId(null)
-      setEditForm({})
-      setCustomModelId('')
+  const resetForm = useCallback(() => {
+    setFormName('')
+    setFormApiKey('')
+    setFormProvider('anthropic')
+    setFormBaseUrl('')
+    setFormModel('claude-sonnet-4-6')
+    setEditingProfileId(null)
+    setShowProfileForm(false)
+  }, [])
+
+  const handleSaveProfile = useCallback(async () => {
+    if (!formName.trim() || !formApiKey.trim()) return
+    if (editingProfileId) {
+      await window.api.settings.updateProfile(editingProfileId, {
+        name: formName,
+        apiKey: formApiKey,
+        apiProvider: formProvider,
+        baseUrl: formBaseUrl,
+        model: formModel
+      })
+    } else {
+      await window.api.settings.addProfile({
+        id: `profile-${Date.now()}`,
+        name: formName,
+        apiKey: formApiKey,
+        apiProvider: formProvider,
+        baseUrl: formBaseUrl,
+        model: formModel
+      })
     }
-  }
+    const settings = await window.api.settings.get()
+    setProfiles(settings.profiles)
+    resetForm()
+  }, [formName, formApiKey, formProvider, formBaseUrl, formModel, editingProfileId, resetForm])
 
-  const handleRemoveProfile = async (id: string) => {
+  const handleEditProfile = useCallback((profile: typeof profiles[0]) => {
+    setEditingProfileId(profile.id)
+    setFormName(profile.name)
+    setFormApiKey(profile.apiKey)
+    setFormProvider(profile.apiProvider)
+    setFormBaseUrl(profile.baseUrl)
+    setFormModel(profile.model)
+    setShowProfileForm(true)
+  }, [])
+
+  const handleDeleteProfile = useCallback(async (id: string) => {
     await window.api.settings.removeProfile(id)
-    await refreshSettings()
-    if (editingProfileId === id) {
-      setEditingProfileId(null)
-      setEditForm({})
-    }
-  }
+    const settings = await window.api.settings.get()
+    setProfiles(settings.profiles)
+    setActiveProfileId(settings.activeProfileId)
+  }, [])
 
-  const handleSetActiveProfile = async (id: string) => {
+  const handleSetActive = useCallback(async (id: string) => {
     await window.api.settings.setActiveProfile(id)
-    await refreshSettings()
-  }
-
-  const handleAddDirectory = async () => {
-    const dir = await window.api.workspace.openDirectoryDialog()
-    if (dir) {
-      await window.api.settings.addDirectory(dir)
-      await refreshSettings()
-    }
-  }
-
-  const handleRemoveDirectory = async (dir: string) => {
-    await window.api.settings.removeDirectory(dir)
-    await refreshSettings()
-  }
-
-  const getProfileLabel = (profile: ModelProfile) => {
-    const provider = PROVIDERS.find((p) => p.value === profile.apiProvider)?.label
-    const model = PRESET_MODELS.find((m) => m.value === profile.model)?.label || profile.model
-    return `${provider} / ${model}`
-  }
-
-  if (!settings) return <div className="modal-overlay">Loading...</div>
-
-  const isCustomProvider = editForm.apiProvider === 'custom'
-  const isPresetModel = PRESET_MODELS.some((m) => m.value === editForm.model)
+    setActiveProfileId(id)
+  }, [])
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Settings</h2>
-          <button className="modal-close-btn" onClick={onClose}>
-            <X size={16} />
+    <div className="settings-overlay" onClick={onClose}>
+      <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-header">
+          <h2>设置</h2>
+          <button className="settings-close-btn" onClick={onClose}>
+            <X size={18} />
           </button>
         </div>
 
-        <div className="modal-body">
-          {/* --- Model Profiles --- */}
+        <div className="settings-content">
+          {/* Appearance */}
           <div className="settings-section">
-            <h3 className="settings-section-title">Model Profiles</h3>
+            <h3>外观</h3>
+            <div className="theme-options">
+              <button
+                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+                onClick={() => handleThemeChange('light')}
+              >
+                <Sun size={18} />
+                <span>浅色</span>
+              </button>
+              <button
+                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+                onClick={() => handleThemeChange('dark')}
+              >
+                <Moon size={18} />
+                <span>深色</span>
+              </button>
+              <button
+                className={`theme-option ${theme === 'system' ? 'active' : ''}`}
+                onClick={() => handleThemeChange('system')}
+              >
+                <Monitor size={18} />
+                <span>跟随系统</span>
+              </button>
+            </div>
+          </div>
 
-            <div className="profile-list">
-              {settings.profiles.map((profile) => (
-                <div
-                  key={profile.id}
-                  className={`profile-card ${profile.id === settings.activeProfileId ? 'profile-active' : ''}`}
-                >
-                  <div className="profile-card-header">
-                    <span className="profile-indicator">
-                      {profile.id === settings.activeProfileId ? '●' : '○'}
-                    </span>
-                    <span className="profile-name">{profile.name || 'Unnamed'}</span>
-                    <span className="profile-meta">{getProfileLabel(profile)}</span>
-                    <div className="profile-actions">
-                      {profile.id !== settings.activeProfileId && (
-                        <button
-                          className="profile-action-btn"
-                          onClick={() => handleSetActiveProfile(profile.id)}
-                          title="Set active"
-                        >
-                          <Check size={14} />
-                        </button>
-                      )}
-                      <button
-                        className="profile-action-btn"
-                        onClick={() => {
-                          setEditingProfileId(profile.id)
-                          setEditForm(profile)
-                          setCustomModelId(
-                            PRESET_MODELS.some((m) => m.value === profile.model) ? '' : profile.model
-                          )
-                        }}
-                        title="Edit"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        className="profile-action-btn profile-action-danger"
-                        onClick={() => handleRemoveProfile(profile.id)}
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <button className="profile-add-btn" onClick={handleAddProfile}>
-                <Plus size={14} />
-                Add Profile
+          {/* Model Profiles */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <h3>模型配置</h3>
+              <button
+                className="settings-add-btn"
+                onClick={() => {
+                  resetForm()
+                  setShowProfileForm(true)
+                }}
+              >
+                + 添加
               </button>
             </div>
 
-            {/* --- Edit Profile Form --- */}
-            {editingProfileId && (
-              <div className="profile-edit-form">
-                <div className="form-field">
-                  <label>Name</label>
-                  <input
-                    type="text"
-                    value={editForm.name || ''}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    placeholder="e.g. Work Account"
-                  />
+            {profiles.map((profile) => (
+              <div
+                key={profile.id}
+                className={`settings-profile ${activeProfileId === profile.id ? 'active' : ''}`}
+              >
+                <div className="settings-profile-info">
+                  <span className="settings-profile-name">{profile.name}</span>
+                  <span className="settings-profile-model">{profile.model}</span>
                 </div>
-                <div className="form-field">
-                  <label>API Provider</label>
-                  <select
-                    value={editForm.apiProvider || 'custom'}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, apiProvider: e.target.value as ModelProfile['apiProvider'] })
-                    }
-                  >
-                    {PROVIDERS.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-                {isCustomProvider && (
-                  <div className="form-field">
-                    <label>Base URL</label>
-                    <input
-                      type="text"
-                      value={editForm.baseUrl || ''}
-                      onChange={(e) => setEditForm({ ...editForm, baseUrl: e.target.value })}
-                      placeholder="https://api.example.com/v1"
-                    />
-                  </div>
-                )}
-                <div className="form-field">
-                  <label>API Key</label>
-                  <input
-                    type="password"
-                    value={editForm.apiKey || ''}
-                    onChange={(e) => setEditForm({ ...editForm, apiKey: e.target.value })}
-                    placeholder="sk-ant-..."
-                  />
-                </div>
-                <div className="form-field">
-                  <label>Model ID</label>
-                  <select
-                    value={isPresetModel ? editForm.model : '__custom__'}
-                    onChange={(e) => {
-                      if (e.target.value === '__custom__') {
-                        setEditForm({ ...editForm, model: '' })
-                        setCustomModelId('')
-                      } else {
-                        setEditForm({ ...editForm, model: e.target.value })
-                        setCustomModelId('')
-                      }
-                    }}
-                  >
-                    {PRESET_MODELS.map((m) => (
-                      <option key={m.value} value={m.value}>{m.label}</option>
-                    ))}
-                    <option value="__custom__">Custom...</option>
-                  </select>
-                  {!isPresetModel && (
-                    <input
-                      type="text"
-                      className="form-field-extra-input"
-                      value={customModelId}
-                      onChange={(e) => setCustomModelId(e.target.value)}
-                      placeholder="Enter custom model ID"
-                    />
+                <div className="settings-profile-actions">
+                  {activeProfileId !== profile.id && (
+                    <button
+                      className="settings-profile-activate"
+                      onClick={() => handleSetActive(profile.id)}
+                    >
+                      激活
+                    </button>
                   )}
+                  <button
+                    className="settings-profile-edit"
+                    onClick={() => handleEditProfile(profile)}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    className="settings-profile-delete"
+                    onClick={() => handleDeleteProfile(profile.id)}
+                  >
+                    删除
+                  </button>
                 </div>
-                <div className="form-actions">
-                  <button className="btn-primary" onClick={handleSaveProfile}>Save</button>
-                  <button className="btn-secondary" onClick={() => { setEditingProfileId(null); setEditForm({}); setCustomModelId('') }}>Cancel</button>
+              </div>
+            ))}
+
+            {showProfileForm && (
+              <div className="settings-form">
+                <input
+                  className="settings-input"
+                  type="text"
+                  placeholder="配置名称"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                />
+                <input
+                  className="settings-input"
+                  type="password"
+                  placeholder="API Key"
+                  value={formApiKey}
+                  onChange={(e) => setFormApiKey(e.target.value)}
+                />
+                <select
+                  className="settings-select"
+                  value={formProvider}
+                  onChange={(e) => setFormProvider(e.target.value as typeof formProvider)}
+                >
+                  <option value="anthropic">Anthropic</option>
+                  <option value="bedrock">AWS Bedrock</option>
+                  <option value="vertex">Google Vertex</option>
+                  <option value="azure">Azure</option>
+                  <option value="custom">自定义</option>
+                </select>
+                {formProvider === 'custom' && (
+                  <input
+                    className="settings-input"
+                    type="text"
+                    placeholder="Base URL"
+                    value={formBaseUrl}
+                    onChange={(e) => setFormBaseUrl(e.target.value)}
+                  />
+                )}
+                <input
+                  className="settings-input"
+                  type="text"
+                  placeholder="模型 (e.g. claude-sonnet-4-6)"
+                  value={formModel}
+                  onChange={(e) => setFormModel(e.target.value)}
+                />
+                <div className="settings-form-actions">
+                  <button className="settings-save-btn" onClick={handleSaveProfile}>
+                    保存
+                  </button>
+                  <button className="settings-cancel-btn" onClick={resetForm}>
+                    取消
+                  </button>
                 </div>
               </div>
             )}
-          </div>
-
-          {/* --- Workspace --- */}
-          <div className="settings-section">
-            <h3 className="settings-section-title">Workspace</h3>
-            <div className="directory-list">
-              {settings.authorizedDirectories.map((dir) => (
-                <div key={dir} className="directory-entry">
-                  <span className="directory-path">{dir}</span>
-                  <button
-                    className="directory-remove-btn"
-                    onClick={() => handleRemoveDirectory(dir)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-              <button className="directory-add-btn" onClick={handleAddDirectory}>
-                <Plus size={14} />
-                Add Directory
-              </button>
-            </div>
           </div>
         </div>
       </div>

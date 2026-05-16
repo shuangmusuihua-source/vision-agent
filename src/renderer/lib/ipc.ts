@@ -18,6 +18,7 @@ interface AppSettings {
   profiles: ModelProfile[]
   activeProfileId: string | null
   authorizedDirectories: string[]
+  theme: 'light' | 'dark' | 'system'
 }
 
 interface WorkspaceApi {
@@ -36,6 +37,8 @@ interface SettingsApi {
   setActiveProfile: (id: string) => Promise<{ success: boolean }>
   addDirectory: (dir: string) => Promise<{ success: boolean }>
   removeDirectory: (dir: string) => Promise<{ success: boolean }>
+  getTheme: () => Promise<'light' | 'dark' | 'system'>
+  setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
 }
 
 interface AgentApi {
@@ -47,12 +50,72 @@ interface AgentApi {
   onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void
 }
 
+interface GraphApi {
+  getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>
+}
+
+interface GraphNode {
+  id: string
+  label: string
+  type: 'file' | 'memory'
+}
+
+interface GraphEdge {
+  source: string
+  target: string
+}
+
+interface CronTask {
+  id: string
+  name: string
+  cronExpression: string
+  prompt: string
+  createdAt: number
+  lastRunAt: number | null
+  lastResult: string | null
+  status: 'active' | 'paused'
+}
+
+interface CronApi {
+  register: (cronExpression: string, prompt: string, name?: string) => Promise<{ success: boolean; task?: CronTask; error?: string }>
+  list: () => Promise<CronTask[]>
+  remove: (taskId: string) => Promise<boolean>
+  execute: (taskId: string) => Promise<{ success: boolean; result?: string; error?: string }>
+  onTaskCompleted: (callback: (data: { taskId: string; result: string }) => void) => () => void
+}
+
+interface SlashCommand {
+  name: string
+  description: string
+  argumentHint: string
+  aliases?: string[]
+}
+
+interface SkillsApi {
+  list: () => Promise<SlashCommand[]>
+}
+
+interface SearchResult {
+  filePath: string
+  fileName: string
+  line: number
+  content: string
+}
+
+interface SearchApi {
+  query: (keyword: string) => Promise<SearchResult[]>
+}
+
 interface WindowApi {
   ping: () => Promise<string>
   workspace: WorkspaceApi
   settings: SettingsApi
   agent: AgentApi
   memory: MemoryApi
+  graph: GraphApi
+  cron: CronApi
+  skills: SkillsApi
+  search: SearchApi
 }
 
 interface MemoryApi {
@@ -85,9 +148,18 @@ export type {
   SettingsApi,
   AgentApi,
   MemoryApi,
+  GraphApi,
+  CronApi,
+  SkillsApi,
+  SearchApi,
   FileEntry,
   ModelProfile,
   AppSettings,
   SessionInfo,
-  AgentMessageData
+  AgentMessageData,
+  GraphNode,
+  GraphEdge,
+  CronTask,
+  SlashCommand,
+  SearchResult
 }

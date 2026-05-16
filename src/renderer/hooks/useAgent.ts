@@ -115,19 +115,14 @@ function useAgent() {
         // Extract tool_use blocks
         const toolUses = content.filter((c) => c.type === 'tool_use')
 
-        // Extract tool_result blocks
-        const toolResults = content.filter((c) => c.type === 'tool_result')
-
         // Handle text content
         if (textParts.length > 0) {
           const textContent = textParts.join('')
           const lastMsg = messages[messages.length - 1]
 
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-            // Append to existing streaming message
             appendToLastAssistantMessage(textContent)
           } else {
-            // New assistant message
             const msgId = `assistant-${Date.now()}`
             addMessage({
               id: msgId,
@@ -141,14 +136,12 @@ function useAgent() {
 
         // Handle tool_use blocks
         if (toolUses.length > 0) {
-          // Ensure we have an assistant message to attach tool calls to
           let targetMsgId = lastAssistantMsgIdRef.current
           if (!targetMsgId) {
             const lastMsg = messages[messages.length - 1]
             if (lastMsg?.role === 'assistant') {
               targetMsgId = lastMsg.id
             } else {
-              // Create a placeholder assistant message for tool calls
               const msgId = `assistant-${Date.now()}`
               addMessage({
                 id: msgId,
@@ -171,7 +164,6 @@ function useAgent() {
             }
             setToolCall(targetMsgId, toolCall)
 
-            // Track file edits for editor sync
             if (toolName === 'Write' || toolName === 'Edit') {
               const editedPath = (toolCall.input as Record<string, unknown>).file_path as string
               if (editedPath) {
@@ -183,7 +175,20 @@ function useAgent() {
           setAgentStatus('running')
         }
 
-        // Handle tool_result blocks — update existing tool calls
+        if (textParts.length === 0 && toolUses.length === 0) {
+          setAgentStatus('thinking')
+        }
+
+        return
+      }
+
+      // --- user message (contains tool_result from SDK) ---
+      if (type === 'user') {
+        const apiMessage = msg.message as SDKMsg | undefined
+        const content = apiMessage?.content as Array<SDKMsg> | undefined
+        if (!content) return
+
+        const toolResults = content.filter((c) => c.type === 'tool_result')
         if (toolResults.length > 0) {
           const targetMsgId = lastAssistantMsgIdRef.current
           if (targetMsgId) {
@@ -199,12 +204,6 @@ function useAgent() {
             }
           }
         }
-
-        // If no text and no tool_use, just mark as thinking
-        if (textParts.length === 0 && toolUses.length === 0) {
-          setAgentStatus('thinking')
-        }
-
         return
       }
 

@@ -20,7 +20,9 @@ const api = {
     removeProfile: (id: string) => ipcRenderer.invoke('settings:removeProfile', id),
     setActiveProfile: (id: string) => ipcRenderer.invoke('settings:setActiveProfile', id),
     addDirectory: (dir: string) => ipcRenderer.invoke('settings:addDirectory', dir),
-    removeDirectory: (dir: string) => ipcRenderer.invoke('settings:removeDirectory', dir)
+    removeDirectory: (dir: string) => ipcRenderer.invoke('settings:removeDirectory', dir),
+    getTheme: () => ipcRenderer.invoke('settings:getTheme'),
+    setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('settings:setTheme', theme)
   },
 
   agent: {
@@ -69,6 +71,31 @@ const api = {
     read: (filePath: string) => ipcRenderer.invoke('memory:read', filePath),
     write: (filePath: string, content: string) => ipcRenderer.invoke('memory:write', filePath, content),
     delete: (filePath: string) => ipcRenderer.invoke('memory:delete', filePath)
+  },
+
+  graph: {
+    getData: () => ipcRenderer.invoke('graph:getData')
+  },
+
+  cron: {
+    register: (cronExpression: string, prompt: string, name?: string) =>
+      ipcRenderer.invoke('cron:register', cronExpression, prompt, name),
+    list: () => ipcRenderer.invoke('cron:list'),
+    remove: (taskId: string) => ipcRenderer.invoke('cron:remove', taskId),
+    execute: (taskId: string) => ipcRenderer.invoke('cron:execute', taskId),
+    onTaskCompleted: (callback: (data: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+      ipcRenderer.on('cron:taskCompleted', handler)
+      return () => ipcRenderer.removeListener('cron:taskCompleted', handler)
+    }
+  },
+
+  skills: {
+    list: () => ipcRenderer.invoke('skills:list')
+  },
+
+  search: {
+    query: (keyword: string) => ipcRenderer.invoke('search:query', keyword)
   }
 }
 

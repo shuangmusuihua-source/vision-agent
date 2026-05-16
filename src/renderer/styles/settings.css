@@ -1,28 +1,28 @@
-/* --- Modal --- */
+/* --- Settings Modal --- */
 
-.modal-overlay {
+.settings-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
 }
 
-.modal-content {
+.settings-modal {
   background: var(--bg-primary);
-  border-radius: 8px;
+  border-radius: 12px;
   width: 480px;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 30px var(--color-shadow-heavy);
 }
 
-.modal-header {
+.settings-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -30,12 +30,12 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.modal-header h2 {
+.settings-header h2 {
   font-size: 16px;
   font-weight: 600;
 }
 
-.modal-close-btn {
+.settings-close-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,170 +45,195 @@
   color: var(--text-secondary);
 }
 
-.modal-close-btn:hover {
+.settings-close-btn:hover {
   background: var(--bg-tertiary);
 }
 
-.modal-body {
+.settings-content {
   padding: 20px;
 }
-
-/* --- Settings Sections --- */
 
 .settings-section {
   margin-bottom: 24px;
 }
 
-.settings-section-title {
-  font-size: 13px;
+.settings-section h3 {
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   margin-bottom: 12px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-section-header h3 {
+  margin-bottom: 0;
+}
+
+.settings-add-btn {
+  font-size: 13px;
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.settings-add-btn:hover {
+  color: var(--accent-color);
+}
+
+/* --- Theme Options --- */
+
+.theme-options {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex: 1;
+  justify-content: center;
+}
+
+.theme-option:hover {
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.theme-option.active {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #fff;
 }
 
 /* --- Profile Cards --- */
 
-.profile-list {
+.settings-profile {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.profile-card {
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 8px 12px;
+  margin-bottom: 6px;
 }
 
-.profile-card.profile-active {
+.settings-profile.active {
   border-color: var(--accent-color);
-  background: rgba(35, 131, 226, 0.05);
+  background: var(--color-profile-active-bg);
 }
 
-.profile-card-header {
+.settings-profile-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.profile-indicator {
+.settings-profile-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.settings-profile-model {
   font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-profile-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-profile-activate,
+.settings-profile-edit,
+.settings-profile-delete {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+}
+
+.settings-profile-activate {
   color: var(--accent-color);
 }
 
-.profile-name {
-  font-weight: 500;
-  font-size: 14px;
+.settings-profile-activate:hover {
+  background: var(--bg-tertiary);
 }
 
-.profile-meta {
-  color: var(--text-secondary);
-  font-size: 12px;
-  flex: 1;
-}
-
-.profile-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.profile-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius);
+.settings-profile-edit {
   color: var(--text-secondary);
 }
 
-.profile-action-btn:hover {
+.settings-profile-edit:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
-.profile-action-danger:hover {
-  color: #e45649;
+.settings-profile-delete {
+  color: var(--color-danger);
 }
 
-.profile-add-btn {
+.settings-profile-delete:hover {
+  background: var(--bg-tertiary);
+}
+
+/* --- Profile Form --- */
+
+.settings-form {
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  margin-top: 8px;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-input {
   padding: 8px 12px;
-  border: 1px dashed var(--border-color);
-  border-radius: 6px;
-  color: var(--accent-color);
-  font-size: 13px;
-}
-
-.profile-add-btn:hover {
-  background: var(--bg-secondary);
-}
-
-/* --- Profile Edit Form --- */
-
-.profile-edit-form {
-  margin-top: 12px;
-  padding: 16px;
-  background: var(--bg-secondary);
-  border-radius: 6px;
-}
-
-.form-field {
-  margin-bottom: 12px;
-}
-
-.form-field label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-}
-
-.form-field input,
-.form-field select {
-  width: 100%;
-  padding: 8px 12px;
+  font-size: 14px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-size: 14px;
   background: var(--bg-primary);
   color: var(--text-primary);
-  outline: none;
 }
 
-.form-field input:focus,
-.form-field select:focus {
+.settings-input:focus {
+  outline: none;
   border-color: var(--accent-color);
 }
 
-.form-field-extra-input {
-  margin-top: 6px;
-  width: 100%;
+.settings-select {
   padding: 8px 12px;
+  font-size: 14px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-size: 14px;
   background: var(--bg-primary);
   color: var(--text-primary);
-  outline: none;
 }
 
-.form-field-extra-input:focus {
+.settings-select:focus {
+  outline: none;
   border-color: var(--accent-color);
 }
 
-.form-actions {
+.settings-form-actions {
   display: flex;
   gap: 8px;
-  margin-top: 16px;
 }
 
-.btn-primary {
+.settings-save-btn {
   padding: 8px 16px;
   background: var(--accent-color);
   color: #fff;
@@ -217,12 +242,12 @@
   font-weight: 500;
 }
 
-.btn-primary:hover {
+.settings-save-btn:hover {
   opacity: 0.9;
   color: #fff;
 }
 
-.btn-secondary {
+.settings-cancel-btn {
   padding: 8px 16px;
   background: var(--bg-tertiary);
   color: var(--text-primary);
@@ -230,61 +255,6 @@
   font-size: 14px;
 }
 
-.btn-secondary:hover {
+.settings-cancel-btn:hover {
   background: var(--border-color);
-}
-
-/* --- Directory List --- */
-
-.directory-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.directory-entry {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-}
-
-.directory-path {
-  font-size: 13px;
-  color: var(--text-primary);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.directory-remove-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius);
-  color: var(--text-secondary);
-}
-
-.directory-remove-btn:hover {
-  color: #e45649;
-}
-
-.directory-add-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px dashed var(--border-color);
-  border-radius: 6px;
-  color: var(--accent-color);
-  font-size: 13px;
-}
-
-.directory-add-btn:hover {
-  background: var(--bg-secondary);
 }

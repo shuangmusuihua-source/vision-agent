@@ -1,37 +1,70 @@
 import { useState, useCallback, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
+import CronPanel from '../sidebar/CronPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
+import GraphView from '../graph/GraphView'
+import SearchPanel from '../search/SearchPanel'
 import useAgent from '../../hooks/useAgent'
 import type { FileEntry } from '../../lib/ipc'
 
 interface AppShellProps {
   onOpenSettings: () => void
+  settingsChangeKey: number
 }
 
-function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
+function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.ReactElement {
+  const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
+  const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [agentCollapsed, setAgentCollapsed] = useState(false)
-  const [files, setFiles] = useState<FileEntry[]>([])
-  const [workspacePath, setWorkspacePath] = useState('')
+  const [cronCollapsed, setCronCollapsed] = useState(false)
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
   const [prefillText, setPrefillText] = useState<string | null>(null)
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+  const [showGraph, setShowGraph] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+
+  // Cmd+Shift+F to open search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
 
+  // Restore/refresh workspaces from settings
+  useEffect(() => {
+    window.api.settings.get().then((settings) => {
+      const dirs = settings.authorizedDirectories
+      setWorkspacePaths(dirs)
+      const fileEntries: Record<string, FileEntry[]> = {}
+      Promise.all(
+        dirs.map(async (dir) => {
+          fileEntries[dir] = await window.api.workspace.listFiles(dir)
+        })
+      ).then(() => setFiles(fileEntries))
+    }).catch(() => {})
+  }, [settingsChangeKey])
+
   const handleOpenDirectory = async () => {
     const path = await window.api.workspace.openDirectoryDialog()
-    if (path) {
-      setWorkspacePath(path)
-      await window.api.settings.addDirectory(path)
+    if (path && !workspacePaths.includes(path)) {
+      setWorkspacePaths((prev) => [...prev, path])
       const entries = await window.api.workspace.listFiles(path)
-      setFiles(entries)
+      setFiles((prev) => ({ ...prev, [path]: entries }))
+      await window.api.settings.addDirectory(path)
     }
   }
 
@@ -125,28 +158,54 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     <div className="app-shell">
       <Sidebar
         files={files}
-        workspacePath={workspacePath}
+        workspacePaths={workspacePaths}
         memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
         onOpenDirectory={handleOpenDirectory}
+        onRemoveWorkspace={async (path) => {
+          setWorkspacePaths((prev) => prev.filter((p) => p !== path))
+          setFiles((prev) => {
+            const next = { ...prev }
+            delete next[path]
+            return next
+          })
+          await window.api.settings.removeDirectory(path)
+        }}
         onOpenSettings={onOpenSettings}
+        onOpenSearch={() => setShowSearch(true)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       <div className="main-content">
-        {openTabs.length > 0 && (
-          <EditorTabs
-            tabs={openTabs}
-            activeTab={activeTab}
-            onTabSwitch={handleTabSwitch}
-            onTabClose={handleTabClose}
-          />
-        )}
-        {activeTab ? (
+        <div className="main-content-header">
+          {openTabs.length > 0 && (
+            <EditorTabs
+              tabs={openTabs}
+              activeTab={activeTab}
+              onTabSwitch={handleTabSwitch}
+              onTabClose={handleTabClose}
+            />
+          )}
+          {workspacePaths.length > 0 && (
+            <button
+              className={`graph-toggle-btn ${showGraph ? 'graph-toggle-active' : ''}`}
+              onClick={() => setShowGraph(!showGraph)}
+              title="Toggle graph view"
+            >
+              Graph
+            </button>
+          )}
+        </div>
+        {showGraph ? (
+          <GraphView onNodeClick={(nodeId) => {
+            handleFileSelect(nodeId)
+            setShowGraph(false)
+          }} />
+        ) : activeTab ? (
           <MarkdownEditor
             content={activeContent}
             filePath={activeTab}
-            workspacePath={workspacePath}
+            workspacePath={workspacePaths[0] || ''}
             onOpenFile={handleFileSelect}
             onSave={handleSave}
             onAskAgent={handleAskAgent}
@@ -157,6 +216,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         )}
       </div>
+      <CronPanel
+        collapsed={cronCollapsed}
+        onToggleCollapse={() => setCronCollapsed(!cronCollapsed)}
+      />
       <AgentPanel
         collapsed={agentCollapsed}
         onToggleCollapse={() => setAgentCollapsed(!agentCollapsed)}
@@ -174,6 +237,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <ChatView messages={messages} />
         <ChatInput onSend={sendMessage} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />
       </AgentPanel>
+      {showSearch && (
+        <SearchPanel
+          onOpenFile={handleFileSelect}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
     </div>
   )
 }

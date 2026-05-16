@@ -161,12 +161,17 @@
   color: var(--accent-color);
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .tool-call-success {
-  color: #50a14f;
+  color: var(--color-success);
 }
 
 .tool-call-error {
-  color: #e45649;
+  color: var(--color-error);
 }
 
 .tool-call-details {
@@ -199,6 +204,10 @@
 }
 
 /* --- Chat Input --- */
+
+.chat-input-container {
+  position: relative;
+}
 
 .chat-input-wrapper {
   display: flex;
@@ -364,7 +373,7 @@
 }
 
 .permission-icon {
-  color: #e45649;
+  color: var(--color-error);
 }
 
 .permission-title {
@@ -443,13 +452,13 @@
 .permission-btn-allow {
   background: #50a14f;
   color: #fff;
-  border-color: #50a14f;
+  border-color: var(--color-success);
 }
 
 .permission-btn-deny {
   background: #e45649;
   color: #fff;
-  border-color: #e45649;
+  border-color: var(--color-error);
 }
 
 /* --- Session History --- */
@@ -553,4 +562,77 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+/* --- Skill Popup --- */
+
+.skill-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 20;
+  margin-bottom: 4px;
+}
+
+.skill-popup-header {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.skill-popup-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.skill-popup-item:last-child {
+  border-bottom: none;
+}
+
+.skill-popup-item:hover,
+.skill-popup-item.selected {
+  background: var(--bg-tertiary);
+}
+
+.skill-popup-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skill-popup-item-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.skill-popup-item-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-popup-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-align: center;
 }
