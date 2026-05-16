@@ -1,4 +1,4 @@
-import { ShieldAlert, Check, X } from 'lucide-react'
+import { ShieldWarning, Check, X } from '@phosphor-icons/react'
 import type { PermissionRequest } from '../../store/agent-store'
 
 interface PermissionDialogProps {
@@ -13,7 +13,7 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
     <div className="permission-overlay">
       <div className="permission-dialog">
         <div className="permission-header">
-          <ShieldAlert size={16} className="permission-icon" />
+          <ShieldWarning size={16} weight="regular" className="permission-icon" />
           <span className="permission-title">Permission Request</span>
         </div>
         <div className="permission-body">
@@ -33,14 +33,14 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
             className="permission-btn permission-btn-allow"
             onClick={() => onRespond(request.id, 'allow')}
           >
-            <Check size={14} />
+            <Check size={14} weight="regular" />
             Allow
           </button>
           <button
             className="permission-btn permission-btn-deny"
             onClick={() => onRespond(request.id, 'deny')}
           >
-            <X size={14} />
+            <X size={14} weight="regular" />
             Deny
           </button>
         </div>

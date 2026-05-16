@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { X } from 'lucide-react'
+import { X } from '@phosphor-icons/react'
 
 interface EditorTabsProps {
   tabs: string[]
@@ -31,7 +31,7 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
             className="editor-tab-close"
             onClick={(e) => handleClose(e, path)}
           >
-            <X size={12} />
+            <X size={12} weight="regular" />
           </button>
         </div>
       ))}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp } from '@phosphor-icons/react'
 import type { SlashCommand } from '../../lib/ipc'
 
 interface ChatInputProps {
@@ -144,7 +144,7 @@ function ChatInput({ onSend, disabled, prefill, onPrefillConsumed }: ChatInputPr
           }}
           disabled={!text.trim() || disabled}
         >
-          <ArrowUp size={16} />
+          <ArrowUp size={16} weight="regular" />
         </button>
       </div>
 

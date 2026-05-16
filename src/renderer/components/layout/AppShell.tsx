@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -193,9 +194,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
         collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
-      <div className="main-content">
+      <div className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}`}>
         <div className="main-content-header">
           {openTabs.length > 0 && (
             <EditorTabs
@@ -215,6 +215,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
             </button>
           )}
         </div>
+        <div className="main-content-scroll">
         {showGraph ? (
           <GraphView onNodeClick={(nodeId) => {
             handleFileSelect(nodeId)
@@ -234,6 +235,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
             <p>Select a file from the sidebar or open a workspace</p>
           </div>
         )}
+        </div>
       </div>
       <AgentPanel
         collapsed={agentCollapsed}
@@ -258,6 +260,9 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           onClose={() => setShowSearch(false)}
         />
       )}
+      <button className="sidebar-toggle-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
+        <SidebarIcon size={14} weight="regular" />
+      </button>
     </div>
   )
 }

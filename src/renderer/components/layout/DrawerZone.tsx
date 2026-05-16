@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ChevronDown, Play, Trash2, Plus, X } from 'lucide-react'
+import { CaretDown, Play, Trash, Plus, X } from '@phosphor-icons/react'
 import type { CronTask } from '../../lib/ipc'
 
 // --- Schedule builder types (migrated from CronPanel) ---
@@ -163,7 +163,7 @@ function DrawerZone(): React.ReactElement {
       <div className="drawer">
         <div className="drawer-lip" onClick={() => setExpanded(!expanded)}>
           <div className={`drawer-lip-icon ${expanded ? 'drawer-lip-icon-active' : ''}`}>
-            <ChevronDown size={16} className={`drawer-chevron ${expanded ? 'drawer-chevron-up' : ''}`} />
+            <CaretDown size={16} weight="regular" className={`drawer-chevron ${expanded ? 'drawer-chevron-up' : ''}`} />
           </div>
         </div>
         <div className="drawer-body">
@@ -291,7 +291,7 @@ function DrawerZone(): React.ReactElement {
 
             {!showForm && tasks.length > 0 && (
               <button className="drawer-add-btn" onClick={() => setShowForm(true)}>
-                <Plus size={12} />
+                <Plus size={12} weight="regular" />
                 新建定时任务
               </button>
             )}
@@ -299,7 +299,7 @@ function DrawerZone(): React.ReactElement {
             {tasks.length === 0 && !showForm ? (
               <div className="drawer-empty">
                 <button className="drawer-add-btn" onClick={() => setShowForm(true)}>
-                  <Plus size={12} />
+                  <Plus size={12} weight="regular" />
                   新建定时任务
                 </button>
               </div>
@@ -318,14 +318,14 @@ function DrawerZone(): React.ReactElement {
                         disabled={running === task.id}
                         title="立即执行"
                       >
-                        <Play size={12} />
+                        <Play size={12} weight="regular" />
                       </button>
                       <button
                         className="drawer-task-action drawer-task-action-danger"
                         onClick={() => handleRemove(task.id)}
                         title="删除"
                       >
-                        <Trash2 size={12} />
+                        <Trash size={12} weight="regular" />
                       </button>
                     </div>
                   </div>
@@ -335,7 +335,7 @@ function DrawerZone(): React.ReactElement {
 
             {showForm && (
               <button className="drawer-form-close" onClick={() => setShowForm(false)}>
-                <X size={12} />
+                <X size={12} weight="regular" />
                 关闭
               </button>
             )}

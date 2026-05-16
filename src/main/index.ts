@@ -14,6 +14,7 @@ function createWindow(): void {
     minHeight: 400,
     show: false,
     titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 8, y: 8 },
     title: 'Vision Agent',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

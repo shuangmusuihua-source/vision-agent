@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, MessageSquare, Plus, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
+import { Clock, ChatCircle, Plus, ArrowsClockwise, CaretDown, CaretRight } from '@phosphor-icons/react'
 import type { SdkSessionInfo } from '../../store/agent-store'
 
 interface SessionHistoryProps {
@@ -20,16 +20,16 @@ function SessionHistory({ sessions, currentSessionId, onSelectSession, onNewSess
           className="session-history-toggle"
           onClick={() => setCollapsed(!collapsed)}
         >
-          {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-          <Clock size={12} />
+          {collapsed ? <CaretRight size={12} weight="regular" /> : <CaretDown size={12} weight="regular" />}
+          <Clock size={12} weight="regular" />
           <span className="session-history-title">History</span>
         </button>
         <div className="session-history-actions">
           <button className="session-history-btn" onClick={onRefresh} title="Refresh">
-            <RefreshCw size={12} />
+            <ArrowsClockwise size={12} weight="regular" />
           </button>
           <button className="session-history-btn" onClick={onNewSession} title="New session">
-            <Plus size={12} />
+            <Plus size={12} weight="regular" />
           </button>
         </div>
       </div>
@@ -44,7 +44,7 @@ function SessionHistory({ sessions, currentSessionId, onSelectSession, onNewSess
                 className={`session-history-item ${s.id === currentSessionId ? 'active' : ''}`}
                 onClick={() => onSelectSession(s.id)}
               >
-                <MessageSquare size={12} />
+                <ChatCircle size={12} weight="regular" />
                 <span className="session-history-item-title">
                   {s.title || s.id.slice(0, 12)}
                 </span>

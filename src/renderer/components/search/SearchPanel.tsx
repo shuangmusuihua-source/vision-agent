@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, X, FileText } from 'lucide-react'
+import { MagnifyingGlass, X, FileText } from '@phosphor-icons/react'
 import type { SearchResult } from '../../lib/ipc'
 
 interface SearchPanelProps {
@@ -67,7 +67,7 @@ function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElem
     <div className="search-overlay" onClick={onClose}>
       <div className="search-panel" onClick={(e) => e.stopPropagation()}>
         <div className="search-input-row">
-          <Search size={16} className="search-icon" />
+          <MagnifyingGlass size={16} weight="regular" className="search-icon" />
           <input
             ref={inputRef}
             className="search-input"
@@ -79,7 +79,7 @@ function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElem
           />
           {keyword && (
             <button className="search-clear-btn" onClick={() => setKeyword('')}>
-              <X size={14} />
+              <X size={14} weight="regular" />
             </button>
           )}
         </div>
@@ -98,7 +98,7 @@ function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElem
                 onClose()
               }}
             >
-              <FileText size={14} className="search-result-icon" />
+              <FileText size={14} weight="regular" className="search-result-icon" />
               <div className="search-result-info">
                 <span className="search-result-file">{result.fileName}</span>
                 <span className="search-result-line">:{result.line}</span>
