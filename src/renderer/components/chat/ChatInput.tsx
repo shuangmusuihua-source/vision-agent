@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { ArrowUp } from 'lucide-react'
 import type { SlashCommand } from '../../lib/ipc'
 
 interface ChatInputProps {
@@ -133,7 +134,7 @@ function ChatInput({ onSend, disabled, prefill, onPrefillConsumed }: ChatInputPr
           rows={1}
         />
         <button
-          className="chat-send-btn"
+          className={`chat-send-btn ${text.trim() && !disabled ? 'chat-send-btn-active' : ''}`}
           onClick={() => {
             if (text.trim() && !disabled) {
               onSend(text.trim())
@@ -141,9 +142,9 @@ function ChatInput({ onSend, disabled, prefill, onPrefillConsumed }: ChatInputPr
               setShowSkillPopup(false)
             }
           }}
-          disabled={disabled || !text.trim()}
+          disabled={!text.trim() || disabled}
         >
-          发送
+          <ArrowUp size={16} />
         </button>
       </div>
 
