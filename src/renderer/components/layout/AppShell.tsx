@@ -233,9 +233,9 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         onSelectSession={resumeSession}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
+        chatInput={<ChatInput onSend={sendMessage} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
       >
         <ChatView messages={messages} />
-        <ChatInput onSend={sendMessage} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel

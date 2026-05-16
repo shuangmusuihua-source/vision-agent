@@ -109,7 +109,6 @@ function Sidebar({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-title">Explorer</span>
         <div className="sidebar-header-actions">
           <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
             <Search size={16} />
@@ -120,10 +119,10 @@ function Sidebar({
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="Settings">
             <ChevronRight size={16} />
           </button>
-          <button className="sidebar-toggle" onClick={onToggleCollapse}>
-            <ChevronDown size={16} />
-          </button>
         </div>
+        <button className="sidebar-toggle" onClick={onToggleCollapse}>
+          <ChevronDown size={16} />
+        </button>
       </div>
 
       <div className="sidebar-content">

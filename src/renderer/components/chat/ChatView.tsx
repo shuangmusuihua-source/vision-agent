@@ -17,7 +17,7 @@ function ChatView({ messages }: ChatViewProps): React.ReactElement {
     <div className="chat-view">
       {messages.length === 0 && (
         <div className="chat-empty">
-          <p>Agent is ready. How can I help?</p>
+          <span className="chat-empty-hint">开始对话</span>
         </div>
       )}
       {messages.map((msg) => (

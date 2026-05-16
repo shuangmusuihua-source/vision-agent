@@ -11,9 +11,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 1;
   padding: 40px 0;
+}
+
+.chat-empty-hint {
   color: var(--text-tertiary);
   font-size: 13px;
+  font-weight: 400;
 }
 
 /* --- Message Bubble --- */
@@ -108,7 +113,6 @@
 
 .tool-call-display {
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
   border-radius: var(--radius);
   font-size: 12px;
   margin-bottom: 4px;
@@ -176,7 +180,6 @@
 
 .tool-call-details {
   padding: 8px;
-  border-top: 1px solid var(--border-color);
 }
 
 .tool-call-input,
@@ -214,26 +217,25 @@
   align-items: flex-end;
   gap: 8px;
   padding: 8px 0;
-  border-top: 1px solid var(--border-color);
 }
 
 .chat-input {
   flex: 1;
   resize: none;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
   font-family: inherit;
   line-height: 1.5;
   color: var(--text-primary);
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   outline: none;
   max-height: 120px;
 }
 
 .chat-input:focus {
-  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
 }
 
 .chat-input::placeholder {
@@ -275,7 +277,6 @@
   gap: 6px;
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   font-size: 13px;
   width: 100%;
@@ -302,9 +303,8 @@
   left: 0;
   right: 0;
   background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   z-index: 10;
   margin-top: 4px;
 }
@@ -357,10 +357,10 @@
 
 .permission-dialog {
   background: var(--bg-primary);
-  border: 1px solid var(--border-color);
   border-radius: 8px;
   width: 100%;
   overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
 
 .permission-header {
@@ -369,7 +369,6 @@
   gap: 6px;
   padding: 8px 12px;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
 }
 
 .permission-icon {
@@ -428,7 +427,6 @@
   display: flex;
   gap: 8px;
   padding: 8px 12px;
-  border-top: 1px solid var(--border-color);
 }
 
 .permission-btn {
@@ -574,9 +572,8 @@
   max-height: 240px;
   overflow-y: auto;
   background: var(--bg-primary);
-  border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   z-index: 20;
   margin-bottom: 4px;
 }
@@ -588,13 +585,11 @@
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .skill-popup-item {
   padding: 6px 10px;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .skill-popup-item:last-child {
