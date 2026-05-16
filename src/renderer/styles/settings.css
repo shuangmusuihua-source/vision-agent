@@ -194,6 +194,14 @@
   color: var(--text-primary);
 }
 
+.profile-status-active {
+  color: var(--accent-color);
+}
+
+.profile-status-inactive {
+  color: var(--text-tertiary);
+}
+
 .profile-card-actions {
   display: flex;
   gap: 4px;
@@ -231,11 +239,34 @@
   margin-bottom: 0;
 }
 
+.profile-field.field-error {
+  animation: shake 0.4s ease;
+}
+
+.profile-field.field-error .profile-field-input {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+[data-theme="dark"] .profile-field.field-error .profile-field-input {
+  background: rgba(248, 113, 113, 0.08);
+}
+
 .profile-field-label {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-tertiary);
   margin-bottom: 4px;
+}
+
+.required-mark {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.field-error-msg {
+  font-size: 11px;
+  color: var(--color-danger);
+  margin-top: 4px;
 }
 
 .profile-field-value {
@@ -383,4 +414,14 @@
   color: var(--text-secondary);
   line-height: 1.6;
   margin-bottom: 16px;
+}
+
+/* --- Shake Animation --- */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
 }

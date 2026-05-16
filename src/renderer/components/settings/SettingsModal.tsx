@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Sun, Moon, Monitor, Users, Info, Plus, Trash2, X } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Sun, Moon, Monitor, Users, Info, Plus, X } from 'lucide-react'
 
 interface SettingsModalProps {
   onClose: () => void
@@ -27,6 +27,14 @@ const PROVIDER_OPTIONS: Array<{ value: ModelProfile['apiProvider']; label: strin
   { value: 'custom', label: 'Custom' }
 ]
 
+const NEW_PROFILE: Omit<ModelProfile, 'id'> = {
+  name: '',
+  apiKey: '',
+  apiProvider: 'anthropic',
+  baseUrl: '',
+  model: 'claude-sonnet-4-20250514'
+}
+
 function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [activePage, setActivePage] = useState<SettingsPage>('appearance')
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
@@ -35,6 +43,10 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({})
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<ModelProfile>>({})
+  const [isNewProfile, setIsNewProfile] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const apiKeyInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     window.api.settings.get().then((settings) => {
@@ -71,6 +83,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
   const startEditing = useCallback((profile: ModelProfile) => {
     setEditingProfileId(profile.id)
+    setIsNewProfile(false)
     setEditForm({
       name: profile.name,
       model: profile.model,
@@ -78,23 +91,71 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       apiKey: profile.apiKey,
       baseUrl: profile.baseUrl
     })
+    setValidationErrors({})
   }, [])
 
   const cancelEditing = useCallback(() => {
+    if (isNewProfile) {
+      setProfiles((prev) => prev.filter((p) => p.id !== editingProfileId))
+    }
     setEditingProfileId(null)
+    setIsNewProfile(false)
     setEditForm({})
-  }, [])
+    setValidationErrors({})
+  }, [isNewProfile, editingProfileId])
 
   const saveEditing = useCallback(async (id: string) => {
-    await window.api.settings.updateProfile(id, editForm)
+    const errors: Record<string, boolean> = {}
+    if (!editForm.name?.trim()) errors.name = true
+    if (!editForm.apiKey?.trim()) errors.apiKey = true
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      if (errors.name) nameInputRef.current?.focus()
+      else if (errors.apiKey) apiKeyInputRef.current?.focus()
+      return
+    }
+
+    if (isNewProfile) {
+      await window.api.settings.addProfile({ id, ...editForm } as ModelProfile)
+      if (!activeProfileId) {
+        await window.api.settings.setActiveProfile(id)
+        setActiveProfileId(id)
+      }
+    } else {
+      await window.api.settings.updateProfile(id, editForm)
+    }
     const settings = await window.api.settings.get()
     setProfiles(settings.profiles)
     setEditingProfileId(null)
+    setIsNewProfile(false)
     setEditForm({})
-  }, [editForm])
+    setValidationErrors({})
+  }, [editForm, isNewProfile, activeProfileId])
+
+  const handleAddProfile = useCallback(() => {
+    const id = `profile-${Date.now()}`
+    const tempProfile: ModelProfile = { id, ...NEW_PROFILE }
+    setProfiles((prev) => [...prev, tempProfile])
+    setEditingProfileId(id)
+    setIsNewProfile(true)
+    setEditForm({ ...NEW_PROFILE })
+    setValidationErrors({})
+  }, [])
 
   const toggleApiKey = useCallback((id: string) => {
     setShowApiKey((prev) => ({ ...prev, [id]: !prev[id] }))
+  }, [])
+
+  const clearFieldError = useCallback((field: string) => {
+    setValidationErrors((prev) => {
+      if (prev[field]) {
+        const next = { ...prev }
+        delete next[field]
+        return next
+      }
+      return prev
+    })
   }, [])
 
   return (
@@ -159,33 +220,55 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 const isEditing = editingProfileId === profile.id
                 return (
                   <div className="settings-section" key={profile.id}>
-                    <div className="settings-section-title">{profile.name}</div>
+                    <div className="settings-section-title">
+                      {isEditing && isNewProfile ? '新配置' : profile.name}
+                    </div>
                     <div className="profile-card">
                       <div className="profile-card-header">
-                        <span className="profile-card-name">
+                        <span className={`profile-card-name ${activeProfileId === profile.id ? 'profile-status-active' : 'profile-status-inactive'}`}>
                           {activeProfileId === profile.id ? '● 当前激活' : '○ 未激活'}
                         </span>
                         <div className="profile-card-actions">
-                          {activeProfileId !== profile.id && (
+                          {activeProfileId !== profile.id && !isNewProfile && (
                             <button className="profile-card-btn" onClick={() => handleSetActive(profile.id)}>激活</button>
                           )}
                           {!isEditing && (
                             <button className="profile-card-btn" onClick={() => startEditing(profile)}>编辑</button>
                           )}
-                          <button className="profile-card-btn danger" onClick={() => handleDeleteProfile(profile.id)}>删除</button>
+                          <button className="profile-card-btn danger" onClick={() => {
+                            if (isNewProfile) {
+                              setProfiles((prev) => prev.filter((p) => p.id !== profile.id))
+                              setEditingProfileId(null)
+                              setIsNewProfile(false)
+                              setEditForm({})
+                              setValidationErrors({})
+                            } else {
+                              handleDeleteProfile(profile.id)
+                            }
+                          }}>删除</button>
                         </div>
                       </div>
 
                       {isEditing ? (
                         <>
-                          <div className="profile-field">
-                            <div className="profile-field-label">配置名称</div>
+                          <div className={`profile-field ${validationErrors.name ? 'field-error' : ''}`}>
+                            <div className="profile-field-label">
+                              配置名称 <span className="required-mark">*</span>
+                            </div>
                             <input
+                              ref={nameInputRef}
                               className="profile-field-input"
                               type="text"
+                              placeholder="例如：My Opus"
                               value={editForm.name || ''}
-                              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                              onChange={(e) => {
+                                setEditForm((f) => ({ ...f, name: e.target.value }))
+                                clearFieldError('name')
+                              }}
                             />
+                            {validationErrors.name && (
+                              <div className="field-error-msg">请填写配置名称</div>
+                            )}
                           </div>
                           <div className="profile-field">
                             <div className="profile-field-label">模型</div>
@@ -211,19 +294,29 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               ))}
                             </select>
                           </div>
-                          <div className="profile-field">
-                            <div className="profile-field-label">API Key</div>
+                          <div className={`profile-field ${validationErrors.apiKey ? 'field-error' : ''}`}>
+                            <div className="profile-field-label">
+                              API Key <span className="required-mark">*</span>
+                            </div>
                             <div className="api-key-row">
                               <input
+                                ref={apiKeyInputRef}
                                 className="profile-field-input api-key-input"
                                 type={showApiKey[profile.id] ? 'text' : 'password'}
+                                placeholder="sk-ant-..."
                                 value={editForm.apiKey || ''}
-                                onChange={(e) => setEditForm((f) => ({ ...f, apiKey: e.target.value }))}
+                                onChange={(e) => {
+                                  setEditForm((f) => ({ ...f, apiKey: e.target.value }))
+                                  clearFieldError('apiKey')
+                                }}
                               />
                               <button className="api-key-toggle" onClick={() => toggleApiKey(profile.id)}>
                                 {showApiKey[profile.id] ? '隐藏' : '显示'}
                               </button>
                             </div>
+                            {validationErrors.apiKey && (
+                              <div className="field-error-msg">请填写 API Key</div>
+                            )}
                           </div>
                           <div className="profile-field">
                             <div className="profile-field-label">Base URL</div>
@@ -273,7 +366,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                   </div>
                 )
               })}
-              <button className="add-profile-btn" onClick={() => setActivePage('profiles')}>
+              <button className="add-profile-btn" onClick={handleAddProfile}>
                 <Plus size={16} />
                 添加配置
               </button>
