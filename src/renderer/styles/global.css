@@ -1,7 +1,8 @@
 :root {
   --bg-primary: #ffffff;
   --bg-secondary: #f7f7f5;
-  --bg-tertiary: #f1f1ef;
+  --drawer-bg: #f2f2f0;
+  --bg-tertiary: #eaeae8;
   --text-primary: #37352f;
   --text-secondary: #787574;
   --text-tertiary: #9b9a97;
@@ -34,7 +35,8 @@
 [data-theme="dark"] {
   --bg-primary: #181818;
   --bg-secondary: #1e1e1e;
-  --bg-tertiary: #262626;
+  --drawer-bg: #1c1c1c;
+  --bg-tertiary: #222222;
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
   --text-tertiary: #707070;

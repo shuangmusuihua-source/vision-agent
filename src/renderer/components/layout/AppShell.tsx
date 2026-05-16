@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
-import CronPanel from '../sidebar/CronPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
@@ -21,7 +20,6 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [agentCollapsed, setAgentCollapsed] = useState(false)
-  const [cronCollapsed, setCronCollapsed] = useState(false)
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
@@ -237,10 +235,6 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           </div>
         )}
       </div>
-      <CronPanel
-        collapsed={cronCollapsed}
-        onToggleCollapse={() => setCronCollapsed(!cronCollapsed)}
-      />
       <AgentPanel
         collapsed={agentCollapsed}
         onToggleCollapse={() => setAgentCollapsed(!agentCollapsed)}

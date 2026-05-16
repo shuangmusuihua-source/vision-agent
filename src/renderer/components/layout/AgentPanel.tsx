@@ -3,6 +3,7 @@ import type { AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from '
 import ProfileSwitcher from '../chat/ProfileSwitcher'
 import PermissionDialog from '../chat/PermissionDialog'
 import SessionHistory from '../chat/SessionHistory'
+import DrawerZone from './DrawerZone'
 
 interface AgentPanelProps {
   collapsed: boolean
@@ -71,6 +72,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, 
           </div>
         </div>
         <div className="agent-panel-footer">
+          <DrawerZone />
           {chatInput}
           {usageInfo && (
             <div className="agent-usage">

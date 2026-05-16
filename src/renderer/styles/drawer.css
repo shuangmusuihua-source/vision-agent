@@ -1,0 +1,396 @@
+/* --- Drawer Zone (collapsible area above chat input) --- */
+
+.drawer-zone {
+  position: relative;
+}
+
+.drawer {
+  background: var(--drawer-bg);
+  border-radius: 10px 10px 0 0;
+  overflow: hidden;
+}
+
+/* Drawer lip — the "虚掩" visible part when collapsed */
+.drawer-lip {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 4px 0 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.drawer-lip:hover {
+  background: var(--bg-tertiary);
+}
+
+.drawer-lip-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-left: auto;
+  transition: color 0.15s;
+}
+
+.drawer-lip:hover .drawer-lip-icon {
+  color: var(--text-secondary);
+}
+
+.drawer-lip-icon-active {
+  color: var(--text-primary);
+}
+
+.drawer-chevron {
+  transition: transform 0.15s;
+}
+
+.drawer-chevron-up {
+  transform: rotate(180deg);
+}
+
+/* Drawer body — slides out */
+.drawer-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.drawer-zone-expanded .drawer-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.drawer-body-inner {
+  padding: 0 10px 10px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.drawer-zone-expanded .drawer-body-inner {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.05s;
+}
+
+.drawer-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 0 6px;
+}
+
+/* --- Task list --- */
+
+.drawer-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 7px;
+  transition: background 0.15s;
+}
+
+.drawer-task:hover {
+  background: var(--bg-hover);
+}
+
+.drawer-task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer-task-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-task-schedule {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.drawer-task-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.drawer-task-action {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  transition: all 0.15s;
+}
+
+.drawer-task-action:hover {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--color-success);
+}
+
+.drawer-task-action-danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--color-error);
+}
+
+.drawer-task-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Add button --- */
+
+.drawer-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--accent-color);
+  background: rgba(108, 140, 255, 0.12);
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.drawer-add-btn:hover {
+  background: rgba(108, 140, 255, 0.2);
+}
+
+/* --- Empty state --- */
+
+.drawer-empty {
+  padding: 4px 0;
+}
+
+/* --- Form --- */
+
+.drawer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawer-input {
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+}
+
+.drawer-input:focus {
+  background: var(--bg-hover);
+}
+
+.drawer-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.drawer-textarea {
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 48px;
+  max-height: 80px;
+  line-height: 1.5;
+}
+
+.drawer-textarea:focus {
+  background: var(--bg-hover);
+}
+
+.drawer-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* --- Mode tabs --- */
+
+.drawer-mode-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.drawer-mode-tab {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  transition: all 0.15s;
+}
+
+.drawer-mode-tab.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* --- Preset grid --- */
+
+.drawer-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+
+.drawer-preset-btn {
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  transition: all 0.15s;
+}
+
+.drawer-preset-btn.active {
+  background: rgba(108, 140, 255, 0.12);
+  color: var(--accent-color);
+}
+
+.drawer-preset-btn:hover {
+  color: var(--text-secondary);
+}
+
+/* --- Time picker --- */
+
+.drawer-time-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.drawer-time-btn {
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  transition: all 0.15s;
+}
+
+.drawer-time-btn.active {
+  background: rgba(108, 140, 255, 0.12);
+  color: var(--accent-color);
+}
+
+/* --- Select --- */
+
+.drawer-select {
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+  appearance: none;
+  cursor: pointer;
+}
+
+.drawer-select:focus {
+  background: var(--bg-hover);
+}
+
+/* --- Interval row --- */
+
+.drawer-interval-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drawer-interval-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.drawer-interval-input {
+  width: 60px;
+  text-align: center;
+}
+
+/* --- Preview --- */
+
+.drawer-preview {
+  font-size: 11px;
+  color: var(--accent-color);
+  padding: 4px 0;
+  font-weight: 500;
+}
+
+/* --- Submit button --- */
+
+.drawer-submit-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--accent-color);
+  color: #fff;
+  transition: opacity 0.15s;
+}
+
+.drawer-submit-btn:hover {
+  opacity: 0.9;
+}
+
+.drawer-submit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Form close --- */
+
+.drawer-form-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  transition: color 0.15s;
+}
+
+.drawer-form-close:hover {
+  color: var(--text-secondary);
+}
