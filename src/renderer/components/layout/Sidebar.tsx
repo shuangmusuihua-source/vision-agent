@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2, X, Search, Settings, PanelLeft } from 'lucide-react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2, X, Search, Settings, Sidebar as SidebarIcon } from 'lucide-react'
 import type { FileEntry } from '../lib/ipc'
 
 interface MemoryEntry {
@@ -94,45 +94,24 @@ function Sidebar({
     })
   }
 
-  if (collapsed) {
-    return (
-      <div className="sidebar sidebar-collapsed">
-        <div className="sidebar-collapsed-icons">
-          <button className="sidebar-collapsed-icon" onClick={onToggleCollapse} title="展开侧边栏">
-            <PanelLeft size={18} />
-          </button>
-          <button className="sidebar-collapsed-icon" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
-            <Search size={18} />
-          </button>
-          <button className="sidebar-collapsed-icon" onClick={onOpenDirectory} title="打开目录">
-            <FolderOpen size={18} />
-          </button>
-          <button className="sidebar-collapsed-icon" onClick={onOpenSettings} title="设置">
-            <Settings size={18} />
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   const workspaceName = (path: string) => path.split('/').pop() || path
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-header-actions">
           <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
-            <Search size={16} />
+            <Search size={14} />
           </button>
-          <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="Open workspace">
-            <FolderOpen size={16} />
+          <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="打开工作区">
+            <FolderOpen size={14} />
           </button>
-          <button className="sidebar-icon-btn" onClick={onOpenSettings} title="Settings">
-            <ChevronRight size={16} />
+          <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置">
+            <Settings size={14} />
           </button>
         </div>
         <button className="sidebar-toggle" onClick={onToggleCollapse}>
-          <ChevronDown size={16} />
+          <SidebarIcon size={14} />
         </button>
       </div>
 

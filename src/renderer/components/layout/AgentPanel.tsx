@@ -1,4 +1,4 @@
-import { MessageSquare, ChevronRight } from 'lucide-react'
+import { Sidebar as SidebarIcon } from 'lucide-react'
 import type { AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
 import ProfileSwitcher from '../chat/ProfileSwitcher'
 import PermissionDialog from '../chat/PermissionDialog'
@@ -27,7 +27,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, 
     return (
       <div className="agent-panel agent-panel-collapsed">
         <button className="agent-panel-toggle-btn" onClick={onToggleCollapse}>
-          <MessageSquare size={16} />
+          <SidebarIcon size={16} />
         </button>
       </div>
     )
@@ -48,7 +48,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, 
           </span>
         </div>
         <button className="agent-panel-toggle-btn" onClick={onToggleCollapse}>
-          <ChevronRight size={16} />
+          <SidebarIcon size={16} />
         </button>
       </div>
       <div className="agent-panel-body">

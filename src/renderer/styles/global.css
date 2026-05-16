@@ -2,6 +2,7 @@
   --bg-primary: #ffffff;
   --bg-secondary: #f7f7f5;
   --drawer-bg: #f2f2f0;
+  --sidebar-bg: rgba(247, 247, 245, 0.7);
   --bg-tertiary: #eaeae8;
   --text-primary: #37352f;
   --text-secondary: #787574;
@@ -36,6 +37,7 @@
   --bg-primary: #181818;
   --bg-secondary: #1e1e1e;
   --drawer-bg: #1c1c1c;
+  --sidebar-bg: rgba(30, 30, 30, 0.7);
   --bg-tertiary: #222222;
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;

@@ -14,8 +14,6 @@ function createWindow(): void {
     minHeight: 400,
     show: false,
     titleBarStyle: 'hiddenInset',
-    vibrancy: 'sidebar',
-    backgroundMaterial: 'vibrancy',
     title: 'Vision Agent',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
