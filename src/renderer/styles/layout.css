@@ -363,6 +363,7 @@
   flex-direction: column;
   overflow: hidden;
   padding: 0 12px;
+  position: relative;
 }
 
 .agent-panel-content {
@@ -370,6 +371,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-bottom: 80px;
 }
 
 .agent-panel-messages {
@@ -380,8 +382,12 @@
 }
 
 .agent-panel-footer {
-  flex-shrink: 0;
-  padding: 6px 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 12px;
+  background: transparent;
 }
 
 .agent-usage {
