@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2, X, Search } from 'lucide-react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Brain, Trash2, X, Search, Settings, PanelLeft } from 'lucide-react'
 import type { FileEntry } from '../lib/ipc'
 
 interface MemoryEntry {
@@ -97,9 +97,20 @@ function Sidebar({
   if (collapsed) {
     return (
       <div className="sidebar sidebar-collapsed">
-        <button className="sidebar-toggle" onClick={onToggleCollapse}>
-          <ChevronRight size={16} />
-        </button>
+        <div className="sidebar-collapsed-icons">
+          <button className="sidebar-collapsed-icon" onClick={onToggleCollapse} title="展开侧边栏">
+            <PanelLeft size={18} />
+          </button>
+          <button className="sidebar-collapsed-icon" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
+            <Search size={18} />
+          </button>
+          <button className="sidebar-collapsed-icon" onClick={onOpenDirectory} title="打开目录">
+            <FolderOpen size={18} />
+          </button>
+          <button className="sidebar-collapsed-icon" onClick={onOpenSettings} title="设置">
+            <Settings size={18} />
+          </button>
+        </div>
       </div>
     )
   }

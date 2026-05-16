@@ -106,6 +106,10 @@ interface SearchApi {
   query: (keyword: string) => Promise<SearchResult[]>
 }
 
+interface MenuApi {
+  onAction: (callback: (action: string) => void) => () => void
+}
+
 interface WindowApi {
   ping: () => Promise<string>
   workspace: WorkspaceApi
@@ -116,6 +120,7 @@ interface WindowApi {
   cron: CronApi
   skills: SkillsApi
   search: SearchApi
+  menu: MenuApi
 }
 
 interface MemoryApi {
@@ -152,6 +157,7 @@ export type {
   CronApi,
   SkillsApi,
   SearchApi,
+  MenuApi,
   FileEntry,
   ModelProfile,
   AppSettings,

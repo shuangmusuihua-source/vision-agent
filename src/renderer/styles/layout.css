@@ -11,17 +11,42 @@
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  background: var(--bg-secondary);
+  background: transparent;
   display: flex;
   flex-direction: column;
   transition: width 0.2s ease;
 }
 
 .sidebar-collapsed {
-  width: 40px;
-  min-width: 40px;
+  width: 48px;
+  min-width: 48px;
   align-items: center;
   padding-top: 36px;
+}
+
+.sidebar-collapsed-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.sidebar-collapsed-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.sidebar-collapsed-icon:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
 }
 
 .sidebar-header {
@@ -29,12 +54,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 36px 12px 8px;
+  -webkit-app-region: drag;
 }
 
 .sidebar-header-actions {
   display: flex;
   align-items: center;
   gap: 2px;
+  -webkit-app-region: no-drag;
 }
 
 .sidebar-icon-btn {
@@ -60,6 +87,7 @@
   height: 24px;
   border-radius: var(--radius);
   color: var(--text-secondary);
+  -webkit-app-region: no-drag;
 }
 
 .sidebar-toggle:hover {
@@ -305,12 +333,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 36px 12px 8px;
+  -webkit-app-region: drag;
 }
 
 .agent-panel-header-left {
   display: flex;
   align-items: center;
   gap: 6px;
+  -webkit-app-region: no-drag;
 }
 
 .agent-status-dot {
@@ -381,6 +411,7 @@
   height: 28px;
   border-radius: 6px;
   color: var(--text-secondary);
+  -webkit-app-region: no-drag;
 }
 
 .agent-panel-toggle-btn:hover {

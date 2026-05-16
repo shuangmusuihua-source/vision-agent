@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
+import { setupMenu } from './menu'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -9,10 +10,13 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: 680,
+    minHeight: 400,
     show: false,
     titleBarStyle: 'hiddenInset',
+    vibrancy: 'sidebar',
+    backgroundMaterial: 'vibrancy',
+    title: 'Vision Agent',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -40,6 +44,7 @@ export function getMainWindow(): BrowserWindow | null {
 }
 
 app.whenReady().then(() => {
+  setupMenu()
   registerIpcHandlers()
   createWindow()
 

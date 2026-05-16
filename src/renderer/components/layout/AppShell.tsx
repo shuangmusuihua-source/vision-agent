@@ -42,6 +42,27 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // Menu bar actions
+  useEffect(() => {
+    const unsub = window.api.menu.onAction((action) => {
+      switch (action) {
+        case 'open-settings':
+          onOpenSettings()
+          break
+        case 'toggle-sidebar':
+          setSidebarCollapsed((v) => !v)
+          break
+        case 'toggle-agent-panel':
+          setAgentCollapsed((v) => !v)
+          break
+        case 'open-search':
+          setShowSearch(true)
+          break
+      }
+    })
+    return unsub
+  }, [onOpenSettings])
+
   const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
 
   // Restore/refresh workspaces from settings

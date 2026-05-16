@@ -96,6 +96,14 @@ const api = {
 
   search: {
     query: (keyword: string) => ipcRenderer.invoke('search:query', keyword)
+  },
+
+  menu: {
+    onAction: (callback: (action: string) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, action: string) => callback(action)
+      ipcRenderer.on('menu-action', handler)
+      return () => ipcRenderer.removeListener('menu-action', handler)
+    }
   }
 }
 
