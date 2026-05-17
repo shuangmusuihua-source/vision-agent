@@ -258,29 +258,6 @@
   -webkit-app-region: drag;
 }
 
-.graph-toggle-btn {
-  margin-left: auto;
-  margin-right: 8px;
-  padding: 2px 8px;
-  font-size: 12px;
-  border-radius: var(--radius);
-  color: var(--text-secondary);
-  background: transparent;
-  white-space: nowrap;
-  align-self: center;
-}
-
-.graph-toggle-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.graph-toggle-active {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
 .editor-placeholder {
   padding: 48px 64px;
   max-width: 800px;

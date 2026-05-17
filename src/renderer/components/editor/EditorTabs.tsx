@@ -52,17 +52,27 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
     if (!el) return
     const amount = el.clientWidth * 0.6
     el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' })
-    setTimeout(updateScrollState, 300)
+  }, [])
+
+  // Update scroll state after scroll animation completes
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const onScrollEnd = () => updateScrollState()
+    el.addEventListener('scrollend', onScrollEnd)
+    // Also update on regular scroll events for immediate feedback
+    el.addEventListener('scroll', updateScrollState)
+    return () => {
+      el.removeEventListener('scrollend', onScrollEnd)
+      el.removeEventListener('scroll', updateScrollState)
+    }
   }, [updateScrollState])
 
   const handleClose = useCallback((e: React.MouseEvent, path: string) => {
     e.stopPropagation()
     onTabClose(path)
   }, [onTabClose])
-
-  const handleScroll = useCallback(() => {
-    updateScrollState()
-  }, [updateScrollState])
 
   return (
     <div className="editor-tabs-container">
@@ -71,7 +81,7 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
           <CaretLeft size={14} weight="regular" />
         </button>
       )}
-      <div className="editor-tabs" ref={scrollRef} onScroll={handleScroll}>
+      <div className="editor-tabs" ref={scrollRef}>
         {tabs.map((path) => (
           <div
             key={path}

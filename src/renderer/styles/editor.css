@@ -342,6 +342,14 @@
   background: var(--bg-secondary);
 }
 
+.editor-tabs-nav-left {
+  margin-right: 2px;
+}
+
+.editor-tabs-nav-right {
+  margin-left: 2px;
+}
+
 .editor-tab {
   display: flex;
   align-items: center;

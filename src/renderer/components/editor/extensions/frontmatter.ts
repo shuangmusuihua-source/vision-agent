@@ -88,9 +88,12 @@ export const Frontmatter = Node.create<FrontmatterOptions>({
       Backspace: ({ editor }) => {
         const { empty, $anchor } = editor.state.selection
         if (!empty) return false
+        // Only delete entire frontmatter when cursor is at the very start of the node
         if ($anchor.parentOffset !== 0) return false
-        const node = $anchor.node()
-        if (node.type.name !== this.name) return false
+        const parent = $anchor.parent
+        if (parent.type.name !== this.name) return false
+        // Only trigger if cursor is at doc position 0 (start of frontmatter node)
+        if ($anchor.pos !== 1) return false
         return editor.commands.removeFrontmatter()
       }
     }

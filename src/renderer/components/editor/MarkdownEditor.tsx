@@ -308,6 +308,8 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       editor.commands.setContent(body || '', { contentType: 'markdown' })
       if (frontmatter) {
         editor.commands.setFrontmatter({ content: frontmatter })
+      } else {
+        editor.commands.removeFrontmatter()
       }
     }
   }, [content, editor])

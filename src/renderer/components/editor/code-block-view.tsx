@@ -18,13 +18,27 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
   const language = node.attrs.language as string | null
   const isMermaid = language === 'mermaid'
 
+  const [themeKey, setThemeKey] = useState(0)
+
   const nodeText = node.textContent || ''
+  const mermaidCodeRef = useRef(nodeText)
+  const [mermaidCode, setMermaidCode] = useState(nodeText)
+
+  // Only update mermaid code when not actively editing (debounced via showSource toggle or theme change)
+  useEffect(() => {
+    if (!isMermaid) return
+    const timer = setTimeout(() => {
+      setMermaidCode(nodeText)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [nodeText, isMermaid])
+
   const getMermaidCode = useCallback(() => {
     if (codeRef.current?.textContent) {
       return codeRef.current.textContent
     }
-    return nodeText
-  }, [nodeText])
+    return mermaidCode
+  }, [mermaidCode])
 
   const handleCopy = useCallback(() => {
     const text = codeRef.current?.textContent ?? ''
@@ -43,6 +57,7 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
     const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
     setMermaidError(null)
 
+    mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme() })
     mermaid
       .render(id, code.trim())
       .then(({ svg }) => {
@@ -55,13 +70,13 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
         const phantom = document.querySelector(`#d${id}`)
         if (phantom) phantom.remove()
       })
-  }, [isMermaid, showSource, getMermaidCode])
+  }, [isMermaid, showSource, getMermaidCode, themeKey])
 
   useEffect(() => {
     if (!isMermaid) return
 
     const observer = new MutationObserver(() => {
-      mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme() })
+      setThemeKey((k) => k + 1)
     })
     observer.observe(document.documentElement, {
       attributes: true,
