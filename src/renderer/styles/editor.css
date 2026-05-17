@@ -1,209 +1,98 @@
-/* --- Editor Tabs --- */
-
-.editor-tabs {
-  display: flex;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  overflow-x: auto;
-  flex-shrink: 0;
-}
-
-.editor-tabs::-webkit-scrollbar {
-  height: 0;
-}
-
-.editor-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-right: 1px solid var(--border-color);
-  white-space: nowrap;
-  min-width: 0;
-  max-width: 160px;
-}
-
-.editor-tab:hover {
-  background: var(--bg-tertiary);
-}
-
-.editor-tab-active {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--accent-color);
-}
-
-.editor-tab-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.editor-tab-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.editor-tab-close:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
 /* --- Editor Wrapper --- */
 
 .editor-wrapper {
   flex: 1;
   overflow-y: auto;
   padding: 16px 24px;
-}
-
-.editor-empty {
   display: flex;
-  align-items: center;
   justify-content: center;
-  flex: 1;
-  color: var(--text-tertiary);
-  font-size: 14px;
 }
-
-.editor-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  color: var(--text-tertiary);
-  font-size: 14px;
-}
-
-/* --- Tiptap Editor --- */
 
 .markdown-editor {
   outline: none;
   min-height: 100%;
-  font-size: 15px;
-  line-height: 1.7;
+  max-width: 800px;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
   color: var(--text-primary);
 }
 
+.markdown-editor > :first-child {
+  margin-top: 0;
+}
+
+/* --- Headings --- */
+
+.markdown-editor h1,
+.markdown-editor h2,
+.markdown-editor h3,
+.markdown-editor h4,
+.markdown-editor h5,
+.markdown-editor h6 {
+  font-family: var(--heading-font);
+  line-height: var(--heading-line-height);
+  margin-top: var(--heading-top-margin);
+  margin-bottom: var(--heading-bottom-margin);
+}
+
 .markdown-editor h1 {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 24px 0 12px;
-  line-height: 1.3;
+  font-size: var(--h1-size);
+  font-weight: var(--h1-weight);
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .markdown-editor h2 {
-  font-size: 22px;
-  font-weight: 600;
-  margin: 20px 0 10px;
-  line-height: 1.3;
+  font-size: var(--h2-size);
+  font-weight: var(--h2-weight);
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .markdown-editor h3 {
-  font-size: 18px;
+  font-size: var(--h3-size);
+  font-weight: var(--h3-weight);
+}
+
+.markdown-editor h4 {
+  font-size: var(--h4-size);
+  font-weight: var(--h4-weight);
+}
+
+.markdown-editor h5,
+.markdown-editor h6 {
+  font-size: 1em;
   font-weight: 600;
-  margin: 16px 0 8px;
-  line-height: 1.4;
-}
-
-.markdown-editor p {
-  margin-bottom: 8px;
-}
-
-.markdown-editor ul,
-.markdown-editor ol {
-  padding-left: 24px;
-  margin-bottom: 8px;
-}
-
-.markdown-editor blockquote {
-  border-left: 3px solid var(--border-color);
-  padding-left: 16px;
-  margin: 8px 0;
   color: var(--text-secondary);
 }
 
-.markdown-editor code {
-  font-family: 'SF Mono', Menlo, monospace;
-  font-size: 13px;
-  background: var(--bg-tertiary);
-  padding: 2px 5px;
-  border-radius: 3px;
+/* --- Paragraphs --- */
+
+.markdown-editor p {
+  margin-bottom: var(--editor-paragraph-spacing);
 }
 
-.markdown-editor pre {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  overflow-x: auto;
-  font-size: 13px;
-  margin: 8px 0;
+/* --- Lists --- */
+
+.markdown-editor ul,
+.markdown-editor ol {
+  padding-left: var(--list-indent);
+  margin-bottom: var(--editor-paragraph-spacing);
 }
 
-.markdown-editor pre code {
-  background: none;
-  padding: 0;
-  font-size: 13px;
+.markdown-editor li {
+  margin-bottom: 0.25em;
 }
 
-/* Code block syntax highlighting */
-.markdown-editor pre .hljs-keyword,
-.markdown-editor pre .hljs-selector-tag,
-.markdown-editor pre .hljs-literal { color: var(--hl-keyword); }
-
-.markdown-editor pre .hljs-string,
-.markdown-editor pre .hljs-doctag,
-.markdown-editor pre .hljs-template-variable { color: var(--hl-string); }
-
-.markdown-editor pre .hljs-number,
-.markdown-editor pre .hljs-built_in { color: var(--hl-number); }
-
-.markdown-editor pre .hljs-comment,
-.markdown-editor pre .hljs-quote { color: var(--hl-comment); font-style: italic; }
-
-.markdown-editor pre .hljs-function .hljs-title,
-.markdown-editor pre .hljs-title { color: var(--hl-function); }
-
-.markdown-editor pre .hljs-type,
-.markdown-editor pre .hljs-class { color: var(--hl-type); }
-
-.markdown-editor pre .hljs-variable,
-.markdown-editor pre .hljs-attr { color: var(--hl-variable); }
-
-.markdown-editor pre .hljs-params { color: var(--hl-params); }
-
-.markdown-editor hr {
-  border: none;
-  border-top: 1px solid var(--border-color);
-  margin: 16px 0;
+.markdown-editor li > ul,
+.markdown-editor li > ol {
+  margin-bottom: 0;
+  margin-top: 0.25em;
 }
 
-.markdown-editor a {
-  color: var(--accent-color);
-  text-decoration: none;
-}
-
-.markdown-editor a:hover {
-  text-decoration: underline;
-}
-
-.markdown-editor img {
-  max-width: 100%;
-  border-radius: var(--radius);
-}
-
-/* --- Task List --- */
+/* Task list */
 
 .markdown-editor ul[data-type="taskList"] {
   list-style: none;
@@ -214,153 +103,408 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 0.35em;
 }
 
 .markdown-editor ul[data-type="taskList"] li > label {
-  display: flex;
-  align-items: center;
-  margin-top: 4px;
   flex-shrink: 0;
+  margin-top: 3px;
 }
 
 .markdown-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
   accent-color: var(--accent-color);
-  cursor: pointer;
 }
 
 .markdown-editor ul[data-type="taskList"] li > div {
   flex: 1;
+  min-width: 0;
 }
 
-/* --- Table --- */
+/* --- Blockquotes --- */
+
+.markdown-editor blockquote {
+  border-left: var(--blockquote-border-width) solid var(--accent-color);
+  background: var(--bg-secondary);
+  border-radius: 0 8px 8px 0;
+  padding: 0.5em 1em;
+  margin: 0 0 var(--editor-paragraph-spacing) 0;
+  color: var(--text-secondary);
+}
+
+.markdown-editor blockquote blockquote {
+  border-left-color: var(--text-tertiary);
+  background: transparent;
+}
+
+.markdown-editor blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Inline code --- */
+
+.markdown-editor code {
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  color: var(--accent-color);
+}
+
+.markdown-editor pre code {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+}
+
+/* --- Code blocks --- */
+
+.markdown-editor pre {
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1em;
+  margin: 0 0 var(--editor-paragraph-spacing) 0;
+  overflow-x: auto;
+  position: relative;
+}
+
+/* Enhanced code block wrapper */
+
+.code-block-wrapper {
+  position: relative;
+  margin: 0 0 var(--editor-paragraph-spacing) 0;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px 8px 0 0;
+  font-family: var(--font-sans);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.code-block-wrapper:hover .code-block-header {
+  opacity: 1;
+}
+
+.code-block-language {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-block-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.code-block-copy-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+/* --- Horizontal rule --- */
+
+.markdown-editor hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 1.5em 0;
+}
+
+/* --- Tables --- */
 
 .markdown-editor table {
   border-collapse: collapse;
   width: 100%;
-  margin: 8px 0;
+  margin: 0 0 var(--editor-paragraph-spacing) 0;
   overflow: hidden;
+  border-radius: 6px;
 }
 
-.markdown-editor table td,
-.markdown-editor table th {
+.markdown-editor th,
+.markdown-editor td {
   border: 1px solid var(--border-color);
-  padding: 6px 10px;
-  min-width: 80px;
-  vertical-align: top;
+  padding: 8px 12px;
   text-align: left;
+  min-width: 80px;
 }
 
-.markdown-editor table th {
+.markdown-editor th {
   background: var(--bg-secondary);
   font-weight: 600;
+  font-size: 0.9em;
 }
 
-.markdown-editor table .selectedCell {
-  background: var(--bg-tertiary);
+.markdown-editor tr:hover td {
+  background: var(--bg-secondary);
 }
 
-.markdown-editor table .column-resize-handle {
-  position: absolute;
-  right: -2px;
-  top: 0;
-  bottom: -2px;
-  width: 4px;
-  background-color: var(--accent-color);
-  pointer-events: none;
+/* --- Images --- */
+
+.markdown-editor img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 0.5em 0;
+}
+
+/* --- Links --- */
+
+.markdown-editor a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.markdown-editor a:hover {
+  text-decoration: underline;
 }
 
 /* --- Highlight --- */
 
 .markdown-editor mark {
-  background: var(--color-mark);
-  padding: 1px 3px;
+  background: rgba(255, 212, 0, 0.4);
   border-radius: 2px;
+  padding: 0.1em 0.2em;
 }
 
-/* --- Wikilink --- */
+/* --- Strong / Em --- */
 
-.markdown-editor .wikilink {
-  color: var(--accent-color);
-  background: var(--color-wikilink-bg);
-  padding: 1px 4px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-weight: 500;
+.markdown-editor strong {
+  font-weight: 650;
 }
 
-.markdown-editor .wikilink:hover {
-  background: var(--color-wikilink-bg-hover);
-  text-decoration: none;
-}
+/* --- Editor tabs --- */
 
-/* --- Wikilink Suggestion --- */
-
-.wikilink-suggestion-list {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  padding: 4px 0;
-  max-height: 200px;
-  overflow-y: auto;
-  font-size: 13px;
-  min-width: 200px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.wikilink-suggestion-empty {
-  padding: 8px 12px;
-  color: var(--text-tertiary);
-}
-
-.wikilink-suggestion-item {
+.editor-tabs {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  gap: 1px;
+  padding: 0 8px;
+  -webkit-app-region: drag;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-radius: 6px;
   cursor: pointer;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  transition: background 0.1s;
 }
 
-.wikilink-suggestion-item:hover,
-.wikilink-suggestion-selected {
-  background: var(--bg-tertiary);
-}
-
-.wikilink-suggestion-label {
-  font-weight: 500;
+.editor-tab:hover {
+  background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
-.wikilink-suggestion-path {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.editor-tab-active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
-/* --- Editor Context Menu --- */
+.editor-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.editor-tab:hover .editor-tab-close {
+  opacity: 1;
+}
+
+.editor-tab-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* --- Editor context menu --- */
 
 .editor-context-menu {
   position: fixed;
-  z-index: 10000;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  padding: 4px 0;
-  min-width: 160px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  min-width: 140px;
 }
 
 .editor-context-menu-item {
   padding: 6px 12px;
   font-size: 13px;
   color: var(--text-primary);
+  border-radius: 4px;
   cursor: pointer;
 }
 
 .editor-context-menu-item:hover {
-  background: var(--bg-tertiary);
+  background: var(--accent-color);
+  color: #fff;
+}
+
+/* --- Editor loading --- */
+
+.editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+}
+
+/* --- Editor status bar --- */
+
+.editor-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 24px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+/* --- Source mode --- */
+
+.editor-source-textarea {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--font-mono);
+  font-size: var(--code-font-size);
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: transparent;
+  padding: 16px 24px;
+  box-sizing: border-box;
+}
+
+/* --- Focus mode --- */
+
+.markdown-editor.focus-mode [data-decorator-class="focus-mode-dimmed"],
+.markdown-editor.focus-mode .focus-mode-dimmed {
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
+}
+
+.markdown-editor.focus-mode .focus-mode-dimmed:hover {
+  opacity: 0.6;
+}
+
+.markdown-editor.focus-mode .focus-mode-active {
+  opacity: 1;
+}
+
+/* --- Heading anchors --- */
+
+.markdown-editor .heading-with-anchor {
+  position: relative;
+}
+
+.markdown-editor .heading-with-anchor::after {
+  content: '#';
+  position: absolute;
+  left: -1.2em;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-weight: 400;
+}
+
+.markdown-editor .heading-with-anchor:hover::after {
+  opacity: 1;
+}
+
+/* --- Wikilink --- */
+
+.wikilink {
+  color: var(--accent-color);
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 2px;
+  background: var(--bg-secondary);
+}
+
+.wikilink:hover {
+  text-decoration: underline;
+}
+
+.wikilink-suggestion-list {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+  min-width: 200px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.wikilink-suggestion-empty {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.wikilink-suggestion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wikilink-suggestion-item:hover,
+.wikilink-suggestion-selected {
+  background: var(--bg-secondary);
+}
+
+.wikilink-suggestion-label {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.wikilink-suggestion-path {
+  font-size: 11px;
+  color: var(--text-tertiary);
 }

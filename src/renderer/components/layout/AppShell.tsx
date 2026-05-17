@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -28,6 +28,10 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const [showGraph, setShowGraph] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [sourceMode, setSourceMode] = useState(false)
+  const [focusMode, setFocusMode] = useState(false)
+  const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
+  const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
   // Cmd+Shift+F to open search
   useEffect(() => {
@@ -56,6 +60,14 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           break
         case 'open-search':
           setShowSearch(true)
+          break
+        case 'toggle-source-mode':
+          setSourceMode((v) => !v)
+          break
+        case 'toggle-focus-mode':
+          setFocusMode((v) => !v)
+          break
+        case 'save-file':
           break
       }
     })
@@ -226,9 +238,12 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
             content={activeContent}
             filePath={activeTab}
             workspacePath={workspacePaths[0] || ''}
+            sourceMode={sourceMode}
+            focusMode={focusMode}
             onOpenFile={handleFileSelect}
             onSave={handleSave}
             onAskAgent={handleAskAgent}
+            onStatsUpdate={(words, chars) => setEditorStats({ words, chars })}
           />
         ) : (
           <div className="editor-empty">
@@ -236,6 +251,14 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           </div>
         )}
         </div>
+        {activeTab && (
+          <div className="editor-status-bar">
+            <span>{editorStats.words} words</span>
+            <span>{editorStats.chars} characters</span>
+            {sourceMode && <span>Source</span>}
+            {focusMode && <span>Focus</span>}
+          </div>
+        )}
       </div>
       <AgentPanel
         collapsed={agentCollapsed}

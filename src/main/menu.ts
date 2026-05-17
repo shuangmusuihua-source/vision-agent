@@ -25,6 +25,12 @@ export function setupMenu(): void {
         ]
       : []),
     {
+      label: 'File',
+      submenu: [
+        { label: 'Save', accelerator: 'CmdOrCtrl+S', click: sendMenuAction('save-file') }
+      ]
+    },
+    {
       label: 'Edit',
       submenu: [
         { role: 'undo' },
@@ -43,6 +49,9 @@ export function setupMenu(): void {
         { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+B', click: sendMenuAction('toggle-agent-panel') },
         { type: 'separator' },
         { label: 'Search', accelerator: 'CmdOrCtrl+Shift+F', click: sendMenuAction('open-search') },
+        { type: 'separator' },
+        { label: 'Source Mode', accelerator: 'CmdOrCtrl+/', click: sendMenuAction('toggle-source-mode') },
+        { label: 'Focus Mode', accelerator: 'CmdOrCtrl+\\', click: sendMenuAction('toggle-focus-mode') },
         { type: 'separator' },
         { role: 'togglefullscreen' },
         { role: 'toggleDevTools' }

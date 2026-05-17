@@ -1,6 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { Table } from '@tiptap/extension-table'
@@ -15,6 +14,12 @@ import { ReactRenderer } from '@tiptap/react'
 import tippy, { type Instance as TippyInstance } from 'tippy.js'
 import { Wikilink } from './extensions/wikilink'
 import { Markdown } from '@tiptap/markdown'
+import { CodeBlockEnhanced } from './extensions/code-block-enhanced'
+import { FocusMode } from './extensions/focus-mode'
+import { HeadingAnchor } from './extensions/heading-anchor'
+import { ImagePaste } from './extensions/image-paste'
+import Image from '@tiptap/extension-image'
+import { Extension } from '@tiptap/core'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 
 const lowlight = createLowlight(common)
@@ -28,9 +33,12 @@ interface MarkdownEditorProps {
   content: string
   filePath: string
   workspacePath: string | null
+  sourceMode: boolean
+  focusMode: boolean
   onOpenFile: (filePath: string) => void
   onSave: (filePath: string, content: string) => void
   onAskAgent: (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => void
+  onStatsUpdate: (wordCount: number, charCount: number) => void
 }
 
 function SuggestionList({ items, command, selectedIndex }: {
@@ -58,9 +66,11 @@ function SuggestionList({ items, command, selectedIndex }: {
   )
 }
 
-function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, onAskAgent }: MarkdownEditorProps): React.ReactElement {
+function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMode, onOpenFile, onSave, onAskAgent, onStatsUpdate }: MarkdownEditorProps): React.ReactElement {
   const [markdownFiles, setMarkdownFiles] = useState<MarkdownFile[]>([])
   const filesRef = useRef<MarkdownFile[]>([])
+  const [internalSourceMode, setInternalSourceMode] = useState(sourceMode)
+  const [sourceText, setSourceText] = useState('')
 
   useEffect(() => {
     if (!workspacePath) {
@@ -82,7 +92,7 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
       StarterKit.configure({
         codeBlock: false
       }),
-      CodeBlockLowlight.configure({
+      CodeBlockEnhanced.configure({
         lowlight
       }),
       TaskList,
@@ -99,6 +109,22 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
       Typography,
       Markdown.configure({
         markedOptions: { breaks: true }
+      }),
+      FocusMode,
+      HeadingAnchor,
+      Image,
+      ImagePaste,
+      Extension.create({
+        name: 'saveShortcut',
+        addKeyboardShortcuts() {
+          return {
+            'Mod-s': () => {
+              const md = this.editor.getMarkdown?.() ?? ''
+              onSave(filePath, md)
+              return true
+            }
+          }
+        }
       }),
       Wikilink.configure({
         onOpen: (target: string) => {
@@ -203,10 +229,25 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
     contentType: 'markdown',
     editorProps: {
       attributes: {
-        class: 'markdown-editor'
+        class: `markdown-editor${focusMode ? ' focus-mode' : ''}`
       }
     }
   })
+
+  // Sync source mode from parent
+  useEffect(() => {
+    if (sourceMode !== internalSourceMode) {
+      if (!editor) return
+      if (sourceMode) {
+        // Entering source mode: save current markdown to sourceText
+        setSourceText(editor.getMarkdown?.() ?? '')
+      } else {
+        // Leaving source mode: apply sourceText back to editor
+        editor.commands.setContent(sourceText, { contentType: 'markdown' })
+      }
+      setInternalSourceMode(sourceMode)
+    }
+  }, [sourceMode, internalSourceMode, editor, sourceText])
 
   useEffect(() => {
     if (!editor) return
@@ -240,6 +281,18 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
       cleanup?.()
     }
   }, [editor, filePath, onSave])
+
+  useEffect(() => {
+    if (!editor) return
+    const updateCounts = () => {
+      const text = editor.getText()
+      const words = text.trim().split(/\s+/).filter(Boolean).length
+      onStatsUpdate(text.trim() ? words : 0, text.length)
+    }
+    editor.on('update', updateCounts)
+    updateCounts()
+    return () => { editor.off('update', updateCounts) }
+  }, [editor, onStatsUpdate])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
@@ -288,6 +341,17 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
 
   if (!editor) {
     return <div className="editor-loading">Loading editor...</div>
+  }
+
+  if (internalSourceMode) {
+    return (
+      <textarea
+        className="editor-source-textarea"
+        value={sourceText}
+        onChange={(e) => setSourceText(e.target.value)}
+        spellCheck={false}
+      />
+    )
   }
 
   return (
