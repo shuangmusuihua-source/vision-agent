@@ -22,7 +22,6 @@ Remaining improvements for the markdown editor, roughly ordered by impact.
 
 ## Medium Priority
 - **KaTeX math rendering** — `$inline$` and `$$block$$` syntax. Use `@tiptap/extension-mathematics` or custom node.
-- **Theme system** — CSS variables already in place. Allow loading custom `.css` theme files from workspace. Settings UI for built-in themes.
 
 ## Lower Priority
 - **Export** — PDF and HTML export. Use browser print-to-PDF or dedicated renderer.
