@@ -205,6 +205,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         }}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
+        onToggleGraph={() => setShowGraph(!showGraph)}
+        showGraph={showGraph}
         collapsed={sidebarCollapsed}
       />
       <div className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}`}>
@@ -216,15 +218,6 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
               onTabSwitch={handleTabSwitch}
               onTabClose={handleTabClose}
             />
-          )}
-          {workspacePaths.length > 0 && (
-            <button
-              className={`graph-toggle-btn ${showGraph ? 'graph-toggle-active' : ''}`}
-              onClick={() => setShowGraph(!showGraph)}
-              title="Toggle graph view"
-            >
-              Graph
-            </button>
           )}
         </div>
         <div className="main-content-scroll">

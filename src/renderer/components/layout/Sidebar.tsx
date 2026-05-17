@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph } from '@phosphor-icons/react'
 import type { FileEntry } from '../lib/ipc'
 
 interface MemoryEntry {
@@ -16,6 +16,8 @@ interface SidebarProps {
   onRemoveWorkspace: (path: string) => void
   onOpenSettings: () => void
   onOpenSearch: () => void
+  onToggleGraph: () => void
+  showGraph: boolean
   collapsed: boolean
 }
 
@@ -28,6 +30,8 @@ function Sidebar({
   onRemoveWorkspace,
   onOpenSettings,
   onOpenSearch,
+  onToggleGraph,
+  showGraph,
   collapsed
 }: SidebarProps): React.ReactElement {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
@@ -100,6 +104,9 @@ function Sidebar({
         <div className="sidebar-header-actions">
           <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
             <MagnifyingGlass size={14} weight="regular" />
+          </button>
+          <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图">
+            <Graph size={14} weight="regular" />
           </button>
           <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="打开工作区">
             <FolderOpen size={14} weight="regular" />
