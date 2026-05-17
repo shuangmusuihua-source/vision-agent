@@ -18,11 +18,39 @@ import { CodeBlockEnhanced } from './extensions/code-block-enhanced'
 import { FocusMode } from './extensions/focus-mode'
 import { HeadingAnchor } from './extensions/heading-anchor'
 import { ImagePaste } from './extensions/image-paste'
+import { Frontmatter } from './extensions/frontmatter'
 import Image from '@tiptap/extension-image'
 import { Extension } from '@tiptap/core'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 
 const lowlight = createLowlight(common)
+
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
+
+function extractFrontmatter(md: string): { frontmatter: string; body: string } {
+  const match = md.match(FRONTMATTER_RE)
+  if (match) {
+    return { frontmatter: match[1], body: md.slice(match[0].length) }
+  }
+  return { frontmatter: '', body: md }
+}
+
+function prependFrontmatter(frontmatter: string, body: string): string {
+  if (!frontmatter) return body
+  return `---\n${frontmatter}\n---\n${body}`
+}
+
+function getFullMarkdown(editor: { getJSON: () => Record<string, unknown>; getMarkdown: () => string }): string {
+  const doc = editor.getJSON()
+  const content = doc.content as Array<Record<string, unknown>> | undefined
+  let frontmatter = ''
+  if (content?.[0]?.type === 'frontmatter') {
+    const attrs = content[0].attrs as { content?: string } | undefined
+    frontmatter = attrs?.content || ''
+  }
+  const bodyMd = editor.getMarkdown()
+  return prependFrontmatter(frontmatter, bodyMd)
+}
 
 interface MarkdownFile {
   label: string
@@ -71,6 +99,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   const filesRef = useRef<MarkdownFile[]>([])
   const [internalSourceMode, setInternalSourceMode] = useState(sourceMode)
   const [sourceText, setSourceText] = useState('')
+  const frontmatterRef = useRef('')
 
   useEffect(() => {
     if (!workspacePath) {
@@ -114,12 +143,13 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       HeadingAnchor,
       Image,
       ImagePaste,
+      Frontmatter,
       Extension.create({
         name: 'saveShortcut',
         addKeyboardShortcuts() {
           return {
             'Mod-s': () => {
-              const md = this.editor.getMarkdown?.() ?? ''
+              const md = getFullMarkdown(this.editor)
               onSave(filePath, md)
               return true
             }
@@ -225,8 +255,23 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
         }
       })
     ],
-    content,
+    content: (() => {
+      const { frontmatter, body } = extractFrontmatter(content)
+      if (frontmatter) {
+        // Store frontmatter for injection after editor creates
+        frontmatterRef.current = frontmatter
+        return body || ''
+      }
+      return content
+    })(),
     contentType: 'markdown',
+    onCreate: ({ editor }) => {
+      const fm = frontmatterRef.current
+      if (fm) {
+        editor.commands.setFrontmatter({ content: fm })
+        frontmatterRef.current = ''
+      }
+    },
     editorProps: {
       attributes: {
         class: `markdown-editor${focusMode ? ' focus-mode' : ''}`
@@ -239,11 +284,17 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     if (sourceMode !== internalSourceMode) {
       if (!editor) return
       if (sourceMode) {
-        // Entering source mode: save current markdown to sourceText
-        setSourceText(editor.getMarkdown?.() ?? '')
+        // Entering source mode: save current full markdown to sourceText
+        setSourceText(getFullMarkdown(editor))
       } else {
         // Leaving source mode: apply sourceText back to editor
-        editor.commands.setContent(sourceText, { contentType: 'markdown' })
+        const { frontmatter, body } = extractFrontmatter(sourceText)
+        editor.commands.setContent(body || '', { contentType: 'markdown' })
+        if (frontmatter) {
+          editor.commands.setFrontmatter({ content: frontmatter })
+        } else {
+          editor.commands.removeFrontmatter()
+        }
       }
       setInternalSourceMode(sourceMode)
     }
@@ -251,9 +302,13 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
 
   useEffect(() => {
     if (!editor) return
-    const currentMd = editor.getMarkdown?.() ?? ''
+    const currentMd = getFullMarkdown(editor)
     if (content !== currentMd) {
-      editor.commands.setContent(content, { contentType: 'markdown' })
+      const { frontmatter, body } = extractFrontmatter(content)
+      editor.commands.setContent(body || '', { contentType: 'markdown' })
+      if (frontmatter) {
+        editor.commands.setFrontmatter({ content: frontmatter })
+      }
     }
   }, [content, editor])
 
@@ -263,7 +318,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
 
     const handleUpdate = () => {
       const saveTimer = setTimeout(() => {
-        const md = editor.getMarkdown?.() ?? ''
+        const md = getFullMarkdown(editor)
         onSave(filePath, md)
       }, 1500)
       return () => clearTimeout(saveTimer)

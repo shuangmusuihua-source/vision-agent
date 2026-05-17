@@ -109,7 +109,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
 
     // Read file content and add to tabs
     const result = await window.api.workspace.readFile(path)
-    if (result.success && result.content) {
+    if (result.success && result.content !== undefined) {
       setOpenTabs((prev) => [...prev, path])
       setActiveTab(path)
       setTabContents((prev) => ({ ...prev, [path]: result.content! }))
@@ -150,7 +150,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       if (activeTab) {
         const timer = setTimeout(() => {
           window.api.workspace.readFile(activeTab).then((result) => {
-            if (result.success && result.content) {
+            if (result.success && result.content !== undefined) {
               setTabContents((prev) => {
                 if (prev[activeTab] !== result.content) {
                   return { ...prev, [activeTab]: result.content! }

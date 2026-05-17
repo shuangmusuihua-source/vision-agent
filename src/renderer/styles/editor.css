@@ -577,3 +577,149 @@
 [data-theme="dark"] .wikilink {
   background: rgba(74, 158, 255, 0.12);
 }
+
+/* --- Frontmatter --- */
+
+.frontmatter-block {
+  margin: 0 0 1em 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.frontmatter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  cursor: default;
+  user-select: none;
+}
+
+.frontmatter-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.frontmatter-toggle {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.frontmatter-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.frontmatter-body {
+  padding: 8px 12px;
+}
+
+.frontmatter-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.frontmatter-table td {
+  padding: 3px 8px;
+  vertical-align: top;
+}
+
+.frontmatter-key {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-color);
+  white-space: nowrap;
+  width: 1%;
+  padding-right: 16px !important;
+}
+
+.frontmatter-value {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.frontmatter-raw {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Dark mode frontmatter */
+
+[data-theme="dark"] .frontmatter-block {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .frontmatter-header {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .frontmatter-key {
+  color: #7ec8e3;
+}
+
+/* --- Mermaid diagrams --- */
+
+.code-block-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mermaid-diagram-wrapper {
+  padding: 16px;
+  overflow-x: auto;
+  background: var(--bg-secondary);
+  border-radius: 0 0 8px 8px;
+}
+
+.mermaid-diagram {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+  border-radius: 6px;
+}
+
+.mermaid-error pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Dark mode mermaid */
+
+[data-theme="dark"] .mermaid-diagram-wrapper {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .mermaid-error {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+}

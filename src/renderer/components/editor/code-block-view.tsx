@@ -1,11 +1,30 @@
-import { NodeViewContent, NodeViewWrapper } from '@tiptap/react'
-import { useCallback, useState, useRef } from 'react'
-import { Copy } from '@phosphor-icons/react'
+import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react'
+import { useCallback, useState, useRef, useEffect } from 'react'
+import { Copy, ChartBar } from '@phosphor-icons/react'
+import mermaid from 'mermaid'
 
-function CodeBlockView({ node }: { node: { attrs: { language: string | null } } }): React.ReactElement {
+mermaid.initialize({ startOnLoad: false, theme: 'default' })
+
+function getMermaidTheme(): 'dark' | 'default' {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+}
+
+function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement {
   const [copied, setCopied] = useState(false)
+  const [showSource, setShowSource] = useState(false)
+  const [mermaidError, setMermaidError] = useState<string | null>(null)
   const codeRef = useRef<HTMLPreElement>(null)
-  const language = node.attrs.language
+  const mermaidRef = useRef<HTMLDivElement>(null)
+  const language = node.attrs.language as string | null
+  const isMermaid = language === 'mermaid'
+
+  const nodeText = node.textContent || ''
+  const getMermaidCode = useCallback(() => {
+    if (codeRef.current?.textContent) {
+      return codeRef.current.textContent
+    }
+    return nodeText
+  }, [nodeText])
 
   const handleCopy = useCallback(() => {
     const text = codeRef.current?.textContent ?? ''
@@ -15,17 +34,77 @@ function CodeBlockView({ node }: { node: { attrs: { language: string | null } } 
     })
   }, [])
 
+  useEffect(() => {
+    if (!isMermaid || showSource || !mermaidRef.current) return
+
+    const code = getMermaidCode()
+    if (!code.trim()) return
+
+    const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
+    setMermaidError(null)
+
+    mermaid
+      .render(id, code.trim())
+      .then(({ svg }) => {
+        if (mermaidRef.current) {
+          mermaidRef.current.innerHTML = svg
+        }
+      })
+      .catch((err) => {
+        setMermaidError(String(err.message || err))
+        const phantom = document.querySelector(`#d${id}`)
+        if (phantom) phantom.remove()
+      })
+  }, [isMermaid, showSource, getMermaidCode])
+
+  useEffect(() => {
+    if (!isMermaid) return
+
+    const observer = new MutationObserver(() => {
+      mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme() })
+    })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    })
+    return () => observer.disconnect()
+  }, [isMermaid])
+
   return (
     <NodeViewWrapper className="code-block-wrapper" as="div">
       <div className="code-block-header">
         <span className="code-block-language">{language || 'text'}</span>
-        <button className="code-block-copy-btn" onClick={handleCopy}>
-          {copied ? 'Copied' : <Copy size={13} weight="regular" />}
-        </button>
+        <div className="code-block-header-actions">
+          {isMermaid && (
+            <button
+              className="code-block-copy-btn"
+              onClick={() => setShowSource(!showSource)}
+              title={showSource ? 'Show diagram' : 'Show source'}
+            >
+              <ChartBar size={13} weight="regular" />
+              {showSource ? 'Diagram' : 'Source'}
+            </button>
+          )}
+          <button className="code-block-copy-btn" onClick={handleCopy}>
+            {copied ? 'Copied' : <Copy size={13} weight="regular" />}
+          </button>
+        </div>
       </div>
-      <pre ref={codeRef}>
-        <NodeViewContent className="code-block-content" />
-      </pre>
+      {isMermaid && !showSource ? (
+        <div className="mermaid-diagram-wrapper">
+          {mermaidError ? (
+            <div className="mermaid-error">
+              <pre>{mermaidError}</pre>
+            </div>
+          ) : (
+            <div ref={mermaidRef} className="mermaid-diagram" />
+          )}
+        </div>
+      ) : (
+        <pre ref={codeRef}>
+          <NodeViewContent className="code-block-content" />
+        </pre>
+      )}
     </NodeViewWrapper>
   )
 }

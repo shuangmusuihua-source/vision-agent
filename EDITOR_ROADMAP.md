@@ -13,6 +13,8 @@ Remaining improvements for the markdown editor, roughly ordered by impact.
 - ~~**Focus/typewriter mode**~~ — Cmd+\ toggle, dims non-active paragraphs.
 - ~~**Heading anchors**~~ — Hover `#` link on headings.
 - ~~**Image paste**~~ — Clipboard image paste as data URL.
+- ~~**YAML frontmatter**~~ — Parse and display `---` blocks at doc start. Collapsible key-value table view with raw fallback.
+- ~~**Mermaid diagrams**~~ — Render ```mermaid code blocks as diagrams. Toggle between diagram and source view. Auto theme switching.
 
 ## High Priority
 - **Search/Replace** — In-editor find and replace (not cross-file). Typora-style Cmd+F/Cmd+H overlay.
@@ -20,8 +22,6 @@ Remaining improvements for the markdown editor, roughly ordered by impact.
 
 ## Medium Priority
 - **KaTeX math rendering** — `$inline$` and `$$block$$` syntax. Use `@tiptap/extension-mathematics` or custom node.
-- **Mermaid diagrams** — Render ```mermaid code blocks as diagrams. Lazy-load mermaid.js.
-- **YAML frontmatter** — Parse and display `---` blocks at doc start. Editable form or raw view.
 - **Theme system** — CSS variables already in place. Allow loading custom `.css` theme files from workspace. Settings UI for built-in themes.
 
 ## Lower Priority
