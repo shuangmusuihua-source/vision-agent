@@ -29,3 +29,4 @@ Remaining improvements for the markdown editor, roughly ordered by impact.
 - **Drag-and-drop reorder** — Paragraphs and list items via drag handles.
 - **Image drag-and-drop** — Drop image files from Finder into editor. Resize handles on images.
 - **Tab bar polish** — Remove unnecessary padding, add max-width truncation, scroll navigation arrows, auto-scroll to active tab.
+- **Tab-content gap** — Tab bar and editor content area are visually flush; need spacing between them.
