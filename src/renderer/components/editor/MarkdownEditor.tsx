@@ -14,6 +14,7 @@ import { useEffect, useCallback, useRef, useState } from 'react'
 import { ReactRenderer } from '@tiptap/react'
 import tippy, { type Instance as TippyInstance } from 'tippy.js'
 import { Wikilink } from './extensions/wikilink'
+import { Markdown } from '@tiptap/markdown'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 
 const lowlight = createLowlight(common)
@@ -96,6 +97,9 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
       TableHeader,
       Highlight,
       Typography,
+      Markdown.configure({
+        markedOptions: { breaks: true }
+      }),
       Wikilink.configure({
         onOpen: (target: string) => {
           const match = filesRef.current.find(
@@ -196,6 +200,7 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
       })
     ],
     content,
+    contentType: 'markdown',
     editorProps: {
       attributes: {
         class: 'markdown-editor'
@@ -204,8 +209,10 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
   })
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content)
+    if (!editor) return
+    const currentMd = editor.getMarkdown?.() ?? ''
+    if (content !== currentMd) {
+      editor.commands.setContent(content, { contentType: 'markdown' })
     }
   }, [content, editor])
 
@@ -215,7 +222,8 @@ function MarkdownEditor({ content, filePath, workspacePath, onOpenFile, onSave, 
 
     const handleUpdate = () => {
       const saveTimer = setTimeout(() => {
-        onSave(filePath, editor.getHTML())
+        const md = editor.getMarkdown?.() ?? ''
+        onSave(filePath, md)
       }, 1500)
       return () => clearTimeout(saveTimer)
     }
