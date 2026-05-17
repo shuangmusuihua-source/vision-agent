@@ -508,3 +508,72 @@
   font-size: 11px;
   color: var(--text-tertiary);
 }
+
+/* --- Dark mode editor polish --- */
+
+[data-theme="dark"] .markdown-editor pre {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .code-block-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .code-block-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .markdown-editor code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #7ec8e3;
+}
+
+[data-theme="dark"] .markdown-editor pre code {
+  background: none;
+  color: inherit;
+}
+
+[data-theme="dark"] .markdown-editor blockquote {
+  border-left-color: rgba(74, 158, 255, 0.4);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .markdown-editor blockquote blockquote {
+  border-left-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .markdown-editor th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .markdown-editor tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .markdown-editor .heading-with-anchor::after {
+  color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .markdown-editor mark {
+  background: rgba(255, 183, 3, 0.3);
+  color: #ffe082;
+}
+
+[data-theme="dark"] .markdown-editor h1,
+[data-theme="dark"] .markdown-editor h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .editor-status-bar {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .editor-source-textarea {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .wikilink {
+  background: rgba(74, 158, 255, 0.12);
+}
