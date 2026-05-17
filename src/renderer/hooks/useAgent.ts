@@ -27,6 +27,7 @@ function useAgent() {
     addMessage,
     updateLastAssistantMessage,
     appendToLastAssistantMessage,
+    replaceLastAssistantMessage,
     finishStreaming,
     setToolCall,
     updateToolCallResult,
@@ -120,7 +121,9 @@ function useAgent() {
           const textContent = textParts.join('')
           const lastMsg = messages[messages.length - 1]
 
-          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+          if (lastMsg?.isStatusIndicator) {
+            replaceLastAssistantMessage(textContent)
+          } else if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
             appendToLastAssistantMessage(textContent)
           } else {
             const msgId = `assistant-${Date.now()}`
@@ -152,6 +155,12 @@ function useAgent() {
               targetMsgId = msgId
               lastAssistantMsgIdRef.current = msgId
             }
+          }
+
+          // Clear status indicator when tool calls arrive
+          const lastMsg = messages[messages.length - 1]
+          if (lastMsg?.isStatusIndicator) {
+            replaceLastAssistantMessage('')
           }
 
           for (const tu of toolUses) {
@@ -266,6 +275,10 @@ function useAgent() {
       // --- status message ---
       if (type === 'status') {
         const statusType = msg.status as string
+        const lastMsg = messages[messages.length - 1]
+        if (lastMsg?.isStatusIndicator && STATUS_TEXT[statusType]) {
+          updateLastAssistantMessage(STATUS_TEXT[statusType])
+        }
         if (statusType === 'compacting') {
           setAgentStatus('compacting')
         } else if (statusType === 'requesting') {
@@ -310,20 +323,33 @@ function useAgent() {
 
       // Ignore other message types (hook events, plugin installs, etc.)
     },
-    [messages, addMessage, updateLastAssistantMessage, appendToLastAssistantMessage, finishStreaming, setToolCall, updateToolCallResult, setStreaming, setSessionId, setAgentStatus, setUsageInfo]
+    [messages, addMessage, updateLastAssistantMessage, appendToLastAssistantMessage, replaceLastAssistantMessage, finishStreaming, setToolCall, updateToolCallResult, setStreaming, setSessionId, setAgentStatus, setUsageInfo]
   )
 
+  const STATUS_TEXT: Record<string, string> = {
+    thinking: '正在思考...',
+    compacting: '正在压缩上下文...'
+  }
+
   const sendMessage = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, activeFilePath?: string) => {
       addMessage({
         id: `user-${Date.now()}`,
         role: 'user',
         content: prompt
       })
+      const statusId = `status-${Date.now()}`
+      addMessage({
+        id: statusId,
+        role: 'assistant',
+        content: STATUS_TEXT.thinking,
+        isStreaming: true,
+        isStatusIndicator: true
+      })
+      lastAssistantMsgIdRef.current = statusId
       setStreaming(true)
       setAgentStatus('thinking')
-      lastAssistantMsgIdRef.current = null
-      await window.api.agent.sendMessage(prompt, currentSessionId || undefined)
+      await window.api.agent.sendMessage(prompt, currentSessionId || undefined, activeFilePath)
     },
     [currentSessionId, addMessage, setStreaming, setAgentStatus]
   )

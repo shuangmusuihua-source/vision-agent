@@ -39,11 +39,28 @@ export const useAgentStore = create<AgentState>((set) => ({
       return { messages }
     }),
 
+  replaceLastAssistantMessage: (content: string) =>
+    set((state) => {
+      const messages = [...state.messages]
+      const lastIdx = messages.findLastIndex((m) => m.role === 'assistant')
+      if (lastIdx >= 0) {
+        messages[lastIdx] = {
+          ...messages[lastIdx],
+          content,
+          isStreaming: true,
+          isStatusIndicator: false
+        }
+      }
+      return { messages }
+    }),
+
   finishStreaming: () =>
     set((state) => {
-      const messages = state.messages.map((m) =>
-        m.isStreaming ? { ...m, isStreaming: false } : m
-      )
+      const messages = state.messages
+        .filter((m) => !(m.isStatusIndicator && m.isStreaming))
+        .map((m) =>
+          m.isStreaming ? { ...m, isStreaming: false } : m
+        )
       return { messages, isStreaming: false, agentStatus: 'idle' }
     }),
 

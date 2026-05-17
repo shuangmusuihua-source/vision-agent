@@ -224,10 +224,10 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Agent ---
-  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string) => {
+  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    sendMessage(window, prompt, sessionId)
+    sendMessage(window, prompt, sessionId, activeFilePath)
     return { started: true }
   })
 

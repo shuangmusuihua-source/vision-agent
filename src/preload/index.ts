@@ -26,8 +26,8 @@ const api = {
   },
 
   agent: {
-    sendMessage: (prompt: string, sessionId?: string) =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) =>
+      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath),
     getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
     onMessage: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)

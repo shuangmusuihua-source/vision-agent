@@ -101,7 +101,7 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
   }
 }
 
-function buildOptions(mainWindow: BrowserWindow): Options {
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Options {
   const apiKey = getApiKey()
   const model = getModel()
   const baseUrl = getBaseUrl()
@@ -128,7 +128,8 @@ function buildOptions(mainWindow: BrowserWindow): Options {
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     systemPrompt: {
       type: 'preset' as const,
-      preset: 'claude_code' as const
+      preset: 'claude_code' as const,
+      ...(activeFilePath ? { append: `用户当前正在查看的文件: ${activeFilePath}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` } : {})
     },
     settings: {
       autoMemoryDirectory: join(cwd, '.vision', 'memory')
@@ -212,9 +213,10 @@ function extractPathFromToolInput(
 export async function sendMessage(
   mainWindow: BrowserWindow,
   prompt: string,
-  sessionId?: string
+  sessionId?: string,
+  activeFilePath?: string
 ): Promise<void> {
-  const options = buildOptions(mainWindow)
+  const options = buildOptions(mainWindow, activeFilePath)
   let currentSessionId = sessionId
 
   console.log('[AgentManager] Sending message')

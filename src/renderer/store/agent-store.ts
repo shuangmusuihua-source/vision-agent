@@ -12,6 +12,7 @@ interface ChatMessage {
   content: string
   toolCalls?: ToolCall[]
   isStreaming?: boolean
+  isStatusIndicator?: boolean
 }
 
 type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error'
@@ -49,6 +50,7 @@ interface AgentState {
   addMessage: (message: ChatMessage) => void
   updateLastAssistantMessage: (content: string) => void
   appendToLastAssistantMessage: (chunk: string) => void
+  replaceLastAssistantMessage: (content: string) => void
   finishStreaming: () => void
   setToolCall: (messageId: string, toolCall: ToolCall) => void
   updateToolCallResult: (messageId: string, toolUseId: string, result: string, status: 'completed' | 'error') => void

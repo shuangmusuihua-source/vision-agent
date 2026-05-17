@@ -74,7 +74,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     return unsub
   }, [onOpenSettings])
 
-  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
+  const { messages, isStreaming, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
 
   // Restore/refresh workspaces from settings
   useEffect(() => {
@@ -178,7 +178,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       if (action === 'ask') {
         setPrefillText(prompts.ask)
       } else {
-        sendMessage(prompts[action])
+        sendMessage(prompts[action], filePath)
       }
     },
     [sendMessage]
@@ -257,7 +257,6 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         collapsed={agentCollapsed}
         onToggleCollapse={() => setAgentCollapsed(!agentCollapsed)}
         onOpenSettings={onOpenSettings}
-        agentStatus={agentStatus}
         usageInfo={usageInfo}
         permissionRequest={permissionRequest}
         onPermissionRespond={respondPermission}
@@ -266,7 +265,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         onSelectSession={resumeSession}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
-        chatInput={<ChatInput onSend={sendMessage} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
+        chatInput={<ChatInput onSend={(msg) => sendMessage(msg, activeTab || undefined)} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
+        activeFilePath={activeTab || undefined}
       >
         <ChatView messages={messages} />
       </AgentPanel>

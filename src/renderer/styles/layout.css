@@ -291,60 +291,42 @@
 /* --- Agent Panel --- */
 
 .agent-panel {
-  width: var(--agent-panel-width);
-  min-width: var(--agent-panel-width);
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
-  transition: width 0.2s ease;
+  overflow: hidden;
+  transition: width 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+              max-width 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  max-width: var(--agent-panel-width);
+  width: var(--agent-panel-width);
 }
 
 .agent-panel-collapsed {
+  max-width: 40px;
   width: 40px;
-  min-width: 40px;
   align-items: center;
   padding-top: 8px;
+}
+
+.agent-panel .agent-panel-body,
+.agent-panel .context-zone {
+  opacity: 1;
+  transition: opacity 0.15s ease 0.1s;
+}
+
+.agent-panel-collapsed .agent-panel-body,
+.agent-panel-collapsed .context-zone {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
 }
 
 .agent-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 8px 12px;
   -webkit-app-region: drag;
-}
-
-.agent-panel-header-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  -webkit-app-region: no-drag;
-}
-
-.agent-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
-
-.agent-status-dot.active {
-  background: var(--accent-color);
-  animation: status-pulse 1.5s infinite;
-}
-
-@keyframes status-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-.agent-status-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.agent-status-label.active {
-  color: var(--accent-color);
 }
 
 .agent-panel-body {

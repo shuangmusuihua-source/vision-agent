@@ -42,7 +42,7 @@ interface SettingsApi {
 }
 
 interface AgentApi {
-  sendMessage: (prompt: string, sessionId?: string) => Promise<{ started: boolean }>
+  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) => Promise<{ started: boolean }>
   getSessionList: () => Promise<SessionInfo[]>
   onMessage: (callback: (data: AgentMessageData) => void) => () => void
   onSessionCreated: (callback: (sessionId: string) => void) => () => void

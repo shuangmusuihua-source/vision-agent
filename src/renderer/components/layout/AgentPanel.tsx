@@ -1,15 +1,15 @@
 import { SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
-import type { AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
+import type { UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
 import ProfileSwitcher from '../chat/ProfileSwitcher'
 import PermissionDialog from '../chat/PermissionDialog'
 import SessionHistory from '../chat/SessionHistory'
+import ContextZone from '../chat/ContextZone'
 import DrawerZone from './DrawerZone'
 
 interface AgentPanelProps {
   collapsed: boolean
   onToggleCollapse: () => void
   onOpenSettings: () => void
-  agentStatus: AgentStatus
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
@@ -20,9 +20,10 @@ interface AgentPanelProps {
   onRefreshSessions: () => void
   children: React.ReactNode
   chatInput: React.ReactNode
+  activeFilePath?: string
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, activeFilePath }: AgentPanelProps): React.ReactElement {
   if (collapsed) {
     return (
       <div className="agent-panel agent-panel-collapsed">
@@ -33,24 +34,14 @@ function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, agentStatus, 
     )
   }
 
-  const isActive = agentStatus !== 'idle'
-
   return (
     <div className="agent-panel">
       <div className="agent-panel-header">
-        <div className="agent-panel-header-left">
-          <span className={`agent-status-dot ${isActive ? 'active' : ''}`} />
-          <span className={`agent-status-label ${isActive ? 'active' : ''}`}>
-            {agentStatus === 'thinking' ? 'Thinking' :
-             agentStatus === 'running' ? 'Running' :
-             agentStatus === 'compacting' ? 'Compacting' :
-             agentStatus === 'error' ? 'Error' : ''}
-          </span>
-        </div>
         <button className="agent-panel-toggle-btn" onClick={onToggleCollapse}>
           <SidebarIcon size={16} weight="regular" />
         </button>
       </div>
+      <ContextZone activeFilePath={activeFilePath} />
       <div className="agent-panel-body">
         <div className="agent-panel-content">
           <ProfileSwitcher onOpenSettings={onOpenSettings} />

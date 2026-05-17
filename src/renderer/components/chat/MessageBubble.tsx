@@ -10,6 +10,16 @@ interface MessageBubbleProps {
 function MessageBubble({ message }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
 
+  if (message.isStatusIndicator) {
+    return (
+      <div className="message-bubble message-assistant">
+        <div className="message-status-indicator">
+          {message.content}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`message-bubble ${isUser ? 'message-user' : 'message-assistant'}`}>
       {isUser ? (
