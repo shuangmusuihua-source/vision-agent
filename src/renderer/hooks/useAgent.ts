@@ -425,12 +425,13 @@ function useAgent() {
       })
       await window.api.agent.respondAskUser(requestId, answer)
       setAskUserRequest(null)
-      setAgentStatus('streaming')
+      setAgentStatus('running')
     }, [addMessage, setAskUserRequest, setAgentStatus])
 
     return {
     messages,
     isStreaming,
+    currentSessionId,
     agentStatus,
     usageInfo,
     permissionRequest,
