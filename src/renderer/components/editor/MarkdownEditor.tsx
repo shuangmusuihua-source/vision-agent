@@ -8,6 +8,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Highlight } from '@tiptap/extension-highlight'
 import { Typography } from '@tiptap/extension-typography'
+import Placeholder from '@tiptap/extension-placeholder'
 import { common, createLowlight } from 'lowlight'
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { ReactRenderer } from '@tiptap/react'
@@ -48,7 +49,9 @@ function getFullMarkdown(editor: { getJSON: () => Record<string, unknown>; getMa
     const attrs = content[0].attrs as { content?: string } | undefined
     frontmatter = attrs?.content || ''
   }
-  const bodyMd = editor.getMarkdown()
+  let bodyMd = editor.getMarkdown()
+  // Strip empty placeholder — save as empty file on disk
+  if (bodyMd === '\n\n' || bodyMd === '<p></p>') bodyMd = ''
   return prependFrontmatter(frontmatter, bodyMd)
 }
 
@@ -100,6 +103,10 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   const [internalSourceMode, setInternalSourceMode] = useState(sourceMode)
   const [sourceText, setSourceText] = useState('')
   const frontmatterRef = useRef('')
+  const isLocalChange = useRef(false)
+
+  // Normalize markdown for comparison: strip trailing whitespace
+  const normalizeMd = (md: string) => md.replace(/\n+$/, '')
 
   useEffect(() => {
     if (!workspacePath) {
@@ -117,8 +124,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   }, [workspacePath])
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
+    extensions: [      StarterKit.configure({
         codeBlock: false
       }),
       CodeBlockEnhanced.configure({
@@ -144,6 +150,9 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       Image,
       ImagePaste,
       Frontmatter,
+      Placeholder.configure({
+        placeholder: '开始输入...'
+      }),
       Extension.create({
         name: 'saveShortcut',
         addKeyboardShortcuts() {
@@ -258,11 +267,10 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     content: (() => {
       const { frontmatter, body } = extractFrontmatter(content)
       if (frontmatter) {
-        // Store frontmatter for injection after editor creates
         frontmatterRef.current = frontmatter
-        return body || ''
+        return body || '<p></p>'
       }
-      return content
+      return content || '<p></p>'
     })(),
     contentType: 'markdown',
     onCreate: ({ editor }) => {
@@ -275,6 +283,11 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     editorProps: {
       attributes: {
         class: `markdown-editor${focusMode ? ' focus-mode' : ''}`
+      },
+      handleClick: (view, pos) => {
+        if (!view.hasFocus()) {
+          view.focus()
+        }
       }
     }
   })
@@ -289,7 +302,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       } else {
         // Leaving source mode: apply sourceText back to editor
         const { frontmatter, body } = extractFrontmatter(sourceText)
-        editor.commands.setContent(body || '', { contentType: 'markdown' })
+        editor.commands.setContent(body || '\n\n', { contentType: 'markdown', emitUpdate: false })
         if (frontmatter) {
           editor.commands.setFrontmatter({ content: frontmatter })
         } else {
@@ -302,10 +315,13 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
 
   useEffect(() => {
     if (!editor) return
-    const currentMd = getFullMarkdown(editor)
-    if (content !== currentMd) {
+    if (isLocalChange.current) {
+      isLocalChange.current = false
+      return
+    }
+    if (normalizeMd(content) !== normalizeMd(getFullMarkdown(editor))) {
       const { frontmatter, body } = extractFrontmatter(content)
-      editor.commands.setContent(body || '', { contentType: 'markdown' })
+      editor.commands.setContent(body || '\n\n', { contentType: 'markdown', emitUpdate: false })
       if (frontmatter) {
         editor.commands.setFrontmatter({ content: frontmatter })
       } else {
@@ -319,6 +335,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     if (!editor || !filePath) return
 
     const handleUpdate = () => {
+      isLocalChange.current = true
       const saveTimer = setTimeout(() => {
         const md = getFullMarkdown(editor)
         onSave(filePath, md)

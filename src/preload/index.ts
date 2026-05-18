@@ -9,7 +9,11 @@ const api = {
     writeFile: (filePath: string, content: string) =>
       ipcRenderer.invoke('workspace:writeFile', filePath, content),
     listMarkdownFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listMarkdownFiles', dirPath),
-    openDirectoryDialog: () => ipcRenderer.invoke('workspace:openDirectoryDialog')
+    openDirectoryDialog: () => ipcRenderer.invoke('workspace:openDirectoryDialog'),
+    openInBrowser: (filePath: string) => ipcRenderer.invoke('workspace:openInBrowser', filePath),
+    newDirectoryDialog: () => ipcRenderer.invoke('workspace:newDirectoryDialog'),
+    createFile: (dirPath: string, fileName: string) =>
+      ipcRenderer.invoke('workspace:createFile', dirPath, fileName)
   },
 
   settings: {

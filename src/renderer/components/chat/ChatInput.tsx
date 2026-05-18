@@ -1,18 +1,25 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp } from '@phosphor-icons/react'
-import type { SlashCommand } from '../../lib/ipc'
+import { ArrowUp, FileText, PresentationChart, Article } from '@phosphor-icons/react'
+import type { SkillDefinition } from '../../lib/ipc'
 
 interface ChatInputProps {
   onSend: (message: string) => void
+  onSkillSelect?: (skill: SkillDefinition) => void
   disabled: boolean
   placeholder?: string
   prefill?: string | null
   onPrefillConsumed?: () => void
 }
 
-function ChatInput({ onSend, disabled, placeholder, prefill, onPrefillConsumed }: ChatInputProps): React.ReactElement {
+const ICON_MAP: Record<string, React.ComponentType<{ size: number; weight: string }>> = {
+  FileText,
+  PresentationChart,
+  Article
+}
+
+function ChatInput({ onSend, onSkillSelect, disabled, placeholder, prefill, onPrefillConsumed }: ChatInputProps): React.ReactElement {
   const [text, setText] = useState('')
-  const [skills, setSkills] = useState<SlashCommand[]>([])
+  const [skills, setSkills] = useState<SkillDefinition[]>([])
   const [showSkillPopup, setShowSkillPopup] = useState(false)
   const [skillFilter, setSkillFilter] = useState('')
   const [selectedSkillIdx, setSelectedSkillIdx] = useState(0)
@@ -49,23 +56,17 @@ function ChatInput({ onSend, disabled, placeholder, prefill, onPrefillConsumed }
 
   const filteredSkills = skills.filter(s =>
     s.name.toLowerCase().includes(skillFilter) ||
-    s.description.toLowerCase().includes(skillFilter) ||
-    s.aliases?.some(a => a.toLowerCase().includes(skillFilter))
+    (s.description || '').toLowerCase().includes(skillFilter) ||
+    (s.id || '').toLowerCase().includes(skillFilter)
   )
 
-  const handleSelectSkill = useCallback((skill: SlashCommand) => {
-    const prefix = `/${skill.name} `
-    setText(prefix)
+  const handleSelectSkill = useCallback((skill: SkillDefinition) => {
     setShowSkillPopup(false)
-    inputRef.current?.focus()
-    // Move cursor to end
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.selectionStart = prefix.length
-        inputRef.current.selectionEnd = prefix.length
-      }
-    }, 0)
-  }, [])
+    setText('')
+    if (onSkillSelect) {
+      onSkillSelect(skill)
+    }
+  }, [onSkillSelect])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showSkillPopup && filteredSkills.length > 0) {
@@ -152,23 +153,27 @@ function ChatInput({ onSend, disabled, placeholder, prefill, onPrefillConsumed }
       {showSkillPopup && filteredSkills.length > 0 && (
         <div className="skill-popup" ref={popupRef}>
           <div className="skill-popup-header">可用技能</div>
-          {filteredSkills.map((skill, idx) => (
+          {filteredSkills.map((skill, idx) => {
+            const IconComp = ICON_MAP[skill.icon]
+            return (
             <div
-              key={skill.name}
+              key={skill.id}
               className={`skill-popup-item ${idx === selectedSkillIdx ? 'selected' : ''}`}
               data-skill-idx={idx}
               onClick={() => handleSelectSkill(skill)}
               onMouseEnter={() => setSelectedSkillIdx(idx)}
             >
               <div className="skill-popup-item-name">
-                /{skill.name}
+                {IconComp && <IconComp size={14} weight="regular" />}
+                {skill.name}
                 {skill.argumentHint && (
                   <span className="skill-popup-item-hint">{skill.argumentHint}</span>
                 )}
               </div>
               <div className="skill-popup-item-desc">{skill.description}</div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

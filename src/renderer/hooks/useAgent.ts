@@ -25,6 +25,7 @@ function useAgent() {
     sessionList,
     lastEditedFile,
     lastEditedFileTime,
+    activeSkillInfo,
     addMessage,
     updateLastAssistantMessage,
     appendToLastAssistantMessage,
@@ -41,6 +42,7 @@ function useAgent() {
     askUserRequest,
     setSessionList,
     setLastEditedFile,
+    setActiveSkillInfo,
     clearMessages
   } = useAgentStore()
 
@@ -160,7 +162,8 @@ function useAgent() {
               id: msgId,
               role: 'assistant',
               content: textContent,
-              isStreaming: true
+              isStreaming: true,
+              skillInfo: activeSkillInfo || undefined
             })
             lastAssistantMsgIdRef.current = msgId
           }
@@ -179,7 +182,8 @@ function useAgent() {
                 id: msgId,
                 role: 'assistant',
                 content: '',
-                isStreaming: true
+                isStreaming: true,
+                skillInfo: activeSkillInfo || undefined
               })
               targetMsgId = msgId
               lastAssistantMsgIdRef.current = msgId
@@ -352,7 +356,7 @@ function useAgent() {
 
       // Ignore other message types (hook events, plugin installs, etc.)
     },
-    [messages, addMessage, updateLastAssistantMessage, appendToLastAssistantMessage, replaceLastAssistantMessage, finishStreaming, setToolCall, updateToolCallResult, setStreaming, setSessionId, setAgentStatus, setUsageInfo]
+    [messages, addMessage, updateLastAssistantMessage, appendToLastAssistantMessage, replaceLastAssistantMessage, finishStreaming, setToolCall, updateToolCallResult, setStreaming, setSessionId, setAgentStatus, setUsageInfo, activeSkillInfo]
   )
 
   const STATUS_TEXT: Record<string, string> = {
@@ -443,12 +447,15 @@ function useAgent() {
     sessionList,
     lastEditedFile,
     lastEditedFileTime,
+    activeSkillInfo,
     sendMessage,
+    addMessage,
     respondPermission,
     respondAskUser,
     loadSessions,
     resumeSession,
     newSession,
+    setActiveSkillInfo,
     clearMessages
   }
 }

@@ -26,7 +26,10 @@ interface WorkspaceApi {
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   openDirectoryDialog: () => Promise<string | null>
+  newDirectoryDialog: () => Promise<string | null>
+  createFile: (dirPath: string, fileName: string) => Promise<{ success: boolean; path?: string; error?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
+  openInBrowser: (filePath: string) => Promise<void>
 }
 
 interface SettingsApi {
@@ -102,15 +105,17 @@ interface CronApi {
   onTaskCompleted: (callback: (data: { taskId: string; result: string }) => void) => () => void
 }
 
-interface SlashCommand {
+interface SkillDefinition {
+  id: string
   name: string
   description: string
-  argumentHint: string
-  aliases?: string[]
+  icon: string
+  promptTemplate: string
+  argumentHint?: string
 }
 
 interface SkillsApi {
-  list: () => Promise<SlashCommand[]>
+  list: () => Promise<SkillDefinition[]>
 }
 
 interface SearchResult {
@@ -186,6 +191,6 @@ export type {
   GraphNode,
   GraphEdge,
   CronTask,
-  SlashCommand,
+  SkillDefinition,
   SearchResult
 }

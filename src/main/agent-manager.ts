@@ -178,8 +178,11 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
       // AskUserQuestion — route to askUser flow instead of permission dialog
       if (toolName === 'AskUserQuestion') {
         const requestId = `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        const question = (input.question as string) || ''
-        const rawOptions = input.options as Array<Record<string, string>> | undefined
+        // SDK format: { questions: [{ question, header, options: [{ label, description }], multiSelect }] }
+        const questions = input.questions as Array<Record<string, unknown>> | undefined
+        const firstQ = questions?.[0]
+        const question = (firstQ?.question as string) || ''
+        const rawOptions = firstQ?.options as Array<Record<string, string>> | undefined
         const optionsList = rawOptions?.map((o) => ({
           label: o.label || '',
           description: o.description || ''
