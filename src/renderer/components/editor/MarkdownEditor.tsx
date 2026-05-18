@@ -8,6 +8,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Highlight } from '@tiptap/extension-highlight'
 import { Typography } from '@tiptap/extension-typography'
+import Placeholder from '@tiptap/extension-placeholder'
 import { common, createLowlight } from 'lowlight'
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { ReactRenderer } from '@tiptap/react'
@@ -49,8 +50,8 @@ function getFullMarkdown(editor: { getJSON: () => Record<string, unknown>; getMa
     frontmatter = attrs?.content || ''
   }
   let bodyMd = editor.getMarkdown()
-  // Strip placeholder empty paragraph — save as empty file on disk
-  if (bodyMd === '\n\n') bodyMd = ''
+  // Strip empty placeholder — save as empty file on disk
+  if (bodyMd === '\n\n' || bodyMd === '<p></p>') bodyMd = ''
   return prependFrontmatter(frontmatter, bodyMd)
 }
 
@@ -149,6 +150,9 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       Image,
       ImagePaste,
       Frontmatter,
+      Placeholder.configure({
+        placeholder: '开始输入...'
+      }),
       Extension.create({
         name: 'saveShortcut',
         addKeyboardShortcuts() {
@@ -264,9 +268,9 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       const { frontmatter, body } = extractFrontmatter(content)
       if (frontmatter) {
         frontmatterRef.current = frontmatter
-        return body || '\n\n'
+        return body || '<p></p>'
       }
-      return content || '\n\n'
+      return content || '<p></p>'
     })(),
     contentType: 'markdown',
     onCreate: ({ editor }) => {
@@ -279,6 +283,11 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     editorProps: {
       attributes: {
         class: `markdown-editor${focusMode ? ' focus-mode' : ''}`
+      },
+      handleClick: (view, pos) => {
+        if (!view.hasFocus()) {
+          view.focus()
+        }
       }
     }
   })
