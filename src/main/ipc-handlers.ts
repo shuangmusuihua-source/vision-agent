@@ -1,11 +1,11 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, shell } from 'electron'
 import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
 import { join, extname, relative } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
-import { listSkills } from './agent-manager'
+import { getBuiltinSkills } from './skills/builtin'
 import {
   getSettings,
   addProfile,
@@ -175,12 +175,48 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('workspace:newDirectoryDialog', async () => {
+    try {
+      const window = getMainWindow()
+      if (!window) return null
+      const result = await dialog.showSaveDialog(window, {
+        title: '新建工作区',
+        buttonLabel: '创建',
+        properties: ['createDirectory']
+      })
+      if (result.canceled || !result.filePath) return null
+      await mkdir(result.filePath, { recursive: true })
+      return result.filePath
+    } catch (err) {
+      console.error('Failed to create new directory:', err)
+      return null
+    }
+  })
+
+  ipcMain.handle('workspace:createFile', async (_event, dirPath: string, fileName: string) => {
+    try {
+      let name = fileName.trim()
+      if (!name) return { success: false, error: '文件名不能为空' }
+      if (!extname(name)) name += '.md'
+      const filePath = join(dirPath, name)
+      if (existsSync(filePath)) return { success: false, error: '文件已存在' }
+      await writeFile(filePath, '', 'utf-8')
+      return { success: true, path: filePath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {
     try {
       return await listMarkdownFiles(dirPath)
     } catch {
       return []
     }
+  })
+
+  ipcMain.handle('workspace:openInBrowser', async (_event, filePath: string) => {
+    await shell.openPath(filePath)
   })
 
   // --- Settings ---
@@ -355,7 +391,7 @@ export function registerIpcHandlers(): void {
 
   // --- Skills ---
   ipcMain.handle('skills:list', async () => {
-    return await listSkills()
+    return getBuiltinSkills()
   })
 
   // --- Search ---

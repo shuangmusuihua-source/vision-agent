@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from './agent-store'
+import type { ChatMessage, ToolCall, SkillInfo, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from './agent-store'
 import type { AskUserRequest } from '../lib/ipc'
 
 export const useAgentStore = create<AgentState>((set) => ({
@@ -13,6 +13,7 @@ export const useAgentStore = create<AgentState>((set) => ({
   sessionList: [],
   lastEditedFile: null,
   lastEditedFileTime: 0,
+  activeSkillInfo: null,
 
   addMessage: (message: ChatMessage) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -58,12 +59,35 @@ export const useAgentStore = create<AgentState>((set) => ({
 
   finishStreaming: () =>
     set((state) => {
+      const outputFile = state.lastEditedFile || undefined
       const messages = state.messages
         .filter((m) => !(m.isStatusIndicator && m.isStreaming))
         .map((m) =>
           m.isStreaming ? { ...m, isStreaming: false } : m
         )
-      return { messages, isStreaming: false, agentStatus: 'idle' }
+        .map((m) =>
+          m.skillInfo && m.skillInfo.status === 'running'
+            ? { ...m, skillInfo: { ...m.skillInfo, status: 'completed' as const, outputFile } }
+            : m
+        )
+
+      // Add output artifact bubble if Skill produced a file
+      if (outputFile && state.activeSkillInfo) {
+        const ext = outputFile.split('.').pop()?.toLowerCase()
+        messages.push({
+          id: `artifact-${Date.now()}`,
+          role: 'assistant',
+          content: '',
+          isStreaming: false,
+          artifact: {
+            filePath: outputFile,
+            fileName: outputFile.split('/').pop() || outputFile,
+            fileType: ext === 'html' || ext === 'htm' ? 'html' : 'md'
+          }
+        })
+      }
+
+      return { messages, isStreaming: false, agentStatus: 'idle', activeSkillInfo: null }
     }),
 
   setToolCall: (messageId: string, toolCall: ToolCall) =>
@@ -112,6 +136,8 @@ export const useAgentStore = create<AgentState>((set) => ({
 
   setLastEditedFile: (path: string | null) => set({ lastEditedFile: path, lastEditedFileTime: Date.now() }),
 
+  setActiveSkillInfo: (info: SkillInfo | null) => set({ activeSkillInfo: info }),
+
   clearMessages: () =>
-    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, askUserRequest: null, lastEditedFile: null, lastEditedFileTime: 0 })
+    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, askUserRequest: null, lastEditedFile: null, lastEditedFileTime: 0, activeSkillInfo: null })
 }))

@@ -663,3 +663,188 @@
   font-style: italic;
   font-size: 12px;
 }
+
+/* --- Skill Card --- */
+
+.skill-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.skill-card-running {
+  border-left: 3px solid var(--accent-color);
+}
+
+.skill-card-completed {
+  border-left: 3px solid var(--color-success);
+}
+
+.skill-card-error {
+  border-left: 3px solid var(--color-error);
+}
+
+.skill-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.skill-card-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.skill-card-name {
+  flex: 1;
+}
+
+.skill-card-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.skill-card-check {
+  color: var(--color-success);
+}
+
+.skill-card-error-icon {
+  color: var(--color-error);
+}
+
+.skill-card-progress {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.skill-card-steps {
+  padding: 4px 12px;
+}
+
+.skill-card-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.skill-card-step-completed {
+  color: var(--color-success);
+}
+
+.skill-card-step-error {
+  color: var(--color-error);
+}
+
+.skill-card-step-running {
+  color: var(--accent-color);
+}
+
+.skill-card-step-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+[data-theme="dark"] .skill-card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .skill-card-running {
+  border-left-color: var(--accent-color);
+}
+
+[data-theme="dark"] .skill-card-completed {
+  border-left-color: var(--color-success);
+}
+
+[data-theme="dark"] .skill-card-error {
+  border-left-color: var(--color-error);
+}
+
+[data-theme="dark"] .skill-card-header {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.skill-card-output {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-top: 1px solid var(--border-color);
+  transition: background 0.15s;
+}
+
+.skill-card-output:hover {
+  background: var(--bg-tertiary);
+}
+
+.skill-card-output-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-card-output-action {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* --- Artifact Bubble --- */
+
+.artifact-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  max-width: 280px;
+}
+
+.artifact-bubble:hover {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+.artifact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.artifact-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-action {
+  font-size: 11px;
+  color: var(--accent-color);
+}

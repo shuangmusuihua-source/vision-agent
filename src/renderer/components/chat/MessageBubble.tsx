@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { FileText, FileHtml, ArrowSquareOut } from '@phosphor-icons/react'
 import type { ChatMessage } from '../../store/agent-store'
 import type { AskUserRequest } from '../../lib/ipc'
 import ToolCallDisplay from './ToolCallDisplay'
+import SkillCard from './SkillCard'
 
 const REMARK_PLUGINS = [remarkGfm]
 
@@ -11,9 +13,11 @@ interface MessageBubbleProps {
   message: ChatMessage
   askUserRequest: AskUserRequest | null
   onRespondAskUser: (requestId: string, answer: string) => void
+  skillFollowingMessages?: ChatMessage[]
+  onOpenFile?: (path: string) => void
 }
 
-function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBubbleProps): React.ReactElement {
+function MessageBubble({ message, askUserRequest, onRespondAskUser, skillFollowingMessages, onOpenFile }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
   const [answered, setAnswered] = useState(false)
@@ -28,6 +32,34 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBub
     )
   }
 
+  // Artifact bubble
+  if (message.artifact) {
+    const art = message.artifact
+    const Icon = art.fileType === 'html' ? FileHtml : FileText
+    const handleOpen = () => {
+      if (!onOpenFile) return
+      if (art.fileType === 'html') {
+        window.api.workspace.openInBrowser(art.filePath)
+      } else {
+        onOpenFile(art.filePath)
+      }
+    }
+    return (
+      <div className="message-bubble message-assistant">
+        <div className="artifact-bubble" onClick={handleOpen}>
+          <Icon size={20} weight="regular" />
+          <div className="artifact-info">
+            <span className="artifact-name">{art.fileName}</span>
+            <span className="artifact-action">
+              {art.fileType === 'html' ? '在浏览器中预览' : '在编辑器中打开'}
+            </span>
+          </div>
+          <ArrowSquareOut size={14} weight="regular" />
+        </div>
+      </div>
+    )
+  }
+
   const handleAnswer = (requestId: string, answer: string) => {
     if (answered) return
     setAnswered(true)
@@ -37,10 +69,22 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBub
   return (
     <div className={`message-bubble ${isUser ? 'message-user' : 'message-assistant'}${isSystem ? ' message-system' : ''}`}>
       {isUser ? (
-        <div className="message-user-content">{message.content}</div>
+        <div className="message-user-content">
+          {message.skillInfo && (
+            <SkillCard
+              skillInfo={message.skillInfo}
+              toolCalls={skillFollowingMessages?.flatMap((m) => m.toolCalls || []) || message.toolCalls}
+              onOpenFile={onOpenFile}
+            />
+          )}
+          {message.content}
+        </div>
       ) : (
         <div className="message-assistant-content">
-          {message.toolCalls && message.toolCalls.length > 0 && (
+          {message.skillInfo && (
+            <SkillCard skillInfo={message.skillInfo} toolCalls={message.toolCalls} onOpenFile={onOpenFile} />
+          )}
+          {!message.skillInfo && message.toolCalls && message.toolCalls.length > 0 && (
             <div className="message-tool-calls">
               {message.toolCalls.map((tc) => (
                 <ToolCallDisplay key={tc.toolUseId} toolCall={tc} />

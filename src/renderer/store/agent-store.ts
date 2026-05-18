@@ -8,6 +8,20 @@ interface ToolCall {
   status: 'running' | 'completed' | 'error'
 }
 
+interface SkillInfo {
+  id: string
+  name: string
+  icon: string
+  status: 'running' | 'completed' | 'error'
+  outputFile?: string
+}
+
+interface Artifact {
+  filePath: string
+  fileName: string
+  fileType: 'md' | 'html'
+}
+
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -15,6 +29,8 @@ interface ChatMessage {
   toolCalls?: ToolCall[]
   isStreaming?: boolean
   isStatusIndicator?: boolean
+  skillInfo?: SkillInfo
+  artifact?: Artifact
 }
 
 type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error' | 'waitingForUserInput'
@@ -50,6 +66,7 @@ interface AgentState {
   sessionList: SdkSessionInfo[]
   lastEditedFile: string | null
   lastEditedFileTime: number
+  activeSkillInfo: SkillInfo | null
   addMessage: (message: ChatMessage) => void
   updateLastAssistantMessage: (content: string) => void
   appendToLastAssistantMessage: (chunk: string) => void
@@ -65,7 +82,8 @@ interface AgentState {
   setAskUserRequest: (request: AskUserRequest | null) => void
   setSessionList: (sessions: SdkSessionInfo[]) => void
   setLastEditedFile: (path: string | null) => void
+  setActiveSkillInfo: (info: SkillInfo | null) => void
   clearMessages: () => void
 }
 
-export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo }
+export type { ChatMessage, ToolCall, SkillInfo, Artifact, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo }

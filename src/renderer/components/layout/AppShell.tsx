@@ -9,7 +9,8 @@ import EditorTabs from '../editor/EditorTabs'
 import GraphView from '../graph/GraphView'
 import SearchPanel from '../search/SearchPanel'
 import useAgent from '../../hooks/useAgent'
-import type { FileEntry } from '../../lib/ipc'
+import type { ChatMessage } from '../../store/agent-store'
+import type { FileEntry, SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -79,7 +80,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     return unsub
   }, [onOpenSettings])
 
-  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, askUserRequest, sessionList, currentSessionId, sendMessage, respondPermission, respondAskUser, loadSessions, resumeSession, newSession } = useAgent()
+  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, askUserRequest, sessionList, currentSessionId, sendMessage, addMessage, respondPermission, respondAskUser, loadSessions, resumeSession, newSession, setActiveSkillInfo, lastEditedFile } = useAgent()
 
   // Restore/refresh workspaces from settings
   useEffect(() => {
@@ -105,7 +106,21 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     }
   }
 
-  const handleFileSelect = async (path: string) => {
+  const handleNewDirectory = async () => {
+    const path = await window.api.workspace.newDirectoryDialog()
+    if (path && !workspacePaths.includes(path)) {
+      setWorkspacePaths((prev) => [...prev, path])
+      setFiles((prev) => ({ ...prev, [path]: [] }))
+      await window.api.settings.addDirectory(path)
+    }
+  }
+
+  const handleRefreshWorkspace = async (path: string) => {
+    const entries = await window.api.workspace.listFiles(path)
+    setFiles((prev) => ({ ...prev, [path]: entries }))
+  }
+
+  const handleFileSelect = useCallback(async (path: string) => {
     // If file is already open, just switch to it
     if (openTabs.includes(path)) {
       setActiveTab(path)
@@ -119,7 +134,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       setActiveTab(path)
       setTabContents((prev) => ({ ...prev, [path]: result.content! }))
     }
-  }
+  }, [openTabs])
 
   const handleTabClose = useCallback((path: string) => {
     setOpenTabs((prev) => {
@@ -189,6 +204,24 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     [sendMessage]
   )
 
+  const handleStatsUpdate = useCallback((words: number, chars: number) => {
+    setEditorStats({ words, chars })
+  }, [])
+
+  const handleSkillSelect = useCallback((skill: SkillDefinition) => {
+    const prompt = skill.promptTemplate.replace('{activeFile}', activeTab || '')
+    const skillInfo = { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' as const }
+    setActiveSkillInfo(skillInfo)
+    const userMsg: ChatMessage = {
+      id: `skill-${Date.now()}`,
+      role: 'user',
+      content: `执行 Skill: ${skill.name}`,
+      skillInfo
+    }
+    addMessage(userMsg)
+    sendMessage(prompt, undefined, activeTab || undefined)
+  }, [sendMessage, addMessage, setActiveSkillInfo, activeTab])
+
   const activeContent = activeTab ? tabContents[activeTab] || '' : ''
 
   return (
@@ -199,6 +232,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
         onOpenDirectory={handleOpenDirectory}
+        onNewWorkspace={handleNewDirectory}
+        onRefreshWorkspace={handleRefreshWorkspace}
         onRemoveWorkspace={async (path) => {
           setWorkspacePaths((prev) => prev.filter((p) => p !== path))
           setFiles((prev) => {
@@ -235,6 +270,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           }} />
         ) : activeTab ? (
           <MarkdownEditor
+            key={activeTab}
             content={activeContent}
             filePath={activeTab}
             workspacePath={workspacePaths[0] || ''}
@@ -243,7 +279,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
             onOpenFile={handleFileSelect}
             onSave={handleSave}
             onAskAgent={handleAskAgent}
-            onStatsUpdate={(words, chars) => setEditorStats({ words, chars })}
+            onStatsUpdate={handleStatsUpdate}
           />
         ) : (
           <div className="editor-empty">
@@ -279,10 +315,10 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           } else {
             sendMessage(msg, activeTab || undefined)
           }
-        }} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
+        }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
         activeFilePath={activeTab || undefined}
       >
-        <ChatView messages={messages} askUserRequest={askUserRequest} onRespondAskUser={respondAskUser} />
+        <ChatView messages={messages} askUserRequest={askUserRequest} onRespondAskUser={respondAskUser} onOpenFile={handleFileSelect} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel
