@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { ShieldWarning, Check, X } from '@phosphor-icons/react'
 import type { PermissionRequest } from '../../store/agent-store'
 
@@ -9,9 +10,18 @@ interface PermissionDialogProps {
 function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.ReactElement {
   const inputSummary = summarizePermissionInput(request.toolName, request.input)
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') onRespond(request.id, 'allow')
+      else if (e.key === 'Escape') onRespond(request.id, 'deny')
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [request.id, onRespond])
+
   return (
     <div className="permission-overlay">
-      <div className="permission-dialog">
+      <div className="permission-dialog" role="dialog" aria-modal="true" aria-label="Permission Request">
         <div className="permission-header">
           <ShieldWarning size={16} weight="bold" className="permission-icon" />
           <span className="permission-title">Permission Request</span>

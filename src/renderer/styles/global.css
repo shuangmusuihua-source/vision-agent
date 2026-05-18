@@ -5,6 +5,7 @@
   --sidebar-bg: rgba(247, 247, 245, 0.7);
   --glass-bg: rgba(247, 247, 245, 0.7);
   --bg-tertiary: #eaeae8;
+  --bg-hover: rgba(0, 0, 0, 0.04);
   --text-primary: #37352f;
   --text-secondary: #787574;
   --text-tertiary: #9b9a97;
@@ -63,6 +64,7 @@
   --sidebar-bg: rgba(30, 30, 30, 0.7);
   --glass-bg: rgba(30, 30, 30, 0.7);
   --bg-tertiary: #222222;
+  --bg-hover: rgba(255, 255, 255, 0.06);
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
   --text-tertiary: #707070;
@@ -87,10 +89,6 @@
   --hl-variable: #e06c75;
   --hl-params: #abb2bf;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .sidebar-entry:hover {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 * {

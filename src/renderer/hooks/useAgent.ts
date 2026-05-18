@@ -390,8 +390,12 @@ function useAgent() {
 
   const respondPermission = useCallback(
     async (requestId: string, behavior: 'allow' | 'deny') => {
-      setPermissionRequest(null)
-      await window.api.agent.respondPermission(requestId, behavior)
+      try {
+        await window.api.agent.respondPermission(requestId, behavior)
+        setPermissionRequest(null)
+      } catch {
+        // IPC failed — keep dialog visible so user can retry
+      }
     },
     [setPermissionRequest]
   )

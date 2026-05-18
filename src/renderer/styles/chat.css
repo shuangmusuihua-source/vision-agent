@@ -38,7 +38,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-color);
   position: relative;
   height: 28px;
 }
@@ -416,7 +416,7 @@
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
   flex-shrink: 0;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
   cursor: default;
 }
 
@@ -438,10 +438,17 @@
 /* --- Permission Dialog --- */
 
 .permission-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 0;
+  z-index: 50;
+}
+
+[data-theme="dark"] .permission-overlay {
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .permission-dialog {
@@ -637,7 +644,7 @@
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s;
   text-align: left;
   width: 100%;
 }
@@ -752,11 +759,6 @@
   font-size: 11px;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 [data-theme="dark"] .skill-card {
   border-color: rgba(255, 255, 255, 0.08);
 }
@@ -818,7 +820,7 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s;
   max-width: 280px;
 }
 
@@ -847,4 +849,67 @@
 .artifact-action {
   font-size: 11px;
   color: var(--accent-color);
+}
+
+.session-bar-btn:focus-visible,
+.chat-send-btn:focus-visible,
+.permission-btn:focus-visible,
+.ask-user-option-btn:focus-visible,
+.skill-popup-item:focus-visible,
+.skill-card-header:focus-visible,
+.artifact-bubble:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+.session-bar-btn:active,
+.chat-send-btn-active:active,
+.permission-btn:active,
+.ask-user-option-btn:active,
+.skill-popup-item:active,
+.skill-card-header:active,
+.skill-card-output:active,
+.artifact-bubble:active {
+  opacity: 0.7;
+}
+
+/* --- Dark mode chat polish --- */
+
+[data-theme="dark"] .context-zone-tag--file {
+  background: rgba(139, 92, 246, 0.15);
+}
+
+[data-theme="dark"] .context-zone-tag--workspace {
+  background: rgba(74, 222, 128, 0.12);
+}
+
+[data-theme="dark"] .context-zone-tag--semantic {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .chat-input:focus {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .permission-btn-allow {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+[data-theme="dark"] .permission-btn-deny {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+
+[data-theme="dark"] .session-bar-dropdown {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .permission-dialog {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .skill-popup {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }

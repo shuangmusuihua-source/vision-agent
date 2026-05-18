@@ -145,7 +145,7 @@
   justify-content: center;
   border-radius: 4px;
   color: var(--text-tertiary);
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .drawer-task-action:hover {
@@ -175,7 +175,7 @@
   font-size: 11px;
   color: var(--accent-color);
   background: rgba(108, 140, 255, 0.12);
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
   width: 100%;
 }
 
@@ -255,7 +255,7 @@
   border-radius: 4px;
   font-size: 11px;
   color: var(--text-tertiary);
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .drawer-mode-tab.active {
@@ -277,7 +277,7 @@
   font-size: 11px;
   color: var(--text-tertiary);
   background: var(--bg-tertiary);
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .drawer-preset-btn.active {
@@ -303,7 +303,7 @@
   font-size: 10px;
   color: var(--text-tertiary);
   background: var(--bg-tertiary);
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .drawer-time-btn.active {
@@ -395,4 +395,56 @@
 
 .drawer-form-close:hover {
   color: var(--text-secondary);
+}
+
+.drawer-lip:focus-visible,
+.drawer-task-action:focus-visible,
+.drawer-add-btn:focus-visible,
+.drawer-mode-tab:focus-visible,
+.drawer-preset-btn:focus-visible,
+.drawer-time-btn:focus-visible,
+.drawer-submit-btn:focus-visible,
+.drawer-form-close:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+.drawer-lip:active {
+  background: var(--bg-tertiary);
+}
+
+.drawer-task-action:active,
+.drawer-add-btn:active,
+.drawer-mode-tab:active,
+.drawer-preset-btn:active,
+.drawer-time-btn:active,
+.drawer-submit-btn:active,
+.drawer-form-close:active {
+  opacity: 0.7;
+}
+
+/* --- Dark mode drawer polish --- */
+
+[data-theme="dark"] .drawer-task-action:hover {
+  background: rgba(74, 222, 128, 0.15);
+}
+
+[data-theme="dark"] .drawer-task-action-danger:hover {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+[data-theme="dark"] .drawer-add-btn {
+  background: rgba(108, 140, 255, 0.15);
+}
+
+[data-theme="dark"] .drawer-add-btn:hover {
+  background: rgba(108, 140, 255, 0.25);
+}
+
+[data-theme="dark"] .drawer-preset-btn.active {
+  background: rgba(108, 140, 255, 0.15);
+}
+
+[data-theme="dark"] .drawer-time-btn.active {
+  background: rgba(108, 140, 255, 0.15);
 }

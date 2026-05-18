@@ -18,6 +18,7 @@
   background: var(--bg-primary);
   border-radius: 12px;
   width: 560px;
+  max-width: calc(100vw - 40px);
   max-height: 480px;
   display: flex;
   flex-direction: column;
@@ -127,4 +128,15 @@
   color: var(--text-primary);
   border-radius: 2px;
   padding: 0 1px;
+}
+
+.search-count {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-result-item.selected {
+  background: var(--bg-tertiary);
 }

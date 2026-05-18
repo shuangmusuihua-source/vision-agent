@@ -189,7 +189,7 @@
 .sidebar-new-file-error {
   display: block;
   font-size: 11px;
-  color: var(--error-color, #e5484d);
+  color: var(--color-error);
   margin-top: 2px;
 }
 
@@ -247,7 +247,7 @@
 }
 
 .sidebar-entry:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--bg-hover);
 }
 
 .sidebar-folder {
@@ -522,5 +522,44 @@
   gap: 10px;
   font-size: 11px;
   color: var(--text-tertiary);
+}
+
+.sidebar-toggle-btn:focus-visible,
+.sidebar-icon-btn:focus-visible,
+.sidebar-settings-btn:focus-visible,
+.sidebar-open-dir-btn:focus-visible,
+.sidebar-new-dir-btn:focus-visible,
+.sidebar-entry:focus-visible,
+.agent-panel-toggle-btn:focus-visible,
+.agent-panel-swap-btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+.sidebar-toggle-btn:active,
+.sidebar-icon-btn:active,
+.sidebar-settings-btn:active,
+.sidebar-open-dir-btn:active,
+.sidebar-new-dir-btn:active,
+.sidebar-workspace-remove:active,
+.sidebar-workspace-add-file:active,
+.sidebar-memory-delete:active,
+.agent-panel-toggle-btn:active,
+.agent-panel-swap-btn:active {
+  opacity: 0.7;
+}
+
+/* --- Dark mode layout polish --- */
+
+[data-theme="dark"] .sidebar-entry:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .main-content {
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3), 4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .agent-panel {
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
 }
 
