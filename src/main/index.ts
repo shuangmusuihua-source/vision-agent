@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
+import { getSettings } from './store'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -45,6 +46,12 @@ export function getMainWindow(): BrowserWindow | null {
 app.whenReady().then(() => {
   setupMenu()
   registerIpcHandlers()
+
+  const savedTheme = getSettings().theme
+  if (savedTheme !== 'system') {
+    nativeTheme.themeSource = savedTheme
+  }
+
   createWindow()
 
   app.on('activate', () => {

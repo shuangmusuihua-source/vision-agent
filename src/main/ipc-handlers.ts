@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell } from 'electron'
+import { ipcMain, dialog, shell, nativeTheme } from 'electron'
 import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
 import { join, extname, relative } from 'path'
 import { existsSync } from 'fs'
@@ -256,6 +256,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:setTheme', (_event, theme: 'light' | 'dark' | 'system') => {
     setTheme(theme)
+    if (theme === 'system') {
+      nativeTheme.themeSource = 'system'
+    } else {
+      nativeTheme.themeSource = theme
+    }
     return { success: true }
   })
 
