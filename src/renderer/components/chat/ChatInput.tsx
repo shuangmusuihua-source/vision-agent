@@ -145,7 +145,7 @@ function ChatInput({ onSend, disabled, placeholder, prefill, onPrefillConsumed }
           }}
           disabled={!text.trim() || disabled}
         >
-          <ArrowUp size={16} weight="regular" />
+          <ArrowUp size={16} weight="bold" />
         </button>
       </div>
 

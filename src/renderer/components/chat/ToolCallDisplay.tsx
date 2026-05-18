@@ -10,9 +10,9 @@ function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement
   const [expanded, setExpanded] = useState(false)
 
   const statusIcon = {
-    running: <Spinner size={12} weight="regular" className="tool-call-spinner" />,
-    completed: <Check size={12} weight="regular" className="tool-call-success" />,
-    error: <X size={12} weight="regular" className="tool-call-error" />
+    running: <Spinner size={12} weight="bold" className="tool-call-spinner" />,
+    completed: <Check size={12} weight="bold" className="tool-call-success" />,
+    error: <X size={12} weight="bold" className="tool-call-error" />
   }[toolCall.status]
 
   const inputSummary = summarizeInput(toolCall.toolName, toolCall.input)
@@ -26,9 +26,9 @@ function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement
     <div className="tool-call-display">
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
         <span className="tool-call-chevron">
-          {expanded ? <CaretDown size={12} weight="regular" /> : <CaretRight size={12} weight="regular" />}
+          {expanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
         </span>
-        <Wrench size={12} weight="regular" className="tool-call-icon" />
+        <Wrench size={12} weight="bold" className="tool-call-icon" />
         <span className="tool-call-name">{toolCall.toolName}</span>
         <span className="tool-call-summary">{inputSummary}</span>
         <span className="tool-call-status">{statusIcon}</span>

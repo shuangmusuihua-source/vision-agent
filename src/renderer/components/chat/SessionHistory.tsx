@@ -20,16 +20,16 @@ function SessionHistory({ sessions, currentSessionId, onSelectSession, onNewSess
           className="session-history-toggle"
           onClick={() => setCollapsed(!collapsed)}
         >
-          {collapsed ? <CaretRight size={12} weight="regular" /> : <CaretDown size={12} weight="regular" />}
-          <Clock size={12} weight="regular" />
+          {collapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+          <Clock size={12} weight="bold" />
           <span className="session-history-title">History</span>
         </button>
         <div className="session-history-actions">
           <button className="session-history-btn" onClick={onRefresh} title="Refresh">
-            <ArrowsClockwise size={12} weight="regular" />
+            <ArrowsClockwise size={12} weight="bold" />
           </button>
           <button className="session-history-btn" onClick={onNewSession} title="New session">
-            <Plus size={12} weight="regular" />
+            <Plus size={12} weight="bold" />
           </button>
         </div>
       </div>
@@ -44,7 +44,7 @@ function SessionHistory({ sessions, currentSessionId, onSelectSession, onNewSess
                 className={`session-history-item ${s.id === currentSessionId ? 'active' : ''}`}
                 onClick={() => onSelectSession(s.id)}
               >
-                <ChatCircle size={12} weight="regular" />
+                <ChatCircle size={12} weight="bold" />
                 <span className="session-history-item-title">
                   {s.title || s.id.slice(0, 12)}
                 </span>

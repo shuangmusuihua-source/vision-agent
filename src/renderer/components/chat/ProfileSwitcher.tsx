@@ -60,7 +60,7 @@ function ProfileSwitcher({ onOpenSettings }: ProfileSwitcherProps): React.ReactE
             {MODELS[activeProfile.model] || activeProfile.model}
           </span>
         )}
-        <CaretDown size={14} weight="regular" />
+        <CaretDown size={14} weight="bold" />
       </button>
 
       {open && (
@@ -87,7 +87,7 @@ function ProfileSwitcher({ onOpenSettings }: ProfileSwitcherProps): React.ReactE
               onOpenSettings()
             }}
           >
-            <Plus size={14} weight="regular" />
+            <Plus size={14} weight="bold" />
             <span>Add Profile</span>
           </button>
         </div>

@@ -96,12 +96,12 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
               onClick={() => setShowSource(!showSource)}
               title={showSource ? 'Show diagram' : 'Show source'}
             >
-              <ChartBar size={13} weight="regular" />
+              <ChartBar size={13} weight="bold" />
               {showSource ? 'Diagram' : 'Source'}
             </button>
           )}
           <button className="code-block-copy-btn" onClick={handleCopy}>
-            {copied ? 'Copied' : <Copy size={13} weight="regular" />}
+            {copied ? 'Copied' : <Copy size={13} weight="bold" />}
           </button>
         </div>
       </div>

@@ -67,7 +67,7 @@ function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElem
     <div className="search-overlay" onClick={onClose}>
       <div className="search-panel" onClick={(e) => e.stopPropagation()}>
         <div className="search-input-row">
-          <MagnifyingGlass size={16} weight="regular" className="search-icon" />
+          <MagnifyingGlass size={16} weight="bold" className="search-icon" />
           <input
             ref={inputRef}
             className="search-input"
@@ -79,7 +79,7 @@ function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElem
           />
           {keyword && (
             <button className="search-clear-btn" onClick={() => setKeyword('')}>
-              <X size={14} weight="regular" />
+              <X size={14} weight="bold" />
             </button>
           )}
         </div>
@@ -98,7 +98,7 @@ function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElem
                 onClose()
               }}
             >
-              <FileText size={14} weight="regular" className="search-result-icon" />
+              <FileText size={14} weight="bold" className="search-result-icon" />
               <div className="search-result-info">
                 <span className="search-result-file">{result.fileName}</span>
                 <span className="search-result-line">:{result.line}</span>

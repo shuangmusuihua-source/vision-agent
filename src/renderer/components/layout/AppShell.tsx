@@ -265,7 +265,6 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         onToggleCollapse={() => setAgentCollapsed(!agentCollapsed)}
         onSwapLayout={() => setLayoutMode((v) => v === 'edit-first' ? 'chat-first' : 'edit-first')}
         layoutMode={layoutMode}
-        onOpenSettings={onOpenSettings}
         usageInfo={usageInfo}
         permissionRequest={permissionRequest}
         onPermissionRespond={respondPermission}
@@ -292,7 +291,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         />
       )}
       <button className="sidebar-toggle-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
-        <SidebarIcon size={14} weight="regular" />
+        <SidebarIcon size={14} weight="bold" />
       </button>
     </div>
   )

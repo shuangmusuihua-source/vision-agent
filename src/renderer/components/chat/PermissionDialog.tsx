@@ -13,7 +13,7 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
     <div className="permission-overlay">
       <div className="permission-dialog">
         <div className="permission-header">
-          <ShieldWarning size={16} weight="regular" className="permission-icon" />
+          <ShieldWarning size={16} weight="bold" className="permission-icon" />
           <span className="permission-title">Permission Request</span>
         </div>
         <div className="permission-body">
@@ -33,14 +33,14 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
             className="permission-btn permission-btn-allow"
             onClick={() => onRespond(request.id, 'allow')}
           >
-            <Check size={14} weight="regular" />
+            <Check size={14} weight="bold" />
             Allow
           </button>
           <button
             className="permission-btn permission-btn-deny"
             onClick={() => onRespond(request.id, 'deny')}
           >
-            <X size={14} weight="regular" />
+            <X size={14} weight="bold" />
             Deny
           </button>
         </div>

@@ -11,7 +11,6 @@ interface AgentPanelProps {
   onToggleCollapse: () => void
   onSwapLayout: () => void
   layoutMode: 'edit-first' | 'chat-first'
-  onOpenSettings: () => void
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
@@ -25,14 +24,14 @@ interface AgentPanelProps {
   activeFilePath?: string
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, onOpenSettings, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, activeFilePath }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, activeFilePath }: AgentPanelProps): React.ReactElement {
   return (
     <div className={`agent-panel${collapsed ? ' agent-panel-collapsed' : ''}${layoutMode === 'chat-first' ? ' agent-panel-primary' : ''}`}>
       <button className="agent-panel-toggle-btn" onClick={onToggleCollapse}>
-        {collapsed ? <SidebarOpenIcon size={16} weight="regular" /> : <SidebarIcon size={16} weight="regular" />}
+        {collapsed ? <SidebarOpenIcon size={16} weight="bold" /> : <SidebarIcon size={16} weight="bold" />}
       </button>
       <button className="agent-panel-swap-btn" onClick={onSwapLayout} title={layoutMode === 'edit-first' ? '对话为主' : '编辑为主'}>
-        <ArrowsLeftRight size={14} weight="regular" />
+        <ArrowsLeftRight size={14} weight="bold" />
       </button>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
@@ -41,7 +40,6 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, onO
           </div>
         </div>
         <SessionBar
-          onOpenSettings={onOpenSettings}
           sessions={sessionList}
           currentSessionId={currentSessionId}
           onSelectSession={onSelectSession}

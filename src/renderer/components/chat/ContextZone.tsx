@@ -12,7 +12,7 @@ function ContextZone({ activeFilePath }: ContextZoneProps): React.ReactElement |
 
   return (
     <div className="context-zone-tag context-zone-tag--file" title={activeFilePath}>
-      <FileText size={12} weight="regular" />
+      <FileText size={12} weight="bold" />
       <span>{fileName}</span>
     </div>
   )

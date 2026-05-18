@@ -78,7 +78,7 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
     <div className="editor-tabs-container">
       {canScrollLeft && (
         <button className="editor-tabs-nav editor-tabs-nav-left" onClick={() => scroll('left')}>
-          <CaretLeft size={14} weight="regular" />
+          <CaretLeft size={14} weight="bold" />
         </button>
       )}
       <div className="editor-tabs" ref={scrollRef}>
@@ -94,14 +94,14 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
               className="editor-tab-close"
               onClick={(e) => handleClose(e, path)}
             >
-              <X size={12} weight="regular" />
+              <X size={12} weight="bold" />
             </button>
           </div>
         ))}
       </div>
       {canScrollRight && (
         <button className="editor-tabs-nav editor-tabs-nav-right" onClick={() => scroll('right')}>
-          <CaretRight size={14} weight="regular" />
+          <CaretRight size={14} weight="bold" />
         </button>
       )}
     </div>

@@ -8,9 +8,9 @@ interface SettingsModalProps {
 type SettingsPage = 'appearance' | 'profiles' | 'about'
 
 const PAGES: Array<{ id: SettingsPage; label: string; icon: React.ReactElement }> = [
-  { id: 'appearance', label: '外观', icon: <Sun size={16} weight="regular" /> },
-  { id: 'profiles', label: '模型配置', icon: <Users size={16} weight="regular" /> },
-  { id: 'about', label: '关于', icon: <Info size={16} weight="regular" /> }
+  { id: 'appearance', label: '外观', icon: <Sun size={16} weight="bold" /> },
+  { id: 'profiles', label: '模型配置', icon: <Users size={16} weight="bold" /> },
+  { id: 'about', label: '关于', icon: <Info size={16} weight="bold" /> }
 ]
 
 const MODEL_OPTIONS = [
@@ -178,7 +178,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
         <div className="settings-content">
           <button className="settings-close-btn" onClick={onClose}>
-            <X size={16} weight="regular" />
+            <X size={16} weight="bold" />
           </button>
 
           {activePage === 'appearance' && (
@@ -191,21 +191,21 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                     className={`theme-option ${theme === 'light' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('light')}
                   >
-                    <Sun size={24} weight="regular" />
+                    <Sun size={24} weight="bold" />
                     <span className="theme-option-label">浅色</span>
                   </button>
                   <button
                     className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('dark')}
                   >
-                    <Moon size={24} weight="regular" />
+                    <Moon size={24} weight="bold" />
                     <span className="theme-option-label">深色</span>
                   </button>
                   <button
                     className={`theme-option ${theme === 'system' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('system')}
                   >
-                    <Desktop size={24} weight="regular" />
+                    <Desktop size={24} weight="bold" />
                     <span className="theme-option-label">跟随系统</span>
                   </button>
                 </div>
@@ -367,7 +367,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 )
               })}
               <button className="add-profile-btn" onClick={handleAddProfile}>
-                <Plus size={16} weight="regular" />
+                <Plus size={16} weight="bold" />
                 添加配置
               </button>
             </div>

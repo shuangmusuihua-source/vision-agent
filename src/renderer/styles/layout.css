@@ -18,13 +18,12 @@
   width: 22px;
   height: 22px;
   border-radius: var(--radius);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   -webkit-app-region: no-drag;
 }
 
 .sidebar-toggle-btn:hover {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
 }
 
 /* --- Sidebar --- */
@@ -70,12 +69,11 @@
   width: 22px;
   height: 22px;
   border-radius: var(--radius);
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .sidebar-icon-btn:hover {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
 }
 
 .sidebar-icon-btn-active {
@@ -340,14 +338,13 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   -webkit-app-region: no-drag;
   z-index: 2;
 }
 
 .agent-panel-toggle-btn:hover {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
 }
 
 .agent-panel-swap-btn {
@@ -360,14 +357,14 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   -webkit-app-region: no-drag;
   z-index: 2;
 }
 
 .agent-panel-swap-btn:hover {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
+}
 }
 
 .agent-panel-collapsed .agent-panel-swap-btn {
@@ -458,18 +455,3 @@
   color: var(--text-tertiary);
 }
 
-.agent-panel-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  -webkit-app-region: no-drag;
-}
-
-.agent-panel-toggle-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}

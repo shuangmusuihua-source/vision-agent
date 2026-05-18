@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ClockCounterClockwise, Plus, GearSix } from '@phosphor-icons/react'
+import { ClockCounterClockwise, Plus } from '@phosphor-icons/react'
 import type { SdkSessionInfo } from '../../store/agent-store'
 import type { AppSettings } from '../../lib/ipc'
 
@@ -10,7 +10,6 @@ const MODELS: Record<string, string> = {
 }
 
 interface SessionBarProps {
-  onOpenSettings: () => void
   sessions: SdkSessionInfo[]
   currentSessionId: string | null
   onSelectSession: (sessionId: string) => void
@@ -18,7 +17,7 @@ interface SessionBarProps {
   onRefreshSessions: () => void
 }
 
-function SessionBar({ onOpenSettings, sessions, currentSessionId, onSelectSession, onNewSession, onRefreshSessions }: SessionBarProps): React.ReactElement {
+function SessionBar({ sessions, currentSessionId, onSelectSession, onNewSession, onRefreshSessions }: SessionBarProps): React.ReactElement {
   const [showHistory, setShowHistory] = useState(false)
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -63,13 +62,10 @@ function SessionBar({ onOpenSettings, sessions, currentSessionId, onSelectSessio
           }}
           title="历史会话"
         >
-          <ClockCounterClockwise size={14} weight="regular" />
+          <ClockCounterClockwise size={14} weight="bold" />
         </button>
         <button className="session-bar-btn" onClick={onNewSession} title="新建会话">
-          <Plus size={14} weight="regular" />
-        </button>
-        <button className="session-bar-btn" onClick={onOpenSettings} title="设置">
-          <GearSix size={14} weight="regular" />
+          <Plus size={14} weight="bold" />
         </button>
       </div>
 
