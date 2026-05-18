@@ -16,6 +16,10 @@ function createWindow(): void {
     show: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 8, y: 8 },
+    transparent: true,
+    backgroundColor: '#00000000',
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
     title: 'Vision Agent',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

@@ -2,10 +2,11 @@
   --bg-primary: #ffffff;
   --bg-secondary: #f7f7f5;
   --drawer-bg: rgba(242, 242, 240, 0.7);
-  --sidebar-bg: rgba(247, 247, 245, 0.7);
+  --sidebar-bg: rgba(247, 247, 245, 0.42);
   --glass-bg: rgba(247, 247, 245, 0.7);
   --bg-tertiary: #eaeae8;
   --bg-hover: rgba(0, 0, 0, 0.04);
+  --sidebar-glass-border: rgba(0, 0, 0, 0.06);
   --text-primary: #37352f;
   --text-secondary: #787574;
   --text-tertiary: #9b9a97;
@@ -61,10 +62,11 @@
   --bg-primary: #181818;
   --bg-secondary: #222222;
   --drawer-bg: rgba(28, 28, 28, 0.7);
-  --sidebar-bg: rgba(30, 30, 30, 0.7);
+  --sidebar-bg: rgba(30, 30, 30, 0.42);
   --glass-bg: rgba(30, 30, 30, 0.7);
   --bg-tertiary: #222222;
   --bg-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-glass-border: rgba(255, 255, 255, 0.06);
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
   --text-tertiary: #707070;
@@ -91,6 +93,23 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+/* G2 continuous corners for key UI elements */
+.main-content,
+.sidebar,
+.agent-panel,
+.search-panel,
+.settings-window,
+.permission-dialog,
+.tool-call-display,
+.skill-card,
+.artifact-bubble,
+.ask-user-option-btn,
+.drawer-panel,
+.editor-tab,
+.code-block-enhanced {
+  -electron-corner-smoothing: system-ui;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -98,7 +117,7 @@
 }
 
 body {
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
