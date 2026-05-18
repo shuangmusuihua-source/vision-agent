@@ -1,4 +1,4 @@
-import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
+import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight } from '@phosphor-icons/react'
 import type { UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
 import ProfileSwitcher from '../chat/ProfileSwitcher'
 import SessionBar from '../chat/SessionBar'
@@ -9,6 +9,8 @@ import DrawerZone from './DrawerZone'
 interface AgentPanelProps {
   collapsed: boolean
   onToggleCollapse: () => void
+  onSwapLayout: () => void
+  layoutMode: 'edit-first' | 'chat-first'
   onOpenSettings: () => void
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
@@ -23,11 +25,14 @@ interface AgentPanelProps {
   activeFilePath?: string
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onOpenSettings, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, activeFilePath }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, onOpenSettings, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, activeFilePath }: AgentPanelProps): React.ReactElement {
   return (
-    <div className={`agent-panel${collapsed ? ' agent-panel-collapsed' : ''}`}>
+    <div className={`agent-panel${collapsed ? ' agent-panel-collapsed' : ''}${layoutMode === 'chat-first' ? ' agent-panel-primary' : ''}`}>
       <button className="agent-panel-toggle-btn" onClick={onToggleCollapse}>
         {collapsed ? <SidebarOpenIcon size={16} weight="regular" /> : <SidebarIcon size={16} weight="regular" />}
+      </button>
+      <button className="agent-panel-swap-btn" onClick={onSwapLayout} title={layoutMode === 'edit-first' ? '对话为主' : '编辑为主'}>
+        <ArrowsLeftRight size={14} weight="regular" />
       </button>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
+import { ArrowsLeftRight, SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -31,14 +31,19 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [sourceMode, setSourceMode] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
+  const [layoutMode, setLayoutMode] = useState<'edit-first' | 'chat-first'>('edit-first')
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
-  // Cmd+Shift+F to open search
+  // Cmd+Shift+F to open search, Cmd+Shift+R to swap layout
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
         e.preventDefault()
         setShowSearch(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'r') {
+        e.preventDefault()
+        setLayoutMode((v) => v === 'edit-first' ? 'chat-first' : 'edit-first')
       }
     }
     window.addEventListener('keydown', handler)
@@ -209,7 +214,9 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         showGraph={showGraph}
         collapsed={sidebarCollapsed}
       />
-      <div className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}`}>
+      <div
+        className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${layoutMode === 'chat-first' ? ' main-content-secondary' : ''}`}
+      >
         <div className="main-content-header">
           {openTabs.length > 0 && (
             <EditorTabs
@@ -256,6 +263,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       <AgentPanel
         collapsed={agentCollapsed}
         onToggleCollapse={() => setAgentCollapsed(!agentCollapsed)}
+        onSwapLayout={() => setLayoutMode((v) => v === 'edit-first' ? 'chat-first' : 'edit-first')}
+        layoutMode={layoutMode}
         onOpenSettings={onOpenSettings}
         usageInfo={usageInfo}
         permissionRequest={permissionRequest}
