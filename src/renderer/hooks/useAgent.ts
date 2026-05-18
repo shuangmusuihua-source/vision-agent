@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
-import type { ToolCall } from '../store/agent-store'
+import type { ToolCall, AskUserRequest } from '../store/agent-store'
 
 // SDK message type discriminator
 type SDKMsg = Record<string, unknown>
@@ -36,6 +36,8 @@ function useAgent() {
     setAgentStatus,
     setUsageInfo,
     setPermissionRequest,
+    setAskUserRequest,
+    askUserRequest,
     setSessionList,
     setLastEditedFile,
     clearMessages
@@ -79,12 +81,36 @@ function useAgent() {
       })
     })
 
+    const unsubAskUser = window.api.agent.onAskUser((data: unknown) => {
+      const req = data as AskUserRequest
+      setAskUserRequest(req)
+      addMessage({
+        id: req.id,
+        role: 'assistant',
+        content: req.question,
+        isStreaming: false
+      })
+    })
+
+    const unsubAskUserTimeout = window.api.agent.onAskUserTimeout((data: unknown) => {
+      const { requestId } = data as { requestId: string }
+      addMessage({
+        id: `timeout-${Date.now()}`,
+        role: 'assistant',
+        content: '⏱ 等待回答超时，Agent 已停止等待',
+        isStreaming: false
+      })
+      setAskUserRequest(null)
+    })
+
     return () => {
       unsubMessage()
       unsubSession()
       unsubComplete()
       unsubError()
       unsubPermission()
+      unsubAskUser()
+      unsubAskUserTimeout()
     }
   }, [])
 
@@ -390,17 +416,31 @@ function useAgent() {
     setSessionId(null)
   }, [clearMessages, setSessionId])
 
-  return {
+  const respondAskUser = useCallback(async (requestId: string, answer: string) => {
+      addMessage({
+        id: `user-answer-${Date.now()}`,
+        role: 'user',
+        content: answer,
+        isStreaming: false
+      })
+      await window.api.agent.respondAskUser(requestId, answer)
+      setAskUserRequest(null)
+      setAgentStatus('streaming')
+    }, [addMessage, setAskUserRequest, setAgentStatus])
+
+    return {
     messages,
     isStreaming,
     agentStatus,
     usageInfo,
     permissionRequest,
+    askUserRequest,
     sessionList,
     lastEditedFile,
     lastEditedFileTime,
     sendMessage,
     respondPermission,
+    respondAskUser,
     loadSessions,
     resumeSession,
     newSession,

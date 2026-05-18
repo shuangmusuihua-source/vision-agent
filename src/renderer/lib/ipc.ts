@@ -41,6 +41,17 @@ interface SettingsApi {
   setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
 }
 
+interface AskUserOption {
+  label: string
+  description?: string
+}
+
+interface AskUserRequest {
+  id: string
+  question: string
+  options?: AskUserOption[]
+}
+
 interface AgentApi {
   sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) => Promise<{ started: boolean }>
   getSessionList: () => Promise<SessionInfo[]>
@@ -48,6 +59,13 @@ interface AgentApi {
   onSessionCreated: (callback: (sessionId: string) => void) => () => void
   onComplete: (callback: (data: { sessionId: string }) => void) => () => void
   onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void
+  onPermissionRequest: (callback: (request: { id: string; toolName: string; input: Record<string, unknown> }) => void) => () => void
+  respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
+  onAskUser: (callback: (data: AskUserRequest) => void) => () => void
+  respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
+  onAskUserTimeout: (callback: (data: { requestId: string }) => void) => () => void
+  listSdkSessions: () => Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number }>>
+  loadSessionMessages: (sessionId: string) => Promise<Array<Record<string, unknown>>>
 }
 
 interface GraphApi {
@@ -163,6 +181,8 @@ export type {
   AppSettings,
   SessionInfo,
   AgentMessageData,
+  AskUserOption,
+  AskUserRequest,
   GraphNode,
   GraphEdge,
   CronTask,

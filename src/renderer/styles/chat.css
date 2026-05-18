@@ -618,3 +618,49 @@
   color: var(--text-tertiary);
   text-align: center;
 }
+
+/* --- AskUser Options --- */
+
+.ask-user-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ask-user-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  width: 100%;
+}
+
+.ask-user-option-btn:hover {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+.ask-user-option-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ask-user-option-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.message-system {
+  color: var(--text-tertiary);
+  font-style: italic;
+  font-size: 12px;
+}

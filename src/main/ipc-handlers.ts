@@ -3,7 +3,7 @@ import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
 import { join, extname, relative } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
-import { sendMessage, getSessionList, resolvePermission, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
+import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { listSkills } from './agent-manager'
 import {
@@ -235,6 +235,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:permissionResponse', (_event, requestId: string, behavior: 'allow' | 'deny') => {
     resolvePermission(requestId, behavior)
+    return { success: true }
+  })
+
+  ipcMain.handle('agent:respondAskUser', (_event, requestId: string, answer: string) => {
+    resolveAskUser(requestId, answer)
     return { success: true }
   })
 

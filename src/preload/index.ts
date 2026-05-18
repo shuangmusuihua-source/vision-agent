@@ -62,6 +62,18 @@ const api = {
     },
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
+    onAskUser: (callback: (data: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+      ipcRenderer.on('agent:askUser', handler)
+      return () => ipcRenderer.removeListener('agent:askUser', handler)
+    },
+    respondAskUser: (requestId: string, answer: string) =>
+      ipcRenderer.invoke('agent:respondAskUser', requestId, answer),
+    onAskUserTimeout: (callback: (data: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+      ipcRenderer.on('agent:askUserTimeout', handler)
+      return () => ipcRenderer.removeListener('agent:askUserTimeout', handler)
+    },
     listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
     loadSessionMessages: (sessionId: string) => ipcRenderer.invoke('agent:loadSessionMessages', sessionId)
   },

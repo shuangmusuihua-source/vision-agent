@@ -8,14 +8,14 @@ interface ToolCall {
 
 interface ChatMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   toolCalls?: ToolCall[]
   isStreaming?: boolean
   isStatusIndicator?: boolean
 }
 
-type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error'
+type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error' | 'waitingForPermission' | 'waitingForUserInput'
 
 interface UsageInfo {
   inputTokens: number
@@ -28,6 +28,17 @@ interface PermissionRequest {
   id: string
   toolName: string
   input: Record<string, unknown>
+}
+
+interface AskUserOption {
+  label: string
+  description?: string
+}
+
+interface AskUserRequest {
+  id: string
+  question: string
+  options?: AskUserOption[]
 }
 
 interface SdkSessionInfo {
@@ -44,6 +55,7 @@ interface AgentState {
   agentStatus: AgentStatus
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
+  askUserRequest: AskUserRequest | null
   sessionList: SdkSessionInfo[]
   lastEditedFile: string | null
   lastEditedFileTime: number
@@ -59,9 +71,10 @@ interface AgentState {
   setAgentStatus: (status: AgentStatus) => void
   setUsageInfo: (info: UsageInfo | null) => void
   setPermissionRequest: (request: PermissionRequest | null) => void
+  setAskUserRequest: (request: AskUserRequest | null) => void
   setSessionList: (sessions: SdkSessionInfo[]) => void
   setLastEditedFile: (path: string | null) => void
   clearMessages: () => void
 }
 
-export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo }
+export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, AskUserOption, AskUserRequest, SdkSessionInfo }

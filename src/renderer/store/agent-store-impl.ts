@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from './agent-store'
+import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo, AskUserRequest } from './agent-store'
 
 export const useAgentStore = create<AgentState>((set) => ({
   messages: [],
@@ -8,6 +8,7 @@ export const useAgentStore = create<AgentState>((set) => ({
   agentStatus: 'idle',
   usageInfo: null,
   permissionRequest: null,
+  askUserRequest: null,
   sessionList: [],
   lastEditedFile: null,
   lastEditedFileTime: 0,
@@ -104,10 +105,12 @@ export const useAgentStore = create<AgentState>((set) => ({
 
   setPermissionRequest: (request: PermissionRequest | null) => set({ permissionRequest: request }),
 
+  setAskUserRequest: (request: AskUserRequest | null) => set({ askUserRequest: request, agentStatus: request ? 'waitingForUserInput' : 'idle' }),
+
   setSessionList: (sessions: SdkSessionInfo[]) => set({ sessionList: sessions }),
 
   setLastEditedFile: (path: string | null) => set({ lastEditedFile: path, lastEditedFileTime: Date.now() }),
 
   clearMessages: () =>
-    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, lastEditedFile: null, lastEditedFileTime: 0 })
+    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, askUserRequest: null, lastEditedFile: null, lastEditedFileTime: 0 })
 }))

@@ -79,7 +79,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     return unsub
   }, [onOpenSettings])
 
-  const { messages, isStreaming, usageInfo, permissionRequest, sessionList, currentSessionId, sendMessage, respondPermission, loadSessions, resumeSession, newSession } = useAgent()
+  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, askUserRequest, sessionList, currentSessionId, sendMessage, respondPermission, respondAskUser, loadSessions, resumeSession, newSession } = useAgent()
 
   // Restore/refresh workspaces from settings
   useEffect(() => {
@@ -274,10 +274,16 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         onSelectSession={resumeSession}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
-        chatInput={<ChatInput onSend={(msg) => sendMessage(msg, activeTab || undefined)} disabled={isStreaming} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
+        chatInput={<ChatInput onSend={(msg) => {
+          if (askUserRequest) {
+            respondAskUser(askUserRequest.id, msg)
+          } else {
+            sendMessage(msg, activeTab || undefined)
+          }
+        }} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
         activeFilePath={activeTab || undefined}
       >
-        <ChatView messages={messages} />
+        <ChatView messages={messages} askUserRequest={askUserRequest} onRespondAskUser={respondAskUser} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel

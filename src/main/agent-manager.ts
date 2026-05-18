@@ -40,6 +40,12 @@ const pendingPermissions = new Map<string, {
   input: Record<string, unknown>
 }>()
 
+// Pending AskUserQuestion requests waiting for user input
+const pendingAskUser = new Map<string, {
+  resolve: (result: PermissionResult) => void
+  timeout: ReturnType<typeof setTimeout>
+}>()
+
 // Audit log path
 const AUDIT_LOG_PATH = `${process.env.HOME || '/tmp'}/.vision-agent/audit.log`
 
@@ -101,6 +107,15 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
   }
 }
 
+export function resolveAskUser(requestId: string, answer: string): void {
+  const pending = pendingAskUser.get(requestId)
+  if (!pending) return
+  pendingAskUser.delete(requestId)
+  clearTimeout(pending.timeout)
+  // Pass the user's answer back as updatedInput so the agent receives it
+  pending.resolve({ behavior: 'allow', updatedInput: { answer } })
+}
+
 function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Options {
   const apiKey = getApiKey()
   const model = getModel()
@@ -155,6 +170,35 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
             return { behavior: 'allow', updatedInput: input }
           }
         }
+      }
+
+      // AskUserQuestion — route to askUser flow instead of permission dialog
+      if (toolName === 'AskUserQuestion') {
+        const requestId = `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const question = (input.question as string) || ''
+        const rawOptions = input.options as Array<Record<string, string>> | undefined
+        const optionsList = rawOptions?.map((o) => ({
+          label: o.label || '',
+          description: o.description || ''
+        })) || undefined
+
+        mainWindow.webContents.send('agent:askUser', {
+          id: requestId,
+          question,
+          options: optionsList
+        })
+
+        return new Promise<PermissionResult>((resolve) => {
+          const timeout = setTimeout(() => {
+            if (pendingAskUser.has(requestId)) {
+              pendingAskUser.delete(requestId)
+              mainWindow.webContents.send('agent:askUserTimeout', { requestId })
+              resolve({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
+            }
+          }, 300000)
+
+          pendingAskUser.set(requestId, { resolve, timeout })
+        })
       }
 
       // All other tools (Bash, Write, Edit) require user approval

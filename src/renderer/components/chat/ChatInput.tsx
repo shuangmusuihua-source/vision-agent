@@ -5,11 +5,12 @@ import type { SlashCommand } from '../../lib/ipc'
 interface ChatInputProps {
   onSend: (message: string) => void
   disabled: boolean
+  placeholder?: string
   prefill?: string | null
   onPrefillConsumed?: () => void
 }
 
-function ChatInput({ onSend, disabled, prefill, onPrefillConsumed }: ChatInputProps): React.ReactElement {
+function ChatInput({ onSend, disabled, placeholder, prefill, onPrefillConsumed }: ChatInputProps): React.ReactElement {
   const [text, setText] = useState('')
   const [skills, setSkills] = useState<SlashCommand[]>([])
   const [showSkillPopup, setShowSkillPopup] = useState(false)
@@ -126,7 +127,7 @@ function ChatInput({ onSend, disabled, prefill, onPrefillConsumed }: ChatInputPr
         <textarea
           ref={inputRef}
           className="chat-input"
-          placeholder="输入消息，/ 触发技能..."
+          placeholder={placeholder || '输入消息，/ 触发技能...'}
           value={text}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
