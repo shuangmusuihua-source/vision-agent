@@ -109,10 +109,13 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
 
 export function resolveAskUser(requestId: string, answer: string): void {
   const pending = pendingAskUser.get(requestId)
-  if (!pending) return
+  if (!pending) {
+    console.warn(`[AgentManager] resolveAskUser: ${requestId} not found in pending map`)
+    return
+  }
   pendingAskUser.delete(requestId)
   clearTimeout(pending.timeout)
-  // Pass the user's answer back as updatedInput so the agent receives it
+  console.log(`[AgentManager] resolveAskUser: ${requestId} — answer: "${answer}"`)
   pending.resolve({ behavior: 'allow', updatedInput: { answer } })
 }
 
@@ -181,6 +184,8 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
           label: o.label || '',
           description: o.description || ''
         })) || undefined
+
+        console.log(`[AgentManager] AskUserQuestion: ${requestId} — "${question}"`)
 
         mainWindow.webContents.send('agent:askUser', {
           id: requestId,

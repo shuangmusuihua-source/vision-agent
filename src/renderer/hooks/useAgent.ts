@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
-import type { ToolCall, AskUserRequest } from '../store/agent-store'
+import type { ToolCall } from '../store/agent-store'
+import type { AskUserRequest } from '../lib/ipc'
 
 // SDK message type discriminator
 type SDKMsg = Record<string, unknown>
@@ -84,6 +85,7 @@ function useAgent() {
     const unsubAskUser = window.api.agent.onAskUser((data: unknown) => {
       const req = data as AskUserRequest
       setAskUserRequest(req)
+      setAgentStatus('waitingForUserInput')
       addMessage({
         id: req.id,
         role: 'assistant',
@@ -96,11 +98,12 @@ function useAgent() {
       const { requestId } = data as { requestId: string }
       addMessage({
         id: `timeout-${Date.now()}`,
-        role: 'assistant',
+        role: 'system',
         content: '⏱ 等待回答超时，Agent 已停止等待',
         isStreaming: false
       })
       setAskUserRequest(null)
+      setAgentStatus('idle')
     })
 
     return () => {
@@ -354,6 +357,7 @@ function useAgent() {
 
   const STATUS_TEXT: Record<string, string> = {
     thinking: '正在思考...',
+    requesting: '正在思考...',
     compacting: '正在压缩上下文...'
   }
 

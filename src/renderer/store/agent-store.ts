@@ -1,3 +1,5 @@
+import type { AskUserOption, AskUserRequest } from '../lib/ipc'
+
 interface ToolCall {
   toolName: string
   toolUseId: string
@@ -15,7 +17,7 @@ interface ChatMessage {
   isStatusIndicator?: boolean
 }
 
-type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error' | 'waitingForPermission' | 'waitingForUserInput'
+type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error' | 'waitingForUserInput'
 
 interface UsageInfo {
   inputTokens: number
@@ -28,17 +30,6 @@ interface PermissionRequest {
   id: string
   toolName: string
   input: Record<string, unknown>
-}
-
-interface AskUserOption {
-  label: string
-  description?: string
-}
-
-interface AskUserRequest {
-  id: string
-  question: string
-  options?: AskUserOption[]
 }
 
 interface SdkSessionInfo {
@@ -77,4 +68,4 @@ interface AgentState {
   clearMessages: () => void
 }
 
-export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, AskUserOption, AskUserRequest, SdkSessionInfo }
+export type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo }

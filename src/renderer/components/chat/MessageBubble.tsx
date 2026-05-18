@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ChatMessage, AskUserRequest } from '../../store/agent-store'
+import type { ChatMessage } from '../../store/agent-store'
+import type { AskUserRequest } from '../../lib/ipc'
 import ToolCallDisplay from './ToolCallDisplay'
+
+const REMARK_PLUGINS = [remarkGfm]
 
 interface MessageBubbleProps {
   message: ChatMessage
@@ -12,6 +16,7 @@ interface MessageBubbleProps {
 function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
+  const [answered, setAnswered] = useState(false)
 
   if (message.isStatusIndicator) {
     return (
@@ -21,6 +26,12 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBub
         </div>
       </div>
     )
+  }
+
+  const handleAnswer = (requestId: string, answer: string) => {
+    if (answered) return
+    setAnswered(true)
+    onRespondAskUser(requestId, answer)
   }
 
   return (
@@ -38,7 +49,7 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBub
           )}
           {message.content && (
             <div className="message-markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{message.content}</ReactMarkdown>
             </div>
           )}
           {message.isStreaming && !message.content && !message.toolCalls?.length && (
@@ -50,7 +61,8 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser }: MessageBub
                 <button
                   key={i}
                   className="ask-user-option-btn"
-                  onClick={() => onRespondAskUser(askUserRequest.id, opt.label)}
+                  onClick={() => handleAnswer(askUserRequest.id, opt.label)}
+                  disabled={answered}
                   title={opt.description}
                 >
                   <span className="ask-user-option-label">{opt.label}</span>

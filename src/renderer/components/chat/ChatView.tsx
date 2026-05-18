@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import type { ChatMessage, AskUserRequest } from '../../store/agent-store'
+import type { ChatMessage } from '../../store/agent-store'
+import type { AskUserRequest } from '../../lib/ipc'
 import MessageBubble from './MessageBubble'
 
 interface ChatViewProps {

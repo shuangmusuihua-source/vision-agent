@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo, AskUserRequest } from './agent-store'
+import type { ChatMessage, ToolCall, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from './agent-store'
+import type { AskUserRequest } from '../lib/ipc'
 
 export const useAgentStore = create<AgentState>((set) => ({
   messages: [],
@@ -105,7 +106,7 @@ export const useAgentStore = create<AgentState>((set) => ({
 
   setPermissionRequest: (request: PermissionRequest | null) => set({ permissionRequest: request }),
 
-  setAskUserRequest: (request: AskUserRequest | null) => set({ askUserRequest: request, agentStatus: request ? 'waitingForUserInput' : 'idle' }),
+  setAskUserRequest: (request: AskUserRequest | null) => set({ askUserRequest: request }),
 
   setSessionList: (sessions: SdkSessionInfo[]) => set({ sessionList: sessions }),
 
