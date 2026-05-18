@@ -158,7 +158,6 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
       }
 
       // All other tools (Bash, Write, Edit) require user approval
-      console.log('[AgentManager] canUseTool called for:', toolName, JSON.stringify(input).substring(0, 200))
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,
@@ -219,10 +218,6 @@ export async function sendMessage(
   const options = buildOptions(mainWindow, activeFilePath)
   let currentSessionId = sessionId
 
-  console.log('[AgentManager] Sending message')
-  console.log('[AgentManager] Model:', options.model, 'CWD:', options.cwd)
-  console.log('[AgentManager] Has API key:', !!options.env?.ANTHROPIC_API_KEY)
-
   try {
     const messageStream = query({
       prompt,
@@ -235,7 +230,6 @@ export async function sendMessage(
     let messageCount = 0
 
     for await (const message of messageStream) {
-      console.log('[AgentManager] Message received:', JSON.stringify(message).substring(0, 500))
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
         sessions.set(currentSessionId, {

@@ -11,11 +11,9 @@ function ContextZone({ activeFilePath }: ContextZoneProps): React.ReactElement |
   const fileName = activeFilePath.split('/').pop() || activeFilePath
 
   return (
-    <div className="context-zone">
-      <div className="context-zone-tag context-zone-tag--file" title={activeFilePath}>
-        <FileText size={12} weight="regular" />
-        <span>{fileName}</span>
-      </div>
+    <div className="context-zone-tag context-zone-tag--file" title={activeFilePath}>
+      <FileText size={12} weight="regular" />
+      <span>{fileName}</span>
     </div>
   )
 }

@@ -39,8 +39,8 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  z-index: 0;
   flex-shrink: 0;
-  border-radius: 0 14px 14px 0;
 }
 
 .sidebar-collapsed {
@@ -239,6 +239,11 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  z-index: 0;
+  margin-left: -14px;
+  margin-right: -14px;
+  border-radius: 14px;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08), 4px 0 24px rgba(0, 0, 0, 0.08);
   transition: margin-left 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -293,29 +298,54 @@
 .agent-panel {
   background: var(--bg-primary);
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  position: relative;
+  z-index: 1;
   transition: width 0.35s cubic-bezier(0.32, 0.72, 0, 1),
               max-width 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   max-width: var(--agent-panel-width);
   width: var(--agent-panel-width);
+  border-radius: 14px 0 0 14px;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .agent-panel-collapsed {
-  max-width: 40px;
-  width: 40px;
+  max-width: 28px;
+  width: 28px;
+  box-shadow: none;
+}
+
+.agent-panel-toggle-btn {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  display: flex;
   align-items: center;
-  padding-top: 8px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  -webkit-app-region: no-drag;
+  z-index: 2;
 }
 
-.agent-panel .agent-panel-body,
-.agent-panel .context-zone {
+.agent-panel-toggle-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.agent-panel-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
   opacity: 1;
-  transition: opacity 0.15s ease 0.1s;
+  transition: opacity 0.2s ease 0.1s;
 }
 
-.agent-panel-collapsed .agent-panel-body,
-.agent-panel-collapsed .context-zone {
+.agent-panel-collapsed .agent-panel-inner {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
@@ -325,8 +355,16 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 8px 12px;
+  padding: 8px 12px 4px 32px;
   -webkit-app-region: drag;
+}
+
+.agent-panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
 }
 
 .agent-panel-body {

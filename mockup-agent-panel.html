@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vision Agent 面板优化 Mockup</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-glass: rgba(22, 33, 62, 0.85);
+  --text-primary: #e8e8e8;
+  --text-secondary: #a0a0b8;
+  --text-tertiary: #6a6a80;
+  --accent: #533483;
+  --accent-light: #7b5ea7;
+  --border: rgba(255,255,255,0.08);
+  --success: #4ecca3;
+  --warn: #e8a838;
+  --danger: #e45649;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+.subtitle { font-size: 13px; color: var(--text-tertiary); margin-bottom: 32px; }
+
+.mockup-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.mockup-card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.mockup-card.highlight {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 24px rgba(83, 52, 131, 0.25);
+}
+
+.label {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-light);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label .tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.label .tag.now { color: var(--warn); }
+.label .tag.recommended { color: var(--success); }
+.label .tag.future { color: var(--success); }
+
+.desc {
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  border-bottom: 1px solid var(--border);
+}
+
+/* --- App Layout --- */
+
+.app-layout {
+  display: flex;
+  height: 540px;
+  background: var(--bg-primary);
+}
+
+.sidebar-sim {
+  width: 56px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 12px; gap: 8px;
+}
+
+.sidebar-icon {
+  width: 30px; height: 30px; border-radius: 6px;
+  background: var(--bg-tertiary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--text-tertiary);
+}
+.sidebar-icon.active { background: var(--accent); color: white; }
+
+.editor-sim {
+  flex: 1;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+.editor-tabs {
+  display: flex; height: 30px; align-items: center;
+  padding: 0 8px; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.editor-tab { padding: 3px 10px; font-size: 11px; border-radius: 5px; color: var(--text-tertiary); }
+.editor-tab.active { background: var(--bg-tertiary); color: var(--text-primary); font-weight: 500; }
+
+.editor-content {
+  flex: 1; padding: 16px 20px; font-size: 13px; line-height: 1.7;
+  color: var(--text-secondary); overflow: hidden;
+}
+.editor-content h2 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.editor-content p { margin-bottom: 4px; }
+
+.editor-status {
+  height: 22px; background: var(--bg-secondary); border-top: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 12px; font-size: 10px; color: var(--text-tertiary); gap: 12px;
+}
+
+/* --- Agent Panel --- */
+
+.agent-panel {
+  width: 300px;
+  display: flex; flex-direction: column;
+  background: var(--bg-secondary);
+}
+
+/* --- Current State Components --- */
+
+.current-header {
+  height: 30px; display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 10px; border-bottom: 1px solid var(--border);
+}
+.current-header-btn {
+  width: 24px; height: 24px; border-radius: 4px; background: var(--bg-tertiary);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-tertiary);
+}
+
+.current-context {
+  padding: 4px 10px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+}
+.current-context-tag {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+  border-radius: 4px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  background: rgba(83,52,131,0.15); color: var(--accent-light);
+}
+
+.current-profile {
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+}
+.current-profile-select {
+  flex: 1; padding: 3px 8px; border-radius: 4px; font-size: 11px;
+  background: var(--bg-tertiary); color: var(--text-secondary);
+  border: 1px solid var(--border); appearance: none;
+}
+
+.current-sessions {
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.current-session-item {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  border-radius: 4px; font-size: 11px; color: var(--text-secondary);
+  background: transparent; cursor: pointer;
+}
+.current-session-item.active { background: var(--bg-tertiary); color: var(--text-primary); }
+.current-session-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-tertiary); }
+.current-session-item.active .current-session-dot { background: var(--success); }
+
+/* --- Optimized Components --- */
+
+.opt-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  min-height: 32px;
+}
+.opt-header-left {
+  display: flex; align-items: center; gap: 4px;
+  overflow: hidden; flex-wrap: wrap;
+}
+.opt-header-btn {
+  width: 24px; height: 24px; border-radius: 4px; background: var(--bg-tertiary);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Tags */
+.tag-file {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+  border-radius: 4px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  background: rgba(83,52,131,0.15); color: var(--accent-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;
+}
+.tag-workspace {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+  border-radius: 4px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  background: rgba(78,204,163,0.12); color: var(--success);
+  white-space: nowrap;
+}
+.tag-semantic {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+  border-radius: 4px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  background: rgba(232,168,56,0.12); color: var(--warn);
+  white-space: nowrap;
+}
+.tag-skill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+  border-radius: 4px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  background: rgba(83,52,131,0.15); color: var(--accent-light);
+  white-space: nowrap;
+}
+
+/* Session bar */
+.opt-session-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-bottom: 1px solid var(--border);
+  height: 28px;
+}
+.opt-model-label {
+  font-size: 11px; color: var(--text-secondary); font-weight: 500;
+  cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-tertiary);
+}
+.opt-separator { font-size: 10px; color: var(--text-tertiary); }
+.opt-session-label {
+  font-size: 11px; color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100px;
+}
+.opt-session-actions { margin-left: auto; display: flex; gap: 4px; }
+.opt-session-btn {
+  width: 22px; height: 22px; border-radius: 4px; background: var(--bg-tertiary);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text-tertiary);
+}
+
+/* --- Chat Area --- */
+
+.chat-area {
+  flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow: hidden;
+}
+
+.msg-user {
+  align-self: flex-end; background: var(--bg-tertiary); padding: 6px 10px;
+  border-radius: 10px; font-size: 12px; max-width: 85%;
+}
+.msg-assistant {
+  align-self: flex-start; font-size: 12px; color: var(--text-secondary);
+  max-width: 90%; line-height: 1.5;
+}
+.msg-status {
+  align-self: center; font-size: 11px; color: var(--text-tertiary);
+  animation: breathe 2s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.msg-tool-call {
+  align-self: flex-start; background: rgba(83,52,131,0.08);
+  border: 1px solid rgba(83,52,131,0.15); border-radius: 6px;
+  padding: 4px 8px; font-size: 11px; color: var(--accent-light);
+  display: flex; align-items: center; gap: 4px; max-width: 90%;
+}
+
+/* --- Toolbox --- */
+
+.opt-toolbox { border-top: 1px solid var(--border); }
+.opt-toolbox-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; font-size: 11px; color: var(--text-tertiary);
+  cursor: pointer; user-select: none;
+}
+.opt-toolbox-header:hover { color: var(--text-secondary); }
+.opt-toolbox-chevron { font-size: 10px; transition: transform 0.2s; }
+.opt-toolbox.open .opt-toolbox-chevron { transform: rotate(90deg); }
+.opt-toolbox-body {
+  padding: 0 10px 6px 10px; display: none;
+  flex-direction: column; gap: 4px;
+}
+.opt-toolbox.open .opt-toolbox-body { display: flex; }
+.opt-toolbox-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 4px; font-size: 11px;
+  color: var(--text-secondary); background: var(--bg-tertiary);
+}
+.opt-toolbox-item-badge {
+  margin-left: auto; font-size: 9px; padding: 1px 5px;
+  border-radius: 3px; background: rgba(78,204,163,0.15); color: var(--success);
+}
+.opt-toolbox-item-badge.warn { background: rgba(232,168,56,0.15); color: var(--warn); }
+
+/* --- Input Area --- */
+
+.input-area {
+  display: flex; align-items: center; padding: 0 10px 6px 10px;
+  background: var(--bg-glass); backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+}
+.input-area textarea {
+  flex: 1; resize: none; border: none; background: transparent;
+  color: var(--text-primary); font-size: 13px; font-family: 'DM Sans', sans-serif;
+  padding: 8px 0; outline: none; min-height: 32px;
+}
+.input-area textarea::placeholder { color: var(--text-tertiary); }
+.send-btn {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px; flex-shrink: 0;
+}
+
+/* --- Usage --- */
+
+.usage-bar {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 2px 10px 4px; font-size: 10px; color: var(--text-tertiary); gap: 8px;
+}
+
+/* --- Annotations --- */
+
+.annotation {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.annotation-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-bottom: 5px;
+}
+
+.annotation-label {
+  font-size: 10px; font-weight: 600; min-width: 48px;
+  padding-top: 1px;
+}
+.annotation-label.pro { color: var(--success); }
+.annotation-label.con { color: var(--danger); }
+.annotation-label.note { color: var(--accent-light); }
+
+.annotation-text {
+  font-size: 11px; color: var(--text-secondary); line-height: 1.5;
+}
+
+.layer-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;
+}
+.layer-count.bad { background: rgba(228,86,73,0.15); color: var(--danger); }
+.layer-count.good { background: rgba(78,204,163,0.15); color: var(--success); }
+
+.full-width { grid-column: 1 / -1; }
+
+/* --- Context Zone D+ Detail --- */
+
+.context-zone-detail {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.cz-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cz-label {
+  font-size: 10px; color: var(--text-tertiary); min-width: 40px;
+  text-align: right;
+}
+
+.cz-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.cz-color-legend {
+  display: flex; gap: 16px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.cz-legend-item {
+  display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-tertiary);
+}
+
+.cz-legend-dot {
+  width: 8px; height: 8px; border-radius: 2px;
+}
+.cz-legend-dot.purple { background: var(--accent-light); }
+.cz-legend-dot.green { background: var(--success); }
+.cz-legend-dot.orange { background: var(--warn); }
+
+/* --- Interactive Context Zone Demo --- */
+
+.cz-demo {
+  max-width: 1200px;
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.cz-demo-card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--accent-light);
+  overflow: hidden;
+}
+
+.cz-demo-label {
+  padding: 12px 16px;
+  font-size: 14px; font-weight: 600; color: var(--accent-light);
+  border-bottom: 1px solid var(--border);
+}
+
+.cz-demo-desc {
+  padding: 8px 16px; font-size: 11px; color: var(--text-tertiary); line-height: 1.5;
+  border-bottom: 1px solid var(--border);
+}
+
+.cz-demo-body {
+  padding: 16px;
+  display: flex;
+  gap: 24px;
+}
+
+.cz-demo-col {
+  flex: 1;
+  min-width: 280px;
+}
+
+.cz-demo-title {
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.cz-demo-title-badge {
+  font-size: 9px; padding: 1px 5px; border-radius: 3px;
+  background: rgba(78,204,163,0.15); color: var(--success); font-weight: 600;
+}
+
+.cz-demo-title-badge.v1 { background: rgba(83,52,131,0.15); color: var(--accent-light); }
+
+/* Simulated Context Zone states */
+
+.cz-sim {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.cz-sim-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  min-height: 32px;
+}
+
+.cz-sim-header-left {
+  display: flex; align-items: center; gap: 4px;
+  overflow: hidden;
+}
+
+.cz-sim-toggle {
+  width: 20px; height: 20px; border-radius: 3px;
+  background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--text-tertiary); cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.cz-sim-toggle.expanded { transform: rotate(90deg); }
+
+.cz-sim-collapse-btn {
+  width: 24px; height: 24px; border-radius: 4px; background: var(--bg-tertiary);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-tertiary);
+}
+
+/* Expanded detail */
+.cz-sim-expanded {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.cz-sim-section {
+  display: flex; align-items: center; gap: 6px;
+}
+
+.cz-sim-section-label {
+  font-size: 10px; color: var(--text-tertiary); min-width: 36px;
+}
+
+.cz-sim-section-tags {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+
+/* Clickable tag */
+.cz-clickable {
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.cz-clickable:hover {
+  filter: brightness(1.3);
+  transform: translateY(-1px);
+}
+
+.cz-clickable-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.cz-clickable:hover .cz-clickable-tooltip {
+  display: block;
+}
+
+/* Interaction notes */
+.cz-interaction {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.cz-interaction-item {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.cz-interaction-icon {
+  font-size: 16px; text-align: center;
+}
+
+.cz-interaction-title {
+  font-size: 11px; font-weight: 600; color: var(--text-primary); text-align: center;
+}
+
+.cz-interaction-desc {
+  font-size: 10px; color: var(--text-tertiary); text-align: center; line-height: 1.4;
+}
+</style>
+</head>
+<body>
+
+<h1>Vision Agent 面板优化</h1>
+<p class="subtitle">当前状态 → 优化后 → V2.0 扩展态，含 Context Zone 标签体系</p>
+
+<div class="mockup-row">
+
+  <!-- Current State -->
+  <div class="mockup-card">
+    <div class="label">
+      当前状态
+      <span class="tag now">现状</span>
+    </div>
+    <div class="desc">4 层结构：Header + Context Zone + ProfileSwitcher + SessionHistory，聊天区被严重压缩。</div>
+    <div class="app-layout">
+      <div class="sidebar-sim">
+        <div class="sidebar-icon active">📁</div>
+        <div class="sidebar-icon">🧠</div>
+        <div class="sidebar-icon">⚙️</div>
+      </div>
+      <div class="editor-sim">
+        <div class="editor-tabs">
+          <div class="editor-tab active">EDITOR_ROADMAP.md</div>
+        </div>
+        <div class="editor-content">
+          <h2>Editor Roadmap</h2>
+          <p>Remaining improvements...</p>
+          <p>## High Priority</p>
+          <p>- Search/Replace</p>
+          <p>- TOC outline</p>
+        </div>
+        <div class="editor-status"><span>142 words</span></div>
+      </div>
+      <div class="agent-panel">
+        <div class="current-header"><div class="current-header-btn">◀</div></div>
+        <div class="current-context"><div class="current-context-tag">📄 EDITOR_ROADMAP.md</div></div>
+        <div class="current-profile"><select class="current-profile-select"><option>Sonnet 4</option></select></div>
+        <div class="current-sessions">
+          <div class="current-session-item active"><span class="current-session-dot"></span>帮我优化搜索功能</div>
+          <div class="current-session-item"><span class="current-session-dot"></span>解释一下架构</div>
+          <div class="current-session-item"><span class="current-session-dot"></span>+ 新会话</div>
+        </div>
+        <div class="chat-area">
+          <div class="msg-user">我在看什么文件？</div>
+          <div class="msg-assistant">你当前正在查看 EDITOR_ROADMAP.md...</div>
+        </div>
+        <div class="input-area"><textarea placeholder="输入消息..." rows="1"></textarea><div class="send-btn">↑</div></div>
+      </div>
+    </div>
+    <div class="annotation">
+      <div class="annotation-row"><span class="annotation-label con">问题</span><span class="annotation-text">上方 <span class="layer-count bad">4 层</span> 占据大量空间</span></div>
+      <div class="annotation-row"><span class="annotation-label con">问题</span><span class="annotation-text">Header 只有一个按钮却占一整行</span></div>
+      <div class="annotation-row"><span class="annotation-label con">问题</span><span class="annotation-text">SessionHistory 默认展开，低频操作占高频空间</span></div>
+    </div>
+  </div>
+
+  <!-- Optimized State -->
+  <div class="mockup-card highlight">
+    <div class="label">
+      优化后
+      <span class="tag recommended">★ 推荐</span>
+    </div>
+    <div class="desc">Header + Context Zone 合并为一行，Profile + Session 合并为一行，SessionHistory 点击展开，聊天区大幅扩展。</div>
+    <div class="app-layout">
+      <div class="sidebar-sim">
+        <div class="sidebar-icon active">📁</div>
+        <div class="sidebar-icon">🧠</div>
+        <div class="sidebar-icon">⚙️</div>
+      </div>
+      <div class="editor-sim">
+        <div class="editor-tabs">
+          <div class="editor-tab active">EDITOR_ROADMAP.md</div>
+        </div>
+        <div class="editor-content">
+          <h2>Editor Roadmap</h2>
+          <p>Remaining improvements...</p>
+          <p>## High Priority</p>
+          <p>- Search/Replace</p>
+          <p>- TOC outline</p>
+        </div>
+        <div class="editor-status"><span>142 words</span></div>
+      </div>
+      <div class="agent-panel">
+        <!-- Merged: Header + Context Zone -->
+        <div class="opt-header">
+          <div class="opt-header-left">
+            <div class="tag-file">📄 EDITOR_ROADMAP.md</div>
+          </div>
+          <div class="opt-header-btn">◀</div>
+        </div>
+        <!-- Merged: Profile + Session -->
+        <div class="opt-session-bar">
+          <span class="opt-model-label">Sonnet 4</span>
+          <span class="opt-separator">·</span>
+          <span class="opt-session-label">帮我优化搜索功能</span>
+          <div class="opt-session-actions">
+            <div class="opt-session-btn" title="历史会话">☰</div>
+            <div class="opt-session-btn" title="新会话">+</div>
+          </div>
+        </div>
+        <!-- Chat -->
+        <div class="chat-area">
+          <div class="msg-user">我在看什么文件？</div>
+          <div class="msg-assistant">你当前正在查看 <strong>EDITOR_ROADMAP.md</strong>，这是编辑器的产品路线图，包含搜索替换、大纲等待办项。</div>
+          <div class="msg-user">帮我规划搜索功能的实现</div>
+          <div class="msg-tool-call">🔍 Read EDITOR_ROADMAP.md</div>
+          <div class="msg-assistant">基于路线图中的 High Priority 条目，我建议分三步实现搜索功能：1) 添加 Cmd+F 浮层 UI 2) 实现文本搜索逻辑 3) 添加替换功能...</div>
+        </div>
+        <!-- Toolbox (collapsed) -->
+        <div class="opt-toolbox">
+          <div class="opt-toolbox-header">
+            <span class="opt-toolbox-chevron">▸</span>
+            <span>定时任务</span>
+            <span class="opt-toolbox-item-badge">2</span>
+          </div>
+        </div>
+        <div class="input-area"><textarea placeholder="输入消息..." rows="1"></textarea><div class="send-btn">↑</div></div>
+        <div class="usage-bar"><span>1.2k tokens</span><span>$0.02</span></div>
+      </div>
+    </div>
+    <div class="annotation">
+      <div class="annotation-row"><span class="annotation-label pro">改进</span><span class="annotation-text">上方从 <span class="layer-count bad">4 层</span> → <span class="layer-count good">2 层</span>，聊天区大幅扩展</span></div>
+      <div class="annotation-row"><span class="annotation-label pro">改进</span><span class="annotation-text">文件标签和收起按钮共处一行</span></div>
+      <div class="annotation-row"><span class="annotation-label pro">改进</span><span class="annotation-text">模型+会话一行搞定，历史点击展开</span></div>
+      <div class="annotation-row"><span class="annotation-label note">设计</span><span class="annotation-text">定时任务默认折叠，点击展开列表</span></div>
+    </div>
+  </div>
+
+  <!-- V2.0 Expanded: Full Panel -->
+  <div class="mockup-card highlight full-width">
+    <div class="label">
+      V2.0 扩展态 — 完整面板
+      <span class="tag future">★ V2.0</span>
+    </div>
+    <div class="desc">Context Zone 多标签扩展，工具箱增加 Skills/MCP 入口，会话管理不变。展示 V2.0 全部模块上线后的面板形态。</div>
+    <div class="app-layout" style="height: 500px;">
+      <div class="sidebar-sim">
+        <div class="sidebar-icon active">📁</div>
+        <div class="sidebar-icon">🧠</div>
+        <div class="sidebar-icon">⚙️</div>
+      </div>
+      <div class="editor-sim">
+        <div class="editor-tabs">
+          <div class="editor-tab active">EDITOR_ROADMAP.md</div>
+        </div>
+        <div class="editor-content">
+          <h2>Editor Roadmap</h2>
+          <p>Remaining improvements...</p>
+          <p>## High Priority</p>
+          <p>- Search/Replace</p>
+          <p>- TOC outline</p>
+        </div>
+        <div class="editor-status"><span>142 words</span></div>
+      </div>
+      <div class="agent-panel">
+        <!-- Header + Context Zone (expanded) -->
+        <div class="opt-header">
+          <div class="opt-header-left" style="flex-wrap: wrap; gap: 4px;">
+            <div class="tag-workspace">📁 vision-agent</div>
+            <div class="tag-file">📄 EDITOR_ROADMAP.md</div>
+            <div class="tag-semantic">🔗 CLAUDE.md</div>
+            <div class="tag-semantic">🔗 V2.0-ROADMAP.md</div>
+          </div>
+          <div class="opt-header-btn">◀</div>
+        </div>
+        <!-- Session bar -->
+        <div class="opt-session-bar">
+          <span class="opt-model-label">Sonnet 4</span>
+          <span class="opt-separator">·</span>
+          <span class="opt-session-label">帮我规划搜索功能</span>
+          <div class="opt-session-actions">
+            <div class="opt-session-btn" title="历史会话">☰</div>
+            <div class="opt-session-btn" title="新会话">+</div>
+          </div>
+        </div>
+        <!-- Chat -->
+        <div class="chat-area">
+          <div class="msg-user">帮我规划搜索功能的实现</div>
+          <div class="msg-tool-call">🔍 Read EDITOR_ROADMAP.md</div>
+          <div class="msg-tool-call">🔍 Read CLAUDE.md</div>
+          <div class="msg-assistant">基于 <strong>EDITOR_ROADMAP.md</strong> 中的 High Priority 条目和 <strong>CLAUDE.md</strong> 中记录的 Tiptap 架构，我建议分三步实现...</div>
+        </div>
+        <!-- Toolbox (expanded with V2.0 items) -->
+        <div class="opt-toolbox open">
+          <div class="opt-toolbox-header">
+            <span class="opt-toolbox-chevron">▸</span>
+            <span>工具箱</span>
+          </div>
+          <div class="opt-toolbox-body">
+            <div class="opt-toolbox-item">⏱ 定时任务 <span class="opt-toolbox-item-badge">2 运行中</span></div>
+            <div class="opt-toolbox-item">⚡ Skills <span class="opt-toolbox-item-badge">3 已激活</span></div>
+            <div class="opt-toolbox-item">🔌 MCP 服务器 <span class="opt-toolbox-item-badge warn">1 断开</span></div>
+          </div>
+        </div>
+        <div class="input-area"><textarea placeholder="输入消息..." rows="1"></textarea><div class="send-btn">↑</div></div>
+        <div class="usage-bar"><span>2.8k tokens</span><span>$0.05</span></div>
+      </div>
+    </div>
+    <!-- Context Zone D+ Detail -->
+    <div class="context-zone-detail">
+      <div class="cz-row">
+        <span class="cz-label">V1</span>
+        <div class="cz-tags">
+          <div class="tag-file">📄 文件名</div>
+        </div>
+      </div>
+      <div class="cz-row">
+        <span class="cz-label">V2.0</span>
+        <div class="cz-tags">
+          <div class="tag-workspace">📁 工作区</div>
+          <div class="tag-file">📄 文件</div>
+          <div class="tag-semantic">🔗 语义关联</div>
+          <div class="tag-skill">⚡ Skills</div>
+        </div>
+      </div>
+      <div class="cz-color-legend">
+        <div class="cz-legend-item"><div class="cz-legend-dot purple"></div> 文件 / Skills</div>
+        <div class="cz-legend-item"><div class="cz-legend-dot green"></div> 工作区</div>
+        <div class="cz-legend-item"><div class="cz-legend-dot orange"></div> 语义关联</div>
+      </div>
+    </div>
+  </div>
+
+<!-- Interactive Context Zone Demo -->
+<div class="cz-demo">
+  <div class="cz-demo-card">
+    <div class="cz-demo-label">Context Zone 交互演示</div>
+    <div class="cz-demo-desc">默认折叠仅显示文件标签，展开后显示完整上下文。标签可点击跳转/查看详情，不同类型用颜色区分。</div>
+    <div class="cz-demo-body">
+
+      <!-- Column 1: V1 Current (collapsed) -->
+      <div class="cz-demo-col">
+        <div class="cz-demo-title">V1 当前态 <span class="cz-demo-title-badge v1">已实现</span></div>
+        <div class="cz-sim">
+          <div class="cz-sim-header">
+            <div class="cz-sim-header-left">
+              <div class="tag-file">📄 EDITOR_ROADMAP.md</div>
+            </div>
+            <div class="cz-sim-collapse-btn">◀</div>
+          </div>
+          <div style="padding: 12px 10px; font-size: 11px; color: var(--text-tertiary); text-align: center;">
+            仅显示当前文件标签
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: V2.0 Collapsed -->
+      <div class="cz-demo-col">
+        <div class="cz-demo-title">V2.0 折叠态 <span class="cz-demo-title-badge">设计</span></div>
+        <div class="cz-sim">
+          <div class="cz-sim-header">
+            <div class="cz-sim-header-left">
+              <div class="cz-sim-toggle" title="点击展开">▸</div>
+              <div class="tag-file cz-clickable">
+                📄 EDITOR_ROADMAP.md
+                <span class="cz-clickable-tooltip">点击跳转到编辑器</span>
+              </div>
+              <div class="tag-workspace cz-clickable">
+                📁 vision-agent
+                <span class="cz-clickable-tooltip">查看工作区信息</span>
+              </div>
+            </div>
+            <div class="cz-sim-collapse-btn">◀</div>
+          </div>
+          <div style="padding: 12px 10px; font-size: 11px; color: var(--text-tertiary); text-align: center;">
+            折叠态：文件 + 工作区标签，点击 ▸ 展开更多
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: V2.0 Expanded -->
+      <div class="cz-demo-col">
+        <div class="cz-demo-title">V2.0 展开态 <span class="cz-demo-title-badge">设计</span></div>
+        <div class="cz-sim">
+          <div class="cz-sim-header">
+            <div class="cz-sim-header-left">
+              <div class="cz-sim-toggle expanded" title="点击折叠">▸</div>
+              <div class="tag-file cz-clickable">
+                📄 EDITOR_ROADMAP.md
+                <span class="cz-clickable-tooltip">点击跳转到编辑器</span>
+              </div>
+              <div class="tag-workspace cz-clickable">
+                📁 vision-agent
+                <span class="cz-clickable-tooltip">查看工作区信息</span>
+              </div>
+            </div>
+            <div class="cz-sim-collapse-btn">◀</div>
+          </div>
+          <div class="cz-sim-expanded">
+            <div class="cz-sim-section">
+              <span class="cz-sim-section-label">语义</span>
+              <div class="cz-sim-section-tags">
+                <div class="tag-semantic cz-clickable">
+                  🔗 CLAUDE.md
+                  <span class="cz-clickable-tooltip">双向链接关联</span>
+                </div>
+                <div class="tag-semantic cz-clickable">
+                  🔗 V2.0-ROADMAP.md
+                  <span class="cz-clickable-tooltip">双向链接关联</span>
+                </div>
+              </div>
+            </div>
+            <div class="cz-sim-section">
+              <span class="cz-sim-section-label">技能</span>
+              <div class="cz-sim-section-tags">
+                <div class="tag-skill cz-clickable">
+                  ⚡ frontend-design
+                  <span class="cz-clickable-tooltip">查看技能详情</span>
+                </div>
+                <div class="tag-skill cz-clickable">
+                  ⚡ TDD
+                  <span class="cz-clickable-tooltip">查看技能详情</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 8px 10px; font-size: 11px; color: var(--text-tertiary); text-align: center;">
+            展开态：完整上下文 — 语义关联 + 技能标签
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Interaction Design Points -->
+    <div class="cz-interaction">
+      <div class="cz-interaction-item">
+        <div class="cz-interaction-icon">📂</div>
+        <div class="cz-interaction-title">默认折叠</div>
+        <div class="cz-interaction-desc">仅显示文件标签，节省空间，不干扰聊天</div>
+      </div>
+      <div class="cz-interaction-item">
+        <div class="cz-interaction-icon">↕️</div>
+        <div class="cz-interaction-title">点击展开</div>
+        <div class="cz-interaction-desc">展开显示完整上下文：语义关联、技能标签</div>
+      </div>
+      <div class="cz-interaction-item">
+        <div class="cz-interaction-icon">👆</div>
+        <div class="cz-interaction-title">标签可点击</div>
+        <div class="cz-interaction-desc">点击标签跳转文件或查看详情，hover 显示提示</div>
+      </div>
+      <div class="cz-interaction-item">
+        <div class="cz-interaction-icon">🎨</div>
+        <div class="cz-interaction-title">颜色区分</div>
+        <div class="cz-interaction-desc">紫色=文件/技能，绿色=工作区，橙色=语义关联</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>

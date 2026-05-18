@@ -1,15 +1,6 @@
 /* --- Chat View --- */
 
-/* --- Context Zone --- */
-
-.context-zone {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-}
+/* --- Context Zone Tags (used inside agent-panel-header) --- */
 
 .context-zone-tag {
   display: inline-flex;
@@ -38,6 +29,118 @@
 .context-zone-tag--semantic {
   background: rgba(232, 168, 56, 0.12);
   color: #e8a838;
+}
+
+/* --- Session Bar --- */
+
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  height: 28px;
+}
+
+.session-bar-left {
+  flex-shrink: 0;
+}
+
+.session-bar-model {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+}
+
+.session-bar-center {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.session-bar-right {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.session-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.session-bar-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.session-bar-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+  right: 12px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 10;
+  margin-top: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.session-bar-dropdown-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.session-bar-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-primary);
+  width: 100%;
+  text-align: left;
+}
+
+.session-bar-dropdown-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.session-bar-dropdown-item.active {
+  background: var(--bg-secondary);
+  font-weight: 500;
+}
+
+.session-bar-dropdown-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.session-bar-dropdown-time {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .chat-view {
@@ -333,88 +436,6 @@
   cursor: not-allowed;
 }
 
-/* --- Profile Switcher --- */
-
-.profile-switcher {
-  position: relative;
-  margin-bottom: 8px;
-}
-
-.profile-switcher-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  font-size: 13px;
-  width: 100%;
-  text-align: left;
-}
-
-.profile-switcher-btn:hover {
-  background: var(--bg-tertiary);
-}
-
-.profile-switcher-label {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.profile-switcher-model {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.profile-switcher-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  z-index: 10;
-  margin-top: 4px;
-}
-
-.profile-switcher-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  width: 100%;
-  text-align: left;
-  border-radius: 4px;
-}
-
-.profile-switcher-option:hover {
-  background: var(--bg-tertiary);
-}
-
-.profile-switcher-option.active {
-  background: var(--bg-secondary);
-}
-
-.profile-switcher-option-indicator {
-  font-size: 10px;
-}
-
-.profile-switcher-option-name {
-  font-weight: 500;
-}
-
-.profile-switcher-option-model {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.profile-switcher-add {
-  color: var(--accent-color);
-  border-top: 1px solid var(--border-color);
-}
-
 /* --- Permission Dialog --- */
 
 .permission-overlay {
@@ -526,109 +547,6 @@
   background: #e45649;
   color: #fff;
   border-color: var(--color-error);
-}
-
-/* --- Session History --- */
-
-.session-history {
-  margin-bottom: 8px;
-}
-
-.session-history-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0;
-}
-
-.session-history-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 0;
-}
-
-.session-history-toggle:hover {
-  color: var(--text-primary);
-}
-
-.session-history-title {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.session-history-actions {
-  display: flex;
-  gap: 2px;
-}
-
-.session-history-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.session-history-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.session-history-empty {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  padding: 4px 0;
-}
-
-.session-history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 120px;
-  overflow-y: auto;
-}
-
-.session-history-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: none;
-  background: none;
-  color: var(--text-primary);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-}
-
-.session-history-item:hover {
-  background: var(--bg-tertiary);
-}
-
-.session-history-item.active {
-  background: var(--bg-secondary);
-  font-weight: 500;
-}
-
-.session-history-item-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
 }
 
 /* --- Skill Popup --- */
