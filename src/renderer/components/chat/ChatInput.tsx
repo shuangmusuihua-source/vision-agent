@@ -134,6 +134,7 @@ function ChatInput({ onSend, onSkillSelect, disabled, placeholder, prefill, onPr
           onKeyDown={handleKeyDown}
           disabled={disabled}
           rows={1}
+          autoFocus
         />
         <button
           className={`chat-send-btn ${text.trim() && !disabled ? 'chat-send-btn-active' : ''}`}

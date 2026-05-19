@@ -1,5 +1,163 @@
 /* --- Chat View --- */
 
+/* --- Agent Panel Header --- */
+
+.agent-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 4px 12px;
+  -webkit-app-region: drag;
+}
+
+.agent-header-model {
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+.agent-header-model-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.agent-header-model-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.agent-header-session {
+  display: flex;
+  align-items: center;
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+.agent-header-session-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+}
+
+.agent-header-session-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.agent-header-session-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+}
+
+.agent-header-session-arrow:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.agent-header-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  -webkit-app-region: no-drag;
+}
+
+.agent-header-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.agent-header-dropdown {
+  position: absolute;
+  top: 100%;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+  margin-top: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.agent-header-model-dropdown {
+  left: 0;
+  min-width: 120px;
+}
+
+.agent-header-history-dropdown {
+  left: 0;
+  right: 0;
+  min-width: 200px;
+}
+
+.agent-header-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  width: 100%;
+  text-align: left;
+}
+
+.agent-header-dropdown-item:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.agent-header-dropdown-item.active {
+  background: var(--color-bg-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.agent-header-dropdown-empty {
+  padding: 10px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.agent-header-history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.agent-header-history-time {
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+[data-theme="dark"] .agent-header-dropdown {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
 /* --- Context Zone Tags (used inside agent-panel-header) --- */
 
 .context-zone-tag {
@@ -150,16 +308,22 @@
 
 .chat-empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   flex: 1;
   padding: 40px 0;
 }
 
-.chat-empty-hint {
+.chat-empty-icon {
   color: var(--color-text-tertiary);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-normal);
+  opacity: 0.4;
+}
+
+.chat-empty-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
 }
 
 /* --- Message Bubble --- */

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { ChatCircleDots } from '@phosphor-icons/react'
 import type { ChatMessage } from '../../store/agent-store'
 import type { AskUserRequest } from '../../lib/ipc'
 import MessageBubble from './MessageBubble'
@@ -37,6 +38,7 @@ function ChatView({ messages, askUserRequest, onRespondAskUser, onOpenFile }: Ch
     <div className="chat-view">
       {messages.length === 0 && (
         <div className="chat-empty">
+          <ChatCircleDots size={48} weight="thin" className="chat-empty-icon" />
           <span className="chat-empty-hint">开始对话</span>
         </div>
       )}

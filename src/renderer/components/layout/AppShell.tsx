@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ArrowsLeftRight, SidebarSimple } from '@phosphor-icons/react'
+import { SidebarSimple, FileText } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -21,6 +21,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
   const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [toggleVisible, setToggleVisible] = useState(true)
+  const toggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [agentCollapsed, setAgentCollapsed] = useState(false)
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
@@ -61,6 +63,23 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  // Auto-hide sidebar toggle button after 3s
+  useEffect(() => {
+    toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
+    return () => {
+      if (toggleTimerRef.current) clearTimeout(toggleTimerRef.current)
+    }
+  }, [])
+
+  const handleToggleMouseEnter = useCallback(() => {
+    if (toggleTimerRef.current) clearTimeout(toggleTimerRef.current)
+    setToggleVisible(true)
+  }, [])
+
+  const handleToggleMouseLeave = useCallback(() => {
+    toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
   }, [])
 
   // Menu bar actions
@@ -290,7 +309,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       <div
         className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${layoutMode === 'chat-first' ? ' main-content-secondary' : ''}`}
       >
-        <div className="main-content-header">
+        <div className={`main-content-header${sidebarCollapsed ? ' main-content-header-cover-sidebar' : ''}`}>
           {openTabs.length > 0 && (
             <EditorTabs
               tabs={openTabs}
@@ -321,7 +340,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           />
         ) : (
           <div className="editor-empty">
-            <p>Select a file from the sidebar or open a workspace</p>
+            <FileText size={48} weight="thin" className="editor-empty-icon" />
+            <span className="editor-empty-hint">选择文件或打开工作区</span>
           </div>
         )}
         </div>
@@ -365,9 +385,19 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           onClose={() => setShowSearch(false)}
         />
       )}
-      <button className="sidebar-toggle-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
-        <SidebarSimple size={14} weight="light" />
-      </button>
+      <div
+        className="sidebar-toggle-area"
+        onMouseEnter={handleToggleMouseEnter}
+        onMouseLeave={handleToggleMouseLeave}
+      >
+        <button
+          className={`sidebar-toggle-btn${toggleVisible ? ' sidebar-toggle-btn-visible' : ''}`}
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+        >
+          <SidebarSimple size={14} weight="light" />
+        </button>
+      </div>
       {showNewWorkspaceModal && (
         <div className={`app-modal-overlay${modalVisible ? ' app-modal-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
           <div className={`app-modal${modalVisible ? ' app-modal-visible' : ''}`} onClick={(e) => e.stopPropagation()}>

@@ -198,8 +198,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   }, [])
 
   return (
-    <div className="settings-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="settings-window" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+    <div className="settings-overlay app-modal-overlay app-modal-visible" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="settings-window app-modal app-modal-visible" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
         <div className="settings-sidebar">
           {PAGES.map((page) => (
             <button

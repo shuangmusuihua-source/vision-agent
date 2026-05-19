@@ -3,14 +3,19 @@
 .settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
+  transition: background 0.2s ease;
 }
 
-[data-theme="dark"] .settings-overlay {
+.settings-overlay.app-modal-visible {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .settings-overlay.app-modal-visible {
   background: rgba(0, 0, 0, 0.5);
 }
 
@@ -23,12 +28,21 @@
   max-height: calc(100vh - 40px);
   background: var(--color-bg-primary);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0);
   overflow: hidden;
   display: flex;
+  opacity: 0;
+  transform: scale(0.95) translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-[data-theme="dark"] .settings-window {
+.settings-window.app-modal-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .settings-window.app-modal-visible {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.05);
 }
 
@@ -41,6 +55,7 @@
   padding: 48px 8px 16px;
   display: flex;
   flex-direction: column;
+  align-self: stretch;
 }
 
 .settings-sidebar-item {
@@ -446,4 +461,3 @@ button.profile-save-btn {
   60% { transform: translateX(-3px); }
   80% { transform: translateX(3px); }
 }
-

@@ -5,23 +5,42 @@
   height: 100vh;
   overflow: hidden;
   position: relative;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
 }
 
 /* --- Sidebar --- */
 
-.sidebar-toggle-btn {
+.sidebar-toggle-area {
   position: fixed;
-  top: 4px;
-  left: 76px;
+  top: 0;
+  left: 68px;
+  width: 36px;
+  height: 32px;
   z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
+  margin-top: 4px;
+  margin-left: 8px;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
-  -webkit-app-region: no-drag;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-toggle-btn-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sidebar-toggle-btn:hover {
@@ -125,7 +144,7 @@
 .sidebar-workspace-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 4px;
   padding: 6px 12px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
@@ -135,6 +154,7 @@
 }
 
 .sidebar-workspace-name {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -469,6 +489,10 @@
   -webkit-app-region: drag;
 }
 
+.main-content-header-cover-sidebar {
+  padding-left: 78px;
+}
+
 .editor-placeholder {
   padding: 48px 64px;
   max-width: 800px;
@@ -492,11 +516,21 @@
 
 .editor-empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
+  gap: 12px;
+}
+
+.editor-empty-icon {
   color: var(--color-text-tertiary);
-  font-size: var(--font-size-xl);
+  opacity: 0.4;
+}
+
+.editor-empty-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
 }
 
 /* --- Agent Panel --- */
@@ -590,7 +624,27 @@
 }
 
 .agent-panel-primary .agent-panel-header {
-  padding-left: 36px;
+  padding-left: 12px;
+}
+
+.agent-panel-expand-btn {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.agent-panel-expand-btn:hover {
+  background: var(--color-bg-tertiary);
 }
 
 .agent-panel-collapsed .agent-panel-inner {
