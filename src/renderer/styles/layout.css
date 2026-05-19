@@ -7,10 +7,12 @@
   position: relative;
 }
 
+/* --- Sidebar --- */
+
 .sidebar-toggle-btn {
-  position: absolute;
-  top: 5px;
-  left: 68px;
+  position: fixed;
+  top: 4px;
+  left: 70px;
   z-index: 100;
   display: flex;
   align-items: center;
@@ -25,8 +27,6 @@
 .sidebar-toggle-btn:hover {
   background: var(--bg-tertiary);
 }
-
-/* --- Sidebar --- */
 
 .sidebar {
   width: var(--sidebar-width);
@@ -64,6 +64,8 @@
   align-items: center;
   gap: 2px;
   -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 10;
 }
 
 .sidebar-icon-btn {
@@ -545,6 +547,7 @@
   color: var(--text-tertiary);
 }
 
+.sidebar-toggle-btn:focus-visible,
 .sidebar-toggle-btn:focus-visible,
 .sidebar-icon-btn:focus-visible,
 .sidebar-settings-btn:focus-visible,

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ArrowsLeftRight, SidebarSimple as SidebarIcon } from '@phosphor-icons/react'
+import { ArrowsLeftRight, SidebarSimple } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -336,7 +336,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         />
       )}
       <button className="sidebar-toggle-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
-        <SidebarIcon size={14} weight="bold" />
+        <SidebarSimple size={14} weight="light" />
       </button>
     </div>
   )
