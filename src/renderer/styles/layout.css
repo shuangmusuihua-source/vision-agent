@@ -32,9 +32,10 @@
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
   background: var(--sidebar-bg);
-  backdrop-filter: blur(50px) saturate(180%);
-  -webkit-backdrop-filter: blur(50px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
   border-right: 1px solid var(--sidebar-glass-border);
+  transition: border-color 0.2s ease;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -46,6 +47,7 @@
 .sidebar-collapsed {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
+  border-right-color: transparent;
 }
 
 .sidebar-header {
@@ -311,7 +313,7 @@
   margin-right: -14px;
   border-radius: 18px;
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
-  transition: margin-left 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: margin-left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .main-content-secondary {
@@ -376,8 +378,8 @@
   display: flex;
   position: relative;
   z-index: 1;
-  transition: width 0.35s cubic-bezier(0.32, 0.72, 0, 1),
-              max-width 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+  transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+              max-width 0.4s cubic-bezier(0.25, 1, 0.5, 1),
               order 0s;
   max-width: var(--agent-panel-width);
   width: var(--agent-panel-width);

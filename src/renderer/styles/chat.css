@@ -38,7 +38,6 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-bottom: 1px solid var(--border-color);
   position: relative;
   height: 28px;
 }
