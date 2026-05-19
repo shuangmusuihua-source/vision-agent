@@ -123,7 +123,10 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     })
   }, [workspacePath])
 
+  const isMemoryFile = filePath.includes('.vision/memory/')
+
   const editor = useEditor({
+    editable: !isMemoryFile,
     extensions: [      StarterKit.configure({
         codeBlock: false
       }),
@@ -332,7 +335,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
 
   // Auto-save with debounce
   useEffect(() => {
-    if (!editor || !filePath) return
+    if (!editor || !filePath || isMemoryFile) return
 
     const handleUpdate = () => {
       isLocalChange.current = true
@@ -417,7 +420,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     return <div className="editor-loading">Loading editor...</div>
   }
 
-  if (internalSourceMode) {
+  if (internalSourceMode && !isMemoryFile) {
     return (
       <textarea
         className="editor-source-textarea"
