@@ -102,7 +102,7 @@ function Sidebar({
               style={{ paddingLeft }}
               onClick={() => toggleDir(entry.path)}
             >
-              {isExpanded ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
+              {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
               {isExpanded ? <FolderOpen size={14} weight="bold" /> : <Folder size={14} weight="bold" />}
               <span>{entry.name}</span>
             </div>
@@ -207,7 +207,7 @@ function Sidebar({
               style={{ paddingLeft: 8 }}
               onClick={() => setMemoryExpanded((v) => !v)}
             >
-              {memoryExpanded ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
+              {memoryExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
               <Brain size={14} weight="bold" />
               <span>Memory</span>
             </div>

@@ -145,6 +145,7 @@ function ChatInput({ onSend, onSkillSelect, disabled, placeholder, prefill, onPr
             }
           }}
           disabled={!text.trim() || disabled}
+          type="button"
         >
           <ArrowUp size={16} weight="bold" />
         </button>

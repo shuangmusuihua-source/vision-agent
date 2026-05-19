@@ -410,8 +410,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.15);
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
   transition: background 0.15s, color 0.15s;
   cursor: default;
 }
@@ -443,7 +443,7 @@
 }
 
 [data-theme="dark"] .permission-overlay {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .permission-dialog {

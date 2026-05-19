@@ -42,6 +42,7 @@
   position: relative;
   z-index: 0;
   flex-shrink: 0;
+  padding-right: 16px;
 }
 
 .sidebar-collapsed {
@@ -247,6 +248,19 @@
   border-radius: 6px;
   user-select: none;
   transition: background 0.1s;
+  min-width: 0;
+}
+
+.sidebar-entry > svg,
+.sidebar-entry > span:first-child {
+  flex-shrink: 0;
+}
+
+.sidebar-entry > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .sidebar-entry:hover {
