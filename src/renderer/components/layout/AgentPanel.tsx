@@ -57,17 +57,6 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
           <div className="agent-panel-footer">
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
             {chatInput}
-            {usageInfo && (
-              <div className="agent-usage">
-                <span>${usageInfo.costUsd.toFixed(4)}</span>
-                {(usageInfo.inputTokens + usageInfo.outputTokens) > 0 && (
-                  <span>{((usageInfo.inputTokens + usageInfo.outputTokens) / 1000).toFixed(1)}k tokens</span>
-                )}
-                {usageInfo.durationMs > 0 && (
-                  <span>{(usageInfo.durationMs / 1000).toFixed(1)}s</span>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>

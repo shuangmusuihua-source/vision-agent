@@ -34,6 +34,10 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
   const [layoutMode, setLayoutMode] = useState<'edit-first' | 'chat-first'>('edit-first')
   const [linkedFile, setLinkedFile] = useState<string | null>(null)
+  const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false)
+  const [newWorkspaceName, setNewWorkspaceName] = useState('')
+  const [newWorkspaceError, setNewWorkspaceError] = useState('')
+  const [modalVisible, setModalVisible] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
   // Auto-link file when activeTab changes
@@ -114,12 +118,38 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     }
   }
 
-  const handleNewDirectory = async () => {
-    const path = await window.api.workspace.newDirectoryDialog()
-    if (path && !workspacePaths.includes(path)) {
-      setWorkspacePaths((prev) => [...prev, path])
-      setFiles((prev) => ({ ...prev, [path]: [] }))
-      await window.api.settings.addDirectory(path)
+  const handleOpenNewWorkspaceModal = () => {
+    setNewWorkspaceName('')
+    setNewWorkspaceError('')
+    setShowNewWorkspaceModal(true)
+    requestAnimationFrame(() => setModalVisible(true))
+  }
+
+  const handleCloseNewWorkspaceModal = () => {
+    setModalVisible(false)
+    setTimeout(() => {
+      setShowNewWorkspaceModal(false)
+      setNewWorkspaceName('')
+      setNewWorkspaceError('')
+    }, 200)
+  }
+
+  const handleCreateWorkspace = async () => {
+    if (!newWorkspaceName.trim()) {
+      setNewWorkspaceError('请输入工作区名称')
+      return
+    }
+    const dirPath = await window.api.workspace.createWorkspace(newWorkspaceName.trim())
+    if (dirPath) {
+      if (!workspacePaths.includes(dirPath)) {
+        setWorkspacePaths((prev) => [...prev, dirPath])
+        const entries = await window.api.workspace.listFiles(dirPath)
+        setFiles((prev) => ({ ...prev, [dirPath]: entries }))
+        await window.api.settings.addDirectory(dirPath)
+      }
+      handleCloseNewWorkspaceModal()
+    } else {
+      setNewWorkspaceError('工作区已存在或创建失败')
     }
   }
 
@@ -240,7 +270,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
         onOpenDirectory={handleOpenDirectory}
-        onNewWorkspace={handleNewDirectory}
+        onNewWorkspace={handleOpenNewWorkspaceModal}
         onRefreshWorkspace={handleRefreshWorkspace}
         onRemoveWorkspace={async (path) => {
           setWorkspacePaths((prev) => prev.filter((p) => p !== path))
@@ -338,6 +368,29 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       <button className="sidebar-toggle-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
         <SidebarSimple size={14} weight="light" />
       </button>
+      {showNewWorkspaceModal && (
+        <div className={`app-modal-overlay${modalVisible ? ' app-modal-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
+          <div className={`app-modal${modalVisible ? ' app-modal-visible' : ''}`} onClick={(e) => e.stopPropagation()}>
+            <div className="app-modal-title">新建工作区</div>
+            <input
+              className="app-modal-input"
+              placeholder="工作区名称"
+              value={newWorkspaceName}
+              onChange={(e) => { setNewWorkspaceName(e.target.value); setNewWorkspaceError('') }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateWorkspace()
+                if (e.key === 'Escape') handleCloseNewWorkspaceModal()
+              }}
+              autoFocus
+            />
+            {newWorkspaceError && <span className="app-modal-error">{newWorkspaceError}</span>}
+            <div className="app-modal-actions">
+              <button className="app-modal-cancel" onClick={handleCloseNewWorkspaceModal}>取消</button>
+              <button className="app-modal-confirm" onClick={handleCreateWorkspace}>创建</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

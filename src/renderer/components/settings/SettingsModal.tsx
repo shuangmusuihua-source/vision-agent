@@ -38,7 +38,7 @@ const NEW_PROFILE: Omit<ModelProfile, 'id'> = {
 
 function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [activePage, setActivePage] = useState<SettingsPage>('appearance')
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system' | null>(null)
   const [profiles, setProfiles] = useState<ModelProfile[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({})

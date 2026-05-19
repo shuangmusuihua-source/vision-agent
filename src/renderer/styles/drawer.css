@@ -5,7 +5,7 @@
 }
 
 .drawer {
-  background: var(--bg-primary);
+  background: var(--color-bg-primary);
   overflow: hidden;
 }
 
@@ -15,7 +15,7 @@
   align-items: center;
   justify-content: space-between;
   height: 24px;
-  padding: 0 10px 0 8px;
+  padding: 0 14px 0 8px;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
@@ -37,24 +37,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
   transition: color 0.15s;
 }
 
 .drawer-lip:hover .drawer-lip-icon {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .drawer-lip-icon-active {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .drawer-lip-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
@@ -73,13 +73,13 @@
 }
 
 .drawer-file-lip .drawer-lip-icon {
-  color: var(--accent-color);
+  color: var(--color-action);
 }
 
 .drawer-file-tag-name {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -93,13 +93,13 @@
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
   transition: background 0.15s, color 0.15s, transform 0.15s;
 }
 
 .drawer-file-tag-close:hover {
   background: rgba(0, 0, 0, 0.06);
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   transform: scale(1.1);
 }
 
@@ -133,9 +133,9 @@
 }
 
 .drawer-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 0 6px;
@@ -154,13 +154,13 @@
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
   border-radius: 7px;
   transition: background 0.15s;
 }
 
 .drawer-task:hover {
-  background: var(--bg-hover);
+  background: var(--color-bg-hover);
 }
 
 .drawer-task-info {
@@ -170,16 +170,16 @@
 
 .drawer-task-name {
   font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .drawer-task-schedule {
-  font-size: 10px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-tertiary);
   margin-top: 1px;
 }
 
@@ -195,7 +195,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
   transition: background 0.15s, color 0.15s;
 }
 
@@ -222,16 +222,16 @@
   justify-content: center;
   gap: 4px;
   padding: 5px;
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--accent-color);
-  background: rgba(108, 140, 255, 0.12);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-action);
+  background: var(--color-action-bg);
   transition: background 0.15s, color 0.15s;
   width: 100%;
 }
 
 .drawer-add-btn:hover {
-  background: rgba(108, 140, 255, 0.2);
+  background: var(--color-action-bg);
 }
 
 /* --- Empty state --- */
@@ -249,31 +249,31 @@
 }
 
 .drawer-input {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
-  font-size: 12px;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
   outline: none;
   font-family: inherit;
 }
 
 .drawer-input:focus {
-  background: var(--bg-hover);
+  background: var(--color-bg-hover);
 }
 
 .drawer-input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .drawer-textarea {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
-  font-size: 12px;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
   outline: none;
   font-family: inherit;
   resize: vertical;
@@ -283,11 +283,11 @@
 }
 
 .drawer-textarea:focus {
-  background: var(--bg-hover);
+  background: var(--color-bg-hover);
 }
 
 .drawer-textarea::placeholder {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 /* --- Mode tabs --- */
@@ -295,8 +295,8 @@
 .drawer-mode-tabs {
   display: flex;
   gap: 2px;
-  background: var(--bg-tertiary);
-  border-radius: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
   padding: 2px;
 }
 
@@ -304,14 +304,14 @@
   flex: 1;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   transition: background 0.15s, color 0.15s;
 }
 
 .drawer-mode-tab.active {
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 /* --- Preset grid --- */
@@ -325,19 +325,19 @@
 .drawer-preset-btn {
   padding: 4px 6px;
   border-radius: 5px;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  background: var(--bg-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
   transition: background 0.15s, color 0.15s;
 }
 
 .drawer-preset-btn.active {
-  background: rgba(108, 140, 255, 0.12);
-  color: var(--accent-color);
+  background: var(--color-action-bg);
+  color: var(--color-action);
 }
 
 .drawer-preset-btn:hover {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 /* --- Time picker --- */
@@ -351,26 +351,26 @@
 .drawer-time-btn {
   padding: 3px 6px;
   border-radius: 4px;
-  font-size: 10px;
-  color: var(--text-tertiary);
-  background: var(--bg-tertiary);
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
   transition: background 0.15s, color 0.15s;
 }
 
 .drawer-time-btn.active {
-  background: rgba(108, 140, 255, 0.12);
-  color: var(--accent-color);
+  background: var(--color-action-bg);
+  color: var(--color-action);
 }
 
 /* --- Select --- */
 
 .drawer-select {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 5px 8px;
-  font-size: 12px;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
   outline: none;
   font-family: inherit;
   width: 100%;
@@ -379,7 +379,7 @@
 }
 
 .drawer-select:focus {
-  background: var(--bg-hover);
+  background: var(--color-bg-hover);
 }
 
 /* --- Interval row --- */
@@ -391,8 +391,8 @@
 }
 
 .drawer-interval-label {
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
 }
 
 .drawer-interval-input {
@@ -403,21 +403,21 @@
 /* --- Preview --- */
 
 .drawer-preview {
-  font-size: 11px;
-  color: var(--accent-color);
+  font-size: var(--font-size-xs);
+  color: var(--color-action);
   padding: 4px 0;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 /* --- Submit button --- */
 
 .drawer-submit-btn {
   padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--accent-color);
-  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-action);
+  color: var(--color-action-text);
   transition: opacity 0.15s;
 }
 
@@ -438,14 +438,14 @@
   justify-content: center;
   gap: 4px;
   padding: 4px;
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   margin-top: 4px;
   transition: color 0.15s;
 }
 
 .drawer-form-close:hover {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .drawer-lip:focus-visible,
@@ -456,12 +456,12 @@
 .drawer-time-btn:focus-visible,
 .drawer-submit-btn:focus-visible,
 .drawer-form-close:focus-visible {
-  outline: 2px solid var(--accent-color);
+  outline: 2px solid var(--color-action);
   outline-offset: -2px;
 }
 
 .drawer-lip:active {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .drawer-task-action:active,
@@ -485,17 +485,17 @@
 }
 
 [data-theme="dark"] .drawer-add-btn {
-  background: rgba(108, 140, 255, 0.15);
+  background: var(--color-action-bg);
 }
 
 [data-theme="dark"] .drawer-add-btn:hover {
-  background: rgba(108, 140, 255, 0.25);
+  background: var(--color-action-bg);
 }
 
 [data-theme="dark"] .drawer-preset-btn.active {
-  background: rgba(108, 140, 255, 0.15);
+  background: var(--color-action-bg);
 }
 
 [data-theme="dark"] .drawer-time-btn.active {
-  background: rgba(108, 140, 255, 0.15);
+  background: var(--color-action-bg);
 }

@@ -21,8 +21,8 @@
   max-width: calc(100vw - 40px);
   height: 520px;
   max-height: calc(100vh - 40px);
-  background: var(--bg-primary);
-  border-radius: 12px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   display: flex;
@@ -37,7 +37,7 @@
 .settings-sidebar {
   width: 170px;
   min-width: 170px;
-  background: var(--bg-secondary);
+  background: var(--color-bg-secondary);
   padding: 48px 8px 16px;
   display: flex;
   flex-direction: column;
@@ -48,9 +48,9 @@
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
   cursor: pointer;
   border: none;
   background: none;
@@ -60,14 +60,14 @@
 }
 
 .settings-sidebar-item:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .settings-sidebar-item.active {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-weight: 500;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .settings-sidebar-spacer {
@@ -76,8 +76,8 @@
 
 .settings-sidebar-version {
   padding: 8px 10px;
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
 }
 
 /* --- Settings Content --- */
@@ -98,21 +98,21 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
   transition: all 0.1s;
   z-index: 1;
 }
 
 .settings-close-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .settings-page-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
   margin-bottom: 20px;
 }
 
@@ -125,9 +125,9 @@
 }
 
 .settings-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 10px;
@@ -147,38 +147,38 @@
   align-items: center;
   gap: 8px;
   padding: 16px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.15s;
-  background: var(--bg-secondary);
+  background: var(--color-bg-secondary);
   border: none;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .theme-option:hover {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .theme-option.active {
-  background: var(--bg-tertiary);
-  box-shadow: inset 0 0 0 1.5px var(--accent-color);
-  color: var(--accent-color);
+  background: var(--color-bg-tertiary);
+  box-shadow: inset 0 0 0 1.5px var(--color-action);
+  color: var(--color-action);
 }
 
 .theme-option-label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .theme-option.active .theme-option-label {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 /* --- Profile Card --- */
 
 .profile-card {
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
   padding: 14px 16px;
   margin-bottom: 8px;
 }
@@ -191,17 +191,17 @@
 }
 
 .profile-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .profile-status-active {
-  color: var(--accent-color);
+  color: var(--color-action);
 }
 
 .profile-status-inactive {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .profile-card-actions {
@@ -212,18 +212,18 @@
 .profile-card-btn {
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   border: none;
   background: none;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   transition: all 0.1s;
 }
 
 .profile-card-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .profile-card-btn.danger:hover {
@@ -254,26 +254,26 @@
 }
 
 .profile-field-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
   margin-bottom: 4px;
 }
 
 .required-mark {
   color: var(--color-danger);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .field-error-msg {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--color-danger);
   margin-top: 4px;
 }
 
 .profile-field-value {
-  font-size: 13px;
-  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
 }
 
 .api-key-row {
@@ -283,8 +283,8 @@
 }
 
 .api-key-value {
-  font-family: 'SF Mono', Menlo, monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -293,24 +293,24 @@
 }
 
 .api-key-input {
-  font-family: 'SF Mono', Menlo, monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
 }
 
 .api-key-toggle {
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   cursor: pointer;
   border: none;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   transition: all 0.1s;
 }
 
 .api-key-toggle:hover {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 /* --- Inline Edit Fields --- */
@@ -318,32 +318,32 @@
 .profile-field-input {
   width: 100%;
   padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
   font-family: inherit;
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
   border: none;
   outline: none;
   transition: background 0.1s;
 }
 
 .profile-field-input:focus {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .profile-field-input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .profile-field-select {
   width: 100%;
   padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
   font-family: inherit;
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
   border: none;
   outline: none;
   cursor: pointer;
@@ -359,12 +359,12 @@
   gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid var(--bg-tertiary);
+  border-top: 1px solid var(--color-bg-tertiary);
 }
 
 button.profile-save-btn {
-  background: var(--accent-color);
-  color: #fff;
+  background: var(--color-action);
+  color: var(--color-action-text);
   padding: 4px 12px;
   border-radius: 4px;
 }
@@ -382,38 +382,38 @@ button.profile-save-btn {
   gap: 6px;
   width: 100%;
   padding: 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   border: none;
   background: none;
-  color: var(--accent-color);
+  color: var(--color-action);
   transition: background 0.1s;
 }
 
 .add-profile-btn:hover {
-  background: var(--bg-secondary);
+  background: var(--color-bg-secondary);
 }
 
 /* --- About --- */
 
 .about-logo {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .about-version {
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
 }
 
 .about-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
   line-height: 1.6;
   margin-bottom: 16px;
 }
@@ -424,7 +424,7 @@ button.profile-save-btn {
 .profile-card-btn:focus-visible,
 .api-key-toggle:focus-visible,
 .add-profile-btn:focus-visible {
-  outline: 2px solid var(--accent-color);
+  outline: 2px solid var(--color-action);
   outline-offset: -2px;
 }
 

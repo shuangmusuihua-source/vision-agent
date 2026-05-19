@@ -8,8 +8,8 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  font-family: 'SF Mono', Menlo, monospace;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -18,7 +18,7 @@
 
 .context-zone-tag--file {
   background: rgba(83, 52, 131, 0.15);
-  color: var(--accent-color);
+  color: var(--color-action);
 }
 
 .context-zone-tag--workspace {
@@ -47,17 +47,17 @@
 }
 
 .session-bar-model {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .session-bar-center {
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -78,11 +78,11 @@
   width: 22px;
   height: 22px;
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .session-bar-btn:hover {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .session-bar-dropdown {
@@ -90,8 +90,8 @@
   top: 100%;
   left: 12px;
   right: 12px;
-  background: var(--bg-primary);
-  border-radius: 8px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   z-index: 10;
   margin-top: 2px;
@@ -101,8 +101,8 @@
 
 .session-bar-dropdown-empty {
   padding: 10px;
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
   text-align: center;
 }
 
@@ -112,19 +112,19 @@
   justify-content: space-between;
   padding: 6px 10px;
   border-radius: 4px;
-  font-size: 12px;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
   width: 100%;
   text-align: left;
 }
 
 .session-bar-dropdown-item:hover {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .session-bar-dropdown-item.active {
-  background: var(--bg-secondary);
-  font-weight: 500;
+  background: var(--color-bg-secondary);
+  font-weight: var(--font-weight-medium);
 }
 
 .session-bar-dropdown-title {
@@ -135,8 +135,8 @@
 }
 
 .session-bar-dropdown-time {
-  font-size: 10px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
   margin-left: 8px;
 }
@@ -157,9 +157,9 @@
 }
 
 .chat-empty-hint {
-  color: var(--text-tertiary);
-  font-size: 13px;
-  font-weight: 400;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-normal);
 }
 
 /* --- Message Bubble --- */
@@ -178,10 +178,10 @@
 }
 
 .message-user-content {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
   padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 14px;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-lg);
   line-height: 1.5;
   max-width: 90%;
   word-wrap: break-word;
@@ -189,7 +189,7 @@
 
 .message-assistant-content {
   max-width: 100%;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   line-height: 1.6;
 }
 
@@ -209,19 +209,19 @@
 }
 
 .message-markdown code {
-  font-family: 'SF Mono', Menlo, monospace;
-  font-size: 12px;
-  background: var(--bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg-tertiary);
   padding: 2px 4px;
   border-radius: 3px;
 }
 
 .message-markdown pre {
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
   padding: 12px;
   overflow-x: auto;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   margin-bottom: 8px;
 }
 
@@ -237,11 +237,11 @@
 }
 
 .message-markdown strong {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .message-streaming-dots {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
   animation: pulse 1.5s infinite;
 }
 
@@ -254,8 +254,8 @@
 
 .message-status-indicator {
   text-align: center;
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
   padding: 8px 0;
   animation: status-breathe 2s ease-in-out infinite;
 }
@@ -268,9 +268,9 @@
 /* --- Tool Call Card --- */
 
 .tool-call-display {
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
-  font-size: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   margin-bottom: 4px;
 }
 
@@ -284,26 +284,26 @@
 }
 
 .tool-call-header:hover {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .tool-call-chevron {
   display: flex;
   align-items: center;
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .tool-call-icon {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .tool-call-name {
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .tool-call-summary {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -318,7 +318,7 @@
 
 .tool-call-spinner {
   animation: spin 1s linear infinite;
-  color: var(--accent-color);
+  color: var(--color-action);
 }
 
 @keyframes spin {
@@ -344,18 +344,18 @@
 }
 
 .tool-call-label {
-  font-weight: 500;
-  color: var(--text-secondary);
-  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
   margin-bottom: 2px;
 }
 
 .tool-call-input pre,
 .tool-call-result pre {
-  background: var(--bg-primary);
+  background: var(--color-bg-primary);
   padding: 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   overflow-x: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -372,21 +372,21 @@
   position: relative;
   display: flex;
   align-items: flex-end;
-  padding: 0 0 8px 0;
-  background: var(--bg-primary);
-  border-radius: 16px;
+  padding: 0;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
 }
 
 .chat-input {
   flex: 1;
   resize: none;
   border: none;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   padding: 10px 40px 10px 14px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-family: inherit;
   line-height: 1.5;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   background: transparent;
   outline: none;
   max-height: 120px;
@@ -397,13 +397,13 @@
 }
 
 .chat-input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .chat-send-btn {
   position: absolute;
   right: 6px;
-  bottom: 14px;
+  bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -417,8 +417,8 @@
 }
 
 .chat-send-btn-active {
-  background: var(--text-primary);
-  color: var(--bg-primary);
+  background: var(--color-action);
+  color: var(--color-action-text);
   cursor: pointer;
 }
 
@@ -447,8 +447,8 @@
 }
 
 .permission-dialog {
-  background: var(--bg-primary);
-  border-radius: 8px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
   width: 100%;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0,0,0,0.1);
@@ -459,7 +459,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: var(--bg-secondary);
+  background: var(--color-bg-secondary);
 }
 
 .permission-icon {
@@ -467,9 +467,9 @@
 }
 
 .permission-title {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
 }
 
 .permission-body {
@@ -480,9 +480,9 @@
 }
 
 .permission-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
   margin-bottom: 2px;
 }
 
@@ -492,9 +492,9 @@
 }
 
 .permission-tool-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  color: var(--color-text-primary);
 }
 
 .permission-detail {
@@ -503,12 +503,12 @@
 }
 
 .permission-detail-code {
-  font-family: 'SF Mono', Menlo, monospace;
-  font-size: 12px;
-  background: var(--bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg-tertiary);
   padding: 4px 8px;
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   word-break: break-all;
   max-height: 60px;
   overflow-y: auto;
@@ -525,13 +525,13 @@
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  border: 1px solid var(--border-color);
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .permission-btn:hover {
@@ -559,8 +559,8 @@
   right: 0;
   max-height: 240px;
   overflow-y: auto;
-  background: var(--bg-primary);
-  border-radius: 8px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   z-index: 20;
   margin-bottom: 4px;
@@ -568,9 +568,9 @@
 
 .skill-popup-header {
   padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -586,27 +586,27 @@
 
 .skill-popup-item:hover,
 .skill-popup-item.selected {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .skill-popup-item-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .skill-popup-item-hint {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-tertiary);
 }
 
 .skill-popup-item-desc {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -615,8 +615,8 @@
 
 .skill-popup-empty {
   padding: 10px;
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
   text-align: center;
 }
 
@@ -635,9 +635,9 @@
   align-items: flex-start;
   gap: 2px;
   padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
   text-align: left;
@@ -645,38 +645,38 @@
 }
 
 .ask-user-option-btn:hover {
-  border-color: var(--accent-color);
-  background: var(--bg-tertiary);
+  border-color: var(--color-action);
+  background: var(--color-bg-tertiary);
 }
 
 .ask-user-option-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .ask-user-option-desc {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
 }
 
 .message-system {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
   font-style: italic;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 /* --- Skill Card --- */
 
 .skill-card {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   margin-bottom: 8px;
   overflow: hidden;
 }
 
 .skill-card-running {
-  border-left: 3px solid var(--accent-color);
+  border-left: 3px solid var(--color-action);
 }
 
 .skill-card-completed {
@@ -693,14 +693,14 @@
   gap: 6px;
   padding: 8px 12px;
   cursor: pointer;
-  background: var(--bg-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  background: var(--color-bg-secondary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .skill-card-header:hover {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .skill-card-name {
@@ -720,8 +720,8 @@
 }
 
 .skill-card-progress {
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
 }
 
 .skill-card-steps {
@@ -733,8 +733,8 @@
   align-items: center;
   gap: 6px;
   padding: 4px 0;
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
 .skill-card-step-completed {
@@ -746,12 +746,12 @@
 }
 
 .skill-card-step-running {
-  color: var(--accent-color);
+  color: var(--color-action);
 }
 
 .skill-card-step-name {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 [data-theme="dark"] .skill-card {
@@ -759,7 +759,7 @@
 }
 
 [data-theme="dark"] .skill-card-running {
-  border-left-color: var(--accent-color);
+  border-left-color: var(--color-action);
 }
 
 [data-theme="dark"] .skill-card-completed {
@@ -780,26 +780,26 @@
   gap: 6px;
   padding: 6px 12px;
   cursor: pointer;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--color-border);
   transition: background 0.15s;
 }
 
 .skill-card-output:hover {
-  background: var(--bg-tertiary);
+  background: var(--color-bg-tertiary);
 }
 
 .skill-card-output-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent-color);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-action);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .skill-card-output-action {
-  font-size: 11px;
-  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -811,17 +811,17 @@
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
   max-width: 280px;
 }
 
 .artifact-bubble:hover {
-  border-color: var(--accent-color);
-  background: var(--bg-tertiary);
+  border-color: var(--color-action);
+  background: var(--color-bg-tertiary);
 }
 
 .artifact-info {
@@ -833,17 +833,17 @@
 }
 
 .artifact-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .artifact-action {
-  font-size: 11px;
-  color: var(--accent-color);
+  font-size: var(--font-size-xs);
+  color: var(--color-action);
 }
 
 .session-bar-btn:focus-visible,
@@ -853,7 +853,7 @@
 .skill-popup-item:focus-visible,
 .skill-card-header:focus-visible,
 .artifact-bubble:focus-visible {
-  outline: 2px solid var(--accent-color);
+  outline: 2px solid var(--color-action);
   outline-offset: -2px;
 }
 

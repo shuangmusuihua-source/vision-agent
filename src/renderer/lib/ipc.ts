@@ -27,6 +27,7 @@ interface WorkspaceApi {
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   openDirectoryDialog: () => Promise<string | null>
   newDirectoryDialog: () => Promise<string | null>
+  createWorkspace: (name: string) => Promise<string | null>
   createFile: (dirPath: string, fileName: string) => Promise<{ success: boolean; path?: string; error?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>

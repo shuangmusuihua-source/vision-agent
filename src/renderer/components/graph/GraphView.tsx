@@ -51,10 +51,10 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
     nodes.select('circle')
       .attr('r', (d) => highlightedIds.has(d.id) ? 26 : 20)
       .attr('stroke-width', (d) => highlightedIds.has(d.id) ? 3 : 2)
-      .attr('stroke', (d) => highlightedIds.has(d.id) ? '#f59e0b' : 'var(--bg-primary)')
+      .attr('stroke', (d) => highlightedIds.has(d.id) ? '#f59e0b' : 'var(--color-bg-primary)')
 
     nodes.select('text')
-      .attr('fill', (d) => highlightedIds.has(d.id) ? '#f59e0b' : 'var(--text-secondary)')
+      .attr('fill', (d) => highlightedIds.has(d.id) ? '#f59e0b' : 'var(--color-text-secondary)')
       .attr('font-weight', (d) => highlightedIds.has(d.id) ? 'bold' : 'normal')
   }, [highlightedIds])
 
@@ -85,7 +85,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
           .attr('x', dimensions.width / 2)
           .attr('y', dimensions.height / 2)
           .attr('text-anchor', 'middle')
-          .attr('fill', 'var(--text-tertiary)')
+          .attr('fill', 'var(--color-text-tertiary)')
           .text('No files found')
         return
       }
@@ -119,7 +119,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
         .selectAll('line')
         .data(simEdges)
         .join('line')
-        .attr('stroke', 'var(--border-color)')
+        .attr('stroke', 'var(--color-border)')
         .attr('stroke-width', 1.5)
 
       // Nodes
@@ -148,14 +148,14 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
       node.append('circle')
         .attr('r', 20)
         .attr('fill', (d) => d.type === 'memory' ? MEMORY_COLOR : FILE_COLOR)
-        .attr('stroke', 'var(--bg-primary)')
+        .attr('stroke', 'var(--color-bg-primary)')
         .attr('stroke-width', 2)
 
       node.append('text')
         .text((d) => d.label)
         .attr('dy', 32)
         .attr('text-anchor', 'middle')
-        .attr('fill', 'var(--text-secondary)')
+        .attr('fill', 'var(--color-text-secondary)')
         .attr('font-size', 11)
         .each(function (d) {
           const text = d3.select(this)
