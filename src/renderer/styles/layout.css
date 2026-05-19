@@ -513,11 +513,15 @@
 
 .agent-panel-footer {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 18px;
+  left: 10%;
+  right: 10%;
   padding: 6px 12px;
-  background: transparent;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color-soft);
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  -electron-corner-smoothing: system-ui;
 }
 
 .agent-usage {

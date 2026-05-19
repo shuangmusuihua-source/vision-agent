@@ -1,9 +1,7 @@
 import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight } from '@phosphor-icons/react'
 import type { UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
-import ProfileSwitcher from '../chat/ProfileSwitcher'
 import SessionBar from '../chat/SessionBar'
 import PermissionDialog from '../chat/PermissionDialog'
-import ContextZone from '../chat/ContextZone'
 import DrawerZone from './DrawerZone'
 
 interface AgentPanelProps {
@@ -21,23 +19,21 @@ interface AgentPanelProps {
   onRefreshSessions: () => void
   children: React.ReactNode
   chatInput: React.ReactNode
-  activeFilePath?: string
+  linkedFile: string | null
+  onUnlinkFile: () => void
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, activeFilePath }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   return (
     <div className={`agent-panel${collapsed ? ' agent-panel-collapsed' : ''}${layoutMode === 'chat-first' ? ' agent-panel-primary' : ''}`}>
       <button className="agent-panel-toggle-btn" onClick={onToggleCollapse}>
         {collapsed ? <SidebarOpenIcon size={16} weight="bold" /> : <SidebarIcon size={16} weight="bold" />}
       </button>
-      <button className="agent-panel-swap-btn" onClick={onSwapLayout} title={layoutMode === 'edit-first' ? '对话为主' : '编辑为主'}>
+      <button className="agent-panel-swap-btn" onClick={onSwapLayout} title={layoutMode === 'chat-first' ? '对话为主' : '编辑为主'}>
         <ArrowsLeftRight size={14} weight="bold" />
       </button>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
-          <div className="agent-panel-header-left">
-            <ContextZone activeFilePath={activeFilePath} />
-          </div>
         </div>
         <SessionBar
           sessions={sessionList}
@@ -59,7 +55,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
             </div>
           </div>
           <div className="agent-panel-footer">
-            <DrawerZone />
+            <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
             {chatInput}
             {usageInfo && (
               <div className="agent-usage">

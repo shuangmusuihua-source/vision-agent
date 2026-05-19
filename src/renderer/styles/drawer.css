@@ -5,10 +5,7 @@
 }
 
 .drawer {
-  background: var(--drawer-bg);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border-radius: 10px 10px 0 0;
+  background: var(--bg-primary);
   overflow: hidden;
 }
 
@@ -16,27 +13,33 @@
 .drawer-lip {
   display: flex;
   align-items: center;
-  height: 32px;
-  padding: 0 4px 0 10px;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 10px 0 8px;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
 }
 
 .drawer-lip:hover {
-  background: var(--bg-tertiary);
+  background: transparent;
+}
+
+.drawer-lip-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .drawer-lip-icon {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  font-size: 13px;
+  border-radius: 6px;
+  font-size: 12px;
   color: var(--text-tertiary);
-  margin-left: auto;
   transition: color 0.15s;
 }
 
@@ -48,12 +51,60 @@
   color: var(--text-primary);
 }
 
+.drawer-lip-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .drawer-chevron {
   transition: transform 0.15s;
 }
 
 .drawer-chevron-up {
   transform: rotate(180deg);
+}
+
+/* --- Linked file tag (replaces drawer lip position) --- */
+
+.drawer-file-lip {
+  cursor: default;
+}
+
+.drawer-file-lip .drawer-lip-icon {
+  color: var(--accent-color);
+}
+
+.drawer-file-tag-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.drawer-file-tag-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--text-tertiary);
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.drawer-file-tag-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+[data-theme="dark"] .drawer-file-tag-close:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Drawer body — slides out */

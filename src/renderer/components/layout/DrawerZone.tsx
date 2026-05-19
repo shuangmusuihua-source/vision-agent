@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { CaretDown, Play, Trash, Plus, X } from '@phosphor-icons/react'
+import { CaretDown, Play, Trash, Plus, X, ClockCounterClockwise, File } from '@phosphor-icons/react'
 import type { CronTask } from '../../lib/ipc'
 
 // --- Schedule builder types (migrated from CronPanel) ---
@@ -80,7 +80,12 @@ function cronToNaturalLanguage(cron: string): string {
   return `每天 ${timeStr}`
 }
 
-function DrawerZone(): React.ReactElement {
+interface DrawerZoneProps {
+  linkedFile: string | null
+  onUnlinkFile: () => void
+}
+
+function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactElement {
   const [expanded, setExpanded] = useState(false)
   const [tasks, setTasks] = useState<CronTask[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -158,14 +163,36 @@ function DrawerZone(): React.ReactElement {
     refreshTasks()
   }, [refreshTasks])
 
+  const fileName = linkedFile ? linkedFile.split('/').pop() : null
+
   return (
     <div className={`drawer-zone ${expanded ? 'drawer-zone-expanded' : ''}`}>
       <div className="drawer">
-        <div className="drawer-lip" onClick={() => setExpanded(!expanded)}>
-          <div className={`drawer-lip-icon ${expanded ? 'drawer-lip-icon-active' : ''}`}>
-            <CaretDown size={16} weight="bold" className={`drawer-chevron ${expanded ? 'drawer-chevron-up' : ''}`} />
+        {linkedFile ? (
+          <div className="drawer-lip drawer-file-lip">
+            <div className="drawer-lip-left">
+              <div className="drawer-lip-icon">
+                <File size={12} weight="fill" />
+              </div>
+              <span className="drawer-file-tag-name" title={linkedFile}>{fileName}</span>
+            </div>
+            <button className="drawer-file-tag-close" onClick={onUnlinkFile}>
+              <X size={10} weight="bold" />
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="drawer-lip" onClick={() => setExpanded(!expanded)}>
+            <div className="drawer-lip-left">
+              <div className={`drawer-lip-icon ${expanded ? 'drawer-lip-icon-active' : ''}`}>
+                <ClockCounterClockwise size={12} weight="bold" />
+              </div>
+              <span className="drawer-lip-label">定时任务</span>
+            </div>
+            <div className="drawer-lip-right">
+              {expanded ? <CaretDown size={12} weight="bold" /> : <CaretDown size={12} weight="bold" className="drawer-chevron" />}
+            </div>
+          </div>
+        )}
         <div className="drawer-body">
           <div className="drawer-body-inner">
             <div className="drawer-section-label">定时任务</div>

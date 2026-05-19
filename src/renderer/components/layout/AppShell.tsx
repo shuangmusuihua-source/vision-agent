@@ -33,7 +33,15 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [focusMode, setFocusMode] = useState(false)
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
   const [layoutMode, setLayoutMode] = useState<'edit-first' | 'chat-first'>('edit-first')
+  const [linkedFile, setLinkedFile] = useState<string | null>(null)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
+
+  // Auto-link file when activeTab changes
+  useEffect(() => {
+    if (activeTab) {
+      setLinkedFile(activeTab)
+    }
+  }, [activeTab])
 
   // Cmd+Shift+F to open search, Cmd+Shift+R to swap layout
   useEffect(() => {
@@ -209,7 +217,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   }, [])
 
   const handleSkillSelect = useCallback((skill: SkillDefinition) => {
-    const prompt = skill.promptTemplate.replace('{activeFile}', activeTab || '')
+    const prompt = skill.promptTemplate.replace('{activeFile}', linkedFile || '')
     const skillInfo = { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' as const }
     setActiveSkillInfo(skillInfo)
     const userMsg: ChatMessage = {
@@ -219,8 +227,8 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
       skillInfo
     }
     addMessage(userMsg)
-    sendMessage(prompt, undefined, activeTab || undefined)
-  }, [sendMessage, addMessage, setActiveSkillInfo, activeTab])
+    sendMessage(prompt, linkedFile || undefined)
+  }, [sendMessage, addMessage, setActiveSkillInfo, linkedFile])
 
   const activeContent = activeTab ? tabContents[activeTab] || '' : ''
 
@@ -313,10 +321,11 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           if (askUserRequest) {
             respondAskUser(askUserRequest.id, msg)
           } else {
-            sendMessage(msg, activeTab || undefined)
+            sendMessage(msg, linkedFile || undefined)
           }
         }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
-        activeFilePath={activeTab || undefined}
+        linkedFile={linkedFile}
+        onUnlinkFile={() => setLinkedFile(null)}
       >
         <ChatView messages={messages} askUserRequest={askUserRequest} onRespondAskUser={respondAskUser} onOpenFile={handleFileSelect} />
       </AgentPanel>

@@ -11,6 +11,7 @@
   --text-secondary: #787574;
   --text-tertiary: #9b9a97;
   --border-color: #e3e2e0;
+  --border-color-soft: rgba(0, 0, 0, 0.06);
   --accent-color: #2383e2;
   --color-success: #50a14f;
   --color-error: #e45649;
