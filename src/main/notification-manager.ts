@@ -1,14 +1,20 @@
-import { Notification, BrowserWindow } from 'electron'
+import { Notification, BrowserWindow, app } from 'electron'
 import { getMainWindow } from './index'
 
 const PERMISSION_NOTIFY_THRESHOLD_MS = 30_000
 
 const pendingPermissionTimers = new Map<string, NodeJS.Timeout>()
 
-function showNotification(title: string, body: string, onClick?: () => void): void {
+function showNotification(title: string, body: string, onClick?: () => void, groupId?: string): void {
   if (!Notification.isSupported()) return
 
-  const notification = new Notification({ title, body })
+  // Skip notification when app is in foreground and window is visible
+  if (process.platform === 'darwin' && app.isActive()) {
+    const mainWindow = getMainWindow()
+    if (mainWindow && !mainWindow.isMinimized()) return
+  }
+
+  const notification = new Notification({ title, body, groupId })
   if (onClick) {
     notification.on('click', () => {
       const window = getMainWindow()
@@ -23,12 +29,12 @@ function showNotification(title: string, body: string, onClick?: () => void): vo
 }
 
 export function notifyAgentComplete(sessionId: string): void {
-  showNotification('Agent 任务完成', '点击返回查看结果')
+  showNotification('Agent 任务完成', '点击返回查看结果', undefined, 'com.vision-agent.agent')
 }
 
 export function notifyCronTaskComplete(taskName: string, result: string): void {
   const preview = result.length > 100 ? result.substring(0, 100) + '...' : result
-  showNotification(`定时任务完成: ${taskName}`, preview)
+  showNotification(`定时任务完成: ${taskName}`, preview, undefined, 'com.vision-agent.cron')
 }
 
 export function schedulePermissionNotification(requestId: string, toolName: string): void {
@@ -45,7 +51,8 @@ export function schedulePermissionNotification(requestId: string, toolName: stri
         // Focus the permission dialog — just focus the window
         const window = getMainWindow()
         if (window) window.focus()
-      }
+      },
+      'com.vision-agent.permission'
     )
   }, PERMISSION_NOTIFY_THRESHOLD_MS)
 
@@ -57,5 +64,22 @@ export function cancelPermissionNotification(requestId: string): void {
   if (timer) {
     clearTimeout(timer)
     pendingPermissionTimers.delete(requestId)
+  }
+}
+
+export async function getNotificationHistory(): Promise<
+  Array<{ id: string; groupId: string; title: string; body: string }>
+> {
+  if (process.platform !== 'darwin') return []
+  try {
+    const history = await Notification.getHistory()
+    return history.map((n) => ({
+      id: n.id,
+      groupId: n.groupId ?? '',
+      title: n.title,
+      body: n.body
+    }))
+  } catch {
+    return []
   }
 }

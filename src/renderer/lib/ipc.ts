@@ -133,6 +133,17 @@ interface MenuApi {
   onAction: (callback: (action: string) => void) => () => void
 }
 
+interface NotificationHistoryItem {
+  id: string
+  groupId: string
+  title: string
+  body: string
+}
+
+interface NotificationApi {
+  getHistory: () => Promise<NotificationHistoryItem[]>
+}
+
 interface WindowApi {
   ping: () => Promise<string>
   workspace: WorkspaceApi
@@ -144,6 +155,7 @@ interface WindowApi {
   skills: SkillsApi
   search: SearchApi
   menu: MenuApi
+  notification: NotificationApi
 }
 
 interface MemoryApi {
@@ -181,6 +193,8 @@ export type {
   SkillsApi,
   SearchApi,
   MenuApi,
+  NotificationApi,
+  NotificationHistoryItem,
   FileEntry,
   ModelProfile,
   AppSettings,

@@ -120,6 +120,10 @@ const api = {
       ipcRenderer.on('menu-action', handler)
       return () => ipcRenderer.removeListener('menu-action', handler)
     }
+  },
+
+  notification: {
+    getHistory: () => ipcRenderer.invoke('notification:getHistory')
   }
 }
 

@@ -18,6 +18,7 @@ import {
   getTheme,
   setTheme
 } from './store'
+import { getNotificationHistory } from './notification-manager'
 
 // --- Workspace ---
 
@@ -440,5 +441,10 @@ export function registerIpcHandlers(): void {
 
     // Limit to 100 results
     return results.slice(0, 100)
+  })
+
+  // --- Notification ---
+  ipcMain.handle('notification:getHistory', async () => {
+    return getNotificationHistory()
   })
 }
