@@ -92,7 +92,7 @@ function ChatInput({ onSend, onSkillSelect, disabled, placeholder, prefill, onPr
       }
     }
 
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       if (text.trim() && !disabled) {
         onSend(text.trim())

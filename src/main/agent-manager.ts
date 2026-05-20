@@ -43,6 +43,7 @@ const pendingPermissions = new Map<string, {
 // Pending AskUserQuestion requests waiting for user input
 const pendingAskUser = new Map<string, {
   resolve: (result: PermissionResult) => void
+  originalInput: Record<string, unknown>
   timeout: ReturnType<typeof setTimeout>
 }>()
 
@@ -116,7 +117,7 @@ export function resolveAskUser(requestId: string, answer: string): void {
   pendingAskUser.delete(requestId)
   clearTimeout(pending.timeout)
   console.log(`[AgentManager] resolveAskUser: ${requestId} — answer: "${answer}"`)
-  pending.resolve({ behavior: 'allow', updatedInput: { answer } })
+  pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers: { answer } } })
 }
 
 function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Options {
@@ -208,7 +209,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
             }
           }, 300000)
 
-          pendingAskUser.set(requestId, { resolve, timeout })
+          pendingAskUser.set(requestId, { resolve, timeout, originalInput: input })
         })
       }
 
