@@ -112,7 +112,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     return unsub
   }, [onOpenSettings])
 
-  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, askUserRequest, sessionList, currentSessionId, sendMessage, addMessage, respondPermission, respondAskUser, loadSessions, resumeSession, newSession, setActiveSkillInfo, lastEditedFile } = useAgent()
+  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, askUserRequest, sessionList, currentSessionId, sendMessage, addMessage, respondPermission, respondAskUser, loadSessions, resumeSession, newSession, setActiveSkillInfo, activeSkillInfo, lastEditedFile } = useAgent()
 
   // Restore/refresh workspaces from settings
   useEffect(() => {
@@ -375,6 +375,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         onSelectSession={resumeSession}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
+        activeSkillInfo={activeSkillInfo}
         chatInput={<ChatInput onSend={(msg) => {
           if (askUserRequest && askDrawerRespondRef.current) {
             askDrawerRespondRef.current(msg)

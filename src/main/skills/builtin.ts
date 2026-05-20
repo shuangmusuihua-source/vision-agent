@@ -53,6 +53,26 @@ const builtinSkills: SkillDefinition[] = [
 3. 摘要长度为原文的 20%-30%
 4. 将摘要写入与原文件同目录下的 摘要.md 文件中
 5. 输出完成后，告知用户文件路径`
+  },
+  {
+    id: 'slides',
+    name: 'Slides',
+    description: '创建精美的 HTML 演示文稿，支持动画和 PPTX 导出',
+    icon: 'PresentationChart',
+    promptTemplate: `你是一个专业的演示文稿设计师。请使用 slides skill 创建一份精美的 HTML 演示文稿。
+
+请先阅读 .claude/skills/slides/SKILL.md 了解工作流程，阅读 .claude/skills/slides/STYLE_PRESETS.md 选择风格预设，阅读 .claude/skills/slides/TEMPLATES.md 获取 HTML 模板。
+
+用户需求：{activeFile}
+
+要求：
+1. 生成一个自包含的 HTML 文件，所有 CSS 和 JS 内联
+2. 每页幻灯片适配一个视口，不允许内部滚动
+3. 包含键盘导航（方向键、空格键）和进度指示器
+4. 使用 CSS 动画实现入场效果
+5. 支持 prefers-reduced-motion
+6. 将 HTML 文件保存到工作区目录
+7. 完成后告知用户文件路径，可用浏览器打开预览`
   }
 ]
 

@@ -356,9 +356,9 @@ function useAgent() {
   )
 
   const STATUS_TEXT: Record<string, string> = {
-    thinking: '正在思考...',
-    requesting: '正在思考...',
-    compacting: '正在压缩上下文...'
+    thinking: '正在思考',
+    requesting: '正在思考',
+    compacting: '正在压缩上下文'
   }
 
   const sendMessage = useCallback(

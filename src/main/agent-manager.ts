@@ -116,7 +116,7 @@ export function resolveAskUser(requestId: string, answer: string): void {
   }
   pendingAskUser.delete(requestId)
   clearTimeout(pending.timeout)
-  console.log(`[AgentManager] resolveAskUser: ${requestId} — answer: "${answer}"`)
+  try { console.log(`[AgentManager] resolveAskUser: ${requestId} — answer: "${answer}"`) } catch {}
 
   // Build answers map keyed by question text
   const questions = pending.originalInput.questions as Array<Record<string, unknown>> | undefined
@@ -124,7 +124,11 @@ export function resolveAskUser(requestId: string, answer: string): void {
   const questionText = (firstQ?.question as string) || 'answer'
   const answers = { [questionText]: answer }
 
-  pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers } })
+  try {
+    pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers } })
+  } catch {
+    // Subprocess may have already exited
+  }
 }
 
 function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Options {

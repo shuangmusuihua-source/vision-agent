@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight, Plus, CaretDown } from '@phosphor-icons/react'
-import type { UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
+import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight, Plus, CaretDown, Spinner, X } from '@phosphor-icons/react'
+import type { UsageInfo, PermissionRequest, SdkSessionInfo, SkillInfo } from '../../store/agent-store'
 import type { AppSettings, ModelProfile, AskUserRequest } from '../../lib/ipc'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
@@ -28,17 +28,19 @@ interface AgentPanelProps {
   onSelectSession: (sessionId: string) => void
   onNewSession: () => void
   onRefreshSessions: () => void
+  activeSkillInfo: SkillInfo | null
   children: React.ReactNode
   chatInput: React.ReactNode
   linkedFile: string | null
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillInfo, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
+  const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
   const modelDropdownRef = useRef<HTMLDivElement>(null)
   const historyDropdownRef = useRef<HTMLDivElement>(null)
@@ -51,6 +53,11 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
   }, [askUserRequest])
+
+  // Reset skill drawer visibility when a new skill starts
+  useEffect(() => {
+    if (activeSkillInfo?.status === 'running') setSkillDrawerHidden(false)
+  }, [activeSkillInfo])
 
   // Send pending answer after close animation completes
   useEffect(() => {
@@ -179,8 +186,18 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
         <div className="agent-panel-body">
           <div className="agent-panel-content">
             <div className="agent-panel-messages">
-              {children}
-            </div>
+            {activeSkillInfo && activeSkillInfo.status === 'running' && !skillDrawerHidden && (
+              <div className="skill-status-bar">
+                <Spinner size={14} className="skill-status-spinner" />
+                <span className="skill-status-name">{activeSkillInfo.name}</span>
+                <span className="skill-status-progress">执行中<span className="skill-status-dots"><span>.</span><span>.</span><span>.</span></span></span>
+                <button className="skill-status-close" onClick={() => setSkillDrawerHidden(true)}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {children}
+          </div>
           </div>
           <div className="agent-panel-footer">
             {permissionRequest && (

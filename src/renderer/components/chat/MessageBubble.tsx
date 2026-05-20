@@ -68,6 +68,9 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
       <div className="message-bubble message-assistant">
         <div className="message-status-indicator">
           {message.content}
+          <span className="status-dot" />
+          <span className="status-dot" />
+          <span className="status-dot" />
         </div>
       </div>
     )
