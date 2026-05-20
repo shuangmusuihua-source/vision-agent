@@ -303,7 +303,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 4px 0;
+  padding: 8px 0;
 }
 
 .chat-empty {
@@ -345,23 +345,23 @@
   background: var(--color-bg-tertiary);
   padding: 8px 12px;
   border-radius: var(--radius-lg);
-  font-size: var(--font-size-lg);
-  line-height: 1.5;
-  max-width: 90%;
+  font-size: var(--font-size-md);
+  line-height: 1.55;
+  max-width: 88%;
   word-wrap: break-word;
 }
 
 .message-assistant-content {
   max-width: 100%;
-  font-size: var(--font-size-lg);
-  line-height: 1.6;
+  font-size: var(--font-size-md);
+  line-height: 1.55;
 }
 
 .message-tool-calls {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .message-markdown {
@@ -369,7 +369,7 @@
 }
 
 .message-markdown p {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .message-markdown code {
@@ -386,7 +386,7 @@
   padding: 12px;
   overflow-x: auto;
   font-size: var(--font-size-sm);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .message-markdown pre code {
@@ -397,7 +397,7 @@
 .message-markdown ul,
 .message-markdown ol {
   padding-left: 20px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .message-markdown strong {
@@ -610,7 +610,7 @@
 .input-drawer__content {
   padding: 12px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
+  background: transparent;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   margin-bottom: 4px;
 }
@@ -838,6 +838,24 @@
   color: var(--color-text-tertiary);
   font-style: italic;
   font-size: var(--font-size-sm);
+}
+
+/* --- Selection Action Button --- */
+
+.selection-action-btn {
+  position: fixed;
+  padding: 4px 10px;
+  background: var(--color-action);
+  color: var(--color-action-text) !important;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  z-index: 50;
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  user-select: none;
 }
 
 /* --- Skill Card --- */

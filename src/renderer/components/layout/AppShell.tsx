@@ -243,6 +243,10 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     }
   }, [isStreaming, activeTab])
 
+  const handleSelectText = useCallback((text: string) => {
+    setPrefillText(text)
+  }, [])
+
   const handleAskAgent = useCallback(
     (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => {
       const context = `文件：${filePath}\n\n选中内容：\n${selection}`
@@ -381,7 +385,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
-        <ChatView messages={messages} onOpenFile={handleFileSelect} />
+        <ChatView messages={messages} onOpenFile={handleFileSelect} onSelectText={handleSelectText} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel

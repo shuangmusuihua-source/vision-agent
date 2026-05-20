@@ -6,9 +6,10 @@ import MessageBubble from './MessageBubble'
 interface ChatViewProps {
   messages: ChatMessage[]
   onOpenFile?: (path: string) => void
+  onSelectText?: (text: string) => void
 }
 
-function ChatView({ messages, onOpenFile }: ChatViewProps): React.ReactElement {
+function ChatView({ messages, onOpenFile, onSelectText }: ChatViewProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,6 +45,7 @@ function ChatView({ messages, onOpenFile }: ChatViewProps): React.ReactElement {
           message={msg}
           skillFollowingMessages={skillToolCallsMap.get(msg.id)}
           onOpenFile={onOpenFile}
+          onSelectText={onSelectText}
         />
       ))}
       <div ref={bottomRef} />

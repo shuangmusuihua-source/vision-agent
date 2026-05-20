@@ -1,3 +1,4 @@
+import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileHtml, ArrowSquareOut } from '@phosphor-icons/react'
@@ -11,11 +12,56 @@ interface MessageBubbleProps {
   message: ChatMessage
   skillFollowingMessages?: ChatMessage[]
   onOpenFile?: (path: string) => void
+  onSelectText?: (text: string) => void
 }
 
-function MessageBubble({ message, skillFollowingMessages, onOpenFile }: MessageBubbleProps): React.ReactElement {
+function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectText }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
+
+  const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const handleMouseUp = useCallback(() => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      setSelectionBtn(null)
+      return
+    }
+    const text = sel.toString().trim()
+    const range = sel.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) {
+      setSelectionBtn(null)
+      return
+    }
+    setSelectionBtn({
+      text,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 4
+    })
+  }, [])
+
+  const handleClickAddToChat = useCallback(() => {
+    if (selectionBtn && onSelectText) {
+      onSelectText(selectionBtn.text)
+    }
+    window.getSelection()?.removeAllRanges()
+    setSelectionBtn(null)
+  }, [selectionBtn, onSelectText])
+
+  // Clear selection button on any click outside
+  useEffect(() => {
+    if (!selectionBtn) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.selection-action-btn')) {
+        setSelectionBtn(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [selectionBtn])
 
   if (message.isStatusIndicator) {
     return (
@@ -57,7 +103,7 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile }: MessageB
   return (
     <div className={`message-bubble ${isUser ? 'message-user' : 'message-assistant'}${isSystem ? ' message-system' : ''}`}>
       {isUser ? (
-        <div className="message-user-content">
+        <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
           {message.skillInfo && (
             <SkillCard
               skillInfo={message.skillInfo}
@@ -68,7 +114,7 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile }: MessageB
           {message.content}
         </div>
       ) : (
-        <div className="message-assistant-content">
+        <div className="message-assistant-content" ref={contentRef} onMouseUp={handleMouseUp}>
           {message.skillInfo && (
             <SkillCard skillInfo={message.skillInfo} toolCalls={message.toolCalls} onOpenFile={onOpenFile} />
           )}
@@ -87,6 +133,15 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile }: MessageB
           {message.isStreaming && !message.content && !message.toolCalls?.length && (
             <span className="message-streaming-dots">· · ·</span>
           )}
+        </div>
+      )}
+      {selectionBtn && onSelectText && (
+        <div
+          className="selection-action-btn"
+          style={{ left: selectionBtn.x, top: selectionBtn.y }}
+          onClick={handleClickAddToChat}
+        >
+          添加到对话
         </div>
       )}
     </div>
