@@ -575,19 +575,14 @@
   height: 28px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.3);
-  color: #fff;
-  transition: background 0.15s, color 0.15s;
+  color: #fff !important;
   cursor: default;
 }
 
 .chat-send-btn-active {
   background: var(--color-action);
-  color: var(--color-action-text);
+  color: var(--color-action-text) !important;
   cursor: pointer;
-}
-
-.chat-send-btn-active:hover {
-  opacity: 0.85;
 }
 
 .chat-send-btn:disabled {

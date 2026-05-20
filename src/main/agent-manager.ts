@@ -117,7 +117,14 @@ export function resolveAskUser(requestId: string, answer: string): void {
   pendingAskUser.delete(requestId)
   clearTimeout(pending.timeout)
   console.log(`[AgentManager] resolveAskUser: ${requestId} — answer: "${answer}"`)
-  pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers: { answer } } })
+
+  // Build answers map keyed by question text
+  const questions = pending.originalInput.questions as Array<Record<string, unknown>> | undefined
+  const firstQ = questions?.[0]
+  const questionText = (firstQ?.question as string) || 'answer'
+  const answers = { [questionText]: answer }
+
+  pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers } })
 }
 
 function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Options {
