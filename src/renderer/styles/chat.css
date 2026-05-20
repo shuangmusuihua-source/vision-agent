@@ -844,10 +844,13 @@
 
 .selection-action-btn {
   position: fixed;
-  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
   background: var(--color-action);
   color: var(--color-action-text) !important;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   cursor: pointer;

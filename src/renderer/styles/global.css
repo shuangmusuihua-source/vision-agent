@@ -280,7 +280,12 @@ input, textarea, select {
 }
 
 ::selection {
-  background: var(--color-action-bg);
+  background: rgba(14, 21, 58, 0.18);
+  color: inherit;
+}
+
+[data-theme="dark"] ::selection {
+  background: rgba(91, 156, 245, 0.3);
 }
 
 ::-webkit-scrollbar {

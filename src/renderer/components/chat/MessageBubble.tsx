@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { FileText, FileHtml, ArrowSquareOut } from '@phosphor-icons/react'
+import { FileText, FileHtml, ArrowSquareOut, ChatCircleText } from '@phosphor-icons/react'
 import type { ChatMessage } from '../../store/agent-store'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillCard from './SkillCard'
@@ -141,6 +141,7 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
           style={{ left: selectionBtn.x, top: selectionBtn.y }}
           onClick={handleClickAddToChat}
         >
+          <ChatCircleText size={12} weight="bold" />
           添加到对话
         </div>
       )}
