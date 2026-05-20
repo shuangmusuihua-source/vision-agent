@@ -31,6 +31,8 @@
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0);
   overflow: hidden;
   display: flex;
+  padding: 0;
+  border: none;
   opacity: 0;
   transform: scale(0.95) translateY(8px);
   transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
