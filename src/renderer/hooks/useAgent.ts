@@ -88,12 +88,6 @@ function useAgent() {
       const req = data as AskUserRequest
       setAskUserRequest(req)
       setAgentStatus('waitingForUserInput')
-      addMessage({
-        id: req.id,
-        role: 'assistant',
-        content: req.question,
-        isStreaming: false
-      })
     })
 
     const unsubAskUserTimeout = window.api.agent.onAskUserTimeout((data: unknown) => {
@@ -198,6 +192,8 @@ function useAgent() {
 
           for (const tu of toolUses) {
             const toolName = (tu.name as string) || 'unknown'
+            // AskUserQuestion is handled via the drawer, skip it in chat messages
+            if (toolName === 'AskUserQuestion') continue
             const toolCall: ToolCall = {
               toolName,
               toolUseId: (tu.id as string) || `tu-${Date.now()}`,

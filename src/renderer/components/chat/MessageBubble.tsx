@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileHtml, ArrowSquareOut } from '@phosphor-icons/react'
 import type { ChatMessage } from '../../store/agent-store'
-import type { AskUserRequest } from '../../lib/ipc'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillCard from './SkillCard'
 
@@ -11,16 +9,13 @@ const REMARK_PLUGINS = [remarkGfm]
 
 interface MessageBubbleProps {
   message: ChatMessage
-  askUserRequest: AskUserRequest | null
-  onRespondAskUser: (requestId: string, answer: string) => void
   skillFollowingMessages?: ChatMessage[]
   onOpenFile?: (path: string) => void
 }
 
-function MessageBubble({ message, askUserRequest, onRespondAskUser, skillFollowingMessages, onOpenFile }: MessageBubbleProps): React.ReactElement {
+function MessageBubble({ message, skillFollowingMessages, onOpenFile }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
-  const [answered, setAnswered] = useState(false)
 
   if (message.isStatusIndicator) {
     return (
@@ -32,7 +27,6 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser, skillFollowi
     )
   }
 
-  // Artifact bubble
   if (message.artifact) {
     const art = message.artifact
     const Icon = art.fileType === 'html' ? FileHtml : FileText
@@ -58,12 +52,6 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser, skillFollowi
         </div>
       </div>
     )
-  }
-
-  const handleAnswer = (requestId: string, answer: string) => {
-    if (answered) return
-    setAnswered(true)
-    onRespondAskUser(requestId, answer)
   }
 
   return (
@@ -98,22 +86,6 @@ function MessageBubble({ message, askUserRequest, onRespondAskUser, skillFollowi
           )}
           {message.isStreaming && !message.content && !message.toolCalls?.length && (
             <span className="message-streaming-dots">· · ·</span>
-          )}
-          {askUserRequest && askUserRequest.options && askUserRequest.options.length > 0 && (
-            <div className="ask-user-options">
-              {askUserRequest.options.map((opt, i) => (
-                <button
-                  key={i}
-                  className="ask-user-option-btn"
-                  onClick={() => handleAnswer(askUserRequest.id, opt.label)}
-                  disabled={answered}
-                  title={opt.description}
-                >
-                  <span className="ask-user-option-label">{opt.label}</span>
-                  {opt.description && <span className="ask-user-option-desc">{opt.description}</span>}
-                </button>
-              ))}
-            </div>
           )}
         </div>
       )}

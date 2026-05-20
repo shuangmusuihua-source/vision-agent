@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { ShieldWarning, Check, X } from '@phosphor-icons/react'
+import { InputDrawer } from './InputDrawer'
 import type { PermissionRequest } from '../../store/agent-store'
 
 interface PermissionDialogProps {
@@ -20,60 +21,38 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
   }, [request.id, onRespond])
 
   return (
-    <div className="permission-overlay">
-      <div className="permission-dialog" role="dialog" aria-modal="true" aria-label="Permission Request">
-        <div className="permission-header">
-          <ShieldWarning size={16} weight="bold" className="permission-icon" />
-          <span className="permission-title">Permission Request</span>
+    <InputDrawer open onClose={() => {}}>
+      <div className="drawer-permission">
+        <div className="drawer-permission-header">
+          <ShieldWarning size={16} weight="bold" className="drawer-permission-icon" />
+          <span className="drawer-permission-title">权限请求</span>
+          <span className="drawer-permission-tool">{request.toolName}</span>
         </div>
-        <div className="permission-body">
-          <div className="permission-tool">
-            <span className="permission-label">Tool</span>
-            <span className="permission-tool-name">{request.toolName}</span>
+        {inputSummary && (
+          <div className="drawer-permission-body">
+            <code className="drawer-permission-code">{inputSummary}</code>
           </div>
-          {inputSummary && (
-            <div className="permission-detail">
-              <span className="permission-label">Detail</span>
-              <code className="permission-detail-code">{inputSummary}</code>
-            </div>
-          )}
-        </div>
-        <div className="permission-actions">
-          <button
-            className="permission-btn permission-btn-allow"
-            onClick={() => onRespond(request.id, 'allow')}
-          >
-            <Check size={14} weight="bold" />
-            Allow
+        )}
+        <div className="drawer-permission-actions">
+          <button className="drawer-permission-btn drawer-permission-btn--deny" onClick={() => onRespond(request.id, 'deny')}>
+            <X size={14} weight="bold" /> Deny
           </button>
-          <button
-            className="permission-btn permission-btn-deny"
-            onClick={() => onRespond(request.id, 'deny')}
-          >
-            <X size={14} weight="bold" />
-            Deny
+          <button className="drawer-permission-btn drawer-permission-btn--allow" onClick={() => onRespond(request.id, 'allow')}>
+            <Check size={14} weight="bold" /> Allow
           </button>
         </div>
       </div>
-    </div>
+    </InputDrawer>
   )
 }
 
 function summarizePermissionInput(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
-    case 'Bash':
-      return String(input.command || '')
-    case 'Read':
-      return String(input.file_path || '')
-    case 'Write':
-      return String(input.file_path || '')
-    case 'Edit':
-      return String(input.file_path || '')
-    default: {
-      const vals = Object.values(input)
-      if (vals.length > 0) return String(vals[0])
-      return ''
-    }
+    case 'Bash': return String(input.command || '')
+    case 'Read': return String(input.file_path || '')
+    case 'Write': return String(input.file_path || '')
+    case 'Edit': return String(input.file_path || '')
+    default: { const vals = Object.values(input); if (vals.length > 0) return String(vals[0]); return '' }
   }
 }
 

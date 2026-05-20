@@ -147,7 +147,10 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
     systemPrompt: {
       type: 'preset' as const,
       preset: 'claude_code' as const,
-      ...(activeFilePath ? { append: `用户当前正在查看的文件: ${activeFilePath}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` } : {})
+      append: [
+        '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
+        activeFilePath ? `用户当前正在查看的文件: ${activeFilePath}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : ''
+      ].filter(Boolean).join('\n')
     },
     settings: {
       autoMemoryDirectory: join(cwd, '.vision', 'memory')

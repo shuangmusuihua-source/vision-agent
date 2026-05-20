@@ -40,6 +40,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
   const [newWorkspaceError, setNewWorkspaceError] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
+  const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
   // Auto-link file when activeTab changes
@@ -362,14 +363,17 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         usageInfo={usageInfo}
         permissionRequest={permissionRequest}
         onPermissionRespond={respondPermission}
+        askUserRequest={askUserRequest}
+        onAskUserRespond={respondAskUser}
+        onAskUserDrawerRespond={(respond) => { askDrawerRespondRef.current = respond }}
         sessionList={sessionList}
         currentSessionId={currentSessionId}
         onSelectSession={resumeSession}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
         chatInput={<ChatInput onSend={(msg) => {
-          if (askUserRequest) {
-            respondAskUser(askUserRequest.id, msg)
+          if (askUserRequest && askDrawerRespondRef.current) {
+            askDrawerRespondRef.current(msg)
           } else {
             sendMessage(msg, linkedFile || undefined)
           }
@@ -377,7 +381,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
-        <ChatView messages={messages} askUserRequest={askUserRequest} onRespondAskUser={respondAskUser} onOpenFile={handleFileSelect} />
+        <ChatView messages={messages} onOpenFile={handleFileSelect} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight, Plus, CaretDown } from '@phosphor-icons/react'
 import type { UsageInfo, PermissionRequest, SdkSessionInfo } from '../../store/agent-store'
-import type { AppSettings, ModelProfile } from '../../lib/ipc'
+import type { AppSettings, ModelProfile, AskUserRequest } from '../../lib/ipc'
 import PermissionDialog from '../chat/PermissionDialog'
+import AskUserDrawer from '../chat/AskUserDrawer'
 import DrawerZone from './DrawerZone'
 
 const MODELS: Record<string, string> = {
@@ -19,6 +20,9 @@ interface AgentPanelProps {
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
+  askUserRequest: AskUserRequest | null
+  onAskUserRespond: (requestId: string, answer: string) => void
+  onAskUserDrawerRespond?: (answer: string) => void
   sessionList: SdkSessionInfo[]
   currentSessionId: string | null
   onSelectSession: (sessionId: string) => void
@@ -30,10 +34,12 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [askDrawerOpen, setAskDrawerOpen] = useState(false)
+  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
   const modelDropdownRef = useRef<HTMLDivElement>(null)
   const historyDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -41,7 +47,34 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
     window.api.settings.get().then(setSettings)
   }, [])
 
-  // Close dropdowns on outside click
+  // Open ask drawer when request arrives
+  useEffect(() => {
+    if (askUserRequest) setAskDrawerOpen(true)
+  }, [askUserRequest])
+
+  // Send pending answer after close animation completes
+  useEffect(() => {
+    if (pendingAskAnswer && !askDrawerOpen) {
+      onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answer)
+      setPendingAskAnswer(null)
+    }
+  }, [pendingAskAnswer, askDrawerOpen, onAskUserRespond])
+
+  const handleAskUserRespond = useCallback((answer: string) => {
+    if (!askUserRequest) return
+    setPendingAskAnswer({ requestId: askUserRequest.id, answer })
+    setAskDrawerOpen(false)
+  }, [askUserRequest])
+
+  // Expose handleAskUserRespond to parent via callback ref
+  useEffect(() => {
+    onAskUserDrawerRespond?.(handleAskUserRespond)
+  }, [handleAskUserRespond, onAskUserDrawerRespond])
+
+  // Expose handleAskUserRespond to parent via callback ref
+  useEffect(() => {
+    onAskUserDrawerRespond?.(handleAskUserRespond)
+  }, [handleAskUserRespond, onAskUserDrawerRespond])
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (showModelDropdown && modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
@@ -145,17 +178,25 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
         </div>
         <div className="agent-panel-body">
           <div className="agent-panel-content">
+            <div className="agent-panel-messages">
+              {children}
+            </div>
+          </div>
+          <div className="agent-panel-footer">
             {permissionRequest && (
               <PermissionDialog
                 request={permissionRequest}
                 onRespond={onPermissionRespond}
               />
             )}
-            <div className="agent-panel-messages">
-              {children}
-            </div>
-          </div>
-          <div className="agent-panel-footer">
+            {askUserRequest && (
+              <AskUserDrawer
+                request={askUserRequest}
+                open={askDrawerOpen}
+                onClose={() => setAskDrawerOpen(false)}
+                onRespond={handleAskUserRespond}
+              />
+            )}
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
             {chatInput}
           </div>
