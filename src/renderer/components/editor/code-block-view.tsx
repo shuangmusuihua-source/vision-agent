@@ -11,7 +11,6 @@ async function loadMermaid() {
   if (mermaidLoadPromise) return mermaidLoadPromise
   mermaidLoadPromise = import('mermaid').then((m) => {
     mermaidModule = m.default
-    mermaidModule.initialize({ startOnLoad: false, theme: 'default' })
     return mermaidModule
   })
   return mermaidLoadPromise
@@ -25,7 +24,6 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
   const [copied, setCopied] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [mermaidError, setMermaidError] = useState<string | null>(null)
-  const [mermaidLoading, setMermaidLoading] = useState(false)
   const codeRef = useRef<HTMLPreElement>(null)
   const mermaidRef = useRef<HTMLDivElement>(null)
   const language = node.attrs.language as string | null
@@ -37,21 +35,14 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
   const mermaidCodeRef = useRef(nodeText)
   const [mermaidCode, setMermaidCode] = useState(nodeText)
 
-  // Only update mermaid code when not actively editing (debounced)
+  // Update mermaid code when node content changes (debounced)
   useEffect(() => {
     if (!isMermaid) return
     const timer = setTimeout(() => {
       setMermaidCode(nodeText)
-    }, 500)
+    }, 300)
     return () => clearTimeout(timer)
   }, [nodeText, isMermaid])
-
-  const getMermaidCode = useCallback(() => {
-    if (codeRef.current?.textContent) {
-      return codeRef.current.textContent
-    }
-    return mermaidCode
-  }, [mermaidCode])
 
   const handleCopy = useCallback(() => {
     const text = codeRef.current?.textContent ?? ''
@@ -61,40 +52,44 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
     })
   }, [])
 
-  // Render mermaid diagram — lazy load the library on first use
+  // Render mermaid diagram
   useEffect(() => {
     if (!isMermaid || showSource || !mermaidRef.current) return
 
-    const code = getMermaidCode()
+    const code = mermaidCode
     if (!code.trim()) return
 
-    const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
+    const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     setMermaidError(null)
-    setMermaidLoading(true)
 
     let cancelled = false
 
-    loadMermaid().then((mermaid) => {
-      if (cancelled) return
-      mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme() })
-      return mermaid.render(id, code.trim())
-    }).then((result) => {
-      if (cancelled || !result) return
-      const { svg } = result
-      setMermaidLoading(false)
-      if (mermaidRef.current) {
-        mermaidRef.current.innerHTML = svg
-      }
-    }).catch((err) => {
-      if (cancelled) return
-      setMermaidLoading(false)
-      setMermaidError(String(err.message || err))
-      const phantom = document.querySelector(`#d${id}`)
-      if (phantom) phantom.remove()
-    })
+    loadMermaid()
+      .then((mermaid) => {
+        if (cancelled) return
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: getMermaidTheme(),
+          securityLevel: 'loose'
+        })
+        return mermaid.render(id, code.trim())
+      })
+      .then((result) => {
+        if (cancelled || !result) return
+        if (mermaidRef.current) {
+          mermaidRef.current.innerHTML = result.svg
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setMermaidError(String(err.message || err))
+        // Clean up phantom element mermaid may have created
+        const phantom = document.getElementById(`d${id}`)
+        if (phantom) phantom.remove()
+      })
 
     return () => { cancelled = true }
-  }, [isMermaid, showSource, getMermaidCode, themeKey])
+  }, [isMermaid, showSource, mermaidCode, themeKey])
 
   // Watch theme changes for mermaid re-render
   useEffect(() => {
@@ -136,8 +131,6 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
             <div className="mermaid-error">
               <pre>{mermaidError}</pre>
             </div>
-          ) : mermaidLoading ? (
-            <div className="mermaid-diagram">Loading diagram...</div>
           ) : (
             <div ref={mermaidRef} className="mermaid-diagram" />
           )}

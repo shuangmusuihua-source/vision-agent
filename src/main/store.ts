@@ -55,10 +55,9 @@ export function getAuthorizedDirectories(): string[] {
 
 export function addProfile(profile: ModelProfile): void {
   const profiles = store.get('profiles')
-  store.set('profiles', [...profiles, profile])
-  if (!store.get('activeProfileId')) {
-    store.set('activeProfileId', profile.id)
-  }
+  const newProfiles = [...profiles, profile]
+  const newActiveId = store.get('activeProfileId') || profile.id
+  store.set({ profiles: newProfiles, activeProfileId: newActiveId })
 }
 
 export function updateProfile(id: string, updates: Partial<ModelProfile>): void {
@@ -72,10 +71,12 @@ export function updateProfile(id: string, updates: Partial<ModelProfile>): void 
 
 export function removeProfile(id: string): void {
   const profiles = store.get('profiles')
-  store.set('profiles', profiles.filter((p) => p.id !== id))
-  if (store.get('activeProfileId') === id) {
-    store.set('activeProfileId', profiles.length > 0 ? profiles[0].id : null)
-  }
+  const newProfiles = profiles.filter((p) => p.id !== id)
+  const currentActiveId = store.get('activeProfileId')
+  const newActiveId = currentActiveId === id
+    ? (newProfiles.length > 0 ? newProfiles[0].id : null)
+    : currentActiveId
+  store.set({ profiles: newProfiles, activeProfileId: newActiveId })
 }
 
 export function setActiveProfile(id: string): void {

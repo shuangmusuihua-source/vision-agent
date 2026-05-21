@@ -8,21 +8,32 @@ import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackM
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 
+let _cachedCliPath: string | undefined | null = null
+
 export function resolveClaudeCodeExecutable(): string | undefined {
+  if (_cachedCliPath !== null) return _cachedCliPath
+
   const require = createRequire(import.meta.url)
 
   // 优先使用平台原生二进制
   try {
     const nativeBinary = require.resolve('@anthropic-ai/claude-agent-sdk-darwin-arm64/claude')
-    if (existsSync(nativeBinary)) return nativeBinary
+    if (existsSync(nativeBinary)) {
+      _cachedCliPath = nativeBinary
+      return nativeBinary
+    }
   } catch {}
 
   // 回退到 cli.js
   try {
     const cliJs = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js')
-    if (existsSync(cliJs)) return cliJs
+    if (existsSync(cliJs)) {
+      _cachedCliPath = cliJs
+      return cliJs
+    }
   } catch {}
 
+  _cachedCliPath = undefined
   return undefined
 }
 
@@ -33,6 +44,16 @@ interface SessionInfo {
 }
 
 const sessions = new Map<string, SessionInfo>()
+
+const MAX_SESSIONS = 50
+function evictOldSessions() {
+  if (sessions.size <= MAX_SESSIONS) return
+  const keys = [...sessions.keys()]
+  const toDelete = keys.slice(0, sessions.size - MAX_SESSIONS)
+  for (const key of toDelete) {
+    sessions.delete(key)
+  }
+}
 
 // Pending permission requests waiting for user response
 const pendingPermissions = new Map<string, {
@@ -276,12 +297,21 @@ function extractPathFromToolInput(
   return value
 }
 
+// Guard against concurrent sendMessage calls
+let _activeQuery: Query | null = null
+
 export async function sendMessage(
   mainWindow: BrowserWindow,
   prompt: string,
   sessionId?: string,
   activeFilePath?: string
 ): Promise<void> {
+  // Abort any still-running query before starting a new one
+  if (_activeQuery) {
+    try { _activeQuery.abort() } catch {}
+    _activeQuery = null
+  }
+
   const options = buildOptions(mainWindow, activeFilePath)
   let currentSessionId = sessionId
 
@@ -293,6 +323,7 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
+    _activeQuery = messageStream as Query
 
     let messageCount = 0
 
@@ -305,6 +336,7 @@ export async function sendMessage(
           messageCount: 0
         })
         mainWindow.webContents.send('agent:sessionCreated', currentSessionId)
+        evictOldSessions()
       }
 
       messageCount++
@@ -328,11 +360,14 @@ export async function sendMessage(
       sessionId: currentSessionId,
       error: (err as Error).message
     })
+  } finally {
+    _activeQuery = null
   }
 }
 
 function serializeMessage(message: SDKMessage): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(message))
+  // Electron IPC uses structured clone internally — no need to pre-serialize
+  return message as unknown as Record<string, unknown>
 }
 
 export function getSessionList(): SessionInfo[] {
@@ -363,7 +398,7 @@ export async function listSdkSessions(): Promise<Array<{ id: string; title?: str
 export async function loadSdkSessionMessages(sessionId: string): Promise<Array<Record<string, unknown>>> {
   try {
     const messages = await getSessionMessages(sessionId)
-    return messages.map((m) => JSON.parse(JSON.stringify(m)))
+    return messages.map((m) => m as unknown as Record<string, unknown>)
   } catch (err) {
     console.error('[AgentManager] getSessionMessages error:', err)
     return []
