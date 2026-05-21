@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { ChatCircleDots } from '@phosphor-icons/react'
 import type { ChatMessage } from '../../store/agent-store'
-import { useMessages } from '../../hooks/useAgent'
+import { useMessages, useIsStreaming, useStreamingContent } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
 
 interface ChatViewProps {
@@ -12,11 +12,17 @@ interface ChatViewProps {
 
 function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
   const messages = useMessages()
+  const isStreaming = useIsStreaming()
+  const streamingContent = useStreamingContent()
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  const prevMsgCount = useRef(messages.length)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (messages.length > prevMsgCount.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevMsgCount.current = messages.length
+  }, [messages.length])
 
   const skillToolCallsMap = useMemo(() => {
     const map = new Map<string, ChatMessage[]>()
@@ -36,6 +42,12 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
     return map
   }, [messages])
 
+  // Find the last streaming assistant message to inject streamingContent
+  const lastStreamingIdx = useMemo(() => {
+    if (!isStreaming) return -1
+    return messages.findLastIndex((m) => m.role === 'assistant' && m.isStreaming)
+  }, [messages, isStreaming])
+
   return (
     <div className="chat-view">
       {messages.length === 0 && (
@@ -44,13 +56,14 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
           <span className="chat-empty-hint">开始对话</span>
         </div>
       )}
-      {messages.map((msg) => (
+      {messages.map((msg, idx) => (
         <MessageBubble
           key={msg.id}
-          message={msg}
+          message={idx === lastStreamingIdx ? { ...msg, streamingContent } : msg}
           skillFollowingMessages={skillToolCallsMap.get(msg.id)}
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
+          workspacePath={workspacePath}
         />
       ))}
       <div ref={bottomRef} />

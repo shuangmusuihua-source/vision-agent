@@ -1233,50 +1233,30 @@
 
 .skill-output-card-body {
   background: var(--color-bg-secondary);
-  overflow-y: auto;
-  max-height: 320px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  color: var(--color-text-primary);
-}
-
-.skill-output-card-code {
-  display: flex;
-  gap: 0;
-}
-
-.skill-output-card-line-numbers {
-  display: flex;
-  flex-direction: column;
-  padding: 12px 8px 12px 12px;
-  text-align: right;
-  user-select: none;
-  color: var(--color-text-tertiary);
-  opacity: 0.5;
   font-size: var(--font-size-xs);
   line-height: 1.5;
-  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  padding: 6px 12px 8px;
+  overflow: hidden;
 }
 
 .skill-output-card-body pre {
   margin: 0;
-  padding: 12px 16px 12px 8px;
   white-space: pre;
   tab-size: 2;
-  overflow-x: auto;
-  flex: 1;
-  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Lowlight syntax highlighting */
-.skill-output-card-body .hljs-tag { color: var(--color-action); }
-.skill-output-card-body .hljs-attr { color: var(--color-success); }
-.skill-output-card-body .hljs-string { color: #e8a838; }
-.skill-output-card-body .hljs-comment { color: var(--color-text-tertiary); opacity: 0.6; }
-.skill-output-card-body .hljs-name { color: var(--color-action); }
-.skill-output-card-body .hljs-keyword { color: #c678dd; }
-.skill-output-card-body .hljs-number { color: #d19a66; }
+.skill-output-card-body .hljs-tag { color: var(--color-action); opacity: 0.7; }
+.skill-output-card-body .hljs-attr { color: var(--color-success); opacity: 0.7; }
+.skill-output-card-body .hljs-string { color: #e8a838; opacity: 0.7; }
+.skill-output-card-body .hljs-comment { color: var(--color-text-tertiary); opacity: 0.4; }
+.skill-output-card-body .hljs-name { color: var(--color-action); opacity: 0.7; }
+.skill-output-card-body .hljs-keyword { color: #c678dd; opacity: 0.7; }
+.skill-output-card-body .hljs-number { color: #d19a66; opacity: 0.7; }
 
 /* --- Artifact Action Buttons --- */
 
@@ -1342,6 +1322,6 @@
   background: rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; }
-[data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; }
-[data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; }
+[data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; opacity: 0.7; }
+[data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; opacity: 0.7; }
+[data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; opacity: 0.7; }

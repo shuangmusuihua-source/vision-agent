@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
 import type { ToolCall, ChatMessage, SkillInfo } from '../store/agent-store'
 import type { AskUserRequest } from '../lib/ipc'
@@ -20,12 +20,18 @@ const STATUS_TEXT: Record<string, string> = {
   compacting: '正在压缩上下文'
 }
 
+// Track whether we've received stream_events for the current turn
+let hasStreamEvents = false
+
+// Module-level ref for tool call association — survives across renders
+const lastAssistantMsgIdRef = { current: null as string | null }
+
 // Process incoming SDK messages — reads state via getState(), no stale closures
 function handleAgentMessage(msg: SDKMsg) {
   const state = useAgentStore.getState()
   const { messages, currentSessionId, activeSkillInfo } = state
   const {
-    addMessage, updateLastAssistantMessage, appendToLastAssistantMessage,
+    addMessage, updateLastAssistantMessage,
     replaceLastAssistantMessage, finishStreaming, setToolCall,
     updateToolCallResult, setStreaming, setSessionId, setAgentStatus,
     setUsageInfo, setPermissionRequest, setLastEditedFile
@@ -56,29 +62,24 @@ function handleAgentMessage(msg: SDKMsg) {
     const toolUses = content.filter((c) => c.type === 'tool_use')
 
     // Skip text content if stream_events already delivered it token-by-token
-    // OR if the text contains skill-output (will be rendered via SkillOutputCard)
     if (textParts.length > 0 && !hasStreamEvents) {
       const textContent = textParts.join('')
-      if (textContent.includes('```skill-output')) {
-        hasStreamEvents = true // prevent further text processing
-      } else {
-        const lastMsg = messages[messages.length - 1]
+      const lastMsg = messages[messages.length - 1]
 
-        if (lastMsg?.isStatusIndicator) {
-          replaceLastAssistantMessage(textContent)
-        } else if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-          appendToLastAssistantMessage(textContent)
-        } else {
-          const msgId = `assistant-${Date.now()}`
-          addMessage({
-            id: msgId,
-            role: 'assistant',
-            content: textContent,
-            isStreaming: true,
-            skillInfo: activeSkillInfo || undefined
-          })
-          lastAssistantMsgIdRef.current = msgId
-        }
+      if (lastMsg?.isStatusIndicator) {
+        replaceLastAssistantMessage(textContent)
+      } else if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+        updateLastAssistantMessage(textContent)
+      } else {
+        const msgId = `assistant-${Date.now()}`
+        addMessage({
+          id: msgId,
+          role: 'assistant',
+          content: textContent,
+          isStreaming: true,
+          skillInfo: activeSkillInfo || undefined
+        })
+        lastAssistantMsgIdRef.current = msgId
       }
     }
 
@@ -110,9 +111,13 @@ function handleAgentMessage(msg: SDKMsg) {
       for (const tu of toolUses) {
         const toolName = (tu.name as string) || 'unknown'
         if (toolName === 'AskUserQuestion') continue
+        const toolUseId = (tu.id as string) || `tu-${Date.now()}`
+        // Skip if this tool call already exists in the message
+        const existingMsg = messages.find((m) => m.id === targetMsgId)
+        if (existingMsg?.toolCalls?.some((tc) => tc.toolUseId === toolUseId)) continue
         const toolCall: ToolCall = {
           toolName,
-          toolUseId: (tu.id as string) || `tu-${Date.now()}`,
+          toolUseId,
           input: (tu.input as Record<string, unknown>) || {},
           status: 'running'
         }
@@ -255,11 +260,8 @@ function handleAgentMessage(msg: SDKMsg) {
   }
 }
 
-// Track whether we've received stream_events for the current turn
-// When true, handleAgentMessage skips text content to avoid duplication
-let hasStreamEvents = false
-
 // Handle stream_event messages — token-by-token text deltas
+// Updates streamingContent (independent store field) instead of messages array
 function handleStreamEvent(streamMsg: SDKMsg) {
   const event = streamMsg.event as SDKMsg | undefined
   if (!event) return
@@ -273,34 +275,32 @@ function handleStreamEvent(streamMsg: SDKMsg) {
     if (delta?.type === 'text_delta') {
       const text = (delta.text as string) || ''
       if (text) {
-        const { appendToLastAssistantMessage, messages, addMessage, activeSkillInfo } = useAgentStore.getState()
+        const { appendStreamingContent, messages, addMessage, activeSkillInfo, setAgentStatus } = useAgentStore.getState()
         const lastMsg = messages[messages.length - 1]
 
-        // If no assistant message exists yet, create one
+        // Ensure an assistant message exists for tool calls to attach to
         if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.isStreaming) {
           const msgId = `assistant-${Date.now()}`
           addMessage({
             id: msgId,
             role: 'assistant',
-            content: text,
+            content: '',
             isStreaming: true,
             skillInfo: activeSkillInfo || undefined
           })
           lastAssistantMsgIdRef.current = msgId
-        } else {
-          appendToLastAssistantMessage(text)
         }
+
+        appendStreamingContent(text)
+        setAgentStatus('running')
       }
     }
   }
 }
 
-// Module-level ref for tool call association — survives across renders
-const lastAssistantMsgIdRef = { current: null as string | null }
-
 function useAgent() {
-  // Subscribe only to what this hook's consumers need
   const messages = useAgentStore((s) => s.messages)
+  const streamingContent = useAgentStore((s) => s.streamingContent)
   const isStreaming = useAgentStore((s) => s.isStreaming)
   const currentSessionId = useAgentStore((s) => s.currentSessionId)
   const agentStatus = useAgentStore((s) => s.agentStatus)
@@ -312,7 +312,6 @@ function useAgent() {
   const lastEditedFileTime = useAgentStore((s) => s.lastEditedFileTime)
   const activeSkillInfo = useAgentStore((s) => s.activeSkillInfo)
 
-  // Get action references (stable — they come from zustand, never change identity)
   const addMessage = useAgentStore((s) => s.addMessage)
   const setStreaming = useAgentStore((s) => s.setStreaming)
   const setAgentStatus = useAgentStore((s) => s.setAgentStatus)
@@ -326,7 +325,7 @@ function useAgent() {
   const finishStreaming = useAgentStore((s) => s.finishStreaming)
   const respondPermission = useAgentStore((s) => s.respondPermission)
 
-  // Register IPC listeners once — handleAgentMessage reads state via getState()
+  // Register IPC listeners once
   useEffect(() => {
     const unsubMessage = window.api.agent.onMessage((data) => {
       const msg = data as { sessionId: string; message: SDKMsg }
@@ -402,6 +401,8 @@ function useAgent() {
   const sendMessage = useCallback(
     async (prompt: string, activeFilePath?: string) => {
       const { addMessage, setStreaming, setAgentStatus, currentSessionId } = useAgentStore.getState()
+      // Reset stream tracking for new turn
+      hasStreamEvents = false
       addMessage({
         id: `user-${Date.now()}`,
         role: 'user',
@@ -480,6 +481,7 @@ function useAgent() {
 
   return {
     messages,
+    streamingContent,
     isStreaming,
     currentSessionId,
     agentStatus,
@@ -502,7 +504,6 @@ function useAgent() {
   }
 }
 
-// Export store + selectors for components that only need specific fields
 export { useAgentStore }
 
 export function useMessages() {
@@ -539,6 +540,10 @@ export function useCurrentSessionId() {
 
 export function useUsageInfo() {
   return useAgentStore((s) => s.usageInfo)
+}
+
+export function useStreamingContent() {
+  return useAgentStore((s) => s.streamingContent)
 }
 
 export default useAgent

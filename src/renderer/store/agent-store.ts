@@ -33,7 +33,6 @@ interface ChatMessage {
   isStatusIndicator?: boolean
   skillInfo?: SkillInfo
   artifact?: Artifact
-  skillOutputContent?: string
 }
 
 type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error' | 'waitingForUserInput'
@@ -60,6 +59,7 @@ interface SdkSessionInfo {
 
 interface AgentState {
   messages: ChatMessage[]
+  streamingContent: string
   isStreaming: boolean
   currentSessionId: string | null
   agentStatus: AgentStatus
@@ -72,7 +72,8 @@ interface AgentState {
   activeSkillInfo: SkillInfo | null
   addMessage: (message: ChatMessage) => void
   updateLastAssistantMessage: (content: string) => void
-  appendToLastAssistantMessage: (chunk: string) => void
+  appendStreamingContent: (chunk: string) => void
+  clearStreamingContent: () => void
   replaceLastAssistantMessage: (content: string) => void
   finishStreaming: () => void
   setToolCall: (messageId: string, toolCall: ToolCall) => void

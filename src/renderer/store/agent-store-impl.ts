@@ -2,28 +2,18 @@ import { create } from 'zustand'
 import type { ChatMessage, ToolCall, SkillInfo, AgentState, AgentStatus, UsageInfo, PermissionRequest, SdkSessionInfo } from './agent-store'
 import type { AskUserRequest } from '../lib/ipc'
 
-function extractSkillOutputContent(messages: ChatMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (msg.role === 'assistant' && msg.content) {
-      const match = msg.content.match(/```skill-output\n([\s\S]*?)```/)
-      if (match) return match[1]
-    }
-  }
+function extractSkillOutputContent(content: string): string | null {
+  const match = content.match(/```skill-output\n([\s\S]*?)```/)
+  if (match) return match[1]
+  // Partial (unclosed) block
+  const partialMatch = content.match(/```skill-output\n([\s\S]*)$/)
+  if (partialMatch) return partialMatch[1]
   return null
-}
-
-function extractPartialSkillOutput(content: string): string | null {
-  const startIdx = content.indexOf('```skill-output\n')
-  if (startIdx === -1) return null
-  const contentStart = startIdx + '```skill-output\n'.length
-  const endIdx = content.indexOf('```', contentStart)
-  if (endIdx !== -1) return content.substring(contentStart, endIdx)
-  return content.substring(contentStart)
 }
 
 export const useAgentStore = create<AgentState>((set) => ({
   messages: [],
+  streamingContent: '',
   isStreaming: false,
   currentSessionId: null,
   agentStatus: 'idle',
@@ -48,57 +38,24 @@ export const useAgentStore = create<AgentState>((set) => ({
       return { messages }
     }),
 
-  appendToLastAssistantMessage: (chunk: string) =>
-    set((state) => {
-      const messages = [...state.messages]
-      const lastIdx = messages.findLastIndex((m) => m.role === 'assistant')
-      if (lastIdx >= 0) {
-        const msg = { ...messages[lastIdx], content: messages[lastIdx].content + chunk, isStreaming: true }
+  // Streaming content — independent of messages array, no re-render cascade
+  appendStreamingContent: (chunk: string) =>
+    set((state) => ({ streamingContent: state.streamingContent + chunk })),
 
-        // Detect skill-output code block content
-        const skillOutputMatch = msg.content.match(/```skill-output\n([\s\S]*?)```/)
-        if (skillOutputMatch) {
-          msg.skillOutputContent = skillOutputMatch[1]
-          console.log('[Store] append: skill-output COMPLETE detected, len:', skillOutputMatch[1].length)
-        } else {
-          const partialMatch = msg.content.match(/```skill-output\n([\s\S]*)$/)
-          if (partialMatch) {
-            msg.skillOutputContent = partialMatch[1]
-            console.log('[Store] append: skill-output PARTIAL detected, len:', partialMatch[1].length)
-          }
-        }
-
-        messages[lastIdx] = msg
-      }
-      return { messages }
-    }),
+  clearStreamingContent: () =>
+    set({ streamingContent: '' }),
 
   replaceLastAssistantMessage: (content: string) =>
     set((state) => {
       const messages = [...state.messages]
       const lastIdx = messages.findLastIndex((m) => m.role === 'assistant')
       if (lastIdx >= 0) {
-        const msg = {
+        messages[lastIdx] = {
           ...messages[lastIdx],
           content,
           isStreaming: true,
           isStatusIndicator: false
         }
-
-        // Detect skill-output code block content
-        const skillOutputMatch = msg.content.match(/```skill-output\n([\s\S]*?)```/)
-        if (skillOutputMatch) {
-          msg.skillOutputContent = skillOutputMatch[1]
-          console.log('[Store] replaceLast: skill-output COMPLETE detected, len:', skillOutputMatch[1].length)
-        } else {
-          const partialMatch = msg.content.match(/```skill-output\n([\s\S]*)$/)
-          if (partialMatch) {
-            msg.skillOutputContent = partialMatch[1]
-            console.log('[Store] replaceLast: skill-output PARTIAL detected, len:', partialMatch[1].length)
-          }
-        }
-
-        messages[lastIdx] = msg
       }
       return { messages }
     }),
@@ -106,26 +63,37 @@ export const useAgentStore = create<AgentState>((set) => ({
   finishStreaming: () =>
     set((state) => {
       if (!state.isStreaming) return state
+
+      const streamingContent = state.streamingContent
       const outputFile = state.lastEditedFile || undefined
-      const messages = state.messages
+
+      // Commit streaming content into the last assistant message
+      let messages = state.messages
         .filter((m) => !(m.isStatusIndicator && m.isStreaming))
         .map((m) =>
           m.isStreaming ? { ...m, isStreaming: false } : m
         )
-        .map((m) =>
-          m.skillInfo && m.skillInfo.status === 'running'
-            ? { ...m, skillInfo: { ...m.skillInfo, status: 'completed' as const, outputFile } }
-            : m
-        )
 
-      // Prefer skill-output code block content over Write-produced file
-      const skillContent = extractSkillOutputContent(messages)
-      console.log('[Store] finishStreaming: skillContent=', !!skillContent, 'outputFile=', outputFile, 'activeSkillInfo=', !!state.activeSkillInfo)
+      // If there's streaming content, write it into the last assistant message
+      if (streamingContent) {
+        const lastIdx = messages.findLastIndex((m) => m.role === 'assistant')
+        if (lastIdx >= 0) {
+          messages[lastIdx] = { ...messages[lastIdx], content: streamingContent }
+        }
+      }
+
+      // Update skill status
+      messages = messages.map((m) =>
+        m.skillInfo && m.skillInfo.status === 'running'
+          ? { ...m, skillInfo: { ...m.skillInfo, status: 'completed' as const, outputFile } }
+          : m
+      )
+
+      // Check for skill-output content → create artifact
+      const skillContent = extractSkillOutputContent(streamingContent)
       if (skillContent) {
-        // Clear outputFile on skill messages to avoid duplicate artifact in SkillCard
         for (let i = 0; i < messages.length; i++) {
           if (messages[i].skillInfo?.outputFile) {
-            console.log('[Store] Clearing outputFile on message', messages[i].id)
             messages[i] = { ...messages[i], skillInfo: { ...messages[i].skillInfo!, outputFile: undefined } }
           }
         }
@@ -140,12 +108,6 @@ export const useAgentStore = create<AgentState>((set) => ({
             content: skillContent
           }
         })
-        // Clear outputFile on skill messages to avoid duplicate artifact in SkillCard
-        for (let i = 0; i < messages.length; i++) {
-          if (messages[i].skillInfo?.outputFile) {
-            messages[i] = { ...messages[i], skillInfo: { ...messages[i].skillInfo!, outputFile: undefined } }
-          }
-        }
       } else if (outputFile && state.activeSkillInfo) {
         const ext = outputFile.split('.').pop()?.toLowerCase()
         messages.push({
@@ -161,7 +123,7 @@ export const useAgentStore = create<AgentState>((set) => ({
         })
       }
 
-      return { messages, isStreaming: false, agentStatus: 'idle', activeSkillInfo: null }
+      return { messages, streamingContent: '', isStreaming: false, agentStatus: 'idle', activeSkillInfo: null }
     }),
 
   setToolCall: (messageId: string, toolCall: ToolCall) =>
@@ -226,5 +188,5 @@ export const useAgentStore = create<AgentState>((set) => ({
     }),
 
   clearMessages: () =>
-    set({ messages: [], isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, askUserRequest: null, lastEditedFile: null, lastEditedFileTime: 0, activeSkillInfo: null })
+    set({ messages: [], streamingContent: '', isStreaming: false, currentSessionId: null, agentStatus: 'idle', usageInfo: null, permissionRequest: null, askUserRequest: null, lastEditedFile: null, lastEditedFileTime: 0, activeSkillInfo: null })
 }))

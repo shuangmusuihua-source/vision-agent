@@ -11,15 +11,21 @@ import SkillOutputCard from './SkillOutputCard'
 const REMARK_PLUGINS = [remarkGfm]
 
 function stripSkillOutputBlock(content: string): string {
-  // Strip complete blocks
   let result = content.replace(/```skill-output\n[\s\S]*?```/g, '')
-  // Strip partial (unclosed) blocks
   result = result.replace(/```skill-output\n[\s\S]*$/g, '')
   return result.trim()
 }
 
+function extractSkillOutputContent(content: string): string | null {
+  const match = content.match(/```skill-output\n([\s\S]*?)```/)
+  if (match) return match[1]
+  const partialMatch = content.match(/```skill-output\n([\s\S]*)$/)
+  if (partialMatch) return partialMatch[1]
+  return null
+}
+
 interface MessageBubbleProps {
-  message: ChatMessage
+  message: ChatMessage & { streamingContent?: string }
   skillFollowingMessages?: ChatMessage[]
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string) => void
@@ -29,7 +35,11 @@ interface MessageBubbleProps {
 function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
-  const isStreaming = useAgentStore((s) => s.isStreaming)
+
+  // For streaming messages, use streamingContent; for completed messages, use message.content
+  const displayContent = message.streamingContent ?? message.content
+  const isStreaming = message.isStreaming ?? false
+  const skillOutput = isStreaming ? extractSkillOutputContent(displayContent) : null
 
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -62,7 +72,6 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
     setSelectionBtn(null)
   }, [selectionBtn, onSelectText])
 
-  // Clear selection button on any click outside
   useEffect(() => {
     if (!selectionBtn) return
     const handler = (e: MouseEvent) => {
@@ -174,21 +183,21 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
               ))}
             </div>
           )}
-          {message.skillOutputContent && (
+          {skillOutput && (
             <SkillOutputCard
-              content={message.skillOutputContent}
-              isStreaming={message.isStreaming ?? false}
+              content={skillOutput}
+              isStreaming={isStreaming}
               language="html"
             />
           )}
-          {message.content && (
+          {displayContent && (
             <div className="message-markdown">
               <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
-                {stripSkillOutputBlock(message.content)}
+                {stripSkillOutputBlock(displayContent)}
               </ReactMarkdown>
             </div>
           )}
-          {message.isStreaming && !message.content && !message.toolCalls?.length && !message.skillOutputContent && (
+          {isStreaming && !displayContent && !message.toolCalls?.length && !skillOutput && (
             <span className="message-streaming-dots">· · ·</span>
           )}
         </div>
