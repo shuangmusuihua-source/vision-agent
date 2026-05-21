@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Sun, Moon, Desktop, Users, Info, Plus, X, Trash } from '@phosphor-icons/react'
 import ReactDOM from 'react-dom'
+import { useSettings, getSettingsCache } from '../../store/settings-cache'
 
 interface SettingsModalProps {
   onClose: () => void
@@ -49,13 +50,15 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const nameInputRef = useRef<HTMLInputElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
 
+  const cachedSettings = useSettings()
+
   useEffect(() => {
-    window.api.settings.get().then((settings) => {
-      setProfiles(settings.profiles)
-      setActiveProfileId(settings.activeProfileId)
-      setTheme(settings.theme)
-    })
-  }, [])
+    if (cachedSettings) {
+      setProfiles(cachedSettings.profiles)
+      setActiveProfileId(cachedSettings.activeProfileId)
+      setTheme(cachedSettings.theme)
+    }
+  }, [cachedSettings])
 
   const handleThemeChange = useCallback(async (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme)
@@ -71,9 +74,11 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
   const handleDeleteProfile = useCallback(async (id: string) => {
     await window.api.settings.removeProfile(id)
-    const settings = await window.api.settings.get()
-    setProfiles(settings.profiles)
-    setActiveProfileId(settings.activeProfileId)
+    const s = getSettingsCache()
+    if (s) {
+      setProfiles(s.profiles)
+      setActiveProfileId(s.activeProfileId)
+    }
     if (editingProfileId === id) setEditingProfileId(null)
   }, [editingProfileId])
 

@@ -3,7 +3,8 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
-import { getSettings } from './store'
+import { getSettings, getAuthorizedDirectories } from './store'
+import { fileIndexService } from './file-index-service'
 
 // Prevent EPIPE errors from crashing the process when stdout/stderr pipes close
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code === 'EPIPE') process.stdout.destroy() })
@@ -58,6 +59,12 @@ app.whenReady().then(() => {
   const savedTheme = getSettings().theme
   if (savedTheme !== 'system') {
     nativeTheme.themeSource = savedTheme
+  }
+
+  // Initialize file index for saved workspace
+  const dirs = getAuthorizedDirectories()
+  if (dirs.length > 0) {
+    fileIndexService.init(dirs[0]).catch(() => {})
   }
 
   createWindow()

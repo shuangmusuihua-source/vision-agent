@@ -26,7 +26,12 @@ const api = {
     addDirectory: (dir: string) => ipcRenderer.invoke('settings:addDirectory', dir),
     removeDirectory: (dir: string) => ipcRenderer.invoke('settings:removeDirectory', dir),
     getTheme: () => ipcRenderer.invoke('settings:getTheme'),
-    setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('settings:setTheme', theme)
+    setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('settings:setTheme', theme),
+    onChanged: (callback: (settings: Record<string, unknown>) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, settings: Record<string, unknown>) => callback(settings)
+      ipcRenderer.on('settings:changed', handler)
+      return () => { ipcRenderer.removeListener('settings:changed', handler) }
+    }
   },
 
   agent: {

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { initSettingsCache, updateSettingsCache, useSettings } from './store/settings-cache'
 import './styles/global.css'
 import './styles/layout.css'
 import './styles/editor.css'
@@ -22,33 +23,39 @@ function applyTheme(theme: 'light' | 'dark' | 'system'): void {
 
 function App(): React.ReactElement {
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsChangeKey, setSettingsChangeKey] = useState(0)
+  const settings = useSettings()
 
-  // Apply theme on mount and when settings change
+  // Init settings cache and listen for push updates from main process
   useEffect(() => {
-    window.api.settings.getTheme().then(applyTheme).catch(() => {})
-  }, [settingsChangeKey])
+    initSettingsCache()
+    const unsub = window.api.settings.onChanged((s) => {
+      updateSettingsCache(s as import('./lib/ipc').AppSettings)
+    })
+    return unsub
+  }, [])
+
+  // Apply theme from cached settings
+  useEffect(() => {
+    if (settings?.theme) applyTheme(settings.theme)
+  }, [settings?.theme])
 
   // Listen for system theme changes when in 'system' mode
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => {
-      window.api.settings.getTheme().then((theme) => {
-        if (theme === 'system') applyTheme('system')
-      }).catch(() => {})
+      if (settings?.theme === 'system') applyTheme('system')
     }
     mediaQuery.addEventListener('change', handler)
     return () => mediaQuery.removeEventListener('change', handler)
-  }, [settingsChangeKey])
+  }, [settings?.theme])
 
   const handleSettingsClose = useCallback(() => {
     setShowSettings(false)
-    setSettingsChangeKey((k) => k + 1)
   }, [])
 
   return (
     <>
-      <AppShell onOpenSettings={() => setShowSettings(true)} settingsChangeKey={settingsChangeKey} />
+      <AppShell onOpenSettings={() => setShowSettings(true)} />
       {showSettings && <SettingsModal onClose={handleSettingsClose} />}
     </>
   )

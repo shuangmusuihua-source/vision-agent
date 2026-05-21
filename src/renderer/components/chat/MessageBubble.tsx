@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileHtml, ArrowSquareOut, ChatCircleText } from '@phosphor-icons/react'
@@ -152,4 +152,4 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
   )
 }
 
-export default MessageBubble
+export default memo(MessageBubble)

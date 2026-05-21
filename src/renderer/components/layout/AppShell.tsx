@@ -9,15 +9,15 @@ import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import useAgent, { useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStore } from '../../hooks/useAgent'
+import { useSettings } from '../../store/settings-cache'
 import type { ChatMessage } from '../../store/agent-store'
 import type { FileEntry, SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
   onOpenSettings: () => void
-  settingsChangeKey: number
 }
 
-function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.ReactElement {
+function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
   const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -131,19 +131,23 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
   const usageInfo = useUsageInfo()
   const sessionList = useSessionList()
 
-  // Restore/refresh workspaces from settings
+  // Restore/refresh workspaces from cached settings
+  const settings = useSettings()
+  const prevAuthDirsRef = useRef<string>('')
   useEffect(() => {
-    window.api.settings.get().then((settings) => {
-      const dirs = settings.authorizedDirectories
-      setWorkspacePaths(dirs)
-      const fileEntries: Record<string, FileEntry[]> = {}
-      Promise.all(
-        dirs.map(async (dir) => {
-          fileEntries[dir] = await window.api.workspace.listFiles(dir)
-        })
-      ).then(() => setFiles(fileEntries))
-    }).catch(() => {})
-  }, [settingsChangeKey])
+    if (!settings) return
+    const dirs = settings.authorizedDirectories
+    const key = dirs.join(',')
+    if (key === prevAuthDirsRef.current) return
+    prevAuthDirsRef.current = key
+    setWorkspacePaths(dirs)
+    const fileEntries: Record<string, FileEntry[]> = {}
+    Promise.all(
+      dirs.map(async (dir) => {
+        fileEntries[dir] = await window.api.workspace.listFiles(dir)
+      })
+    ).then(() => setFiles(fileEntries))
+  }, [settings])
 
   const handleOpenDirectory = async () => {
     const path = await window.api.workspace.openDirectoryDialog()

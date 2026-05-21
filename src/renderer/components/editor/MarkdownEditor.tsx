@@ -10,7 +10,7 @@ import { Highlight } from '@tiptap/extension-highlight'
 import { Typography } from '@tiptap/extension-typography'
 import Placeholder from '@tiptap/extension-placeholder'
 import { common, createLowlight } from 'lowlight'
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef, useState, memo } from 'react'
 import { ReactRenderer } from '@tiptap/react'
 import tippy, { type Instance as TippyInstance } from 'tippy.js'
 import { Wikilink } from './extensions/wikilink'
@@ -444,4 +444,10 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   )
 }
 
-export default MarkdownEditor
+export default memo(MarkdownEditor, (prev, next) =>
+  prev.content === next.content &&
+  prev.filePath === next.filePath &&
+  prev.workspacePath === next.workspacePath &&
+  prev.sourceMode === next.sourceMode &&
+  prev.focusMode === next.focusMode
+)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CaretDown, Plus } from '@phosphor-icons/react'
 import type { ModelProfile, AppSettings } from '../../lib/ipc'
+import { useSettings } from '../../store/settings-cache'
 
 const MODELS: Record<string, string> = {
   'claude-opus-4-20250514': 'Opus 4',
@@ -13,23 +14,14 @@ interface ProfileSwitcherProps {
 }
 
 function ProfileSwitcher({ onOpenSettings }: ProfileSwitcherProps): React.ReactElement {
-  const [settings, setSettings] = useState<AppSettings | null>(null)
+  const settings = useSettings()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const refresh = useCallback(async () => {
-    const s = await window.api.settings.get()
-    setSettings(s)
-  }, [])
-
-  // Refresh on mount and when dropdown opens
-  useEffect(() => {
-    refresh()
-  }, [refresh])
-
-  useEffect(() => {
-    if (open) refresh()
-  }, [open, refresh])
+  const handleSelect = async (id: string) => {
+    await window.api.settings.setActiveProfile(id)
+    setOpen(false)
+  }
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -40,12 +32,6 @@ function ProfileSwitcher({ onOpenSettings }: ProfileSwitcherProps): React.ReactE
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const handleSelect = async (id: string) => {
-    await window.api.settings.setActiveProfile(id)
-    await refresh()
-    setOpen(false)
-  }
 
   const activeProfile = settings?.profiles.find((p) => p.id === settings.activeProfileId)
 

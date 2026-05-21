@@ -1,6 +1,6 @@
 import { ipcMain, dialog, shell, nativeTheme } from 'electron'
 import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
-import { join, extname, relative } from 'path'
+import { join, extname, relative, basename } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
@@ -19,6 +19,7 @@ import {
   setTheme
 } from './store'
 import { getNotificationHistory } from './notification-manager'
+import { fileIndexService } from './file-index-service'
 
 // --- Workspace ---
 
@@ -225,31 +226,44 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:addProfile', (_event, profile: Record<string, unknown>) => {
     addProfile(profile as { id: string; name: string; apiKey: string; apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'azure'; model: string })
+    pushSettingsToRenderer()
     return { success: true }
   })
 
   ipcMain.handle('settings:updateProfile', (_event, id: string, updates: Record<string, unknown>) => {
     updateProfile(id, updates)
+    pushSettingsToRenderer()
     return { success: true }
   })
 
   ipcMain.handle('settings:removeProfile', (_event, id: string) => {
     removeProfile(id)
+    pushSettingsToRenderer()
     return { success: true }
   })
 
   ipcMain.handle('settings:setActiveProfile', (_event, id: string) => {
     setActiveProfile(id)
+    pushSettingsToRenderer()
     return { success: true }
   })
 
-  ipcMain.handle('settings:addDirectory', (_event, dir: string) => {
+  ipcMain.handle('settings:addDirectory', async (_event, dir: string) => {
     addAuthorizedDirectory(dir)
+    await fileIndexService.init(dir)
+    pushSettingsToRenderer()
     return { success: true }
   })
 
-  ipcMain.handle('settings:removeDirectory', (_event, dir: string) => {
+  ipcMain.handle('settings:removeDirectory', async (_event, dir: string) => {
     removeAuthorizedDirectory(dir)
+    const dirs = getAuthorizedDirectories()
+    if (dirs.length > 0) {
+      await fileIndexService.init(dirs[0])
+    } else {
+      fileIndexService.destroy()
+    }
+    pushSettingsToRenderer()
     return { success: true }
   })
 
@@ -262,6 +276,7 @@ export function registerIpcHandlers(): void {
     } else {
       nativeTheme.themeSource = theme
     }
+    pushSettingsToRenderer()
     return { success: true }
   })
 
@@ -372,27 +387,8 @@ export function registerIpcHandlers(): void {
 
   // --- Graph ---
   ipcMain.handle('graph:getData', async () => {
-    const dirs = getAuthorizedDirectories()
-    const allNodes: GraphNode[] = []
-    const allEdges: GraphEdge[] = []
-    for (const dir of dirs) {
-      const data = await buildGraphData(dir)
-      allNodes.push(...data.nodes)
-      allEdges.push(...data.edges)
-    }
-    // Deduplicate nodes by id
-    const nodeMap = new Map<string, GraphNode>()
-    for (const n of allNodes) nodeMap.set(n.id, n)
-    const edgeSet = new Set<string>()
-    const dedupedEdges: GraphEdge[] = []
-    for (const e of allEdges) {
-      const key = `${e.source}->${e.target}`
-      if (!edgeSet.has(key)) {
-        edgeSet.add(key)
-        dedupedEdges.push(e)
-      }
-    }
-    return { nodes: Array.from(nodeMap.values()), edges: dedupedEdges }
+    await fileIndexService.onReady()
+    return fileIndexService.getGraphData()
   })
 
   // --- Skills ---
@@ -403,44 +399,14 @@ export function registerIpcHandlers(): void {
   // --- Search ---
   ipcMain.handle('search:query', async (_event, keyword: string) => {
     if (!keyword.trim()) return []
-    const dirs = getAuthorizedDirectories()
-    const results: Array<{ filePath: string; fileName: string; line: number; content: string }> = []
-    const lowerKeyword = keyword.toLowerCase()
-
-    for (const dir of dirs) {
-      async function walkSearch(d: string): Promise<void> {
-        if (!existsSync(d)) return
-        const entries = await readdir(d, { withFileTypes: true })
-        for (const entry of entries) {
-          if (entry.name.startsWith('.') && entry.name !== '.vision') continue
-          const fullPath = join(d, entry.name)
-          if (entry.isDirectory()) {
-            await walkSearch(fullPath)
-          } else if (extname(entry.name) === '.md') {
-            try {
-              const content = await readFile(fullPath, 'utf-8')
-              const lines = content.split('\n')
-              for (let i = 0; i < lines.length; i++) {
-                if (lines[i].toLowerCase().includes(lowerKeyword)) {
-                  results.push({
-                    filePath: fullPath,
-                    fileName: entry.name,
-                    line: i + 1,
-                    content: lines[i].trim()
-                  })
-                }
-              }
-            } catch {
-              // Skip unreadable files
-            }
-          }
-        }
-      }
-      await walkSearch(dir)
-    }
-
-    // Limit to 100 results
-    return results.slice(0, 100)
+    await fileIndexService.onReady()
+    const results = fileIndexService.search(keyword)
+    return results.map((r) => ({
+      filePath: r.filePath,
+      fileName: basename(r.filePath),
+      line: r.line,
+      content: r.snippet
+    }))
   })
 
   // --- Notification ---
