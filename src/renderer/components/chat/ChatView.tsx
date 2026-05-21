@@ -1,6 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { ChatCircleDots } from '@phosphor-icons/react'
-import type { ChatMessage } from '../../store/agent-store'
 import { useMessages, useIsStreaming, useStreamingContent } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
 
@@ -24,24 +23,6 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
     prevMsgCount.current = messages.length
   }, [messages.length])
 
-  const skillToolCallsMap = useMemo(() => {
-    const map = new Map<string, ChatMessage[]>()
-    for (let i = 0; i < messages.length; i++) {
-      if (messages[i].skillInfo && messages[i].role === 'user') {
-        const following: ChatMessage[] = []
-        for (let j = i + 1; j < messages.length; j++) {
-          if (messages[j].role === 'assistant' && messages[j].skillInfo) {
-            following.push(messages[j])
-          } else if (messages[j].role === 'user') {
-            break
-          }
-        }
-        map.set(messages[i].id, following)
-      }
-    }
-    return map
-  }, [messages])
-
   // Find the last streaming assistant message to inject streamingContent
   const lastStreamingIdx = useMemo(() => {
     if (!isStreaming) return -1
@@ -60,7 +41,6 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
         <MessageBubble
           key={msg.id}
           message={idx === lastStreamingIdx ? { ...msg, streamingContent } : msg}
-          skillFollowingMessages={skillToolCallsMap.get(msg.id)}
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
           workspacePath={workspacePath}

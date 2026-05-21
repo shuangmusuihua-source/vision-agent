@@ -1188,18 +1188,20 @@
 }
 
 .skill-output-card-streaming {
-  border-left: 3px solid var(--color-action);
-  animation: skill-output-pulse 2s ease-in-out infinite;
 }
 
 .skill-output-card-completed {
-  border-left: 3px solid var(--color-success);
 }
 
-@keyframes skill-output-pulse {
-  0%, 100% { border-left-color: var(--color-action); }
-  50% { border-left-color: transparent; }
+@keyframes generating-dots {
+  0%, 20% { opacity: 0; }
+  40% { opacity: 1; }
+  100% { opacity: 0; }
 }
+
+.generating-dots span:nth-child(1) { animation: generating-dots 1.4s ease-in-out infinite; }
+.generating-dots span:nth-child(2) { animation: generating-dots 1.4s ease-in-out 0.2s infinite; }
+.generating-dots span:nth-child(3) { animation: generating-dots 1.4s ease-in-out 0.4s infinite; }
 
 .skill-output-card-header {
   display: flex;
@@ -1223,12 +1225,64 @@
 .skill-output-card-lines {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  min-width: 5.5em;
+}
+
+.odometer-number {
+  display: inline-flex;
+  align-items: center;
+}
+
+.odometer {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.odometer-digit {
+  display: inline-block;
+}
+
+.odometer-digit.placeholder {
+  visibility: hidden;
+}
+
+.odometer-digit.static {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.odometer-digit.exit {
+  animation: odometer-exit 0.3s ease-in forwards;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.odometer-digit.enter {
+  animation: odometer-enter 0.3s ease-out forwards;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+@keyframes odometer-exit {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-100%); opacity: 0; }
+}
+
+@keyframes odometer-enter {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .skill-output-card-status {
   font-size: var(--font-size-xs);
   color: var(--color-action);
-  animation: skill-output-pulse 2s ease-in-out infinite;
 }
 
 .skill-output-card-body {
@@ -1239,6 +1293,10 @@
   color: var(--color-text-tertiary);
   padding: 6px 12px 8px;
   overflow: hidden;
+}
+
+.skill-output-card-streaming .skill-output-card-body {
+  height: calc(var(--font-size-xs) * 1.5 * 5 + 14px); /* 5 lines + padding */
 }
 
 .skill-output-card-body pre {

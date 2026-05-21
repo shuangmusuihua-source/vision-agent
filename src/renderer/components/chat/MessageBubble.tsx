@@ -5,7 +5,6 @@ import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } fr
 import type { ChatMessage } from '../../store/agent-store'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
-import SkillCard from './SkillCard'
 import SkillOutputCard from './SkillOutputCard'
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -26,20 +25,19 @@ function extractSkillOutputContent(content: string): string | null {
 
 interface MessageBubbleProps {
   message: ChatMessage & { streamingContent?: string }
-  skillFollowingMessages?: ChatMessage[]
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string) => void
   workspacePath?: string
 }
 
-function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
+function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
   // For streaming messages, use streamingContent; for completed messages, use message.content
   const displayContent = message.streamingContent ?? message.content
   const isStreaming = message.isStreaming ?? false
-  const skillOutput = isStreaming ? extractSkillOutputContent(displayContent) : null
+  const skillOutput = extractSkillOutputContent(displayContent)
 
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -162,21 +160,11 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
     <div className={`message-bubble ${isUser ? 'message-user' : 'message-assistant'}${isSystem ? ' message-system' : ''}`}>
       {isUser ? (
         <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
-          {message.skillInfo && (
-            <SkillCard
-              skillInfo={message.skillInfo}
-              toolCalls={skillFollowingMessages?.flatMap((m) => m.toolCalls || []) || message.toolCalls}
-              onOpenFile={onOpenFile}
-            />
-          )}
           {message.content}
         </div>
       ) : (
         <div className="message-assistant-content" ref={contentRef} onMouseUp={handleMouseUp}>
-          {message.skillInfo && (
-            <SkillCard skillInfo={message.skillInfo} toolCalls={message.toolCalls} onOpenFile={onOpenFile} />
-          )}
-          {!message.skillInfo && message.toolCalls && message.toolCalls.length > 0 && (
+          {message.toolCalls && message.toolCalls.length > 0 && (
             <div className="message-tool-calls">
               {message.toolCalls.map((tc) => (
                 <ToolCallDisplay key={tc.toolUseId} toolCall={tc} />

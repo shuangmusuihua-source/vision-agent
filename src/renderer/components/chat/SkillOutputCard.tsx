@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import { createLowlight, common } from 'lowlight'
 
 const lowlight = createLowlight(common)
@@ -26,6 +26,43 @@ function treeToHtml(tree: any): string {
   return ''
 }
 
+function OdometerDigit({ digit }: { digit: string }) {
+  const [display, setDisplay] = useState({ current: digit, prev: digit })
+  const [animating, setAnimating] = useState(false)
+
+  useEffect(() => {
+    if (digit !== display.current) {
+      setDisplay({ current: digit, prev: display.current })
+      setAnimating(true)
+      const timer = setTimeout(() => setAnimating(false), 300)
+      return () => clearTimeout(timer)
+    }
+  }, [digit])
+
+  return (
+    <span className="odometer">
+      <span className="odometer-digit placeholder" aria-hidden="true">{display.current}</span>
+      {animating ? (
+        <>
+          <span className="odometer-digit exit" key={`p-${display.prev}`}>{display.prev}</span>
+          <span className="odometer-digit enter" key={`c-${display.current}`}>{display.current}</span>
+        </>
+      ) : (
+        <span className="odometer-digit static" key={`s-${display.current}`}>{display.current}</span>
+      )}
+    </span>
+  )
+}
+
+function OdometerNumber({ value }: { value: number }) {
+  const digits = String(value).split('')
+  return (
+    <span className="odometer-number">
+      {digits.map((d, i) => <OdometerDigit key={i} digit={d} />)}
+    </span>
+  )
+}
+
 export default function SkillOutputCard({ content, isStreaming, language = 'html' }: SkillOutputCardProps) {
   const lines = content.split('\n')
   const lineCount = lines.length
@@ -36,7 +73,7 @@ export default function SkillOutputCard({ content, isStreaming, language = 'html
       <div className="skill-output-card skill-output-card-completed">
         <div className="skill-output-card-header">
           <span className="skill-output-card-lang">{language.toUpperCase()}</span>
-          <span className="skill-output-card-lines">{lineCount} 行</span>
+          <span className="skill-output-card-lines"><OdometerNumber value={lineCount} /> 行</span>
           <span className="skill-output-card-status done">Done</span>
         </div>
       </div>
@@ -60,8 +97,8 @@ export default function SkillOutputCard({ content, isStreaming, language = 'html
     <div className="skill-output-card skill-output-card-streaming">
       <div className="skill-output-card-header">
         <span className="skill-output-card-lang">{language.toUpperCase()}</span>
-        <span className="skill-output-card-lines">{lineCount} 行</span>
-        <span className="skill-output-card-status">Generating</span>
+        <span className="skill-output-card-lines"><OdometerNumber value={lineCount} /> 行</span>
+        <span className="skill-output-card-status">Generating<span className="generating-dots"><span>.</span><span>.</span><span>.</span></span></span>
       </div>
       <div className="skill-output-card-body">
         <pre><code className={`hljs language-${language}`} dangerouslySetInnerHTML={{ __html: highlightedHtml }} /></pre>
