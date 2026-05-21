@@ -333,6 +333,12 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     }
   }, [content, editor])
 
+  // Sync editable state when filePath changes (memory files are read-only)
+  useEffect(() => {
+    if (!editor) return
+    editor.setEditable(!isMemoryFile)
+  }, [isMemoryFile, editor])
+
   // Auto-save with debounce
   useEffect(() => {
     if (!editor || !filePath || isMemoryFile) return

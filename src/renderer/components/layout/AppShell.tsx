@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { SidebarSimple, FileText } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -6,9 +6,9 @@ import MarkdownEditor from '../editor/MarkdownEditor'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
-import GraphView from '../graph/GraphView'
 import SearchPanel from '../search/SearchPanel'
-import useAgent from '../../hooks/useAgent'
+const GraphView = lazy(() => import('../graph/GraphView'))
+import useAgent, { useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStore } from '../../hooks/useAgent'
 import type { ChatMessage } from '../../store/agent-store'
 import type { FileEntry, SkillDefinition } from '../../lib/ipc'
 
@@ -112,7 +112,24 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     return unsub
   }, [onOpenSettings])
 
-  const { messages, isStreaming, agentStatus, usageInfo, permissionRequest, askUserRequest, sessionList, currentSessionId, sendMessage, addMessage, respondPermission, respondAskUser, loadSessions, resumeSession, newSession, setActiveSkillInfo, activeSkillInfo, lastEditedFile } = useAgent()
+  const {
+    sendMessage,
+    agentStatus,
+    lastEditedFile,
+    activeSkillInfo,
+    setActiveSkillInfo,
+    newSession,
+    loadSessions,
+    resumeSession,
+    respondPermission,
+    respondAskUser,
+  } = useAgent()
+  const isStreaming = useIsStreaming()
+  const permissionRequest = usePermissionRequest()
+  const askUserRequest = useAskUserRequest()
+  const currentSessionId = useCurrentSessionId()
+  const usageInfo = useUsageInfo()
+  const sessionList = useSessionList()
 
   // Restore/refresh workspaces from settings
   useEffect(() => {
@@ -223,7 +240,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
 
   // Auto-reload editor and memory when Agent finishes
   useEffect(() => {
-    if (!isStreaming && messages.length > 0) {
+    if (!isStreaming && useAgentStore.getState().messages.length > 0) {
       setMemoryRefreshKey((k) => k + 1)
       if (activeTab) {
         const timer = setTimeout(() => {
@@ -274,15 +291,14 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
     const prompt = skill.promptTemplate.replace('{activeFile}', linkedFile || '')
     const skillInfo = { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' as const }
     setActiveSkillInfo(skillInfo)
-    const userMsg: ChatMessage = {
+    useAgentStore.getState().addMessage({
       id: `skill-${Date.now()}`,
       role: 'user',
       content: `执行 Skill: ${skill.name}`,
       skillInfo
-    }
-    addMessage(userMsg)
+    })
     sendMessage(prompt, linkedFile || undefined)
-  }, [sendMessage, addMessage, setActiveSkillInfo, linkedFile])
+  }, [sendMessage, setActiveSkillInfo, linkedFile])
 
   const activeContent = activeTab ? tabContents[activeTab] || '' : ''
 
@@ -332,7 +348,6 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
           }} />
         ) : activeTab ? (
           <MarkdownEditor
-            key={activeTab}
             content={activeContent}
             filePath={activeTab}
             workspacePath={workspacePaths[0] || ''}
@@ -386,7 +401,7 @@ function AppShell({ onOpenSettings, settingsChangeKey }: AppShellProps): React.R
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
-        <ChatView messages={messages} onOpenFile={handleFileSelect} onSelectText={handleSelectText} />
+        <ChatView onOpenFile={handleFileSelect} onSelectText={handleSelectText} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel

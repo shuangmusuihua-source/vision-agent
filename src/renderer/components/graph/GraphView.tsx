@@ -1,18 +1,28 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
-import * as d3 from 'd3'
-import type { GraphNode, GraphEdge } from '../lib/ipc'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide
+} from 'd3-force'
+import type { SimulationNodeDatum, SimulationLinkDatum, Simulation } from 'd3-force'
+import { select } from 'd3-selection'
+import { zoom } from 'd3-zoom'
+import { drag } from 'd3-drag'
+import type { GraphNode, GraphEdge } from '../../lib/ipc'
 
 interface GraphViewProps {
   onNodeClick: (nodeId: string) => void
 }
 
-interface SimNode extends d3.SimulationNodeDatum {
+interface SimNode extends SimulationNodeDatum {
   id: string
   label: string
   type: 'file' | 'memory'
 }
 
-interface SimEdge extends d3.SimulationLinkDatum<SimNode> {
+interface SimEdge extends SimulationLinkDatum<SimNode> {
   source: SimNode | string
   target: SimNode | string
 }
@@ -24,7 +34,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const simulationRef = useRef<d3.Simulation<SimNode, SimEdge> | null>(null)
+  const simulationRef = useRef<Simulation<SimNode, SimEdge> | null>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
@@ -42,10 +52,10 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
     return () => window.removeEventListener('resize', handleResize)
   }, [handleResize])
 
-  // Search highlighting - update existing nodes without rebuilding graph
+  // Search highlighting
   useEffect(() => {
     if (!svgRef.current) return
-    const svg = d3.select(svgRef.current)
+    const svg = select(svgRef.current)
     const nodes = svg.selectAll<SVGGElement, SimNode>('g[cursor="pointer"]')
 
     nodes.select('circle')
@@ -77,7 +87,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
     window.api.graph.getData().then(({ nodes, edges }) => {
       if (!svgRef.current) return
 
-      const svg = d3.select(svgRef.current)
+      const svg = select(svgRef.current)
       svg.selectAll('*').remove()
 
       if (nodes.length === 0) {
@@ -99,19 +109,19 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
       const g = svg.append('g')
 
       // Zoom
-      const zoom = d3.zoom<SVGSVGElement, unknown>()
+      const zoomBehavior = zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.2, 4])
         .on('zoom', (event) => {
           g.attr('transform', event.transform)
         })
-      svg.call(zoom)
+      svg.call(zoomBehavior)
 
       // Simulation
-      const simulation = d3.forceSimulation<SimNode>(simNodes)
-        .force('link', d3.forceLink<SimNode, SimEdge>(simEdges).id((d) => d.id).distance(120))
-        .force('charge', d3.forceManyBody().strength(-300))
-        .force('center', d3.forceCenter(dimensions.width / 2, dimensions.height / 2))
-        .force('collision', d3.forceCollide().radius(40))
+      const simulation = forceSimulation<SimNode>(simNodes)
+        .force('link', forceLink<SimNode, SimEdge>(simEdges).id((d) => d.id).distance(120))
+        .force('charge', forceManyBody().strength(-300))
+        .force('center', forceCenter(dimensions.width / 2, dimensions.height / 2))
+        .force('collision', forceCollide().radius(40))
       simulationRef.current = simulation
 
       // Edges
@@ -128,7 +138,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
         .data(simNodes)
         .join('g')
         .attr('cursor', 'pointer')
-        .call(d3.drag<SVGGElement, SimNode>()
+        .call(drag<SVGGElement, SimNode>()
           .on('start', (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart()
             d.fx = d.x
@@ -158,7 +168,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
         .attr('fill', 'var(--color-text-secondary)')
         .attr('font-size', 11)
         .each(function (d) {
-          const text = d3.select(this)
+          const text = select(this)
           if (d.label.length > 12) {
             text.text(d.label.substring(0, 11) + '…')
           }
@@ -172,7 +182,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
           tooltipRef.current.style.left = `${event.offsetX + 10}px`
           tooltipRef.current.style.top = `${event.offsetY + 10}px`
         }
-        d3.select(event.currentTarget).select('circle')
+        select(event.currentTarget).select('circle')
           .transition().duration(150)
           .attr('r', 24)
           .attr('stroke-width', 3)
@@ -182,7 +192,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
         if (tooltipRef.current) {
           tooltipRef.current.style.display = 'none'
         }
-        d3.select(event.currentTarget).select('circle')
+        select(event.currentTarget).select('circle')
           .transition().duration(150)
           .attr('r', 20)
           .attr('stroke-width', 2)
@@ -203,6 +213,11 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
         node.attr('transform', (d) => `translate(${d.x},${d.y})`)
       })
     }).catch(console.error)
+
+    return () => {
+      simulationRef.current?.stop()
+      simulationRef.current = null
+    }
   }, [dimensions, onNodeClick])
 
   return (
