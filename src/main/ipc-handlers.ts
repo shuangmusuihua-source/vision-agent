@@ -21,6 +21,13 @@ import {
 import { getNotificationHistory } from './notification-manager'
 import { fileIndexService } from './file-index-service'
 
+function pushSettingsToRenderer(): void {
+  const window = getMainWindow()
+  if (window && !window.isDestroyed()) {
+    window.webContents.send('settings:changed', getSettings())
+  }
+}
+
 // --- Workspace ---
 
 interface FileEntry {
