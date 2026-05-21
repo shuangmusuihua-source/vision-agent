@@ -7,9 +7,10 @@ import MessageBubble from './MessageBubble'
 interface ChatViewProps {
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string) => void
+  workspacePath?: string
 }
 
-function ChatView({ onOpenFile, onSelectText }: ChatViewProps): React.ReactElement {
+function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
   const messages = useMessages()
   const bottomRef = useRef<HTMLDivElement>(null)
 

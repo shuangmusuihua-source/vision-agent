@@ -59,6 +59,11 @@ function SkillCard({ skillInfo, toolCalls, onOpenFile }: SkillCardProps): React.
           ))}
         </div>
       )}
+      {isCompleted && skillInfo.outputContent && !skillInfo.outputFile && (
+        <div className="skill-card-output">
+          <span className="skill-card-output-hint">生成完毕，请下载文件</span>
+        </div>
+      )}
       {isCompleted && skillInfo.outputFile && (
         <div className="skill-card-output" onClick={handleOutputClick}>
           <OutputIcon size={14} weight="regular" />

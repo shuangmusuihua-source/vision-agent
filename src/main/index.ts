@@ -5,6 +5,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
 import { getSettings, getAuthorizedDirectories } from './store'
 import { fileIndexService } from './file-index-service'
+import { initAppSkills } from './skill-init'
 
 // Prevent EPIPE errors from crashing the process when stdout/stderr pipes close
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code === 'EPIPE') process.stdout.destroy() })
@@ -55,6 +56,7 @@ export function getMainWindow(): BrowserWindow | null {
 app.whenReady().then(() => {
   setupMenu()
   registerIpcHandlers()
+  initAppSkills()
 
   const savedTheme = getSettings().theme
   if (savedTheme !== 'system') {

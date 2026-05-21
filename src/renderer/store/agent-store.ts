@@ -14,12 +14,14 @@ interface SkillInfo {
   icon: string
   status: 'running' | 'completed' | 'error'
   outputFile?: string
+  outputContent?: string
 }
 
 interface Artifact {
-  filePath: string
+  filePath?: string
   fileName: string
   fileType: 'md' | 'html'
+  content?: string
 }
 
 interface ChatMessage {
@@ -31,6 +33,7 @@ interface ChatMessage {
   isStatusIndicator?: boolean
   skillInfo?: SkillInfo
   artifact?: Artifact
+  skillOutputContent?: string
 }
 
 type AgentStatus = 'idle' | 'thinking' | 'running' | 'compacting' | 'error' | 'waitingForUserInput'
@@ -83,6 +86,7 @@ interface AgentState {
   setSessionList: (sessions: SdkSessionInfo[]) => void
   setLastEditedFile: (path: string | null) => void
   setActiveSkillInfo: (info: SkillInfo | null) => void
+  updateArtifactFilePath: (messageId: string, filePath: string) => void
   clearMessages: () => void
 }
 

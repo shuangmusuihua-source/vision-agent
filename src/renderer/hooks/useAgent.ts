@@ -55,24 +55,30 @@ function handleAgentMessage(msg: SDKMsg) {
 
     const toolUses = content.filter((c) => c.type === 'tool_use')
 
-    if (textParts.length > 0) {
+    // Skip text content if stream_events already delivered it token-by-token
+    // OR if the text contains skill-output (will be rendered via SkillOutputCard)
+    if (textParts.length > 0 && !hasStreamEvents) {
       const textContent = textParts.join('')
-      const lastMsg = messages[messages.length - 1]
-
-      if (lastMsg?.isStatusIndicator) {
-        replaceLastAssistantMessage(textContent)
-      } else if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-        appendToLastAssistantMessage(textContent)
+      if (textContent.includes('```skill-output')) {
+        hasStreamEvents = true // prevent further text processing
       } else {
-        const msgId = `assistant-${Date.now()}`
-        addMessage({
-          id: msgId,
-          role: 'assistant',
-          content: textContent,
-          isStreaming: true,
-          skillInfo: activeSkillInfo || undefined
-        })
-        lastAssistantMsgIdRef.current = msgId
+        const lastMsg = messages[messages.length - 1]
+
+        if (lastMsg?.isStatusIndicator) {
+          replaceLastAssistantMessage(textContent)
+        } else if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+          appendToLastAssistantMessage(textContent)
+        } else {
+          const msgId = `assistant-${Date.now()}`
+          addMessage({
+            id: msgId,
+            role: 'assistant',
+            content: textContent,
+            isStreaming: true,
+            skillInfo: activeSkillInfo || undefined
+          })
+          lastAssistantMsgIdRef.current = msgId
+        }
       }
     }
 
@@ -249,6 +255,46 @@ function handleAgentMessage(msg: SDKMsg) {
   }
 }
 
+// Track whether we've received stream_events for the current turn
+// When true, handleAgentMessage skips text content to avoid duplication
+let hasStreamEvents = false
+
+// Handle stream_event messages — token-by-token text deltas
+function handleStreamEvent(streamMsg: SDKMsg) {
+  const event = streamMsg.event as SDKMsg | undefined
+  if (!event) return
+
+  const eventType = event.type as string
+
+  // text_delta — incremental text content
+  if (eventType === 'content_block_delta') {
+    hasStreamEvents = true
+    const delta = event.delta as SDKMsg | undefined
+    if (delta?.type === 'text_delta') {
+      const text = (delta.text as string) || ''
+      if (text) {
+        const { appendToLastAssistantMessage, messages, addMessage, activeSkillInfo } = useAgentStore.getState()
+        const lastMsg = messages[messages.length - 1]
+
+        // If no assistant message exists yet, create one
+        if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.isStreaming) {
+          const msgId = `assistant-${Date.now()}`
+          addMessage({
+            id: msgId,
+            role: 'assistant',
+            content: text,
+            isStreaming: true,
+            skillInfo: activeSkillInfo || undefined
+          })
+          lastAssistantMsgIdRef.current = msgId
+        } else {
+          appendToLastAssistantMessage(text)
+        }
+      }
+    }
+  }
+}
+
 // Module-level ref for tool call association — survives across renders
 const lastAssistantMsgIdRef = { current: null as string | null }
 
@@ -285,6 +331,10 @@ function useAgent() {
     const unsubMessage = window.api.agent.onMessage((data) => {
       const msg = data as { sessionId: string; message: SDKMsg }
       handleAgentMessage(msg.message)
+    })
+
+    const unsubStreamEvent = window.api.agent.onStreamEvent((data) => {
+      handleStreamEvent(data as SDKMsg)
     })
 
     const unsubSession = window.api.agent.onSessionCreated((sessionId) => {
@@ -339,6 +389,7 @@ function useAgent() {
 
     return () => {
       unsubMessage()
+      unsubStreamEvent()
       unsubSession()
       unsubComplete()
       unsubError()

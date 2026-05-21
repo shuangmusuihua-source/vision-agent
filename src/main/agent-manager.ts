@@ -7,6 +7,7 @@ import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/cl
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
+import { getAppSkillsCwd, getBuiltinSkillNames } from './skill-init'
 
 let _cachedCliPath: string | undefined | null = null
 
@@ -158,7 +159,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
   const baseUrl = getBaseUrl()
   const profile = getActiveProfile()
   const dirs = getAuthorizedDirectories()
-  const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+  const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
 
   const env: Record<string, string | undefined> = { ...process.env }
   if (apiKey) {
@@ -172,9 +173,12 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
 
   return {
     model,
-    cwd,
+    cwd: getAppSkillsCwd(),
     allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
     permissionMode: 'default',
+    settingSources: ['project'],
+    skills: getBuiltinSkillNames(),
+    includePartialMessages: true,
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     systemPrompt: {
@@ -182,13 +186,13 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
       preset: 'claude_code' as const,
       append: [
         '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
-        activeFilePath ? `用户当前正在查看的文件: ${activeFilePath}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : ''
+        activeFilePath ? `用户当前正在查看的文件: ${activeFilePath}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
+        workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd}\n读写用户文件时，请使用完整路径。` : ''
       ].filter(Boolean).join('\n')
     },
     settings: {
-      autoMemoryDirectory: join(cwd, '.vision', 'memory')
+      autoMemoryDirectory: join(workspaceCwd, '.vision', 'memory')
     },
-    skills: 'all',
     hooks: buildHooks(mainWindow),
     canUseTool: async (
       toolName: string,
@@ -200,12 +204,13 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
         return { behavior: 'allow', updatedInput: input }
       }
 
-      // Auto-allow Read within authorized directories
+      // Auto-allow Read within authorized directories and app skills directory
       if (toolName === 'Read') {
         const pathToCheck = extractPathFromToolInput(toolName, input)
         if (pathToCheck) {
           const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(dir))
-          if (isAuthorized) {
+          const isAppSkill = pathToCheck.startsWith(getAppSkillsCwd())
+          if (isAuthorized || isAppSkill) {
             return { behavior: 'allow', updatedInput: input }
           }
         }
@@ -315,6 +320,11 @@ export async function sendMessage(
   const options = buildOptions(mainWindow, activeFilePath)
   let currentSessionId = sessionId
 
+  const debugInfo = `[AgentManager] sendMessage: cwd=${options.cwd}, skills=${JSON.stringify(options.skills)}, settingSources=${JSON.stringify(options.settingSources)}, apiKey=${options.env?.ANTHROPIC_API_KEY ? 'set' : 'missing'}, cliPath=${options.pathToClaudeCodeExecutable || 'none'}`
+  console.log(debugInfo)
+  // Also write to file for visibility
+  try { await appendFile('/tmp/vision-agent-debug.log', debugInfo + '\n') } catch {}
+
   try {
     const messageStream = query({
       prompt,
@@ -325,9 +335,20 @@ export async function sendMessage(
     })
     _activeQuery = messageStream as Query
 
+    console.log('[AgentManager] query started, waiting for messages...')
+    try { await appendFile('/tmp/vision-agent-debug.log', '[AgentManager] query started\n') } catch {}
+
     let messageCount = 0
 
     for await (const message of messageStream) {
+      const msgType = message.type || 'unknown'
+
+      // Forward partial messages (token-by-token streaming) to renderer immediately
+      if (msgType === 'stream_event') {
+        mainWindow.webContents.send('agent:streamEvent', serializeMessage(message))
+        continue
+      }
+
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
         sessions.set(currentSessionId, {

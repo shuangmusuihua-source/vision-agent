@@ -405,7 +405,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
-        <ChatView onOpenFile={handleFileSelect} onSelectText={handleSelectText} />
+        <ChatView onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
       </AgentPanel>
       {showSearch && (
         <SearchPanel

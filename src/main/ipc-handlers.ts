@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, nativeTheme } from 'electron'
+import { ipcMain, dialog, shell, nativeTheme, app } from 'electron'
 import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
 import { join, extname, relative, basename } from 'path'
 import { existsSync } from 'fs'
@@ -228,6 +228,27 @@ export function registerIpcHandlers(): void {
     await shell.openPath(filePath)
   })
 
+  ipcMain.handle('workspace:previewArtifact', async (_event, options: { fileName: string; content: string }) => {
+    const tmpDir = join(app.getPath('temp'), 'vision-agent-preview')
+    await mkdir(tmpDir, { recursive: true })
+    const filePath = join(tmpDir, options.fileName)
+    await writeFile(filePath, options.content, 'utf-8')
+    await shell.openPath(filePath)
+    return { success: true, filePath }
+  })
+
+  ipcMain.handle('workspace:saveArtifact', async (_event, options: { fileName: string; content: string; defaultPath?: string }) => {
+    const window = getMainWindow()
+    if (!window) return { success: false }
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      defaultPath: options.defaultPath ? join(options.defaultPath, options.fileName) : options.fileName,
+      filters: [{ name: 'HTML', extensions: ['html'] }]
+    })
+    if (canceled || !filePath) return { success: false }
+    await writeFile(filePath, options.content, 'utf-8')
+    return { success: true, filePath }
+  })
+
   // --- Settings ---
   ipcMain.handle('settings:get', () => getSettings())
 
@@ -289,6 +310,7 @@ export function registerIpcHandlers(): void {
 
   // --- Agent ---
   ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string) => {
+    console.log('[IPC] agent:sendMessage called, prompt length:', prompt?.length, 'sessionId:', sessionId)
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
     sendMessage(window, prompt, sessionId, activeFilePath)

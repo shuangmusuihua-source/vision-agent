@@ -31,6 +31,8 @@ interface WorkspaceApi {
   createFile: (dirPath: string, fileName: string) => Promise<{ success: boolean; path?: string; error?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
+  saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
+  previewArtifact: (options: { fileName: string; content: string }) => Promise<{ success: boolean; filePath?: string }>
 }
 
 interface SettingsApi {
@@ -60,6 +62,7 @@ interface AgentApi {
   sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) => Promise<{ started: boolean }>
   getSessionList: () => Promise<SessionInfo[]>
   onMessage: (callback: (data: AgentMessageData) => void) => () => void
+  onStreamEvent: (callback: (data: unknown) => void) => () => void
   onSessionCreated: (callback: (sessionId: string) => void) => () => void
   onComplete: (callback: (data: { sessionId: string }) => void) => () => void
   onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void

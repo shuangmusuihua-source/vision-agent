@@ -1175,3 +1175,173 @@
 [data-theme="dark"] .artifact-bubble {
   background: var(--color-bg-secondary);
 }
+
+/* --- Skill Output Card --- */
+
+.skill-output-card {
+  border: none;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 8px 0;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.skill-output-card-streaming {
+  border-left: 3px solid var(--color-action);
+  animation: skill-output-pulse 2s ease-in-out infinite;
+}
+
+.skill-output-card-completed {
+  border-left: 3px solid var(--color-success);
+}
+
+@keyframes skill-output-pulse {
+  0%, 100% { border-left-color: var(--color-action); }
+  50% { border-left-color: transparent; }
+}
+
+.skill-output-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: white;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.skill-output-card-lang {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.skill-output-card-lines {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.skill-output-card-status {
+  font-size: var(--font-size-xs);
+  color: var(--color-action);
+  animation: skill-output-pulse 2s ease-in-out infinite;
+}
+
+.skill-output-card-body {
+  background: var(--color-bg-secondary);
+  overflow-y: auto;
+  max-height: 320px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+.skill-output-card-code {
+  display: flex;
+  gap: 0;
+}
+
+.skill-output-card-line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px 12px 12px;
+  text-align: right;
+  user-select: none;
+  color: var(--color-text-tertiary);
+  opacity: 0.5;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.skill-output-card-body pre {
+  margin: 0;
+  padding: 12px 16px 12px 8px;
+  white-space: pre;
+  tab-size: 2;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Lowlight syntax highlighting */
+.skill-output-card-body .hljs-tag { color: var(--color-action); }
+.skill-output-card-body .hljs-attr { color: var(--color-success); }
+.skill-output-card-body .hljs-string { color: #e8a838; }
+.skill-output-card-body .hljs-comment { color: var(--color-text-tertiary); opacity: 0.6; }
+.skill-output-card-body .hljs-name { color: var(--color-action); }
+.skill-output-card-body .hljs-keyword { color: #c678dd; }
+.skill-output-card-body .hljs-number { color: #d19a66; }
+
+/* --- Artifact Action Buttons --- */
+
+.artifact-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.artifact-action-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.artifact-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--color-action);
+  color: white !important;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  transition: background 0.2s ease;
+}
+
+.artifact-download-btn:hover {
+  background: var(--color-action-hover);
+}
+
+/* --- Skill Card Output Hint --- */
+
+.skill-card-output-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-action);
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Dark mode skill output --- */
+
+[data-theme="dark"] .skill-output-card {
+  background: var(--color-bg-elevated);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .skill-output-card-header {
+  background: var(--color-bg-elevated);
+}
+
+[data-theme="dark"] .skill-output-card-body {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; }
+[data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; }
+[data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; }

@@ -1,23 +1,35 @@
-import { useState, useCallback, useEffect, useRef, memo } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { FileText, FileHtml, ArrowSquareOut, ChatCircleText } from '@phosphor-icons/react'
+import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } from '@phosphor-icons/react'
 import type { ChatMessage } from '../../store/agent-store'
+import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillCard from './SkillCard'
+import SkillOutputCard from './SkillOutputCard'
 
 const REMARK_PLUGINS = [remarkGfm]
+
+function stripSkillOutputBlock(content: string): string {
+  // Strip complete blocks
+  let result = content.replace(/```skill-output\n[\s\S]*?```/g, '')
+  // Strip partial (unclosed) blocks
+  result = result.replace(/```skill-output\n[\s\S]*$/g, '')
+  return result.trim()
+}
 
 interface MessageBubbleProps {
   message: ChatMessage
   skillFollowingMessages?: ChatMessage[]
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string) => void
+  workspacePath?: string
 }
 
-function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectText }: MessageBubbleProps): React.ReactElement {
+function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
+  const isStreaming = useAgentStore((s) => s.isStreaming)
 
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -79,25 +91,59 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
   if (message.artifact) {
     const art = message.artifact
     const Icon = art.fileType === 'html' ? FileHtml : FileText
+
     const handleOpen = () => {
-      if (!onOpenFile) return
-      if (art.fileType === 'html') {
-        window.api.workspace.openInBrowser(art.filePath)
-      } else {
-        onOpenFile(art.filePath)
+      if (art.filePath) {
+        if (art.fileType === 'html') {
+          window.api.workspace.openInBrowser(art.filePath)
+        } else {
+          onOpenFile?.(art.filePath)
+        }
       }
     }
+
+    const handlePreview = async () => {
+      if (art.content && art.fileType === 'html') {
+        await window.api.workspace.previewArtifact({ fileName: art.fileName, content: art.content })
+      }
+    }
+
+    const handleDownload = async () => {
+      if (!art.content) return
+      const result = await window.api.workspace.saveArtifact({
+        fileName: art.fileName,
+        content: art.content,
+        defaultPath: workspacePath
+      })
+      if (result.success && result.filePath) {
+        useAgentStore.getState().updateArtifactFilePath(message.id, result.filePath)
+      }
+    }
+
+    const hasFile = !!art.filePath
+    const hasContent = !!art.content && !hasFile
+
     return (
       <div className="message-bubble message-assistant">
-        <div className="artifact-bubble" onClick={handleOpen}>
+        <div className="artifact-bubble" onClick={hasFile ? handleOpen : undefined}>
           <Icon size={20} weight="regular" />
           <div className="artifact-info">
             <span className="artifact-name">{art.fileName}</span>
             <span className="artifact-action">
-              {art.fileType === 'html' ? '在浏览器中预览' : '在编辑器中打开'}
+              {hasContent ? 'HTML 生成物' : art.fileType === 'html' ? '在浏览器中预览' : '在编辑器中打开'}
             </span>
           </div>
-          <ArrowSquareOut size={14} weight="regular" />
+          {hasContent && art.fileType === 'html' && (
+            <button className="artifact-action-btn" onClick={handlePreview} title="在浏览器中预览">
+              <ArrowSquareOut size={14} weight="regular" />
+            </button>
+          )}
+          {hasContent && (
+            <button className="artifact-download-btn" onClick={handleDownload} title="下载到本地">
+              <DownloadSimple size={14} weight="bold" />
+            </button>
+          )}
+          {hasFile && <ArrowSquareOut size={14} weight="regular" />}
         </div>
       </div>
     )
@@ -128,12 +174,21 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
               ))}
             </div>
           )}
+          {message.skillOutputContent && (
+            <SkillOutputCard
+              content={message.skillOutputContent}
+              isStreaming={message.isStreaming ?? false}
+              language="html"
+            />
+          )}
           {message.content && (
             <div className="message-markdown">
-              <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{message.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
+                {stripSkillOutputBlock(message.content)}
+              </ReactMarkdown>
             </div>
           )}
-          {message.isStreaming && !message.content && !message.toolCalls?.length && (
+          {message.isStreaming && !message.content && !message.toolCalls?.length && !message.skillOutputContent && (
             <span className="message-streaming-dots">· · ·</span>
           )}
         </div>
@@ -152,4 +207,4 @@ function MessageBubble({ message, skillFollowingMessages, onOpenFile, onSelectTe
   )
 }
 
-export default memo(MessageBubble)
+export default MessageBubble

@@ -11,6 +11,10 @@ const api = {
     listMarkdownFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listMarkdownFiles', dirPath),
     openDirectoryDialog: () => ipcRenderer.invoke('workspace:openDirectoryDialog'),
     openInBrowser: (filePath: string) => ipcRenderer.invoke('workspace:openInBrowser', filePath),
+    saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) =>
+      ipcRenderer.invoke('workspace:saveArtifact', options),
+    previewArtifact: (options: { fileName: string; content: string }) =>
+      ipcRenderer.invoke('workspace:previewArtifact', options),
     newDirectoryDialog: () => ipcRenderer.invoke('workspace:newDirectoryDialog'),
     createFile: (dirPath: string, fileName: string) =>
       ipcRenderer.invoke('workspace:createFile', dirPath, fileName)
@@ -38,53 +42,58 @@ const api = {
     sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) =>
       ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath),
     getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
+    respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
+      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
+    respondAskUser: (requestId: string, answer: string) =>
+      ipcRenderer.invoke('agent:respondAskUser', requestId, answer),
+    listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
+    loadSessionMessages: (sessionId: string) =>
+      ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
     onMessage: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:message', handler)
-      return () => ipcRenderer.removeListener('agent:message', handler)
+      return () => { ipcRenderer.removeListener('agent:message', handler) }
+    },
+    onStreamEvent: (callback: (data: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+      ipcRenderer.on('agent:streamEvent', handler)
+      return () => { ipcRenderer.removeListener('agent:streamEvent', handler) }
     },
     onSessionCreated: (callback: (sessionId: string) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, sessionId: string) =>
-        callback(sessionId)
+      const handler = (_event: Electron.IpcRendererEvent, sessionId: string) => callback(sessionId)
       ipcRenderer.on('agent:sessionCreated', handler)
-      return () => ipcRenderer.removeListener('agent:sessionCreated', handler)
+      return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
     onComplete: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:complete', handler)
-      return () => ipcRenderer.removeListener('agent:complete', handler)
+      return () => { ipcRenderer.removeListener('agent:complete', handler) }
     },
     onError: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:error', handler)
-      return () => ipcRenderer.removeListener('agent:error', handler)
+      return () => { ipcRenderer.removeListener('agent:error', handler) }
     },
     onPermissionRequest: (callback: (request: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, request: unknown) => callback(request)
       ipcRenderer.on('agent:permissionRequest', handler)
-      return () => ipcRenderer.removeListener('agent:permissionRequest', handler)
+      return () => { ipcRenderer.removeListener('agent:permissionRequest', handler) }
     },
     onNotification: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:notification', handler)
-      return () => ipcRenderer.removeListener('agent:notification', handler)
+      return () => { ipcRenderer.removeListener('agent:notification', handler) }
     },
-    respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
-      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
     onAskUser: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:askUser', handler)
-      return () => ipcRenderer.removeListener('agent:askUser', handler)
+      return () => { ipcRenderer.removeListener('agent:askUser', handler) }
     },
-    respondAskUser: (requestId: string, answer: string) =>
-      ipcRenderer.invoke('agent:respondAskUser', requestId, answer),
     onAskUserTimeout: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('agent:askUserTimeout', handler)
-      return () => ipcRenderer.removeListener('agent:askUserTimeout', handler)
-    },
-    listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
-    loadSessionMessages: (sessionId: string) => ipcRenderer.invoke('agent:loadSessionMessages', sessionId)
+      return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
+    }
   },
 
   memory: {
@@ -107,7 +116,7 @@ const api = {
     onTaskCompleted: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('cron:taskCompleted', handler)
-      return () => ipcRenderer.removeListener('cron:taskCompleted', handler)
+      return () => { ipcRenderer.removeListener('cron:taskCompleted', handler) }
     }
   },
 
@@ -123,7 +132,7 @@ const api = {
     onAction: (callback: (action: string) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, action: string) => callback(action)
       ipcRenderer.on('menu-action', handler)
-      return () => ipcRenderer.removeListener('menu-action', handler)
+      return () => { ipcRenderer.removeListener('menu-action', handler) }
     }
   },
 
