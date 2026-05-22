@@ -165,7 +165,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey
   }
-  if (baseUrl && profile?.apiProvider === 'custom') {
+  if (baseUrl) {
     env.ANTHROPIC_BASE_URL = baseUrl
   }
 
@@ -320,11 +320,6 @@ export async function sendMessage(
   const options = buildOptions(mainWindow, activeFilePath)
   let currentSessionId = sessionId
 
-  const debugInfo = `[AgentManager] sendMessage: cwd=${options.cwd}, skills=${JSON.stringify(options.skills)}, settingSources=${JSON.stringify(options.settingSources)}, apiKey=${options.env?.ANTHROPIC_API_KEY ? 'set' : 'missing'}, cliPath=${options.pathToClaudeCodeExecutable || 'none'}`
-  console.log(debugInfo)
-  // Also write to file for visibility
-  try { await appendFile('/tmp/vision-agent-debug.log', debugInfo + '\n') } catch {}
-
   try {
     const messageStream = query({
       prompt,
@@ -336,7 +331,6 @@ export async function sendMessage(
     _activeQuery = messageStream as Query
 
     console.log('[AgentManager] query started, waiting for messages...')
-    try { await appendFile('/tmp/vision-agent-debug.log', '[AgentManager] query started\n') } catch {}
 
     let messageCount = 0
 

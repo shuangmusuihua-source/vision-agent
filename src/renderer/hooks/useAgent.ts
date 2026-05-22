@@ -279,15 +279,10 @@ function handleStreamEvent(streamMsg: SDKMsg) {
         const lastMsg = messages[messages.length - 1]
 
         // Ensure an assistant message exists for tool calls to attach to
-        if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.isStreaming) {
+        // Skip status indicators — they'll be removed in finishStreaming
+        if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.isStreaming || lastMsg.isStatusIndicator) {
           const msgId = `assistant-${Date.now()}`
-          addMessage({
-            id: msgId,
-            role: 'assistant',
-            content: '',
-            isStreaming: true,
-            skillInfo: activeSkillInfo || undefined
-          })
+          addMessage({ id: msgId, role: 'assistant', content: '', isStreaming: true, isStatusIndicator: false, skillInfo: activeSkillInfo || undefined })
           lastAssistantMsgIdRef.current = msgId
         }
 
