@@ -3,7 +3,6 @@ import * as path from 'path'
 import * as crypto from 'crypto'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
-import { getAppSkillsCwd } from './skill-init'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { resolveClaudeCodeExecutable } from './agent-manager'
 
@@ -66,31 +65,12 @@ async function readFileContent(filePath: string): Promise<string> {
   }
 }
 
-async function listMarkdownFiles(dir: string): Promise<string[]> {
-  const results: string[] = []
-  async function walk(current: string) {
-    const entries = await fs.promises.readdir(current, { withFileTypes: true })
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
-      const fullPath = path.join(current, entry.name)
-      if (entry.isDirectory()) {
-        await walk(fullPath)
-      } else if (entry.name.endsWith('.md')) {
-        results.push(fullPath)
-      }
-    }
-  }
-  await walk(dir)
-  return results
-}
-
 async function runAgentQuery(prompt: string, cwd: string, effort: 'low' | 'high'): Promise<string> {
   const apiKey = getApiKey()
   const model = getModel()
   const baseUrl = getBaseUrl()
   const profile = getActiveProfile()
   const cliPath = resolveClaudeCodeExecutable()
-  const skillsCwd = getAppSkillsCwd()
 
   const env: Record<string, string | undefined> = { ...process.env }
   if (apiKey) env.ANTHROPIC_API_KEY = apiKey
@@ -101,30 +81,29 @@ async function runAgentQuery(prompt: string, cwd: string, effort: 'low' | 'high'
     cwd,
     allowedTools: ['Read', 'Glob', 'Grep'],
     permissionMode: 'acceptEdits',
-    settingSources: ['project'],
-    skills: 'all',
     effort,
     includePartialMessages: false,
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
-    settings: {
-      autoMemoryDirectory: path.join(skillsCwd, '.vision', 'memory'),
-    },
   }
 
   let result = ''
+  let messageStream: Query | null = null
   try {
-    const messageStream = query({ prompt, options })
+    messageStream = query({ prompt, options }) as Query
 
     for await (const message of messageStream) {
       if (message.type === 'result') {
         result = message.result || ''
-        try { (messageStream as Query).abort() } catch {}
         break
       }
     }
   } catch (err) {
     console.error('[GraphExtractor] runAgentQuery failed:', err)
+  } finally {
+    if (messageStream) {
+      try { messageStream.abort() } catch {}
+    }
   }
 
   return result
@@ -179,8 +158,6 @@ export async function extractSemanticGraph(
   changedFiles: string[],
   onProgress: (phase: string, progress: number) => void
 ): Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; skipped?: boolean }> {
-  onProgress('scanning', 0.1)
-
   if (changedFiles.length === 0) {
     const existingData = await loadSemanticGraph(cwd)
     return { ...semanticDataToGraph(existingData), skipped: true }
@@ -208,13 +185,19 @@ export async function extractSemanticGraph(
     batches.push(filesToProcess.slice(i, i + BATCH_SIZE))
   }
 
-  // Parallel batch extraction
-  onProgress('extracting', 0.2)
+  onProgress('extracting', 0.1)
+
+  // Cache file contents to avoid double reads
+  const contentCache = new Map<string, string>()
 
   const batchPromises = batches.map(async (batch, i) => {
     const fileContents: string[] = []
     for (const file of batch) {
-      const content = await readFileContent(file)
+      let content = contentCache.get(file)
+      if (!content) {
+        content = await readFileContent(file)
+        contentCache.set(file, content)
+      }
       const relPath = path.relative(cwd, file)
       fileContents.push(`--- ${relPath} ---\n${content.slice(0, 3000)}`)
     }
@@ -255,7 +238,7 @@ ${fileContents.join('\n\n')}`
       allEntities.push(...extracted.entities)
       allRelations.push(...extracted.relations)
       for (const file of batch) {
-        const content = await readFileContent(file)
+        const content = contentCache.get(file) || ''
         newHashes[file] = simpleHash(content)
       }
     }

@@ -337,6 +337,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onOpenSearch={() => setShowSearch(true)}
         onToggleGraph={() => setShowGraph(!showGraph)}
         showGraph={showGraph}
+        changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
       />
       <div

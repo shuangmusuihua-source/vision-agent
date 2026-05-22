@@ -131,16 +131,10 @@ class FileIndexService {
     })
 
     this.watcher.on('add', (filePath) => {
-      if (filePath.endsWith('.md')) {
-        console.log('[FileIndex] add:', filePath)
-        this.handleFileChange(filePath)
-      }
+      if (filePath.endsWith('.md')) this.handleFileChange(filePath)
     })
     this.watcher.on('change', (filePath) => {
-      if (filePath.endsWith('.md')) {
-        console.log('[FileIndex] change:', filePath)
-        this.handleFileChange(filePath)
-      }
+      if (filePath.endsWith('.md')) this.handleFileChange(filePath)
     })
     this.watcher.on('unlink', (filePath) => {
       if (filePath.endsWith('.md')) this.handleFileDelete(filePath)
@@ -173,7 +167,6 @@ class FileIndexService {
   /** Push file change notification to renderer */
   private notifyFileChange(): void {
     const window = getMainWindow()
-    console.log('[FileIndex] notifyFileChange, changedFiles:', this.changedFiles.size, 'window:', window ? 'exists' : 'null')
     if (window && !window.isDestroyed()) {
       window.webContents.send('graph:filesChanged', {
         count: this.changedFiles.size,

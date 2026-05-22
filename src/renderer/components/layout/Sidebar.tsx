@@ -20,6 +20,7 @@ interface SidebarProps {
   onOpenSearch: () => void
   onToggleGraph: () => void
   showGraph: boolean
+  changedFileCount: number
   collapsed: boolean
 }
 
@@ -36,6 +37,7 @@ function Sidebar({
   onOpenSearch,
   onToggleGraph,
   showGraph,
+  changedFileCount,
   collapsed
 }: SidebarProps): React.ReactElement {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
@@ -136,6 +138,7 @@ function Sidebar({
           </button>
           <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图">
             <Graph size={14} weight="bold" />
+            {changedFileCount >= 2 && <span className="sidebar-badge-dot" />}
           </button>
           <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="打开工作区">
             <FolderOpen size={14} weight="bold" />

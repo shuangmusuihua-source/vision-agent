@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { Lightning, Spinner } from '@phosphor-icons/react'
+import { Lightning, Spinner, Info, CaretDown } from '@phosphor-icons/react'
 import type { GraphNode, GraphEdge } from '../../lib/ipc'
 
 interface GraphViewProps {
@@ -59,6 +59,7 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] }>({ nodes: [], edges: [] })
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+  const [legendCollapsed, setLegendCollapsed] = useState(false)
 
   // Resize
   useEffect(() => {
@@ -267,28 +268,6 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
             {changedFileCount} changed
           </span>
         )}
-        <div className="graph-legend">
-          <span className="graph-legend-item">
-            <span className="graph-legend-dot" style={{ background: FILE_COLOR }} />
-            File
-          </span>
-          <span className="graph-legend-item">
-            <span className="graph-legend-dot" style={{ background: MEMORY_COLOR }} />
-            Memory
-          </span>
-          <span className="graph-legend-item">
-            <span className="graph-legend-diamond" style={{ background: ENTITY_COLOR }} />
-            Entity
-          </span>
-          <span className="graph-legend-item">
-            <span className="graph-legend-line" style={{ background: REFERENCE_EDGE_COLOR }} />
-            Ref
-          </span>
-          <span className="graph-legend-item">
-            <span className="graph-legend-line dashed" style={{ background: SEMANTIC_EDGE_COLOR }} />
-            Semantic
-          </span>
-        </div>
       </div>
       <div className="graph-canvas">
         {filteredData.nodes.length > 0 ? (
@@ -309,12 +288,43 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
             backgroundColor="transparent"
             warmupTicks={50}
             cooldownTicks={100}
-            d3AlphaDecay={0.03}
+            d3AlphaDecay={0.01}
             d3VelocityDecay={0.3}
+            linkDistance={60}
+            nodeVal={(node) => node.val}
           />
         ) : (
           <div className="graph-empty">No nodes to display</div>
         )}
+        <div className={`graph-legend-card${legendCollapsed ? ' collapsed' : ''}`}>
+          <button className="graph-legend-toggle" onClick={() => setLegendCollapsed(!legendCollapsed)}>
+            {legendCollapsed ? <Info size={14} /> : <CaretDown size={14} />}
+          </button>
+          {!legendCollapsed && (
+            <div className="graph-legend-items">
+              <span className="graph-legend-item">
+                <span className="graph-legend-dot" style={{ background: FILE_COLOR }} />
+                File
+              </span>
+              <span className="graph-legend-item">
+                <span className="graph-legend-dot" style={{ background: MEMORY_COLOR }} />
+                Memory
+              </span>
+              <span className="graph-legend-item">
+                <span className="graph-legend-diamond" style={{ background: ENTITY_COLOR }} />
+                Entity
+              </span>
+              <span className="graph-legend-item">
+                <span className="graph-legend-line" style={{ background: REFERENCE_EDGE_COLOR }} />
+                Ref
+              </span>
+              <span className="graph-legend-item">
+                <span className="graph-legend-line dashed" style={{ background: SEMANTIC_EDGE_COLOR }} />
+                Semantic
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

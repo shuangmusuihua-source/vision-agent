@@ -88,6 +88,7 @@
 }
 
 .sidebar-icon-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -95,6 +96,17 @@
   height: 22px;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
+}
+
+.sidebar-badge-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-action);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .sidebar-icon-btn:hover {
