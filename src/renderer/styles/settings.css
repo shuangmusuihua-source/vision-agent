@@ -386,6 +386,34 @@ button.profile-save-btn {
   border-radius: 4px;
 }
 
+button.profile-test-btn {
+  margin-right: auto;
+  color: var(--color-text-secondary);
+}
+
+button.profile-test-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+}
+
+button.profile-test-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-test-result {
+  font-size: var(--font-size-xs);
+  margin-right: auto;
+  padding: 0 4px;
+}
+
+.profile-test-success {
+  color: #22c55e;
+}
+
+.profile-test-error {
+  color: var(--color-danger);
+}
+
 .profile-save-btn:hover {
   opacity: 0.9;
 }

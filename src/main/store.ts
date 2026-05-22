@@ -4,7 +4,7 @@ interface ModelProfile {
   id: string
   name: string
   apiKey: string
-  apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'azure' | 'custom'
+  apiProvider: string
   baseUrl: string
   model: string
 }

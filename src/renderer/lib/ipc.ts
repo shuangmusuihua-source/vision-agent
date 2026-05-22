@@ -9,7 +9,7 @@ interface ModelProfile {
   id: string
   name: string
   apiKey: string
-  apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'azure' | 'custom'
+  apiProvider: string
   baseUrl: string
   model: string
 }
@@ -45,6 +45,8 @@ interface SettingsApi {
   removeDirectory: (dir: string) => Promise<{ success: boolean }>
   getTheme: () => Promise<'light' | 'dark' | 'system'>
   setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
+  onChanged: (callback: (settings: Record<string, unknown>) => void) => () => void
+  testConnection: (options: { baseUrl: string; apiKey: string; model: string }) => Promise<{ success: boolean; message: string }>
 }
 
 interface AskUserOption {

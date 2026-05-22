@@ -15,26 +15,27 @@ const PAGES: Array<{ id: SettingsPage; label: string; icon: React.ReactElement }
   { id: 'about', label: '关于', icon: <Info size={16} weight="bold" /> }
 ]
 
-const MODEL_OPTIONS = [
+const MODEL_PRESETS = [
   'claude-sonnet-4-20250514',
   'claude-opus-4-20250514',
-  'claude-haiku-4-20250514'
+  'claude-haiku-4-20250514',
+  'deepseek-chat',
+  'deepseek-reasoner',
+  'mistral-large-latest',
+  'gpt-4o',
+  'gpt-4.1',
+  'o3',
+  'o4-mini'
 ]
 
-const PROVIDER_OPTIONS: Array<{ value: ModelProfile['apiProvider']; label: string }> = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'bedrock', label: 'AWS Bedrock' },
-  { value: 'vertex', label: 'Google Vertex' },
-  { value: 'azure', label: 'Azure' },
-  { value: 'custom', label: 'Custom' }
-]
+const PROVIDER_PRESETS = ['anthropic', 'bedrock', 'vertex', 'azure', 'openai', 'deepseek', 'mistral', 'ollama', 'custom']
 
 const NEW_PROFILE: Omit<ModelProfile, 'id'> = {
   name: '',
   apiKey: '',
-  apiProvider: 'anthropic',
+  apiProvider: '',
   baseUrl: '',
-  model: 'claude-sonnet-4-20250514'
+  model: ''
 }
 
 function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
@@ -47,8 +48,11 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [editForm, setEditForm] = useState<Partial<ModelProfile>>({})
   const [isNewProfile, setIsNewProfile] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
+  const [connectionTest, setConnectionTest] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message?: string }>({ status: 'idle' })
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const baseUrlInputRef = useRef<HTMLInputElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
+  const modelInputRef = useRef<HTMLInputElement>(null)
 
   const cachedSettings = useSettings()
 
@@ -98,6 +102,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       baseUrl: profile.baseUrl
     })
     setValidationErrors({})
+    setConnectionTest({ status: 'idle' })
   }, [])
 
   const cancelEditing = useCallback(() => {
@@ -113,12 +118,20 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const saveEditing = useCallback(async (id: string) => {
     const errors: Record<string, boolean> = {}
     if (!editForm.name?.trim()) errors.name = true
+    if (!editForm.baseUrl?.trim()) errors.baseUrl = true
     if (!editForm.apiKey?.trim()) errors.apiKey = true
+    if (!editForm.model?.trim()) errors.model = true
 
     if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors)
-      if (errors.name) nameInputRef.current?.focus()
-      else if (errors.apiKey) apiKeyInputRef.current?.focus()
+      // Clear first then set, so shake animation re-triggers each time
+      setValidationErrors({})
+      requestAnimationFrame(() => {
+        setValidationErrors(errors)
+        if (errors.name) nameInputRef.current?.focus()
+        else if (errors.baseUrl) baseUrlInputRef.current?.focus()
+        else if (errors.apiKey) apiKeyInputRef.current?.focus()
+        else if (errors.model) modelInputRef.current?.focus()
+      })
       return
     }
 
@@ -163,6 +176,24 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       return prev
     })
   }, [])
+
+  const testConnection = useCallback(async () => {
+    if (!editForm.baseUrl?.trim() || !editForm.apiKey?.trim() || !editForm.model?.trim()) {
+      setConnectionTest({ status: 'error', message: '请先填写 Base URL、API Key 和模型' })
+      return
+    }
+    setConnectionTest({ status: 'testing' })
+    try {
+      const result = await window.api.settings.testConnection({
+        baseUrl: editForm.baseUrl,
+        apiKey: editForm.apiKey,
+        model: editForm.model
+      })
+      setConnectionTest({ status: result.success ? 'success' : 'error', message: result.message })
+    } catch (err) {
+      setConnectionTest({ status: 'error', message: (err as Error).message })
+    }
+  }, [editForm.baseUrl, editForm.apiKey, editForm.model])
 
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -315,28 +346,32 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                             )}
                           </div>
                           <div className="profile-field">
-                            <div className="profile-field-label">模型</div>
-                            <select
-                              className="profile-field-select"
-                              value={editForm.model || ''}
-                              onChange={(e) => setEditForm((f) => ({ ...f, model: e.target.value }))}
-                            >
-                              {MODEL_OPTIONS.map((m) => (
-                                <option key={m} value={m}>{m}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="profile-field">
                             <div className="profile-field-label">API Provider</div>
-                            <select
-                              className="profile-field-select"
-                              value={editForm.apiProvider || 'anthropic'}
-                              onChange={(e) => setEditForm((f) => ({ ...f, apiProvider: e.target.value as ModelProfile['apiProvider'] }))}
-                            >
-                              {PROVIDER_OPTIONS.map((p) => (
-                                <option key={p.value} value={p.value}>{p.label}</option>
-                              ))}
-                            </select>
+                            <input
+                              className="profile-field-input"
+                              type="text"
+                              placeholder="anthropic"
+                              value={editForm.apiProvider || ''}
+                              onChange={(e) => setEditForm((f) => ({ ...f, apiProvider: e.target.value }))}
+                            />
+                          </div>
+                          <div className={`profile-field ${validationErrors.baseUrl ? 'field-error' : ''}`}>
+                            <div className="profile-field-label">
+                              Base URL <span className="required-mark">*</span>
+                            </div>
+                            <input
+                              className="profile-field-input"
+                              type="text"
+                              placeholder="https://api.anthropic.com"
+                              value={editForm.baseUrl || ''}
+                              onChange={(e) => {
+                                setEditForm((f) => ({ ...f, baseUrl: e.target.value }))
+                                clearFieldError('baseUrl')
+                              }}
+                            />
+                            {validationErrors.baseUrl && (
+                              <div className="field-error-msg">请填写 Base URL</div>
+                            )}
                           </div>
                           <div className={`profile-field ${validationErrors.apiKey ? 'field-error' : ''}`}>
                             <div className="profile-field-label">
@@ -362,17 +397,37 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               <div className="field-error-msg">请填写 API Key</div>
                             )}
                           </div>
-                          <div className="profile-field">
-                            <div className="profile-field-label">Base URL</div>
+                          <div className={`profile-field ${validationErrors.model ? 'field-error' : ''}`}>
+                            <div className="profile-field-label">
+                              模型 <span className="required-mark">*</span>
+                            </div>
                             <input
                               className="profile-field-input"
                               type="text"
-                              placeholder="https://api.anthropic.com"
-                              value={editForm.baseUrl || ''}
-                              onChange={(e) => setEditForm((f) => ({ ...f, baseUrl: e.target.value }))}
+                              placeholder="claude-sonnet-4-20250514"
+                              value={editForm.model || ''}
+                              onChange={(e) => {
+                                setEditForm((f) => ({ ...f, model: e.target.value }))
+                                clearFieldError('model')
+                              }}
                             />
+                            {validationErrors.model && (
+                              <div className="field-error-msg">请填写模型</div>
+                            )}
                           </div>
                           <div className="profile-edit-actions">
+                            <button
+                              className="profile-card-btn profile-test-btn"
+                              onClick={testConnection}
+                              disabled={connectionTest.status === 'testing'}
+                            >
+                              {connectionTest.status === 'testing' ? '测试中...' : '测试连接'}
+                            </button>
+                            {connectionTest.status !== 'idle' && connectionTest.message && (
+                              <span className={`profile-test-result ${connectionTest.status === 'success' ? 'profile-test-success' : 'profile-test-error'}`}>
+                                {connectionTest.message}
+                              </span>
+                            )}
                             <button className="profile-card-btn" onClick={cancelEditing}>取消</button>
                             <button className="profile-card-btn profile-save-btn" onClick={() => saveEditing(profile.id)}>保存</button>
                           </div>
@@ -380,12 +435,12 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                       ) : (
                         <>
                           <div className="profile-field">
-                            <div className="profile-field-label">模型</div>
-                            <div className="profile-field-value">{profile.model}</div>
-                          </div>
-                          <div className="profile-field">
                             <div className="profile-field-label">API Provider</div>
                             <div className="profile-field-value">{profile.apiProvider}</div>
+                          </div>
+                          <div className="profile-field">
+                            <div className="profile-field-label">Base URL</div>
+                            <div className="profile-field-value">{profile.baseUrl}</div>
                           </div>
                           <div className="profile-field">
                             <div className="profile-field-label">API Key</div>
@@ -398,12 +453,10 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               </button>
                             </div>
                           </div>
-                          {profile.baseUrl && (
-                            <div className="profile-field">
-                              <div className="profile-field-label">Base URL</div>
-                              <div className="profile-field-value">{profile.baseUrl}</div>
-                            </div>
-                          )}
+                          <div className="profile-field">
+                            <div className="profile-field-label">模型</div>
+                            <div className="profile-field-value">{profile.model}</div>
+                          </div>
                         </>
                       )}
                     </div>

@@ -36,7 +36,9 @@ const api = {
       const handler = (_event: Electron.IpcRendererEvent, settings: Record<string, unknown>) => callback(settings)
       ipcRenderer.on('settings:changed', handler)
       return () => { ipcRenderer.removeListener('settings:changed', handler) }
-    }
+    },
+    testConnection: (options: { baseUrl: string; apiKey: string; model: string }) =>
+      ipcRenderer.invoke('settings:testConnection', options)
   },
 
   agent: {
@@ -157,7 +159,7 @@ interface ModelProfile {
   id: string
   name: string
   apiKey: string
-  apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'azure' | 'custom'
+  apiProvider: string
   baseUrl: string
   model: string
 }

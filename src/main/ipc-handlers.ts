@@ -273,7 +273,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('settings:get', () => getSettings())
 
   ipcMain.handle('settings:addProfile', (_event, profile: Record<string, unknown>) => {
-    addProfile(profile as { id: string; name: string; apiKey: string; apiProvider: 'anthropic' | 'bedrock' | 'vertex' | 'azure'; model: string })
+    addProfile(profile as { id: string; name: string; apiKey: string; apiProvider: string; model: string })
     pushSettingsToRenderer()
     return { success: true }
   })
@@ -491,5 +491,39 @@ export function registerIpcHandlers(): void {
   // --- Notification ---
   ipcMain.handle('notification:getHistory', async () => {
     return getNotificationHistory()
+  })
+
+  // --- Connection Test ---
+  ipcMain.handle('settings:testConnection', async (_event, options: { baseUrl: string; apiKey: string; model: string }) => {
+    try {
+      const baseUrl = options.baseUrl.replace(/\/+$/, '')
+      const url = `${baseUrl}/v1/messages`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': options.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: options.model,
+          max_tokens: 16,
+          messages: [{ role: 'user', content: 'Hi' }]
+        }),
+        signal: AbortSignal.timeout(15000)
+      })
+      if (response.ok) {
+        return { success: true, message: '连接成功' }
+      }
+      const body = await response.text().catch(() => '')
+      let errorMsg = `HTTP ${response.status}`
+      try {
+        const json = JSON.parse(body)
+        errorMsg = json.error?.message || json.message || errorMsg
+      } catch {}
+      return { success: false, message: errorMsg }
+    } catch (err) {
+      return { success: false, message: (err as Error).message }
+    }
   })
 }
