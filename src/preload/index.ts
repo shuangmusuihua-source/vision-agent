@@ -16,6 +16,7 @@ const api = {
     previewArtifact: (options: { fileName: string; content: string }) =>
       ipcRenderer.invoke('workspace:previewArtifact', options),
     newDirectoryDialog: () => ipcRenderer.invoke('workspace:newDirectoryDialog'),
+    createWorkspace: (name: string) => ipcRenderer.invoke('workspace:createWorkspace', name),
     createFile: (dirPath: string, fileName: string) =>
       ipcRenderer.invoke('workspace:createFile', dirPath, fileName)
   },

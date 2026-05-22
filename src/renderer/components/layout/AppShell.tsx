@@ -161,7 +161,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const handleOpenDirectory = async () => {
     const path = await window.api.workspace.openDirectoryDialog()
     if (path && !workspacePaths.includes(path)) {
-      setWorkspacePaths((prev) => [...prev, path])
+      setWorkspacePaths((prev) => [path, ...prev])
       const entries = await window.api.workspace.listFiles(path)
       setFiles((prev) => ({ ...prev, [path]: entries }))
       await window.api.settings.addDirectory(path)

@@ -206,6 +206,22 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('workspace:createWorkspace', async (_event, name: string) => {
+    try {
+      const docsDir = join(app.getPath('documents'), 'VisionAgent')
+      if (!existsSync(docsDir)) {
+        await mkdir(docsDir, { recursive: true })
+      }
+      const dirPath = join(docsDir, name)
+      if (existsSync(dirPath)) return null
+      await mkdir(dirPath, { recursive: true })
+      return dirPath
+    } catch (err) {
+      console.error('Failed to create workspace:', err)
+      return null
+    }
+  })
+
   ipcMain.handle('workspace:createFile', async (_event, dirPath: string, fileName: string) => {
     try {
       let name = fileName.trim()

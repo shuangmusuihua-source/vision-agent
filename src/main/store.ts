@@ -86,7 +86,7 @@ export function setActiveProfile(id: string): void {
 export function addAuthorizedDirectory(dir: string): void {
   const dirs = store.get('authorizedDirectories')
   if (!dirs.includes(dir)) {
-    store.set('authorizedDirectories', [...dirs, dir])
+    store.set('authorizedDirectories', [dir, ...dirs])
   }
 }
 
