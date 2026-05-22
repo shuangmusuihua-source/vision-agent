@@ -887,3 +887,97 @@
   box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
 }
 
+
+/* --- Daydream Mode --- */
+
+.daydream-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  cursor: pointer;
+  animation: daydream-fadein 0.6s ease;
+}
+
+@keyframes daydream-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.daydream-hint {
+  position: absolute;
+  bottom: 40px;
+  color: rgba(0, 255, 136, 0.25);
+  font-size: 13px;
+  font-family: monospace;
+  letter-spacing: 1px;
+  animation: daydream-hint-pulse 3s ease infinite;
+}
+
+@keyframes daydream-hint-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+.ai-matrix-loader {
+  width: 240px;
+  height: 290px;
+  position: relative;
+  perspective: 800px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.matrix-digit {
+  color: #00ff88;
+  font-family: monospace;
+  font-size: 22px;
+  text-align: center;
+  text-shadow: 0 0 8px #00ff88, 0 0 20px rgba(0, 255, 136, 0.3);
+  animation:
+    matrix-fall 2.4s infinite,
+    matrix-flicker 0.5s infinite;
+  opacity: 0;
+}
+
+@keyframes matrix-fall {
+  0% {
+    transform: translateY(-50px) rotateX(90deg);
+    opacity: 0;
+  }
+  20%, 80% {
+    transform: translateY(0) rotateX(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(50px) rotateX(-90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes matrix-flicker {
+  0%, 19%, 21%, 100% { opacity: 0.8; }
+  20% { opacity: 0.2; }
+}
+
+.matrix-glow {
+  position: absolute;
+  inset: -30px;
+  background: radial-gradient(
+    circle,
+    rgba(0, 255, 136, 0.12) 0%,
+    transparent 70%
+  );
+  animation: matrix-pulse 2s infinite;
+  pointer-events: none;
+}
+
+@keyframes matrix-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}

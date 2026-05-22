@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../lib/ipc'
 
@@ -21,6 +21,7 @@ interface SidebarProps {
   onOpenSettings: () => void
   onOpenSearch: () => void
   onToggleGraph: () => void
+  onDaydream: () => void
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
@@ -39,6 +40,7 @@ function Sidebar({
   onOpenSettings,
   onOpenSearch,
   onToggleGraph,
+  onDaydream,
   showGraph,
   changedFileCount,
   collapsed
@@ -170,6 +172,9 @@ function Sidebar({
           </button>
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置">
             <Gear size={14} weight="bold" />
+          </button>
+          <button className="sidebar-icon-btn" onClick={onDaydream} title="发呆模式">
+            <Eye size={14} weight="bold" />
           </button>
         </div>
       </div>

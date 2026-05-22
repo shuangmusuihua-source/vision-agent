@@ -8,6 +8,7 @@ import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 const GraphView = lazy(() => import('../graph/GraphView'))
+import DaydreamOverlay from './DaydreamOverlay'
 import useAgent, { useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStore } from '../../hooks/useAgent'
 import { useSettings } from '../../store/settings-cache'
 import type { ChatMessage } from '../../store/agent-store'
@@ -42,6 +43,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
   const [newWorkspaceError, setNewWorkspaceError] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
+  const [showDaydream, setShowDaydream] = useState(false)
   const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
@@ -341,6 +343,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           await window.api.settings.reorderDirectories(paths)
         }}
         onToggleGraph={() => setShowGraph(!showGraph)}
+        onDaydream={() => setShowDaydream(true)}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
@@ -470,6 +473,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         </div>
       )}
+      {showDaydream && <DaydreamOverlay onExit={() => setShowDaydream(false)} />}
     </div>
   )
 }
