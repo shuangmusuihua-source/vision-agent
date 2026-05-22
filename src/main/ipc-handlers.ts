@@ -6,6 +6,7 @@ import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { getBuiltinSkills } from './skills/builtin'
+import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './graph-extractor'
 import {
   getSettings,
   addProfile,
@@ -80,12 +81,15 @@ async function listMarkdownFiles(dirPath: string): Promise<Array<{ label: string
 interface GraphNode {
   id: string
   label: string
-  type: 'file' | 'memory'
+  type: 'file' | 'memory' | 'entity'
+  entityType?: string
 }
 
 interface GraphEdge {
   source: string
   target: string
+  label?: string
+  type: 'reference' | 'semantic'
 }
 
 async function buildGraphData(cwd: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
@@ -417,7 +421,37 @@ export function registerIpcHandlers(): void {
   // --- Graph ---
   ipcMain.handle('graph:getData', async () => {
     await fileIndexService.onReady()
-    return fileIndexService.getGraphData()
+    const rawWikilinkData = fileIndexService.getGraphData()
+    const wikilinkData: { nodes: GraphNode[]; edges: GraphEdge[] } = {
+      nodes: rawWikilinkData.nodes as GraphNode[],
+      edges: rawWikilinkData.edges.map(e => ({ ...e, type: 'reference' as const }))
+    }
+    const dirs = getAuthorizedDirectories()
+    const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+    const semanticRaw = await loadSemanticGraph(cwd)
+    const semanticData = semanticDataToGraph(semanticRaw)
+    return mergeGraphData(wikilinkData, semanticData)
+  })
+
+  ipcMain.handle('graph:extractSemantic', async () => {
+    const dirs = getAuthorizedDirectories()
+    const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+    const window = getMainWindow()
+    const changedFiles = fileIndexService.getAndClearChangedFiles()
+    try {
+      const result = await extractSemanticGraph(cwd, changedFiles, (phase, progress) => {
+        if (window) {
+          window.webContents.send('graph:semanticProgress', { phase, progress })
+        }
+      })
+      if (result.skipped) {
+        return { success: true, skipped: true, message: 'No new or changed files to extract', nodes: result.nodes.length, edges: result.edges.length }
+      }
+      return { success: true, nodes: result.nodes.length, edges: result.edges.length }
+    } catch (err) {
+      console.error('[GraphExtractor] extractSemantic failed:', err)
+      return { success: false, error: (err as Error).message }
+    }
   })
 
   // --- Skills ---

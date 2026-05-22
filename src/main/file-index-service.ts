@@ -1,6 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import type { FSWatcher } from 'fs'
+import chokidar from 'chokidar'
+import { getMainWindow } from './index'
 
 interface IndexedFile {
   filePath: string
@@ -11,11 +12,11 @@ interface IndexedFile {
 
 class FileIndexService {
   private index = new Map<string, IndexedFile>()
-  private watcher: FSWatcher | null = null
+  private watcher: chokidar.FSWatcher | null = null
   private workspaceDir: string | null = null
-  private rebuildTimer: ReturnType<typeof setTimeout> | null = null
   private ready = false
   private readyCallbacks: Array<() => void> = []
+  private changedFiles = new Set<string>()
 
   /** Initialize index for a workspace directory */
   async init(workspaceDir: string): Promise<void> {
@@ -50,7 +51,6 @@ class FileIndexService {
     this.index.clear()
 
     const mdFiles = await this.discoverMarkdownFiles(this.workspaceDir)
-    // Read files in parallel batches to avoid fd exhaustion
     const batchSize = 20
     for (let i = 0; i < mdFiles.length; i += batchSize) {
       const batch = mdFiles.slice(i, i + batchSize)
@@ -119,28 +119,32 @@ class FileIndexService {
     return links
   }
 
-  /** Start fs.watch for incremental updates */
+  /** Start chokidar for incremental updates */
   private startWatching(): void {
     if (!this.workspaceDir) return
 
-    try {
-      this.watcher = fs.watch(
-        this.workspaceDir,
-        { recursive: true },
-        (eventType, filename) => {
-          if (!filename) return
-          if (!filename.endsWith('.md')) return
+    this.watcher = chokidar.watch(this.workspaceDir, {
+      ignored: /(^|[\/\\])\.(git|vision|claude)|node_modules|out|dist/,
+      persistent: true,
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 100 },
+    })
 
-          // Debounce — batch rapid changes
-          if (this.rebuildTimer) clearTimeout(this.rebuildTimer)
-          this.rebuildTimer = setTimeout(() => {
-            this.handleFileChange(path.join(this.workspaceDir!, filename))
-          }, 100)
-        }
-      )
-    } catch {
-      // fs.watch may fail on some platforms — index still works, just not auto-updated
-    }
+    this.watcher.on('add', (filePath) => {
+      if (filePath.endsWith('.md')) {
+        console.log('[FileIndex] add:', filePath)
+        this.handleFileChange(filePath)
+      }
+    })
+    this.watcher.on('change', (filePath) => {
+      if (filePath.endsWith('.md')) {
+        console.log('[FileIndex] change:', filePath)
+        this.handleFileChange(filePath)
+      }
+    })
+    this.watcher.on('unlink', (filePath) => {
+      if (filePath.endsWith('.md')) this.handleFileDelete(filePath)
+    })
   }
 
   /** Handle a single file change event */
@@ -150,13 +154,39 @@ class FileIndexService {
       if (stat.isFile()) {
         await this.indexFile(filePath)
       } else {
-        // File deleted
         this.index.delete(filePath)
       }
     } catch {
-      // File may have been deleted
       this.index.delete(filePath)
     }
+    this.changedFiles.add(filePath)
+    this.notifyFileChange()
+  }
+
+  /** Handle file deletion */
+  private handleFileDelete(filePath: string): void {
+    this.index.delete(filePath)
+    this.changedFiles.add(filePath)
+    this.notifyFileChange()
+  }
+
+  /** Push file change notification to renderer */
+  private notifyFileChange(): void {
+    const window = getMainWindow()
+    console.log('[FileIndex] notifyFileChange, changedFiles:', this.changedFiles.size, 'window:', window ? 'exists' : 'null')
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('graph:filesChanged', {
+        count: this.changedFiles.size,
+        files: Array.from(this.changedFiles),
+      })
+    }
+  }
+
+  /** Get changed files and clear the set */
+  getAndClearChangedFiles(): string[] {
+    const files = Array.from(this.changedFiles)
+    this.changedFiles.clear()
+    return files
   }
 
   /** Get graph data: nodes and edges from wikilinks */
@@ -165,7 +195,6 @@ class FileIndexService {
     const edges: Array<{ source: string; target: string }> = []
     const nodeIds = new Set<string>()
 
-    // Create nodes
     for (const [filePath, data] of this.index) {
       const label = path.basename(filePath, '.md')
       const isMemory = filePath.includes(`${path.sep}.vision${path.sep}memory${path.sep}`)
@@ -174,7 +203,6 @@ class FileIndexService {
       nodes.push({ id, label, type: isMemory ? 'memory' : 'file' })
     }
 
-    // Create edges from wikilinks
     const labelToId = new Map<string, string>()
     for (const node of nodes) {
       labelToId.set(node.label, node.id)
@@ -240,14 +268,11 @@ class FileIndexService {
       this.watcher.close()
       this.watcher = null
     }
-    if (this.rebuildTimer) {
-      clearTimeout(this.rebuildTimer)
-      this.rebuildTimer = null
-    }
     this.index.clear()
     this.workspaceDir = null
     this.ready = false
     this.readyCallbacks = []
+    this.changedFiles.clear()
   }
 }
 

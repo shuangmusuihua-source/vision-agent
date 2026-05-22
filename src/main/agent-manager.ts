@@ -7,7 +7,7 @@ import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/cl
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
-import { getAppSkillsCwd, getBuiltinSkillNames } from './skill-init'
+import { getAppSkillsCwd } from './skill-init'
 
 let _cachedCliPath: string | undefined | null = null
 
@@ -177,7 +177,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
     allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
     permissionMode: 'default',
     settingSources: ['project'],
-    skills: getBuiltinSkillNames(),
+    skills: 'all',
     includePartialMessages: true,
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),

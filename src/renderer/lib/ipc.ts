@@ -77,17 +77,23 @@ interface AgentApi {
 
 interface GraphApi {
   getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>
+  extractSemantic: () => Promise<{ success: boolean; error?: string; skipped?: boolean; message?: string; nodes?: number; edges?: number }>
+  onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => () => void
+  onSemanticProgress: (callback: (data: { phase: string; progress: number }) => void) => () => void
 }
 
 interface GraphNode {
   id: string
   label: string
-  type: 'file' | 'memory'
+  type: 'file' | 'memory' | 'entity'
+  entityType?: string
 }
 
 interface GraphEdge {
   source: string
   target: string
+  label?: string
+  type: 'reference' | 'semantic'
 }
 
 interface CronTask {

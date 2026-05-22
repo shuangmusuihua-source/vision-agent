@@ -31,6 +31,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const [showGraph, setShowGraph] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [changedFileCount, setChangedFileCount] = useState(0)
   const [sourceMode, setSourceMode] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
@@ -84,6 +85,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   // Menu bar actions
+  useEffect(() => {
+    const unsub = window.api.graph.onFilesChanged((data) => {
+      setChangedFileCount(data.count)
+    })
+    return unsub
+  }, [])
+
   useEffect(() => {
     const unsub = window.api.menu.onAction((action) => {
       switch (action) {
@@ -346,10 +354,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         </div>
         <div className="main-content-scroll">
         {showGraph ? (
-          <GraphView onNodeClick={(nodeId) => {
-            handleFileSelect(nodeId)
+          <GraphView onNodeClick={(nodeId, nodeType) => {
+            if (nodeType === 'entity') {
+              const entityName = nodeId.replace(/^entity:/, '')
+              setSearchQuery(entityName)
+              setShowSearch(true)
+            } else {
+              handleFileSelect(nodeId)
+            }
             setShowGraph(false)
-          }} />
+          }} changedFileCount={changedFileCount} onClearChangedFiles={() => setChangedFileCount(0)} />
         ) : activeTab ? (
           <MarkdownEditor
             content={activeContent}

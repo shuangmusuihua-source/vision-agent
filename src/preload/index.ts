@@ -104,7 +104,18 @@ const api = {
   },
 
   graph: {
-    getData: () => ipcRenderer.invoke('graph:getData')
+    getData: () => ipcRenderer.invoke('graph:getData'),
+    extractSemantic: () => ipcRenderer.invoke('graph:extractSemantic'),
+    onSemanticProgress: (callback: (data: { phase: string; progress: number }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { phase: string; progress: number }) => callback(data)
+      ipcRenderer.on('graph:semanticProgress', handler)
+      return () => { ipcRenderer.removeListener('graph:semanticProgress', handler) }
+    },
+    onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { count: number; files: string[] }) => callback(data)
+      ipcRenderer.on('graph:filesChanged', handler)
+      return () => { ipcRenderer.removeListener('graph:filesChanged', handler) }
+    }
   },
 
   cron: {
