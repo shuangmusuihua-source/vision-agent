@@ -5,10 +5,11 @@ import type { SearchResult } from '../../lib/ipc'
 interface SearchPanelProps {
   onOpenFile: (filePath: string) => void
   onClose: () => void
+  initialQuery?: string
 }
 
-function SearchPanel({ onOpenFile, onClose }: SearchPanelProps): React.ReactElement {
-  const [keyword, setKeyword] = useState('')
+function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): React.ReactElement {
+  const [keyword, setKeyword] = useState(initialQuery || '')
   const [results, setResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)

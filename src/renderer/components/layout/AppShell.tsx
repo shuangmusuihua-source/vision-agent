@@ -31,6 +31,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const [showGraph, setShowGraph] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [changedFileCount, setChangedFileCount] = useState(0)
   const [sourceMode, setSourceMode] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
@@ -425,7 +426,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       {showSearch && (
         <SearchPanel
           onOpenFile={handleFileSelect}
-          onClose={() => setShowSearch(false)}
+          onClose={() => { setShowSearch(false); setSearchQuery('') }}
+          initialQuery={searchQuery}
         />
       )}
       <div
