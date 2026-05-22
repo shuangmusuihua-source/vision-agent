@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin } from '@phosphor-icons/react'
+import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../lib/ipc'
 
 interface MemoryEntry {
@@ -16,6 +17,7 @@ interface SidebarProps {
   onNewWorkspace: () => void
   onRemoveWorkspace: (path: string) => void
   onRefreshWorkspace: (path: string) => void
+  onReorderWorkspaces: (paths: string[]) => void
   onOpenSettings: () => void
   onOpenSearch: () => void
   onToggleGraph: () => void
@@ -33,6 +35,7 @@ function Sidebar({
   onNewWorkspace,
   onRemoveWorkspace,
   onRefreshWorkspace,
+  onReorderWorkspaces,
   onOpenSettings,
   onOpenSearch,
   onToggleGraph,
@@ -40,6 +43,7 @@ function Sidebar({
   changedFileCount,
   collapsed
 }: SidebarProps): React.ReactElement {
+  const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set())
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
   const [memoryExpanded, setMemoryExpanded] = useState(true)
   const [memoryFiles, setMemoryFiles] = useState<MemoryEntry[]>([])
@@ -91,6 +95,26 @@ function Sidebar({
     })
   }, [])
 
+  const toggleWorkspace = useCallback((path: string) => {
+    setCollapsedWorkspaces((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const handlePinToTop = useCallback((wsPath: string) => {
+    const idx = workspacePaths.indexOf(wsPath)
+    if (idx <= 0) return
+    const reordered = [...workspacePaths]
+    reordered.splice(idx, 1)
+    reordered.unshift(wsPath)
+    onReorderWorkspaces(reordered)
+  }, [workspacePaths, onReorderWorkspaces])
+
+  const workspaceName = (path: string) => path.split('/').pop() || path
+
   const renderTree = (entries: FileEntry[], depth: number): React.ReactElement[] => {
     return entries.map((entry) => {
       const isExpanded = expandedDirs.has(entry.path)
@@ -127,8 +151,6 @@ function Sidebar({
     })
   }
 
-  const workspaceName = (path: string) => path.split('/').pop() || path
-
   return (
     <div className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
@@ -163,44 +185,74 @@ function Sidebar({
             </button>
           </div>
         ) : (
-          workspacePaths.map((wsPath) => (
-            <div key={wsPath} className="sidebar-workspace-section">
-              <div className="sidebar-workspace-header">
-                <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
-                <button
-                  className="sidebar-workspace-remove"
-                  onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
-                  title="移除工作区"
-                >
-                  <X size={12} weight="bold" />
-                </button>
-                <button
-                  className="sidebar-workspace-add-file"
-                  onClick={() => setCreatingFileIn(wsPath)}
-                  title="新建文件"
-                >
-                  <Plus size={12} weight="bold" />
-                </button>
-              </div>
-              {creatingFileIn === wsPath && (
-                <div className="sidebar-new-file-input">
-                  <input
-                    ref={newFileInputRef}
-                    className="sidebar-new-file-field"
-                    placeholder="文件名（自动添加 .md）"
-                    value={newFileName}
-                    onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateFile(wsPath)
-                      if (e.key === 'Escape') setCreatingFileIn(null)
-                    }}
-                  />
-                  {createError && <span className="sidebar-new-file-error">{createError}</span>}
-                </div>
-              )}
-              {renderTree(files[wsPath] || [], 0)}
-            </div>
-          ))
+          <Flipper
+            flipKey={workspacePaths.join(',')}
+            spring={{ stiffness: 200, damping: 28, precision: 0.5 }}
+            className="sidebar-workspace-list"
+          >
+            {workspacePaths.map((wsPath, idx) => {
+              const isCollapsed = collapsedWorkspaces.has(wsPath)
+              return (
+                <Flipped key={wsPath} flipId={wsPath}>
+                  <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
+                    <div className="sidebar-workspace-header">
+                      <button
+                        className="sidebar-workspace-toggle"
+                        onClick={() => toggleWorkspace(wsPath)}
+                      >
+                        {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+                      </button>
+                      <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
+                      {idx > 0 && (
+                        <button
+                          className="sidebar-workspace-pin"
+                          onClick={() => handlePinToTop(wsPath)}
+                          title="置顶"
+                        >
+                          <PushPin size={12} weight="bold" />
+                        </button>
+                      )}
+                      <button
+                        className="sidebar-workspace-remove"
+                        onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
+                        title="移除工作区"
+                      >
+                        <X size={12} weight="bold" />
+                      </button>
+                      <button
+                        className="sidebar-workspace-add-file"
+                        onClick={() => setCreatingFileIn(wsPath)}
+                        title="新建文件"
+                      >
+                        <Plus size={12} weight="bold" />
+                      </button>
+                    </div>
+                    {!isCollapsed && (
+                      <div className="sidebar-workspace-body">
+                        {creatingFileIn === wsPath && (
+                          <div className="sidebar-new-file-input">
+                            <input
+                              ref={newFileInputRef}
+                              className="sidebar-new-file-field"
+                              placeholder="文件名（自动添加 .md）"
+                              value={newFileName}
+                              onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleCreateFile(wsPath)
+                                if (e.key === 'Escape') setCreatingFileIn(null)
+                              }}
+                            />
+                            {createError && <span className="sidebar-new-file-error">{createError}</span>}
+                          </div>
+                        )}
+                        {renderTree(files[wsPath] || [], 0)}
+                      </div>
+                    )}
+                  </div>
+                </Flipped>
+              )
+            })}
+          </Flipper>
         )}
 
         {memoryFiles.length > 0 && (

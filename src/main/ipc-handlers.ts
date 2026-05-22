@@ -15,6 +15,7 @@ import {
   setActiveProfile,
   addAuthorizedDirectory,
   removeAuthorizedDirectory,
+  reorderAuthorizedDirectories,
   getAuthorizedDirectories,
   getTheme,
   setTheme
@@ -311,6 +312,12 @@ export function registerIpcHandlers(): void {
     } else {
       fileIndexService.destroy()
     }
+    pushSettingsToRenderer()
+    return { success: true }
+  })
+
+  ipcMain.handle('settings:reorderDirectories', (_event, paths: string[]) => {
+    reorderAuthorizedDirectories(paths)
     pushSettingsToRenderer()
     return { success: true }
   })

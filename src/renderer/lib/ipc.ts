@@ -43,6 +43,7 @@ interface SettingsApi {
   setActiveProfile: (id: string) => Promise<{ success: boolean }>
   addDirectory: (dir: string) => Promise<{ success: boolean }>
   removeDirectory: (dir: string) => Promise<{ success: boolean }>
+  reorderDirectories: (paths: string[]) => Promise<{ success: boolean }>
   getTheme: () => Promise<'light' | 'dark' | 'system'>
   setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
   onChanged: (callback: (settings: Record<string, unknown>) => void) => () => void

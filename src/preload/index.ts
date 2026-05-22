@@ -30,6 +30,7 @@ const api = {
     setActiveProfile: (id: string) => ipcRenderer.invoke('settings:setActiveProfile', id),
     addDirectory: (dir: string) => ipcRenderer.invoke('settings:addDirectory', dir),
     removeDirectory: (dir: string) => ipcRenderer.invoke('settings:removeDirectory', dir),
+    reorderDirectories: (paths: string[]) => ipcRenderer.invoke('settings:reorderDirectories', paths),
     getTheme: () => ipcRenderer.invoke('settings:getTheme'),
     setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('settings:setTheme', theme),
     onChanged: (callback: (settings: Record<string, unknown>) => void) => {

@@ -153,6 +153,26 @@
   margin-bottom: 4px;
 }
 
+.sidebar-workspace-section.sidebar-workspace-collapsed .sidebar-workspace-body {
+  display: none;
+}
+
+.sidebar-workspace-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.sidebar-workspace-toggle:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
 .sidebar-workspace-header {
   display: flex;
   align-items: center;
@@ -163,6 +183,113 @@
   color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.sidebar-workspace-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sidebar-workspace-header:hover .sidebar-workspace-pin {
+  opacity: 1;
+}
+
+.sidebar-workspace-pin:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-action);
+}
+
+.sidebar-workspace-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+}
+
+.sidebar-workspace-remove,
+.sidebar-workspace-add-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sidebar-workspace-header:hover .sidebar-workspace-remove,
+.sidebar-workspace-header:hover .sidebar-workspace-add-file {
+  opacity: 1;
+}
+
+.sidebar-workspace-remove:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.sidebar-workspace-add-file:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.sidebar-workspace-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-workspace-drop-line {
+  height: 2px;
+  margin: 0 12px;
+  background: var(--color-action);
+  border-radius: 1px;
+  opacity: 0.7;
+}
+
+.sidebar-workspace-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+}
+
+.sidebar-workspace-remove,
+.sidebar-workspace-add-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sidebar-workspace-header:hover .sidebar-workspace-remove,
+.sidebar-workspace-header:hover .sidebar-workspace-add-file {
+  opacity: 1;
+}
+
+.sidebar-workspace-remove:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.sidebar-workspace-add-file:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .sidebar-workspace-name {

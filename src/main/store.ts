@@ -95,6 +95,13 @@ export function removeAuthorizedDirectory(dir: string): void {
   store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
 }
 
+export function reorderAuthorizedDirectories(paths: string[]): void {
+  const current = store.get('authorizedDirectories')
+  if (paths.length !== current.length) return
+  if (!paths.every((p) => current.includes(p))) return
+  store.set('authorizedDirectories', paths)
+}
+
 export function getTheme(): 'light' | 'dark' | 'system' {
   return store.get('theme')
 }

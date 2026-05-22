@@ -336,6 +336,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         }}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
+        onReorderWorkspaces={async (paths) => {
+          setWorkspacePaths(paths)
+          await window.api.settings.reorderDirectories(paths)
+        }}
         onToggleGraph={() => setShowGraph(!showGraph)}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
