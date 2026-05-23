@@ -46,6 +46,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [newWorkspaceError, setNewWorkspaceError] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
   const [showDaydream, setShowDaydream] = useState(false)
+  const [daydreamMode, setDaydreamMode] = useState('matrix')
   const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
@@ -349,7 +350,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           await window.api.settings.reorderDirectories(paths)
         }}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
-        onDaydream={() => setShowDaydream(true)}
+        onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
@@ -479,7 +480,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         </div>
       )}
-      {showDaydream && <DaydreamOverlay onExit={() => setShowDaydream(false)} />}
+      {showDaydream && <DaydreamOverlay onExit={() => setShowDaydream(false)} mode={daydreamMode} />}
     </div>
   )
 }

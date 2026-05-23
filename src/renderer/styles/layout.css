@@ -916,6 +916,11 @@
   font-family: monospace;
   letter-spacing: 1px;
   animation: daydream-hint-pulse 3s ease infinite;
+  transition: opacity 3s ease;
+}
+.daydream-hint-fadeout {
+  opacity: 0;
+  animation: none;
 }
 
 @keyframes daydream-hint-pulse {
@@ -923,61 +928,98 @@
   50% { opacity: 0.7; }
 }
 
-.ai-matrix-loader {
-  width: 240px;
-  height: 290px;
-  position: relative;
-  perspective: 800px;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
+/* Daydream picker */
+.daydream-picker {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 140px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  z-index: 9998;
+  animation: daydream-picker-in 0.15s ease-out;
+}
+@keyframes daydream-picker-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.daydream-picker-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 4px 8px 6px;
+  font-weight: 500;
+}
+.daydream-picker-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.daydream-picker-item:hover {
+  background: var(--bg-hover);
+}
+.daydream-picker-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.matrix-preview {
+  background: #0a0a0a;
+  background-image: linear-gradient(rgba(0,255,65,0.15) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,255,65,0.15) 1px, transparent 1px);
+  background-size: 6px 6px;
+  box-shadow: inset 0 0 8px rgba(0,255,65,0.2);
+}
+.starfield-preview {
+  background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+  box-shadow: inset 0 0 4px rgba(255,255,255,0.3), inset 0 0 1px rgba(255,255,255,0.6);
+}
+.math-preview {
+  background: #05050a;
+  background-image: linear-gradient(rgba(0,150,255,0.08) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,150,255,0.08) 1px, transparent 1px);
+  background-size: 6px 6px;
+  box-shadow: inset 0 0 6px rgba(100,200,255,0.2), inset 0 0 2px rgba(255,105,180,0.3);
+}
+.rain-preview {
+  background: #000;
+  background-image: linear-gradient(rgba(0,255,0,0.12) 1px, transparent 2px);
+  background-size: 3px 5px;
+  box-shadow: inset 0 0 6px rgba(0,255,0,0.15);
 }
 
-.matrix-digit {
-  color: #00ff88;
-  font-family: monospace;
-  font-size: 22px;
-  text-align: center;
-  text-shadow: 0 0 8px #00ff88, 0 0 20px rgba(0, 255, 136, 0.3);
-  animation:
-    matrix-fall 2.4s infinite,
-    matrix-flicker 0.5s infinite;
-  opacity: 0;
+/* Starfield daydream */
+.daydream-starfield {
+  background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+  overflow: hidden;
+}
+.daydream-hint-starfield {
+  color: rgba(255,255,255,0.25);
+  text-shadow: none;
 }
 
-@keyframes matrix-fall {
-  0% {
-    transform: translateY(-50px) rotateX(90deg);
-    opacity: 0;
-  }
-  20%, 80% {
-    transform: translateY(0) rotateX(0deg);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(50px) rotateX(-90deg);
-    opacity: 0;
-  }
+/* Math daydream */
+.daydream-math {
+  background: #05050a;
+}
+.daydream-hint-math {
+  color: rgba(0,150,255,0.25);
 }
 
-@keyframes matrix-flicker {
-  0%, 19%, 21%, 100% { opacity: 0.8; }
-  20% { opacity: 0.2; }
+/* Rain daydream */
+.daydream-rain {
+  background: #000;
 }
-
-.matrix-glow {
-  position: absolute;
-  inset: -30px;
-  background: radial-gradient(
-    circle,
-    rgba(0, 255, 136, 0.12) 0%,
-    transparent 70%
-  );
-  animation: matrix-pulse 2s infinite;
-  pointer-events: none;
-}
-
-@keyframes matrix-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.7; }
+.daydream-hint-rain {
+  color: rgba(0,255,0,0.2);
 }

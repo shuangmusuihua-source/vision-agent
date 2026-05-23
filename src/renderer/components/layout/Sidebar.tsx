@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../lib/ipc'
@@ -21,7 +22,7 @@ interface SidebarProps {
   onOpenSettings: () => void
   onOpenSearch: () => void
   onToggleGraph: () => void
-  onDaydream: () => void
+  onDaydream: (mode: string) => void
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
@@ -153,7 +154,32 @@ function Sidebar({
     })
   }
 
+  const [showDaydreamPicker, setShowDaydreamPicker] = useState(false)
+  const [pickerPos, setPickerPos] = useState({ left: 0, top: 0 })
+  const daydreamBtnRef = useRef<HTMLButtonElement>(null)
+
+  const togglePicker = () => {
+    if (!showDaydreamPicker && daydreamBtnRef.current) {
+      const rect = daydreamBtnRef.current.getBoundingClientRect()
+      setPickerPos({ left: rect.left, top: rect.bottom + 6 })
+    }
+    setShowDaydreamPicker(v => !v)
+  }
+
+  useEffect(() => {
+    if (!showDaydreamPicker) return
+    const handler = (e: MouseEvent) => {
+      if (daydreamBtnRef.current && daydreamBtnRef.current.contains(e.target as Node)) return
+      const picker = document.querySelector('.daydream-picker')
+      if (picker && picker.contains(e.target as Node)) return
+      setShowDaydreamPicker(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showDaydreamPicker])
+
   return (
+    <>
     <div className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-header-actions">
@@ -173,7 +199,7 @@ function Sidebar({
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置">
             <Gear size={14} weight="bold" />
           </button>
-          <button className="sidebar-icon-btn" onClick={onDaydream} title="发呆模式">
+          <button ref={daydreamBtnRef} className="sidebar-icon-btn" onClick={togglePicker} title="心休模式">
             <Eye size={14} weight="bold" />
           </button>
         </div>
@@ -295,6 +321,29 @@ function Sidebar({
         )}
       </div>
     </div>
+    {showDaydreamPicker && createPortal(
+      <div className="daydream-picker" style={{ left: pickerPos.left, top: pickerPos.top }}>
+        <div className="daydream-picker-title">心休模式</div>
+        <button className="daydream-picker-item" onClick={() => { onDaydream('matrix'); setShowDaydreamPicker(false) }}>
+          <span className="daydream-picker-preview matrix-preview" />
+          <span>数字矩阵</span>
+        </button>
+        <button className="daydream-picker-item" onClick={() => { onDaydream('starfield'); setShowDaydreamPicker(false) }}>
+          <span className="daydream-picker-preview starfield-preview" />
+          <span>星空夜语</span>
+        </button>
+        <button className="daydream-picker-item" onClick={() => { onDaydream('math'); setShowDaydreamPicker(false) }}>
+          <span className="daydream-picker-preview math-preview" />
+          <span>数理幻境</span>
+        </button>
+        <button className="daydream-picker-item" onClick={() => { onDaydream('rain'); setShowDaydreamPicker(false) }}>
+          <span className="daydream-picker-preview rain-preview" />
+          <span>绿野甘霖</span>
+        </button>
+      </div>,
+      document.body
+    )}
+    </>
   )
 }
 
