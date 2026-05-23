@@ -7,6 +7,8 @@ import type {
   PermissionRequestIPC,
   SdkSessionInfo,
   UsageInfo,
+  GraphData,
+  GraphExtractionProgress,
 } from './types'
 
 // ─── Request/Response Channels ───────────────────────────────────────
@@ -161,11 +163,11 @@ export type IPCChannelMap = {
   // Graph
   'graph:getData': {
     request: void
-    response: { nodes: unknown[]; edges: unknown[] }
+    response: GraphData
   }
   'graph:extractSemantic': {
     request: void
-    response: { success: boolean; error?: string; skipped?: boolean; message?: string; nodes?: number; edges?: number }
+    response: { success: boolean; error?: string; skipped?: boolean; message?: string; data?: GraphData }
   }
 
   // Cron
@@ -221,7 +223,7 @@ export type IPCEventMap = {
   'agent:askUserTimeout': { requestId: string }
   'agent:notification': { type: string; message: string; title: string }
   'settings:changed': Record<string, unknown>
-  'graph:semanticProgress': { phase: string; progress: number }
+  'graph:semanticProgress': GraphExtractionProgress
   'graph:filesChanged': { count: number; files: string[] }
   'cron:taskCompleted': unknown
   'menu-action': string

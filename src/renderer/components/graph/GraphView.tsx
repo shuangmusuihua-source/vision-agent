@@ -1,12 +1,11 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { Lightning, Spinner, Info, CaretDown } from '@phosphor-icons/react'
-import type { GraphNode, GraphEdge } from '../../lib/ipc'
+import type { GraphNode, GraphEdge } from '../../../shared/types'
+import { useGraphStore } from '../../store/graph-store'
 
 interface GraphViewProps {
   onNodeClick: (nodeId: string, nodeType: string) => void
-  changedFileCount: number
-  onClearChangedFiles: () => void
 }
 
 interface FGNode extends GraphNode {
@@ -31,8 +30,6 @@ const REFERENCE_EDGE_COLOR = '#555555'
 const SEMANTIC_EDGE_COLOR = '#e8a838'
 const HIGHLIGHT_COLOR = '#f59e0b'
 
-type FilterMode = 'all' | 'reference' | 'semantic'
-
 function getNodeColor(node: FGNode, highlighted: boolean): string {
   if (highlighted) return HIGHLIGHT_COLOR
   if (node.type === 'entity') return ENTITY_COLOR
@@ -49,17 +46,19 @@ function drawDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
   ctx.closePath()
 }
 
-function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: GraphViewProps): React.ReactElement {
+function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
+  const store = useGraphStore
   const fgRef = useRef<any>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<FilterMode>('all')
-  const [extracting, setExtracting] = useState(false)
-  const [extractProgress, setExtractProgress] = useState({ phase: '', progress: 0 })
-  const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] }>({ nodes: [], edges: [] })
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [legendCollapsed, setLegendCollapsed] = useState(false)
+
+  const filteredData = store(s => s.filteredData)
+  const extractionState = store(s => s.extractionState)
+  const extractionProgress = store(s => s.extractionProgress)
+  const searchQuery = store(s => s.searchQuery)
+  const filter = store(s => s.filter)
+  const changedFileCount = store(s => s.changedFileCount)
 
   // Resize
   useEffect(() => {
@@ -74,73 +73,39 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Load graph data
+  // Load graph data on mount
   useEffect(() => {
-    window.api.graph.getData().then(setGraphData).catch(console.error)
-  }, [filter])
+    store.getState().loadGraphData()
+  }, [])
 
   // Semantic extraction progress
   useEffect(() => {
     const unsub = window.api.graph.onSemanticProgress((data) => {
-      setExtractProgress(data)
+      store.getState().setExtractionProgress(data)
     })
     return unsub
   }, [])
 
   const handleExtractSemantic = useCallback(async () => {
-    setExtracting(true)
-    setExtractProgress({ phase: 'starting', progress: 0 })
-    try {
-      const result = await window.api.graph.extractSemantic()
-      if (result.skipped) {
-        setExtractProgress({ phase: 'no changes', progress: 1 })
-      } else {
-        onClearChangedFiles()
-      }
-      const data = await window.api.graph.getData()
-      setGraphData(data)
-    } catch (err) {
-      console.error('[GraphView] Semantic extraction failed:', err)
-    }
-    setExtracting(false)
-  }, [onClearChangedFiles])
+    await store.getState().startExtraction()
+  }, [])
 
   // Search highlighting
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setHighlightedIds(new Set())
-      return
-    }
+  const highlightedIds = useMemo(() => {
+    if (!searchQuery.trim()) return new Set<string>()
     const q = searchQuery.toLowerCase()
-    const ids = new Set(graphData.nodes.filter((n) => n.label.toLowerCase().includes(q)).map((n) => n.id))
-    setHighlightedIds(ids)
-  }, [searchQuery, graphData.nodes])
+    return new Set(filteredData.nodes.filter(n => n.label.toLowerCase().includes(q)).map(n => n.id))
+  }, [searchQuery, filteredData.nodes])
 
-  // Filtered data
-  const filteredData = useMemo(() => {
-    let nodes = graphData.nodes
-    let edges = graphData.edges
-
-    if (filter === 'reference') {
-      nodes = nodes.filter((n) => n.type === 'file' || n.type === 'memory')
-      edges = edges.filter((e) => e.type === 'reference')
-    } else if (filter === 'semantic') {
-      const entityIds = new Set(nodes.filter((n) => n.type === 'entity').map((n) => n.id))
-      nodes = nodes.filter((n) => n.type === 'entity' || entityIds.size === 0)
-      edges = edges.filter((e) => e.type === 'semantic')
-    }
-
-    // Ensure all link endpoints reference existing nodes
-    const nodeIds = new Set(nodes.map((n) => n.id))
-    const validEdges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
-
-    const fgNodes: FGNode[] = nodes.map((n) => ({
+  // Prepare force-graph data
+  const fgData = useMemo(() => {
+    const fgNodes: FGNode[] = filteredData.nodes.map(n => ({
       ...n,
       val: highlightedIds.has(n.id) ? 20 : 12,
-      color: getNodeColor(n, highlightedIds.has(n.id)),
+      color: getNodeColor(n as FGNode, highlightedIds.has(n.id)),
     }))
 
-    const fgLinks: FGLink[] = validEdges.map((e) => ({
+    const fgLinks: FGLink[] = filteredData.edges.map(e => ({
       source: e.source,
       target: e.target,
       label: e.label,
@@ -149,7 +114,7 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
     }))
 
     return { nodes: fgNodes, links: fgLinks }
-  }, [graphData, filter, highlightedIds])
+  }, [filteredData, highlightedIds])
 
   // Custom node rendering
   const nodeCanvasObject = useCallback((node: FGNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -184,9 +149,6 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
     ctx.font = `${fontSize}px sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    ctx.fillStyle = isHighlighted ? HIGHLIGHT_COLOR : 'var(--color-text-secondary)'
-
-    // Canvas doesn't support CSS variables, use actual color
     ctx.fillStyle = isHighlighted ? HIGHLIGHT_COLOR : '#888888'
     const label = node.label.length > 12 ? node.label.substring(0, 11) + '…' : node.label
     const yOffset = node.type === 'entity' ? size + 2 : size + 2
@@ -239,6 +201,8 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
     return `${node.label}${typeInfo}`
   }, [])
 
+  const isExtracting = extractionState === 'indexing' || extractionState === 'extracting' || extractionState === 'merging'
+
   return (
     <div ref={containerRef} className="graph-view">
       <div className="graph-toolbar">
@@ -247,21 +211,21 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
           type="text"
           placeholder="Search nodes..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => store.getState().setSearchQuery(e.target.value)}
         />
         <div className="graph-filter-group">
-          <button className={`graph-filter-btn${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>All</button>
-          <button className={`graph-filter-btn${filter === 'reference' ? ' active' : ''}`} onClick={() => setFilter('reference')}>References</button>
-          <button className={`graph-filter-btn${filter === 'semantic' ? ' active' : ''}`} onClick={() => setFilter('semantic')}>Semantic</button>
+          <button className={`graph-filter-btn${filter === 'all' ? ' active' : ''}`} onClick={() => store.getState().setFilter('all')}>All</button>
+          <button className={`graph-filter-btn${filter === 'reference' ? ' active' : ''}`} onClick={() => store.getState().setFilter('reference')}>References</button>
+          <button className={`graph-filter-btn${filter === 'semantic' ? ' active' : ''}`} onClick={() => store.getState().setFilter('semantic')}>Semantic</button>
         </div>
         <button
           className="graph-extract-btn"
           onClick={handleExtractSemantic}
-          disabled={extracting}
+          disabled={isExtracting}
           title="Extract semantic graph from documents"
         >
-          {extracting ? <Spinner size={16} weight="regular" /> : <Lightning size={16} weight="regular" />}
-          {extracting ? ` ${extractProgress.phase}...` : extractProgress.phase === 'no changes' ? ' No changes' : ' Extract'}
+          {isExtracting ? <Spinner size={16} weight="regular" /> : <Lightning size={16} weight="regular" />}
+          {isExtracting ? ` ${extractionProgress?.phase || 'extracting'}...` : extractionState === 'complete' && !extractionProgress ? ' Done' : ' Extract'}
         </button>
         {changedFileCount > 0 && (
           <span className="graph-change-badge">
@@ -270,12 +234,12 @@ function GraphView({ onNodeClick, changedFileCount, onClearChangedFiles }: Graph
         )}
       </div>
       <div className="graph-canvas">
-        {filteredData.nodes.length > 0 ? (
+        {fgData.nodes.length > 0 ? (
           <ForceGraph2D
             ref={fgRef}
             width={dimensions.width}
             height={dimensions.height}
-            graphData={filteredData}
+            graphData={fgData}
             nodeId="id"
             nodeCanvasObject={nodeCanvasObject}
             linkCanvasObject={linkCanvasObject}

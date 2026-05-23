@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import chokidar from 'chokidar'
 import { getMainWindow } from './index'
+import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
 
 interface IndexedFile {
   filePath: string
@@ -183,9 +184,9 @@ class FileIndexService {
   }
 
   /** Get graph data: nodes and edges from wikilinks */
-  getGraphData(): { nodes: Array<{ id: string; label: string; type: 'file' | 'memory' }>; edges: Array<{ source: string; target: string }> } {
-    const nodes: Array<{ id: string; label: string; type: 'file' | 'memory' }> = []
-    const edges: Array<{ source: string; target: string }> = []
+  getGraphData(): GraphData {
+    const nodes: GraphNode[] = []
+    const edges: GraphEdge[] = []
     const nodeIds = new Set<string>()
 
     for (const [filePath, data] of this.index) {
@@ -208,7 +209,7 @@ class FileIndexService {
           const sourceLabel = path.basename(data.filePath, '.md')
           const sourceId = labelToId.get(sourceLabel)
           if (sourceId && sourceId !== targetId) {
-            edges.push({ source: sourceId, target: targetId })
+            edges.push({ source: sourceId, target: targetId, type: 'reference' })
           }
         }
       }

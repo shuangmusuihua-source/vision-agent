@@ -5,38 +5,25 @@ import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { resolveClaudeCodeExecutable } from './agent-manager'
+import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
 
-interface SemanticEntity {
+export interface SemanticEntity {
   name: string
   type: string
   sourceFile: string
 }
 
-interface SemanticRelation {
+export interface SemanticRelation {
   from: string
   to: string
   label: string
   sourceFile: string
 }
 
-interface SemanticGraphData {
+export interface SemanticGraphData {
   entities: SemanticEntity[]
   relations: SemanticRelation[]
   fileHashes: Record<string, string>
-}
-
-interface GraphNode {
-  id: string
-  label: string
-  type: 'file' | 'memory' | 'entity'
-  entityType?: string
-}
-
-interface GraphEdge {
-  source: string
-  target: string
-  label?: string
-  type: 'reference' | 'semantic'
 }
 
 const BATCH_SIZE = 8
@@ -276,7 +263,8 @@ export async function loadSemanticGraph(cwd: string): Promise<SemanticGraphData>
   }
 }
 
-export function semanticDataToGraph(data: SemanticGraphData): { nodes: GraphNode[]; edges: GraphEdge[] } {
+export function semanticDataToGraph(data: SemanticGraphData, wikilinkNodeIds?: Set<string>): GraphData {
+  const entityIds = new Set(data.entities.map(e => `entity:${e.name}`))
   const nodes: GraphNode[] = data.entities.map(e => ({
     id: `entity:${e.name}`,
     label: e.name,
@@ -284,25 +272,61 @@ export function semanticDataToGraph(data: SemanticGraphData): { nodes: GraphNode
     entityType: e.type,
   }))
 
-  const edges: GraphEdge[] = data.relations.map(r => ({
-    source: `entity:${r.from}`,
-    target: `entity:${r.to}`,
-    label: r.label,
-    type: 'semantic' as const,
-  }))
+  const edges: GraphEdge[] = data.relations
+    .filter(r => entityIds.has(`entity:${r.from}`) && entityIds.has(`entity:${r.to}`))
+    .map(r => ({
+      source: `entity:${r.from}`,
+      target: `entity:${r.to}`,
+      label: r.label,
+      type: 'semantic' as const,
+    }))
+
+  // Anchor edges: connect entity nodes to their source file nodes
+  const seenAnchors = new Set<string>()
+  for (const e of data.entities) {
+    if (e.sourceFile && wikilinkNodeIds) {
+      // sourceFile is a relative path; try matching against wikilink node IDs
+      const anchorTarget = findMatchingFileId(e.sourceFile, wikilinkNodeIds)
+      if (anchorTarget) {
+        const anchorKey = `entity:${e.name}->${anchorTarget}`
+        if (!seenAnchors.has(anchorKey)) {
+          seenAnchors.add(anchorKey)
+          edges.push({
+            source: `entity:${e.name}`,
+            target: anchorTarget,
+            label: 'mentioned in',
+            type: 'semantic' as const,
+          })
+        }
+      }
+    }
+  }
 
   return { nodes, edges }
 }
 
+function findMatchingFileId(sourceFile: string, wikilinkNodeIds: Set<string>): string | null {
+  // Direct match
+  if (wikilinkNodeIds.has(sourceFile)) return sourceFile
+  // Try with common prefixes stripped
+  for (const id of wikilinkNodeIds) {
+    if (id.endsWith('/' + sourceFile) || id.endsWith('\\' + sourceFile)) return id
+    // Also try matching just the basename
+    if (id.endsWith('/' + sourceFile.replace(/\.md$/, '') + '.md') || id.endsWith('\\' + sourceFile.replace(/\.md$/, '') + '.md')) return id
+  }
+  return null
+}
+
 export function mergeGraphData(
-  wikilinkData: { nodes: GraphNode[]; edges: GraphEdge[] },
-  semanticData: { nodes: GraphNode[]; edges: GraphEdge[] }
-): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  wikilinkData: GraphData,
+  semanticData: GraphData
+): GraphData {
   const nodeMap = new Map<string, GraphNode>()
   for (const n of wikilinkData.nodes) nodeMap.set(n.id, n)
   for (const n of semanticData.nodes) nodeMap.set(n.id, n)
 
   const edges = [...wikilinkData.edges, ...semanticData.edges]
+    .filter(e => nodeMap.has(e.source) && nodeMap.has(e.target))
 
   return { nodes: Array.from(nodeMap.values()), edges }
 }

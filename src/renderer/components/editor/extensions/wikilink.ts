@@ -70,6 +70,31 @@ export const Wikilink = Node.create<WikilinkOptions>({
     ]
   },
 
+  renderMarkdown(node, helpers, context) {
+    return `[[${node.attrs?.target || ''}]]`
+  },
+
+  parseMarkdown(token, helpers) {
+    const match = token.raw?.match(/^\[\[([^\]]+)\]\]/)
+    if (!match) return null
+    return helpers.createNode('wikilink', { target: match[1] })
+  },
+
+  markdownTokenizer: {
+    name: 'wikilink',
+    level: 'inline',
+    start(src: string) {
+      return src.indexOf('[[')
+    },
+    tokenize(src: string, tokens, helpers) {
+      const match = src.match(/^\[\[([^\]]+)\]\]/)
+      if (match) {
+        return { type: 'wikilink', raw: match[0], text: match[1] }
+      }
+      return undefined
+    }
+  },
+
   addCommands() {
     return {
       setWikilink:

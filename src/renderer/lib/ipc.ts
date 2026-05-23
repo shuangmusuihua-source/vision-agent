@@ -6,18 +6,12 @@ import type {
   SdkSessionInfo,
   UsageInfo,
   AskUserQuestionOption,
+  GraphNode,
+  GraphEdge,
+  FileEntry,
 } from '../../shared/types'
 
-// ─── File Entry ─────────────────────────────────────────────────────
-
-interface FileEntry {
-  name: string
-  path: string
-  isDirectory: boolean
-  children?: FileEntry[]
-}
-
-// ─── Model Profile ───────────────────────────────────────────────────
+// ─── API Interfaces ──────────────────────────────────────────────────
 
 interface ModelProfile {
   id: string
@@ -79,22 +73,6 @@ interface NotificationHistoryItem {
   body: string
 }
 
-// ─── Graph ───────────────────────────────────────────────────────────
-
-interface GraphNode {
-  id: string
-  label: string
-  type: 'file' | 'memory' | 'entity'
-  entityType?: string
-}
-
-interface GraphEdge {
-  source: string
-  target: string
-  label?: string
-  type: 'reference' | 'semantic'
-}
-
 // ─── API Interfaces ──────────────────────────────────────────────────
 
 interface WorkspaceApi {
@@ -146,7 +124,7 @@ interface AgentApi {
 
 interface GraphApi {
   getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>
-  extractSemantic: () => Promise<{ success: boolean; error?: string; skipped?: boolean; message?: string; nodes?: number; edges?: number }>
+  extractSemantic: () => Promise<{ success: boolean; error?: string; skipped?: boolean; message?: string; data?: { nodes: GraphNode[]; edges: GraphEdge[] } }>
   onSemanticProgress: (callback: (data: { phase: string; progress: number }) => void) => () => void
   onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => () => void
 }

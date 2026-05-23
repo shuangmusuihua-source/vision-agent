@@ -11,6 +11,7 @@ const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
 import { useAgent, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { ConversationMessage } from '../../store/agent-store'
 import type { FileEntry, SkillDefinition } from '../../lib/ipc'
@@ -31,10 +32,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
   const [prefillText, setPrefillText] = useState<string | null>(null)
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
-  const [showGraph, setShowGraph] = useState(false)
+  const showGraph = useShowGraph()
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [changedFileCount, setChangedFileCount] = useState(0)
+  const changedFileCount = useChangedFileCount()
   const [sourceMode, setSourceMode] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
@@ -91,7 +92,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // Menu bar actions
   useEffect(() => {
     const unsub = window.api.graph.onFilesChanged((data) => {
-      setChangedFileCount(data.count)
+      useGraphStore.getState().handleFilesChanged(data)
     })
     return unsub
   }, [])
@@ -347,7 +348,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           setWorkspacePaths(paths)
           await window.api.settings.reorderDirectories(paths)
         }}
-        onToggleGraph={() => setShowGraph(!showGraph)}
+        onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={() => setShowDaydream(true)}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
@@ -376,8 +377,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             } else {
               handleFileSelect(nodeId)
             }
-            setShowGraph(false)
-          }} changedFileCount={changedFileCount} onClearChangedFiles={() => setChangedFileCount(0)} />
+            useGraphStore.getState().setShowGraph(false)
+          }} />
         ) : activeTab ? (
           <MarkdownEditor
             content={activeContent}

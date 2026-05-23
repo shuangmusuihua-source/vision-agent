@@ -290,3 +290,70 @@ export type SdkSessionInfo = {
   lastModified?: number
   messageCount?: number
 }
+
+// ─── Graph / Knowledge Graph ────────────────────────────────────────
+
+export type GraphNodeType = 'file' | 'memory' | 'entity'
+
+export type GraphEdgeType = 'reference' | 'semantic'
+
+export type GraphNode = {
+  id: string
+  label: string
+  type: GraphNodeType
+  entityType?: string
+}
+
+export type GraphEdge = {
+  source: string
+  target: string
+  label?: string
+  type: GraphEdgeType
+}
+
+export type GraphData = {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export type GraphExtractionState =
+  | 'idle'
+  | 'indexing'
+  | 'extracting'
+  | 'merging'
+  | 'complete'
+  | 'error'
+
+export type GraphExtractionProgress = {
+  phase: string
+  progress: number
+  currentBatch?: number
+  totalBatches?: number
+}
+
+export type FilterMode = 'all' | 'reference' | 'semantic'
+
+export type GraphExtractionEvent =
+  | { type: 'EXTRACT_START' }
+  | { type: 'INDEX_DONE'; changedFiles: string[] }
+  | { type: 'NO_CHANGES' }
+  | { type: 'BATCH_PROGRESS'; currentBatch: number; totalBatches: number }
+  | { type: 'ALL_BATCHES_DONE' }
+  | { type: 'MERGE_DONE' }
+  | { type: 'EXTRACT_ERROR'; error: string }
+  | { type: 'ABORT' }
+  | { type: 'AUTO_RESET' }
+
+export type FileChangeEvent = {
+  filePath: string
+  changeType: 'add' | 'change' | 'unlink'
+}
+
+// ─── File Entry (workspace tree) ────────────────────────────────────
+
+export type FileEntry = {
+  name: string
+  path: string
+  isDirectory: boolean
+  children?: FileEntry[]
+}

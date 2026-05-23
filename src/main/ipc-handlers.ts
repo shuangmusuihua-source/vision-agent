@@ -6,7 +6,8 @@ import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { getBuiltinSkills } from './skills/builtin'
-import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './graph-extractor'
+import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './semantic-extractor'
+import type { GraphNode, GraphEdge, GraphData, FileEntry } from '../shared/types'
 import {
   getSettings,
   addProfile,
@@ -31,13 +32,6 @@ function pushSettingsToRenderer(): void {
 }
 
 // --- Workspace ---
-
-interface FileEntry {
-  name: string
-  path: string
-  isDirectory: boolean
-  children?: FileEntry[]
-}
 
 async function scanDirectory(dirPath: string, maxDepth = 3, depth = 0): Promise<FileEntry[]> {
   if (depth >= maxDepth) return []
@@ -75,70 +69,6 @@ async function listMarkdownFiles(dirPath: string): Promise<Array<{ label: string
   }
   await walk(dirPath)
   return results
-}
-
-// --- Graph data builder ---
-
-interface GraphNode {
-  id: string
-  label: string
-  type: 'file' | 'memory' | 'entity'
-  entityType?: string
-}
-
-interface GraphEdge {
-  source: string
-  target: string
-  label?: string
-  type: 'reference' | 'semantic'
-}
-
-async function buildGraphData(cwd: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
-  const nodes: GraphNode[] = []
-  const edges: GraphEdge[] = []
-  const fileMap = new Map<string, string>() // label without .md → absolute path
-
-  // Collect workspace .md files
-  async function walkMdFiles(dir: string): Promise<void> {
-    if (!existsSync(dir)) return
-    const entries = await readdir(dir, { withFileTypes: true })
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') && entry.name !== '.vision') continue
-      const fullPath = join(dir, entry.name)
-      if (entry.isDirectory()) {
-        await walkMdFiles(fullPath)
-      } else if (extname(entry.name) === '.md') {
-        const label = entry.name.replace(/\.md$/, '')
-        const relPath = relative(cwd, fullPath)
-        const isMemory = fullPath.includes('.vision/memory')
-        nodes.push({ id: fullPath, label, type: isMemory ? 'memory' : 'file' })
-        fileMap.set(label, fullPath)
-        fileMap.set(relPath, fullPath)
-      }
-    }
-  }
-
-  await walkMdFiles(cwd)
-
-  // Parse [[wikilinks]] from each file
-  const wikilinkPattern = /\[\[([^\]]+)\]\]/g
-  for (const node of nodes) {
-    try {
-      const content = await readFile(node.id, 'utf-8')
-      let match: RegExpExecArray | null
-      while ((match = wikilinkPattern.exec(content)) !== null) {
-        const target = match[1]
-        const targetPath = fileMap.get(target) || fileMap.get(target.replace(/\.md$/, ''))
-        if (targetPath && targetPath !== node.id) {
-          edges.push({ source: node.id, target: targetPath })
-        }
-      }
-    } catch {
-      // Skip unreadable files
-    }
-  }
-
-  return { nodes, edges }
 }
 
 // --- Register all handlers ---
