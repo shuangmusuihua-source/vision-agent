@@ -5,6 +5,8 @@ import { appendFile } from 'fs/promises'
 import { join } from 'path'
 import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
+import { getAppSkillsCwd } from './skill-init'
+import type { AgentIPCMessage, AskUserQuestionOption } from '../shared/types'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 import { getAppSkillsCwd } from './skill-init'
@@ -224,17 +226,20 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
         const firstQ = questions?.[0]
         const question = (firstQ?.question as string) || ''
         const rawOptions = firstQ?.options as Array<Record<string, string>> | undefined
-        const optionsList = rawOptions?.map((o) => ({
+        const optionsList: AskUserQuestionOption[] = rawOptions?.map((o) => ({
           label: o.label || '',
-          description: o.description || ''
-        })) || undefined
+          description: o.description || '',
+        })) || []
+        const multiSelect = (firstQ?.multiSelect as boolean) || false
 
         console.log(`[AgentManager] AskUserQuestion: ${requestId} — "${question}"`)
 
         mainWindow.webContents.send('agent:askUser', {
           id: requestId,
           question,
-          options: optionsList
+          header: (firstQ?.header as string) || '',
+          options: optionsList,
+          multiSelect,
         })
 
         return new Promise<PermissionResult>((resolve) => {
@@ -332,17 +337,14 @@ export async function sendMessage(
 
     console.log('[AgentManager] query started, waiting for messages...')
 
-    let messageCount = 0
-
     for await (const message of messageStream) {
-      const msgType = message.type || 'unknown'
-
-      // Forward partial messages (token-by-token streaming) to renderer immediately
-      if (msgType === 'stream_event') {
-        mainWindow.webContents.send('agent:streamEvent', serializeMessage(message))
-        continue
+      // Convert and emit via unified agent:event channel
+      const ipcMsg = toAgentIPCMessage(message)
+      if (ipcMsg) {
+        mainWindow.webContents.send('agent:event', ipcMsg)
       }
 
+      // Session creation still gets its own lifecycle channel
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
         sessions.set(currentSessionId, {
@@ -353,36 +355,152 @@ export async function sendMessage(
         mainWindow.webContents.send('agent:sessionCreated', currentSessionId)
         evictOldSessions()
       }
-
-      messageCount++
-      mainWindow.webContents.send('agent:message', {
-        sessionId: currentSessionId,
-        message: serializeMessage(message)
-      })
     }
 
-    if (currentSessionId) {
-      const session = sessions.get(currentSessionId)
-      if (session) {
-        session.messageCount = messageCount
-      }
-    }
-
-    mainWindow.webContents.send('agent:complete', { sessionId: currentSessionId })
+        // The SDK stream has completed — the result message was already
+    // emitted inside the for-await loop via agent:event channel.
+    // Send a session-level completion notification only.
     notifyAgentComplete(currentSessionId)
   } catch (err) {
-    mainWindow.webContents.send('agent:error', {
-      sessionId: currentSessionId,
-      error: (err as Error).message
-    })
+    // Query itself threw (not an SDK error result) — emit error via unified channel
+    mainWindow.webContents.send('agent:event', {
+      type: 'result',
+      subtype: 'error',
+      errors: [(err as Error).message],
+      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
+      total_cost_usd: 0,
+      duration_ms: 0,
+    } as AgentIPCMessage)
   } finally {
     _activeQuery = null
   }
 }
 
-function serializeMessage(message: SDKMessage): Record<string, unknown> {
-  // Electron IPC uses structured clone internally — no need to pre-serialize
-  return message as unknown as Record<string, unknown>
+/**
+ * Convert an SDK message into a typed AgentIPCMessage for the renderer.
+ * Unknown/irrelevant message types return null and are silently dropped.
+ */
+function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
+  const msg = message as Record<string, unknown>
+  const type = (msg.type as string) || ''
+  const subtype = (msg.subtype as string) || ''
+
+  switch (type) {
+    case 'system': {
+      if (subtype === 'init') {
+        return {
+          type: 'system',
+          subtype: 'init',
+          session_id: (msg.session_id as string) || '',
+          model: (msg.model as string) || '',
+          tools: (msg.tools as string[]) || [],
+        }
+      }
+      if (subtype === 'status') {
+        const status = msg.status as string | null
+        return {
+          type: 'system',
+          subtype: 'status',
+          status: status === 'compacting' || status === 'requesting' ? status : null,
+        }
+      }
+      if (subtype === 'compact_boundary') {
+        return { type: 'system', subtype: 'compact_boundary' }
+      }
+      if (subtype === 'permission_denied') {
+        return {
+          type: 'system',
+          subtype: 'permission_denied',
+          tool_use_id: (msg.tool_use_id as string) || '',
+          message: (msg.message as string) || '',
+        }
+      }
+      // Drop other system subtypes (notification, task_notification, tool_use_summary)
+      return null
+    }
+
+    case 'assistant': {
+      const apiMessage = msg.message as Record<string, unknown> | undefined
+      const content = apiMessage?.content as Array<Record<string, unknown>> | undefined
+      if (!content) return null
+      return {
+        type: 'assistant',
+        uuid: (msg.uuid as string) || '',
+        message: { content: content as any },
+      }
+    }
+
+    case 'user': {
+      const apiMessage = msg.message as Record<string, unknown> | undefined
+      const content = apiMessage?.content as Array<Record<string, unknown>> | undefined
+      if (!content) return null
+      return {
+        type: 'user',
+        uuid: (msg.uuid as string) || '',
+        message: { content: content as any },
+      }
+    }
+
+    case 'result': {
+      const usage = msg.usage as Record<string, unknown> | undefined
+      if (subtype === 'success') {
+        return {
+          type: 'result',
+          subtype: 'success',
+          usage: {
+            input_tokens: (usage?.input_tokens as number) || 0,
+            output_tokens: (usage?.output_tokens as number) || 0,
+            cache_read_tokens: (usage?.cache_read_input_tokens as number) || 0,
+            cache_creation_tokens: (usage?.cache_creation_input_tokens as number) || 0,
+          },
+          total_cost_usd: (msg.total_cost_usd as number) || 0,
+          duration_ms: (msg.duration_ms as number) || 0,
+        }
+      }
+      // Error result variants
+      const errors = (msg.errors as string[]) || []
+      return {
+        type: 'result',
+        subtype: 'error',
+        errors,
+        usage: {
+          input_tokens: (usage?.input_tokens as number) || 0,
+          output_tokens: (usage?.output_tokens as number) || 0,
+          cache_read_tokens: (usage?.cache_read_input_tokens as number) || 0,
+          cache_creation_tokens: (usage?.cache_creation_input_tokens as number) || 0,
+        },
+        total_cost_usd: (msg.total_cost_usd as number) || 0,
+        duration_ms: (msg.duration_ms as number) || 0,
+      }
+    }
+
+    case 'stream_event': {
+      const event = msg.event as Record<string, unknown> | undefined
+      if (!event) return null
+      const eventType = (event.type as string) || ''
+
+      // Only forward content-related events to renderer
+      if (eventType === 'content_block_start' || eventType === 'content_block_delta' || eventType === 'content_block_stop') {
+        return {
+          type: 'stream_event',
+          uuid: (msg.uuid as string) || '',
+          event: event as any,
+        }
+      }
+      // message_start/delta/stop are structural — forward them too for completeness
+      if (eventType === 'message_start' || eventType === 'message_delta' || eventType === 'message_stop') {
+        return {
+          type: 'stream_event',
+          uuid: (msg.uuid as string) || '',
+          event: event as any,
+        }
+      }
+      return null
+    }
+
+    default:
+      return null
+  }
 }
 
 export function getSessionList(): SessionInfo[] {
@@ -394,10 +512,10 @@ export function getSessionInfo(id: string): SessionInfo | undefined {
 }
 
 export async function listSdkSessions(): Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number }>> {
-  const dirs = getAuthorizedDirectories()
-  const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+  const cwd = getAppSkillsCwd()
   try {
     const result = await listSessions({ dir: cwd })
+    console.log('[AgentManager] listSessions returned', result.length, 'sessions from cwd:', cwd)
     return result.map((s) => ({
       id: s.sessionId,
       title: s.customTitle || s.summary || s.firstPrompt,

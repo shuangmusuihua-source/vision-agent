@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { AgentIPCMessage, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo } from '../shared/types'
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -42,7 +43,9 @@ const api = {
       ipcRenderer.invoke('settings:testConnection', options)
   },
 
+  // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
+    // Request/response channels
     sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) =>
       ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath),
     getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
@@ -53,51 +56,46 @@ const api = {
     listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
-    onMessage: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
-      ipcRenderer.on('agent:message', handler)
-      return () => { ipcRenderer.removeListener('agent:message', handler) }
+
+    // ── Unified event channel ────────────────────────────────────────
+    // All SDK messages (assistant, user, result, stream_event, system)
+    // arrive through this single channel as typed AgentIPCMessage.
+    onEvent: (callback: (msg: AgentIPCMessage) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, msg: AgentIPCMessage) => callback(msg)
+      ipcRenderer.on('agent:event', handler)
+      return () => { ipcRenderer.removeListener('agent:event', handler) }
     },
-    onStreamEvent: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
-      ipcRenderer.on('agent:streamEvent', handler)
-      return () => { ipcRenderer.removeListener('agent:streamEvent', handler) }
-    },
+
+    // ── Lifecycle channels (separate for request/response patterns) ──
     onSessionCreated: (callback: (sessionId: string) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, sessionId: string) => callback(sessionId)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
-    onComplete: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
-      ipcRenderer.on('agent:complete', handler)
-      return () => { ipcRenderer.removeListener('agent:complete', handler) }
-    },
-    onError: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
-      ipcRenderer.on('agent:error', handler)
-      return () => { ipcRenderer.removeListener('agent:error', handler) }
-    },
-    onPermissionRequest: (callback: (request: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, request: unknown) => callback(request)
+
+    onPermissionRequest: (callback: (request: PermissionRequestIPC) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: PermissionRequestIPC) => callback(request)
       ipcRenderer.on('agent:permissionRequest', handler)
       return () => { ipcRenderer.removeListener('agent:permissionRequest', handler) }
     },
-    onNotification: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
-      ipcRenderer.on('agent:notification', handler)
-      return () => { ipcRenderer.removeListener('agent:notification', handler) }
-    },
-    onAskUser: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+
+    onAskUser: (callback: (request: AskUserRequestIPC) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: AskUserRequestIPC) => callback(request)
       ipcRenderer.on('agent:askUser', handler)
       return () => { ipcRenderer.removeListener('agent:askUser', handler) }
     },
-    onAskUserTimeout: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+
+    onAskUserTimeout: (callback: (data: { requestId: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string }) => callback(data)
       ipcRenderer.on('agent:askUserTimeout', handler)
       return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
-    }
+    },
+
+    onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { type: string; message: string; title: string }) => callback(data)
+      ipcRenderer.on('agent:notification', handler)
+      return () => { ipcRenderer.removeListener('agent:notification', handler) }
+    },
   },
 
   memory: {

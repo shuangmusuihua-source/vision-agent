@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } from '@phosphor-icons/react'
-import type { ChatMessage } from '../../store/agent-store'
+import type { ConversationMessage, ToolCallState } from '../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillOutputCard from './SkillOutputCard'
@@ -24,7 +24,7 @@ function extractSkillOutputContent(content: string): string | null {
 }
 
 interface MessageBubbleProps {
-  message: ChatMessage & { streamingContent?: string }
+  message: ConversationMessage
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string) => void
   workspacePath?: string
@@ -34,10 +34,13 @@ function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: Mes
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
-  // For streaming messages, use streamingContent; for completed messages, use message.content
-  const displayContent = message.streamingContent ?? message.content
-  const isStreaming = message.isStreaming ?? false
+  // In the new model, textContent always holds the current text
+  const displayContent = message.textContent
+  const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
   const skillOutput = extractSkillOutputContent(displayContent)
+
+  // Status indicator: system messages with 'thinking' text during streaming
+  const isStatusIndicator = message.role === 'system' && message.phase === 'streaming'
 
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -82,11 +85,11 @@ function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: Mes
     return () => document.removeEventListener('mousedown', handler)
   }, [selectionBtn])
 
-  if (message.isStatusIndicator) {
+  if (isStatusIndicator) {
     return (
       <div className="message-bubble message-assistant">
         <div className="message-status-indicator">
-          {message.content}
+          {displayContent}
           <span className="status-dot" />
           <span className="status-dot" />
           <span className="status-dot" />
@@ -123,7 +126,16 @@ function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: Mes
         defaultPath: workspacePath
       })
       if (result.success && result.filePath) {
-        useAgentStore.getState().updateArtifactFilePath(message.id, result.filePath)
+        // Update artifact path in the message
+        const msgs = [...useAgentStore.getState().messages]
+        const idx = msgs.findIndex((m) => m.id === message.id)
+        if (idx >= 0 && msgs[idx].artifact) {
+          msgs[idx] = {
+            ...msgs[idx],
+            artifact: { ...msgs[idx].artifact!, filePath: result.filePath, content: undefined }
+          }
+          useAgentStore.setState({ messages: msgs })
+        }
       }
     }
 
@@ -160,7 +172,7 @@ function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: Mes
     <div className={`message-bubble ${isUser ? 'message-user' : 'message-assistant'}${isSystem ? ' message-system' : ''}`}>
       {isUser ? (
         <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
-          {message.content}
+          {message.textContent}
         </div>
       ) : (
         <div className="message-assistant-content" ref={contentRef} onMouseUp={handleMouseUp}>

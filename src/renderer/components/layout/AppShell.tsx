@@ -9,9 +9,10 @@ import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
-import useAgent, { useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStore } from '../../hooks/useAgent'
+import { useAgent, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgentStore } from '../../store/agent-store-impl'
 import { useSettings } from '../../store/settings-cache'
-import type { ChatMessage } from '../../store/agent-store'
+import type { ConversationMessage } from '../../store/agent-store'
 import type { FileEntry, SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
@@ -125,10 +126,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const {
     sendMessage,
-    agentStatus,
-    lastEditedFile,
-    activeSkillInfo,
-    setActiveSkillInfo,
     newSession,
     loadSessions,
     resumeSession,
@@ -141,6 +138,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const currentSessionId = useCurrentSessionId()
   const usageInfo = useUsageInfo()
   const sessionList = useSessionList()
+  const agentStatus = useAgentStatus()
+  const lastEditedFile = useLastEditedFile()
+  const activeSkillId = useActiveSkillId()
 
   // Restore/refresh workspaces from cached settings
   const settings = useSettings()
@@ -304,16 +304,21 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const handleSkillSelect = useCallback((skill: SkillDefinition) => {
     const prompt = skill.promptTemplate.replace('{activeFile}', linkedFile || '')
-    const skillInfo = { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' as const }
-    setActiveSkillInfo(skillInfo)
-    useAgentStore.getState().addMessage({
-      id: `skill-${Date.now()}`,
-      role: 'user',
-      content: `执行 Skill: ${skill.name}`,
-      skillInfo
-    })
+    useAgentStore.setState({ activeSkillId: skill.id })
+    useAgentStore.setState((s) => ({
+      messages: [...s.messages, {
+        id: `skill-${Date.now()}`,
+        role: 'user',
+        phase: 'complete',
+        textContent: `执行 Skill: ${skill.name}`,
+        content: [{ type: 'text', text: `执行 Skill: ${skill.name}` }],
+        toolCalls: [],
+        skillMeta: { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' },
+        createdAt: Date.now(),
+      }],
+    }))
     sendMessage(prompt, linkedFile || undefined)
-  }, [sendMessage, setActiveSkillInfo, linkedFile])
+  }, [sendMessage, linkedFile])
 
   const activeContent = activeTab ? tabContents[activeTab] || '' : ''
 
@@ -417,7 +422,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onSelectSession={resumeSession}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
-        activeSkillInfo={activeSkillInfo}
+        activeSkillId={activeSkillId}
         chatInput={<ChatInput onSend={(msg) => {
           if (askUserRequest && askDrawerRespondRef.current) {
             askDrawerRespondRef.current(msg)

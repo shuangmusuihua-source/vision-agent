@@ -1179,6 +1179,8 @@
 /* --- Skill Output Card --- */
 
 .skill-output-card {
+  width: 100%;
+  max-width: 100%;
   border: none;
   border-radius: var(--radius-md);
   overflow: hidden;

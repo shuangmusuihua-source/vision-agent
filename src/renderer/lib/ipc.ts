@@ -1,9 +1,23 @@
+import type {
+  AgentIPCMessage,
+  AskUserRequestIPC,
+  PermissionRequestIPC,
+  ContentBlock,
+  SdkSessionInfo,
+  UsageInfo,
+  AskUserQuestionOption,
+} from '../../shared/types'
+
+// ─── File Entry ─────────────────────────────────────────────────────
+
 interface FileEntry {
   name: string
   path: string
   isDirectory: boolean
   children?: FileEntry[]
 }
+
+// ─── Model Profile ───────────────────────────────────────────────────
 
 interface ModelProfile {
   id: string
@@ -14,12 +28,74 @@ interface ModelProfile {
   model: string
 }
 
+// ─── App Settings ────────────────────────────────────────────────────
+
 interface AppSettings {
   profiles: ModelProfile[]
   activeProfileId: string | null
   authorizedDirectories: string[]
   theme: 'light' | 'dark' | 'system'
 }
+
+// ─── Skill Definition ────────────────────────────────────────────────
+
+interface SkillDefinition {
+  id: string
+  name: string
+  description: string
+  icon: string
+  promptTemplate: string
+  argumentHint?: string
+}
+
+// ─── Search Result ──────────────────────────────────────────────────
+
+interface SearchResult {
+  filePath: string
+  fileName: string
+  line: number
+  content: string
+}
+
+// ─── Cron Task ──────────────────────────────────────────────────────
+
+interface CronTask {
+  id: string
+  name: string
+  cronExpression: string
+  prompt: string
+  createdAt: number
+  lastRunAt: number | null
+  lastResult: string | null
+  status: 'active' | 'paused'
+}
+
+// ─── Notification History ────────────────────────────────────────────
+
+interface NotificationHistoryItem {
+  id: string
+  groupId: string
+  title: string
+  body: string
+}
+
+// ─── Graph ───────────────────────────────────────────────────────────
+
+interface GraphNode {
+  id: string
+  label: string
+  type: 'file' | 'memory' | 'entity'
+  entityType?: string
+}
+
+interface GraphEdge {
+  source: string
+  target: string
+  label?: string
+  type: 'reference' | 'semantic'
+}
+
+// ─── API Interfaces ──────────────────────────────────────────────────
 
 interface WorkspaceApi {
   listFiles: (dirPath: string) => Promise<FileEntry[]>
@@ -50,64 +126,29 @@ interface SettingsApi {
   testConnection: (options: { baseUrl: string; apiKey: string; model: string }) => Promise<{ success: boolean; message: string }>
 }
 
-interface AskUserOption {
-  label: string
-  description?: string
-}
-
-interface AskUserRequest {
-  id: string
-  question: string
-  options?: AskUserOption[]
-}
-
 interface AgentApi {
   sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) => Promise<{ started: boolean }>
-  getSessionList: () => Promise<SessionInfo[]>
-  onMessage: (callback: (data: AgentMessageData) => void) => () => void
-  onStreamEvent: (callback: (data: unknown) => void) => () => void
-  onSessionCreated: (callback: (sessionId: string) => void) => () => void
-  onComplete: (callback: (data: { sessionId: string }) => void) => () => void
-  onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void
-  onPermissionRequest: (callback: (request: { id: string; toolName: string; input: Record<string, unknown> }) => void) => () => void
   respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
-  onAskUser: (callback: (data: AskUserRequest) => void) => () => void
   respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
+  listSdkSessions: () => Promise<SdkSessionInfo[]>
+  loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
+
+  // Unified event channel
+  onEvent: (callback: (msg: AgentIPCMessage) => void) => () => void
+
+  // Lifecycle channels
+  onSessionCreated: (callback: (sessionId: string) => void) => () => void
+  onPermissionRequest: (callback: (request: PermissionRequestIPC) => void) => () => void
+  onAskUser: (callback: (request: AskUserRequestIPC) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string }) => void) => () => void
-  listSdkSessions: () => Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number }>>
-  loadSessionMessages: (sessionId: string) => Promise<Array<Record<string, unknown>>>
+  onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => () => void
 }
 
 interface GraphApi {
   getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>
   extractSemantic: () => Promise<{ success: boolean; error?: string; skipped?: boolean; message?: string; nodes?: number; edges?: number }>
-  onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => () => void
   onSemanticProgress: (callback: (data: { phase: string; progress: number }) => void) => () => void
-}
-
-interface GraphNode {
-  id: string
-  label: string
-  type: 'file' | 'memory' | 'entity'
-  entityType?: string
-}
-
-interface GraphEdge {
-  source: string
-  target: string
-  label?: string
-  type: 'reference' | 'semantic'
-}
-
-interface CronTask {
-  id: string
-  name: string
-  cronExpression: string
-  prompt: string
-  createdAt: number
-  lastRunAt: number | null
-  lastResult: string | null
-  status: 'active' | 'paused'
+  onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => () => void
 }
 
 interface CronApi {
@@ -115,27 +156,11 @@ interface CronApi {
   list: () => Promise<CronTask[]>
   remove: (taskId: string) => Promise<boolean>
   execute: (taskId: string) => Promise<{ success: boolean; result?: string; error?: string }>
-  onTaskCompleted: (callback: (data: { taskId: string; result: string }) => void) => () => void
-}
-
-interface SkillDefinition {
-  id: string
-  name: string
-  description: string
-  icon: string
-  promptTemplate: string
-  argumentHint?: string
+  onTaskCompleted: (callback: (data: unknown) => void) => () => void
 }
 
 interface SkillsApi {
   list: () => Promise<SkillDefinition[]>
-}
-
-interface SearchResult {
-  filePath: string
-  fileName: string
-  line: number
-  content: string
 }
 
 interface SearchApi {
@@ -146,16 +171,11 @@ interface MenuApi {
   onAction: (callback: (action: string) => void) => () => void
 }
 
-interface NotificationHistoryItem {
-  id: string
-  groupId: string
-  title: string
-  body: string
-}
-
 interface NotificationApi {
   getHistory: () => Promise<NotificationHistoryItem[]>
 }
+
+// ─── Window API ──────────────────────────────────────────────────────
 
 interface WindowApi {
   ping: () => Promise<string>
@@ -184,11 +204,6 @@ interface SessionInfo {
   messageCount: number
 }
 
-interface AgentMessageData {
-  sessionId: string
-  message: Record<string, unknown>
-}
-
 declare global {
   interface Window {
     api: WindowApi
@@ -212,12 +227,9 @@ export type {
   ModelProfile,
   AppSettings,
   SessionInfo,
-  AgentMessageData,
-  AskUserOption,
-  AskUserRequest,
+  SkillDefinition,
+  SearchResult,
   GraphNode,
   GraphEdge,
   CronTask,
-  SkillDefinition,
-  SearchResult
 }

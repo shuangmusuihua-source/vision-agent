@@ -1,6 +1,6 @@
 import { ArrowElbowDownLeft } from '@phosphor-icons/react'
 import { InputDrawer } from './InputDrawer'
-import type { AskUserRequest } from '../../lib/ipc'
+import type { AskUserRequestIPC as AskUserRequest } from '../../shared/types'
 
 interface AskUserDrawerProps {
   request: AskUserRequest

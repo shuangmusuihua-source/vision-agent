@@ -1,7 +1,8 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { ChatCircleDots } from '@phosphor-icons/react'
-import { useMessages, useIsStreaming, useStreamingContent } from '../../hooks/useAgent'
+import { useMessages, useIsStreaming } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
+import type { ConversationMessage } from '../../shared/types'
 
 interface ChatViewProps {
   onOpenFile?: (path: string) => void
@@ -12,7 +13,6 @@ interface ChatViewProps {
 function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
   const messages = useMessages()
   const isStreaming = useIsStreaming()
-  const streamingContent = useStreamingContent()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const prevMsgCount = useRef(messages.length)
@@ -23,12 +23,6 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
     prevMsgCount.current = messages.length
   }, [messages.length])
 
-  // Find the last streaming assistant message to inject streamingContent
-  const lastStreamingIdx = useMemo(() => {
-    if (!isStreaming) return -1
-    return messages.findLastIndex((m) => m.role === 'assistant' && m.isStreaming)
-  }, [messages, isStreaming])
-
   return (
     <div className="chat-view">
       {messages.length === 0 && (
@@ -37,10 +31,10 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
           <span className="chat-empty-hint">开始对话</span>
         </div>
       )}
-      {messages.map((msg, idx) => (
+      {messages.map((msg) => (
         <MessageBubble
           key={msg.id}
-          message={idx === lastStreamingIdx ? { ...msg, streamingContent } : msg}
+          message={msg}
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
           workspacePath={workspacePath}

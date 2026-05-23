@@ -85,7 +85,7 @@ function SessionBar({ sessions, currentSessionId, onSelectSession, onNewSession,
               >
                 <span className="session-bar-dropdown-title">{s.title || '未命名会话'}</span>
                 <span className="session-bar-dropdown-time">
-                  {s.mtime ? new Date(s.mtime).toLocaleDateString() : ''}
+                  {s.lastModified ? new Date(s.lastModified).toLocaleDateString() : ''}
                 </span>
               </button>
             ))
