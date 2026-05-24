@@ -4,6 +4,7 @@ export interface SkillDefinition {
   description: string
   icon: string
   promptTemplate: string
+  systemPromptAppend?: string
 }
 
 const builtinSkills: SkillDefinition[] = [

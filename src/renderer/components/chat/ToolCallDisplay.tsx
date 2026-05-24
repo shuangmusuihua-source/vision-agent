@@ -12,7 +12,8 @@ function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement
   const statusIcon = {
     running: <Spinner size={12} weight="bold" className="tool-call-spinner" />,
     completed: <Check size={12} weight="bold" className="tool-call-success" />,
-    error: <X size={12} weight="bold" className="tool-call-error" />
+    error: <X size={12} weight="bold" className="tool-call-error" />,
+    pending: <Spinner size={12} weight="bold" className="tool-call-spinner" />
   }[toolCall.status]
 
   const inputSummary = summarizeInput(toolCall.toolName, toolCall.input)

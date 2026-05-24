@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Sun, Moon, Desktop, Users, Info, Plus, X, Trash } from '@phosphor-icons/react'
 import ReactDOM from 'react-dom'
 import { useSettings, getSettingsCache } from '../../store/settings-cache'
+import type { ModelProfile } from '../../lib/ipc'
 
 interface SettingsModalProps {
   onClose: () => void

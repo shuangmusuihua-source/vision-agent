@@ -13,5 +13,5 @@
     "outDir": "./out/renderer",
     "types": []
   },
-  "include": ["src/renderer/**/*"]
+  "include": ["src/renderer/**/*", "src/shared/**/*"]
 }

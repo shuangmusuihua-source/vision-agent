@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import chokidar from 'chokidar'
+import chokidar, { type FSWatcher } from 'chokidar'
 import { getMainWindow } from './index'
 import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
 
@@ -13,7 +13,7 @@ interface IndexedFile {
 
 class FileIndexService {
   private index = new Map<string, IndexedFile>()
-  private watcher: chokidar.FSWatcher | null = null
+  private watcher: FSWatcher | null = null
   private workspaceDir: string | null = null
   private ready = false
   private readyCallbacks: Array<() => void> = []

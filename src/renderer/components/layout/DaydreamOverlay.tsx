@@ -56,6 +56,7 @@ function StarfieldCanvas() {
 
     let raf: number
     function draw() {
+      if (!ctx) return
       ctx.clearRect(0, 0, w, h)
       for (const s of allStars) {
         ctx.beginPath()
@@ -128,6 +129,7 @@ function MatrixCanvas() {
     }, 800)
 
     function draw() {
+      if (!ctx) return
       ctx.clearRect(0, 0, w, h)
 
       // Glow at center
@@ -290,6 +292,7 @@ function MathCanvas() {
     }, 2000)
 
     function draw() {
+      if (!ctx) return
       ctx.clearRect(0, 0, w, h)
 
       ctx.font = `${FONT_SIZE}px "Courier New", Courier, monospace`
@@ -446,6 +449,7 @@ function RainCanvas() {
     let raf: number
 
     function draw() {
+      if (!ctx) return
       ctx.clearRect(0, 0, w, h)
 
       // Draw drops

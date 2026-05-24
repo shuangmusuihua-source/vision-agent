@@ -34,11 +34,23 @@ interface ModelProfile {
   model: string
 }
 
+export interface CronTask {
+  id: string
+  name: string
+  cronExpression: string
+  prompt: string
+  createdAt: number
+  lastRunAt: number | null
+  lastResult: string | null
+  status: 'active' | 'paused'
+}
+
 interface AppSettings {
   profiles: ModelProfile[]
   activeProfileId: string | null
   authorizedDirectories: string[]
   theme: 'light' | 'dark' | 'system'
+  cronTasks: CronTask[]
 }
 
 const store = new Store<AppSettings>({
@@ -46,7 +58,8 @@ const store = new Store<AppSettings>({
     profiles: [],
     activeProfileId: null,
     authorizedDirectories: [],
-    theme: 'system'
+    theme: 'system',
+    cronTasks: []
   }
 })
 
@@ -177,6 +190,14 @@ export function getTheme(): 'light' | 'dark' | 'system' {
 
 export function setTheme(theme: 'light' | 'dark' | 'system'): void {
   store.set('theme', theme)
+}
+
+export function getCronTasks(): CronTask[] {
+  return store.get('cronTasks') || []
+}
+
+export function saveCronTasks(tasks: CronTask[]): void {
+  store.set('cronTasks', tasks)
 }
 
 export type { ModelProfile, AppSettings }

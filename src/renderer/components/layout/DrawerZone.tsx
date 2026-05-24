@@ -116,8 +116,8 @@ function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactE
     if (mode === 'preset') {
       if (selectedPresetOption.hasTimePicker) {
         const [min] = selectedPresetOption.defaultCron.split(/\s+/)
-        cron = `${min} ${presetHour} * * *${selectedPreset.key === 'weekly-mon' ? ' 1' : ''}`
-        desc = selectedPreset.key === 'weekly-mon'
+        cron = `${min} ${presetHour} * * *${selectedPresetOption.key === 'weekly-mon' ? ' 1' : ''}`
+        desc = selectedPresetOption.key === 'weekly-mon'
           ? `每周一 ${formatHour(presetHour)}`
           : `每天 ${formatHour(presetHour)}`
       } else {

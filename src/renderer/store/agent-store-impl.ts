@@ -16,6 +16,19 @@ import type {
   AskUserRequestIPC,
   SdkSessionInfo,
   StreamingAccumulator,
+  SystemInitPayload,
+  SystemStatusPayload,
+  SystemCompactBoundaryPayload,
+  SystemPermissionDeniedPayload,
+  AssistantPayload,
+  UserPayload,
+  ResultSuccessPayload,
+  ResultErrorPayload,
+  StreamEventPayloadIPC,
+  StreamContentBlockDelta,
+  TextDelta,
+  InputJsonDelta,
+  StreamContentBlockStart,
 } from '../../shared/types'
 import { AGENT_TRANSITIONS as TRANSITIONS } from '../../shared/types'
 

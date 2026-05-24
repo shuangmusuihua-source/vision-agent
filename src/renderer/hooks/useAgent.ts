@@ -19,33 +19,62 @@ import type {
   PermissionRequestIPC,
 } from '../../shared/types'
 
+const WATCHDOG_TIMEOUT = 120_000 // 2 minutes
+
 /**
- * useAgent — thin IPC subscription layer.
+ * useAgent — thin IPC subscription layer with watchdog timer.
  *
  * All message processing logic lives in the store (processIPCMessage).
  * This hook's only job:
  *   1. Subscribe to IPC events on mount
  *   2. Forward typed messages to store.processIPCMessage
- *   3. Expose concise action functions for UI components
+ *   3. Reset watchdog on each IPC event (proof agent is alive)
+ *   4. Expose concise action functions for UI components
  */
 export function useAgent() {
   const store = useAgentStore
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const resetWatchdog = useCallback(() => {
+    if (watchdogRef.current) clearTimeout(watchdogRef.current)
+    const state = store.getState()
+    if (state.agentState === 'thinking' || state.agentState === 'running' || state.agentState === 'compacting') {
+      watchdogRef.current = setTimeout(() => {
+        console.warn('[useAgent] Watchdog: agent stuck for 120s, forcing abort')
+        store.getState().dispatchAgentEvent({ type: 'ABORT' })
+        store.setState((s) => ({
+          messages: [...s.messages, {
+            id: `watchdog-${Date.now()}`,
+            role: 'system',
+            phase: 'complete',
+            textContent: '⏱ Agent 响应超时，已自动终止',
+            content: [{ type: 'text', text: '⏱ Agent 响应超时，已自动终止' }],
+            toolCalls: [],
+            createdAt: Date.now(),
+          }],
+        }))
+      }, WATCHDOG_TIMEOUT)
+    }
+  }, [store])
 
   // ─── IPC Subscriptions ──────────────────────────────────────────────
   useEffect(() => {
     // Unified agent:event channel
     const unsubEvent = window.api.agent.onEvent((msg: AgentIPCMessage) => {
       store.getState().processIPCMessage(msg)
+      resetWatchdog()
     })
 
     // Permission request (separate channel for request/response pattern)
     const unsubPerm = window.api.agent.onPermissionRequest((req: PermissionRequestIPC) => {
       store.getState().handlePermissionRequest(req)
+      resetWatchdog()
     })
 
     // AskUser request
     const unsubAsk = window.api.agent.onAskUser((req: AskUserRequestIPC) => {
       store.getState().handleAskUserRequest(req)
+      resetWatchdog()
     })
 
     // AskUser timeout
@@ -56,6 +85,7 @@ export function useAgent() {
     // Session created
     const unsubSession = window.api.agent.onSessionCreated((sessionId: string) => {
       store.setState({ currentSessionId: sessionId })
+      resetWatchdog()
     })
 
     return () => {
@@ -64,8 +94,9 @@ export function useAgent() {
       unsubAsk()
       unsubAskTimeout()
       unsubSession()
+      if (watchdogRef.current) clearTimeout(watchdogRef.current)
     }
-  }, [store])
+  }, [store, resetWatchdog])
 
   // ─── Actions ────────────────────────────────────────────────────────
 
@@ -90,6 +121,7 @@ export function useAgent() {
     }))
     state.dispatchAgentEvent({ type: 'SEND_MESSAGE' })
     window.api.agent.sendMessage(prompt, state.currentSessionId || undefined, activeFilePath)
+    resetWatchdog()
   }, [store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny') => {

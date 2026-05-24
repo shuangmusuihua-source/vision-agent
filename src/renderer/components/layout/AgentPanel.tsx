@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight, Plus, CaretDown, Spinner, X } from '@phosphor-icons/react'
-import type { UsageInfo, PermissionRequestIPC as PermissionRequest, SdkSessionInfo } from '../../shared/types'
-import type { AskUserRequestIPC as AskUserRequest } from '../../shared/types'
-import type { SkillMeta } from '../../shared/types'
+import type { UsageInfo, PermissionRequestIPC as PermissionRequest, SdkSessionInfo } from '../../../shared/types'
+import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
+import type { SkillMeta } from '../../../shared/types'
 import type { AppSettings, ModelProfile } from '../../lib/ipc'
 import { useAgentStore } from '../../store/agent-store-impl'
 import PermissionDialog from '../chat/PermissionDialog'
@@ -25,7 +25,7 @@ interface AgentPanelProps {
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
   askUserRequest: AskUserRequest | null
   onAskUserRespond: (requestId: string, answer: string) => void
-  onAskUserDrawerRespond?: (answer: string) => void
+  onAskUserDrawerRespond?: (respond: (answer: string) => void) => void
   sessionList: SdkSessionInfo[]
   currentSessionId: string | null
   onSelectSession: (sessionId: string) => void

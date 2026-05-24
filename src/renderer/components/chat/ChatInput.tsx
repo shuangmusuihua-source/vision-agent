@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ArrowUp, FileText, PresentationChart, Article } from '@phosphor-icons/react'
+import type { IconWeight } from '@phosphor-icons/react'
 import type { SkillDefinition } from '../../lib/ipc'
 
 interface ChatInputProps {
@@ -11,7 +12,7 @@ interface ChatInputProps {
   onPrefillConsumed?: () => void
 }
 
-const ICON_MAP: Record<string, React.ComponentType<{ size: number; weight: string }>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ size: number; weight: IconWeight }>> = {
   FileText,
   PresentationChart,
   Article

@@ -10,6 +10,7 @@ import './styles/drawer.css'
 import './styles/search.css'
 import AppShell from './components/layout/AppShell'
 import SettingsModal from './components/settings/SettingsModal'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 
 function applyTheme(theme: 'light' | 'dark' | 'system'): void {
   let effective: 'light' | 'dark'
@@ -29,7 +30,7 @@ function App(): React.ReactElement {
   useEffect(() => {
     initSettingsCache()
     const unsub = window.api.settings.onChanged((s) => {
-      updateSettingsCache(s as import('./lib/ipc').AppSettings)
+      updateSettingsCache(s as unknown as import('./lib/ipc').AppSettings)
     })
     return unsub
   }, [])
@@ -54,10 +55,15 @@ function App(): React.ReactElement {
   }, [])
 
   return (
-    <>
+    <ErrorBoundary fallback={
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '0.75rem', color: 'var(--text-secondary)' }}>
+        <p style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>应用出错</p>
+        <button onClick={() => location.reload()} style={{ padding: '0.5rem 1.5rem', fontSize: '0.875rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>重新加载</button>
+      </div>
+    }>
       <AppShell onOpenSettings={() => setShowSettings(true)} />
       {showSettings && <SettingsModal onClose={handleSettingsClose} />}
-    </>
+    </ErrorBoundary>
   )
 }
 

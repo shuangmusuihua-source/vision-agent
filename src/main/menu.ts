@@ -9,19 +9,19 @@ export function setupMenu(): void {
           {
             label: app.name,
             submenu: [
-              { label: `About ${app.name}`, role: 'about' },
-              { type: 'separator' },
+              { label: `About ${app.name}`, role: 'about' as const },
+              { type: 'separator' as const },
               { label: 'Preferences...', accelerator: 'CmdOrCtrl+,', click: sendMenuAction('open-settings') },
-              { type: 'separator' },
-              { role: 'services' },
-              { type: 'separator' },
-              { role: 'hide' },
-              { role: 'hideOthers' },
-              { role: 'unhide' },
-              { type: 'separator' },
-              { role: 'quit' }
-            ]
-          }
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ] as Electron.MenuItemConstructorOptions[]
+          } as Electron.MenuItemConstructorOptions
         ]
       : []),
     {
@@ -33,13 +33,13 @@ export function setupMenu(): void {
     {
       label: 'Edit',
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'selectAll' as const }
       ]
     },
     {
@@ -47,21 +47,21 @@ export function setupMenu(): void {
       submenu: [
         { label: 'Toggle Sidebar', accelerator: 'CmdOrCtrl+B', click: sendMenuAction('toggle-sidebar') },
         { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+B', click: sendMenuAction('toggle-agent-panel') },
-        { type: 'separator' },
+        { type: 'separator' as const },
         { label: 'Search', accelerator: 'CmdOrCtrl+Shift+F', click: sendMenuAction('open-search') },
-        { type: 'separator' },
+        { type: 'separator' as const },
         { label: 'Source Mode', accelerator: 'CmdOrCtrl+/', click: sendMenuAction('toggle-source-mode') },
         { label: 'Focus Mode', accelerator: 'CmdOrCtrl+\\', click: sendMenuAction('toggle-focus-mode') },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-        { role: 'toggleDevTools' }
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const },
+        { role: 'toggleDevTools' as const }
       ]
     },
     {
       label: 'Window',
       submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
+        { role: 'minimize' as const },
+        { role: 'zoom' as const },
         ...(isMac ? [{ type: 'separator' as const }, { role: 'front' as const }] : [])
       ]
     },

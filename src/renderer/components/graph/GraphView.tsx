@@ -254,8 +254,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
             cooldownTicks={100}
             d3AlphaDecay={0.01}
             d3VelocityDecay={0.3}
-            linkDistance={60}
-            nodeVal={(node) => node.val}
+            nodeVal={(node) => node.val ?? 12}
           />
         ) : (
           <div className="graph-empty">No nodes to display</div>

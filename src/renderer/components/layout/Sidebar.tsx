@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
-import type { FileEntry } from '../lib/ipc'
+import type { FileEntry } from '../../lib/ipc'
 
 interface MemoryEntry {
   name: string
@@ -218,7 +218,7 @@ function Sidebar({
         ) : (
           <Flipper
             flipKey={workspacePaths.join(',')}
-            spring={{ stiffness: 200, damping: 28, precision: 0.5 }}
+            spring={{ stiffness: 200, damping: 28 } as any}
             className="sidebar-workspace-list"
           >
             {workspacePaths.map((wsPath, idx) => {

@@ -6,10 +6,28 @@ import { setupMenu } from './menu'
 import { getSettings, getAuthorizedDirectories } from './store'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
+import { restorePersistedTasks } from './cron-manager'
 
 // Prevent EPIPE errors from crashing the process when stdout/stderr pipes close
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code === 'EPIPE') process.stdout.destroy() })
 process.stderr?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code === 'EPIPE') process.stderr.destroy() })
+
+// Global error handlers to prevent silent crashes
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main] Unhandled rejection:', reason)
+  const window = getMainWindow()
+  if (window && !window.isDestroyed()) {
+    window.webContents.send('main:error', { type: 'unhandledRejection', message: String(reason) })
+  }
+})
+
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Uncaught exception:', error)
+  const window = getMainWindow()
+  if (window && !window.isDestroyed()) {
+    window.webContents.send('main:error', { type: 'uncaughtException', message: error.message })
+  }
+})
 
 let mainWindow: BrowserWindow | null = null
 
@@ -34,7 +52,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    if (mainWindow) mainWindow.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -68,6 +86,8 @@ app.whenReady().then(() => {
   if (dirs.length > 0) {
     fileIndexService.init(dirs[0]).catch(() => {})
   }
+
+  restorePersistedTasks()
 
   createWindow()
 

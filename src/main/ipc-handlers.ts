@@ -211,7 +211,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('settings:get', () => getSettings())
 
   ipcMain.handle('settings:addProfile', (_event, profile: Record<string, unknown>) => {
-    addProfile(profile as { id: string; name: string; apiKey: string; apiProvider: string; model: string })
+    addProfile(profile as { id: string; name: string; apiKey: string; apiProvider: string; baseUrl: string; model: string })
     pushSettingsToRenderer()
     return { success: true }
   })

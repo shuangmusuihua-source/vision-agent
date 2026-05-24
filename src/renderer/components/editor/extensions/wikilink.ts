@@ -76,7 +76,7 @@ export const Wikilink = Node.create<WikilinkOptions>({
 
   parseMarkdown(token, helpers) {
     const match = token.raw?.match(/^\[\[([^\]]+)\]\]/)
-    if (!match) return null
+    if (!match) return null as any
     return helpers.createNode('wikilink', { target: match[1] })
   },
 

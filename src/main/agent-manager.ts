@@ -9,7 +9,6 @@ import { getAppSkillsCwd } from './skill-init'
 import type { AgentIPCMessage, AskUserQuestionOption } from '../shared/types'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
-import { getAppSkillsCwd } from './skill-init'
 
 let _cachedCliPath: string | undefined | null = null
 
@@ -318,7 +317,7 @@ export async function sendMessage(
 ): Promise<void> {
   // Abort any still-running query before starting a new one
   if (_activeQuery) {
-    try { _activeQuery.abort() } catch {}
+    try { (_activeQuery as any).abort() } catch {}
     _activeQuery = null
   }
 
@@ -338,6 +337,7 @@ export async function sendMessage(
     console.log('[AgentManager] query started, waiting for messages...')
 
     for await (const message of messageStream) {
+      if (mainWindow.isDestroyed()) break
       // Convert and emit via unified agent:event channel
       const ipcMsg = toAgentIPCMessage(message)
       if (ipcMsg) {
@@ -360,7 +360,7 @@ export async function sendMessage(
         // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
     // Send a session-level completion notification only.
-    notifyAgentComplete(currentSessionId)
+    notifyAgentComplete(currentSessionId || '')
   } catch (err) {
     // Query itself threw (not an SDK error result) — emit error via unified channel
     mainWindow.webContents.send('agent:event', {
@@ -567,7 +567,7 @@ export async function listSkills(): Promise<Array<{ name: string; description: s
 
     const skills = await (messageStream as Query).supportedCommands()
     // Abort the probe query — we only needed the skill list
-    try { (messageStream as Query).abort() } catch {}
+    try { (messageStream as any).abort() } catch {}
     return skills.map(s => ({
       name: s.name,
       description: s.description,

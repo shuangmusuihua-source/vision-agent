@@ -232,6 +232,7 @@ export type SkillMeta = {
   icon: string
   status: 'running' | 'completed' | 'error'
   outputFile?: string
+  outputContent?: string
 }
 
 export type ConversationMessage = {

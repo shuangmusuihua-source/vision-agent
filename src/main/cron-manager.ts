@@ -1,24 +1,28 @@
-import cron from 'node-cron'
+import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
 import { getMainWindow } from './index'
-import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
+import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile, getCronTasks, saveCronTasks, type CronTask } from './store'
 import { resolveClaudeCodeExecutable } from './agent-manager'
 import { notifyCronTaskComplete } from './notification-manager'
 import { join } from 'path'
 
-interface CronTask {
-  id: string
-  name: string
-  cronExpression: string
-  prompt: string
-  createdAt: number
-  lastRunAt: number | null
-  lastResult: string | null
-  status: 'active' | 'paused'
+const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
+
+function persistTasks(): void {
+  saveCronTasks(Array.from(tasks.values()).map((e) => e.task))
 }
 
-const tasks = new Map<string, { task: CronTask; job: cron.ScheduledTask }>()
+export function restorePersistedTasks(): void {
+  const persisted = getCronTasks()
+  for (const task of persisted) {
+    const job = cron.schedule(task.cronExpression, () => executeTask(task), {
+      scheduled: true
+    } as any)
+    tasks.set(task.id, { task, job })
+  }
+  console.log(`[CronManager] Restored ${persisted.length} persisted tasks`)
+}
 
 export function registerTask(
   cronExpression: string,
@@ -39,9 +43,10 @@ export function registerTask(
 
   const job = cron.schedule(cronExpression, () => executeTask(task), {
     scheduled: true
-  })
+  } as any)
 
   tasks.set(id, { task, job })
+  persistTasks()
   return task
 }
 
@@ -50,6 +55,7 @@ export function removeTask(taskId: string): boolean {
   if (!entry) return false
   entry.job.stop()
   tasks.delete(taskId)
+  persistTasks()
   return true
 }
 
@@ -95,7 +101,7 @@ export async function executeTask(task: CronTask): Promise<void> {
     let result = ''
     for await (const message of messageStream) {
       if (message.type === 'assistant') {
-        for (const block of message.content) {
+        for (const block of (message as any).content) {
           if (block.type === 'text') result += block.text
         }
       }
@@ -103,6 +109,7 @@ export async function executeTask(task: CronTask): Promise<void> {
 
     task.lastRunAt = Date.now()
     task.lastResult = result.substring(0, 500)
+    persistTasks()
 
     const window = getMainWindow()
     if (window) {
@@ -115,6 +122,7 @@ export async function executeTask(task: CronTask): Promise<void> {
   } catch (err) {
     task.lastRunAt = Date.now()
     task.lastResult = `Error: ${(err as Error).message}`
+    persistTasks()
   }
 }
 

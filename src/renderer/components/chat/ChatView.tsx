@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo } from 'react'
 import { ChatCircleDots } from '@phosphor-icons/react'
 import { useMessages, useIsStreaming } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
-import type { ConversationMessage } from '../../shared/types'
+import type { ConversationMessage } from '../../../shared/types'
 
 interface ChatViewProps {
   onOpenFile?: (path: string) => void

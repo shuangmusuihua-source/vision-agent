@@ -7,7 +7,7 @@ import type {
   GraphExtractionProgress,
   GraphExtractionEvent,
   FilterMode,
-} from '../../../shared/types'
+} from '../../shared/types'
 
 // ─── Graph Store ────────────────────────────────────────────────────
 

@@ -223,7 +223,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
               },
 
               onKeyDown(props: SuggestionKeyDownProps) {
-                const itemCount = component?.props?.items?.length || 0
+                const itemCount = (component?.props as Record<string, unknown>)?.items ? ((component?.props as Record<string, unknown>).items as unknown[]).length : 0
                 if (props.event.key === 'ArrowUp') {
                   selectedIndex = (selectedIndex + itemCount - 1) % (itemCount || 1)
                   component?.updateProps({ selectedIndex })
@@ -235,9 +235,9 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
                   return true
                 }
                 if (props.event.key === 'Enter') {
-                  const items = component?.props?.items as MarkdownFile[] | undefined
+                  const items = (component?.props as Record<string, unknown>)?.items as MarkdownFile[] | undefined
                   if (items?.[selectedIndex]) {
-                    ;(component?.props?.command as (item: MarkdownFile) => void)(items[selectedIndex])
+                    ;((component?.props as Record<string, unknown>)?.command as (item: MarkdownFile) => void)(items[selectedIndex])
                   }
                   return true
                 }

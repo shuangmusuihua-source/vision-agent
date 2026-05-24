@@ -81,7 +81,7 @@ async function runAgentQuery(prompt: string, cwd: string, effort: 'low' | 'high'
 
     for await (const message of messageStream) {
       if (message.type === 'result') {
-        result = message.result || ''
+        result = (message as any).result || ''
         break
       }
     }
@@ -89,7 +89,7 @@ async function runAgentQuery(prompt: string, cwd: string, effort: 'low' | 'high'
     console.error('[GraphExtractor] runAgentQuery failed:', err)
   } finally {
     if (messageStream) {
-      try { messageStream.abort() } catch {}
+      try { (messageStream as any).abort() } catch {}
     }
   }
 

@@ -7,13 +7,14 @@ import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
+import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
 import { useAgent, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
-import type { ConversationMessage } from '../../store/agent-store'
+import type { ChatMessage as ConversationMessage } from '../../store/agent-store'
 import type { FileEntry, SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
@@ -381,6 +382,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             useGraphStore.getState().setShowGraph(false)
           }} />
         ) : activeTab ? (
+          <ErrorBoundary onReset={() => setActiveTab(activeTab)}>
           <MarkdownEditor
             content={activeContent}
             filePath={activeTab}
@@ -392,6 +394,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             onAskAgent={handleAskAgent}
             onStatsUpdate={handleStatsUpdate}
           />
+          </ErrorBoundary>
         ) : (
           <div className="editor-empty">
             <FileText size={48} weight="thin" className="editor-empty-icon" />
@@ -435,7 +438,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
+        <ErrorBoundary>
         <ChatView onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
+        </ErrorBoundary>
       </AgentPanel>
       {showSearch && (
         <SearchPanel
