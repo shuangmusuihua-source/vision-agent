@@ -14,8 +14,15 @@ mac:
     - dmg
   category: public.app-category.productivity
   hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
   gatekeeperAssess: false
+  extendInfo:
+    NSDocumentsFolderUsageDescription: "Vision Agent needs access to your Documents folder to create workspaces."
+    NSDesktopFolderUsageDescription: "Vision Agent needs access to your Desktop folder to open workspace directories."
+afterSign: scripts/notarize.js
 dmg:
+  sign: true
   contents:
     - x: 130
       y: 220

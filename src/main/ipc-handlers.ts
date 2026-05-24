@@ -23,6 +23,7 @@ import {
 } from './store'
 import { getNotificationHistory } from './notification-manager'
 import { fileIndexService } from './file-index-service'
+import { isPathAuthorized, sanitizeFileName, addAuthorizedRoot } from './path-validator'
 
 function pushSettingsToRenderer(): void {
   const window = getMainWindow()
@@ -79,6 +80,7 @@ export function registerIpcHandlers(): void {
 
   // --- Workspace ---
   ipcMain.handle('workspace:listFiles', async (_event, dirPath: string) => {
+    if (!isPathAuthorized(dirPath)) return []
     try {
       return await scanDirectory(dirPath)
     } catch {
@@ -87,6 +89,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:readFile', async (_event, filePath: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
       const content = await readFile(filePath, 'utf-8')
       return { success: true, content }
@@ -96,6 +99,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:writeFile', async (_event, filePath: string, content: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
       await writeFile(filePath, content, 'utf-8')
       return { success: true }
@@ -154,8 +158,9 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:createFile', async (_event, dirPath: string, fileName: string) => {
+    if (!isPathAuthorized(dirPath)) return { success: false, error: 'Path not authorized' }
     try {
-      let name = fileName.trim()
+      let name = sanitizeFileName(fileName.trim())
       if (!name) return { success: false, error: '文件名不能为空' }
       if (!extname(name)) name += '.md'
       const filePath = join(dirPath, name)
@@ -168,6 +173,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {
+    if (!isPathAuthorized(dirPath)) return []
     try {
       return await listMarkdownFiles(dirPath)
     } catch {
@@ -176,6 +182,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:openInBrowser', async (_event, filePath: string) => {
+    if (!isPathAuthorized(filePath)) return
     await shell.openPath(filePath)
   })
 
@@ -210,7 +217,12 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('settings:updateProfile', (_event, id: string, updates: Record<string, unknown>) => {
-    updateProfile(id, updates)
+    // If apiKey is masked (contains ***), skip updating it — renderer received a masked key
+    const safeUpdates = { ...updates }
+    if (typeof safeUpdates.apiKey === 'string' && safeUpdates.apiKey.includes('***')) {
+      delete safeUpdates.apiKey
+    }
+    updateProfile(id, safeUpdates)
     pushSettingsToRenderer()
     return { success: true }
   })
@@ -314,6 +326,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('memory:read', async (_event, filePath: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
       const content = await readFile(filePath, 'utf-8')
       return { success: true, content }
@@ -323,6 +336,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('memory:write', async (_event, filePath: string, content: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
       const dir = join(filePath, '..')
       if (!existsSync(dir)) {
@@ -336,6 +350,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('memory:delete', async (_event, filePath: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
       await unlink(filePath)
       return { success: true }
