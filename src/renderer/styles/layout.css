@@ -1024,6 +1024,51 @@
   color: rgba(0,255,0,0.2);
 }
 
+/* --- Update banner --- */
+
+.update-banner {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.update-banner-ready {
+  border-color: var(--color-accent, #2383e2);
+}
+.update-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-accent, #2383e2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.update-banner-btn:hover {
+  opacity: 0.9;
+}
+.update-banner-dismiss {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 2px 4px;
+}
+
 /* --- Responsive breakpoints --- */
 
 /* 900-1199px: auto-collapse sidebar to icon column */

@@ -8,6 +8,10 @@ files:
   - '!electron.vite.config.*'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+publish:
+  provider: github
+  owner: shuangmusuihua-source
+  repo: vision-agent
 mac:
   icon: build/icon.icns
   target:

@@ -151,6 +151,21 @@ const api = {
 
   notification: {
     getHistory: () => ipcRenderer.invoke('notification:getHistory')
+  },
+
+  update: {
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onAvailable: (callback: (info: { version: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
+      ipcRenderer.on('update:available', handler)
+      return () => { ipcRenderer.removeListener('update:available', handler) }
+    },
+    onDownloaded: (callback: () => void) => {
+      const handler = (_event: Electron.IpcRendererEvent) => callback()
+      ipcRenderer.on('update:downloaded', handler)
+      return () => { ipcRenderer.removeListener('update:downloaded', handler) }
+    }
   }
 }
 

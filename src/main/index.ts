@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import * as Sentry from '@sentry/electron/main'
+import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
 import { getSettings, getAuthorizedDirectories } from './store'
@@ -106,10 +107,35 @@ app.whenReady().then(() => {
 
   createWindow()
 
+  // Auto-updater: check for updates after launch (production only)
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.checkForUpdates()
+
+    autoUpdater.on('update-available', (info) => {
+      const win = getMainWindow()
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update:available', { version: info.version })
+      }
+    })
+
+    autoUpdater.on('update-downloaded', () => {
+      const win = getMainWindow()
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update:downloaded')
+      }
+    })
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+// IPC: update actions from renderer
+ipcMain.handle('update:download', () => autoUpdater.downloadUpdate())
+ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

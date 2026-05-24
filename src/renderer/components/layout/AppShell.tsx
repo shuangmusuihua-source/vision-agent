@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
-import { SidebarSimple, FileText } from '@phosphor-icons/react'
+import { SidebarSimple, FileText, Download, ArrowSquareOut } from '@phosphor-icons/react'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -48,6 +48,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [modalVisible, setModalVisible] = useState(false)
   const [showDaydream, setShowDaydream] = useState(false)
   const [daydreamMode, setDaydreamMode] = useState('matrix')
+  const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
+  const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
@@ -106,6 +108,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const handleToggleMouseLeave = useCallback(() => {
     toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
+  }, [])
+
+  // Auto-update notifications
+  useEffect(() => {
+    const unsubAvailable = window.api.update.onAvailable((info) => setUpdateAvailable(info))
+    const unsubDownloaded = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
+    return () => { unsubAvailable(); unsubDownloaded() }
   }, [])
 
   // Menu bar actions
@@ -462,6 +471,23 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         </ErrorBoundary>
       </AgentPanel>
       </aside>
+      {updateAvailable && !updateDownloaded && (
+        <div className="update-banner">
+          <span>新版本 v{updateAvailable.version} 可用</span>
+          <button className="update-banner-btn" onClick={() => window.api.update.download()}>
+            <Download size={14} weight="bold" /> 下载
+          </button>
+          <button className="update-banner-dismiss" onClick={() => setUpdateAvailable(null)}>✕</button>
+        </div>
+      )}
+      {updateDownloaded && (
+        <div className="update-banner update-banner-ready">
+          <span>更新已就绪</span>
+          <button className="update-banner-btn" onClick={() => window.api.update.install()}>
+            <ArrowSquareOut size={14} weight="bold" /> 重启安装
+          </button>
+        </div>
+      )}
       {showSearch && (
         <SearchPanel
           onOpenFile={handleFileSelect}
