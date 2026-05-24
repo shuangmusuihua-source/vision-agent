@@ -1,7 +1,7 @@
 appId: com.vision-agent.app
 productName: Vision Agent
 directories:
-  buildResources: resources
+  buildResources: build
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -9,6 +9,7 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 mac:
+  icon: build/icon.icns
   target:
     - dmg
   category: public.app-category.productivity
