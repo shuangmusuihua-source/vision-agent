@@ -122,7 +122,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
   return (
     <div className={`agent-panel${collapsed ? ' agent-panel-collapsed' : ''}${layoutMode === 'chat-first' ? ' agent-panel-primary' : ''}`}>
       {collapsed && (
-        <button className="agent-panel-expand-btn" onClick={onToggleCollapse} title="展开面板">
+        <button className="agent-panel-expand-btn" onClick={onToggleCollapse} title="展开面板" aria-label="展开面板">
           <SidebarOpenIcon size={14} weight="bold" />
         </button>
       )}
@@ -130,7 +130,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
         <div className="agent-panel-header">
           {/* Model selector */}
           <div className="agent-header-model" ref={modelDropdownRef}>
-            <button className="agent-header-model-btn" onClick={() => setShowModelDropdown(!showModelDropdown)}>
+            <button className="agent-header-model-btn" onClick={() => setShowModelDropdown(!showModelDropdown)} aria-label="选择模型">
               {modelLabel}
               <CaretDown size={10} weight="bold" />
             </button>
@@ -151,10 +151,10 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
 
           {/* New session + history */}
           <div className="agent-header-session" ref={historyDropdownRef}>
-            <button className="agent-header-session-btn" onClick={onNewSession} title="新建会话">
+            <button className="agent-header-session-btn" onClick={onNewSession} title="新建会话" aria-label="新建会话">
               <Plus size={14} weight="bold" />
             </button>
-            <button className="agent-header-session-arrow" onClick={handleToggleHistory} title="历史会话">
+            <button className="agent-header-session-arrow" onClick={handleToggleHistory} title="历史会话" aria-label="历史会话">
               <CaretDown size={10} weight="bold" />
             </button>
             {showHistory && (
@@ -183,10 +183,10 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
           <div className="agent-header-spacer" />
 
           {/* Swap + Collapse */}
-          <button className="agent-header-btn" onClick={onSwapLayout} title={layoutMode === 'chat-first' ? '对话为主' : '编辑为主'}>
+          <button className="agent-header-btn" onClick={onSwapLayout} title="交换布局" aria-label="交换布局">
             <ArrowsLeftRight size={14} weight="bold" />
           </button>
-          <button className="agent-header-btn" onClick={onToggleCollapse} title="折叠面板">
+          <button className="agent-header-btn" onClick={onToggleCollapse} title="折叠面板" aria-label="折叠面板">
             <SidebarIcon size={14} weight="bold" />
           </button>
         </div>

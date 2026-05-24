@@ -24,7 +24,7 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
   }, [messages.length])
 
   return (
-    <div className="chat-view">
+    <div className="chat-view" aria-live="polite" aria-label="对话消息">
       {messages.length === 0 && (
         <div className="chat-empty">
           <ChatCircleDots size={48} weight="thin" className="chat-empty-icon" />

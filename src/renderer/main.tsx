@@ -28,7 +28,10 @@ window.addEventListener('unhandledrejection', (e) => {
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import * as Sentry from '@sentry/electron/renderer'
 import App from './App'
+
+Sentry.init()
 import './styles/global.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

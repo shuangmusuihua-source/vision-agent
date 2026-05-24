@@ -183,23 +183,23 @@ function Sidebar({
     <div className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-header-actions">
-          <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)">
+          <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)" aria-label="搜索">
             <MagnifyingGlass size={14} weight="bold" />
           </button>
-          <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图">
+          <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图" aria-label="图谱视图">
             <Graph size={14} weight="bold" />
             {changedFileCount >= 2 && <span className="sidebar-badge-dot" />}
           </button>
-          <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="打开工作区">
+          <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="打开工作区" aria-label="打开工作区">
             <FolderOpen size={14} weight="bold" />
           </button>
-          <button className="sidebar-icon-btn" onClick={onNewWorkspace} title="新建工作区">
+          <button className="sidebar-icon-btn" onClick={onNewWorkspace} title="新建工作区" aria-label="新建工作区">
             <PlusSquare size={14} weight="bold" />
           </button>
-          <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置">
+          <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置" aria-label="设置">
             <Gear size={14} weight="bold" />
           </button>
-          <button ref={daydreamBtnRef} className="sidebar-icon-btn" onClick={togglePicker} title="心休模式">
+          <button ref={daydreamBtnRef} className="sidebar-icon-btn" onClick={togglePicker} title="心休模式" aria-label="心休模式">
             <Eye size={14} weight="bold" />
           </button>
         </div>
@@ -230,6 +230,7 @@ function Sidebar({
                       <button
                         className="sidebar-workspace-toggle"
                         onClick={() => toggleWorkspace(wsPath)}
+                        aria-label={isCollapsed ? '展开工作区' : '折叠工作区'}
                       >
                         {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
                       </button>
@@ -239,6 +240,7 @@ function Sidebar({
                           className="sidebar-workspace-pin"
                           onClick={() => handlePinToTop(wsPath)}
                           title="置顶"
+                          aria-label="置顶"
                         >
                           <PushPin size={12} weight="bold" />
                         </button>
@@ -247,6 +249,7 @@ function Sidebar({
                         className="sidebar-workspace-remove"
                         onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
                         title="移除工作区"
+                        aria-label="移除工作区"
                       >
                         <X size={12} weight="bold" />
                       </button>
@@ -254,6 +257,7 @@ function Sidebar({
                         className="sidebar-workspace-add-file"
                         onClick={() => setCreatingFileIn(wsPath)}
                         title="新建文件"
+                        aria-label="新建文件"
                       >
                         <Plus size={12} weight="bold" />
                       </button>

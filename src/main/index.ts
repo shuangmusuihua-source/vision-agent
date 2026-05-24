@@ -1,12 +1,25 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import * as Sentry from '@sentry/electron/main'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
 import { getSettings, getAuthorizedDirectories } from './store'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
+
+// Initialize Sentry before any error handlers
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || '',
+  environment: app.isPackaged ? 'production' : 'development',
+  sendDefaultPii: false,
+  beforeSend(event) {
+    // Filter out events containing apiKey to prevent credential leaks
+    if (JSON.stringify(event).includes('apiKey')) return null
+    return event
+  },
+})
 
 // Prevent EPIPE errors from crashing the process when stdout/stderr pipes close
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code === 'EPIPE') process.stdout.destroy() })
@@ -15,6 +28,7 @@ process.stderr?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code ===
 // Global error handlers to prevent silent crashes
 process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled rejection:', reason)
+  Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)))
   const window = getMainWindow()
   if (window && !window.isDestroyed()) {
     window.webContents.send('main:error', { type: 'unhandledRejection', message: String(reason) })
@@ -23,6 +37,7 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (error) => {
   console.error('[Main] Uncaught exception:', error)
+  Sentry.captureException(error)
   const window = getMainWindow()
   if (window && !window.isDestroyed()) {
     window.webContents.send('main:error', { type: 'uncaughtException', message: error.message })

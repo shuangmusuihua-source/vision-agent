@@ -21,6 +21,15 @@ export function InputDrawer({ open, onClose, children }: InputDrawerProps) {
     }
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
   const handleTransitionEnd = () => {
     if (!visible) {
       setRendered(false)
@@ -34,6 +43,9 @@ export function InputDrawer({ open, onClose, children }: InputDrawerProps) {
     <div
       className={`input-drawer ${visible ? 'input-drawer--open' : ''}`}
       onTransitionEnd={handleTransitionEnd}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Agent 提问"
     >
       <div className="input-drawer__content">
         {children}

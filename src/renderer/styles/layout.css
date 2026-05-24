@@ -1023,3 +1023,86 @@
 .daydream-hint-rain {
   color: rgba(0,255,0,0.2);
 }
+
+/* --- Responsive breakpoints --- */
+
+/* 900-1199px: auto-collapse sidebar to icon column */
+@media (max-width: 1199px) {
+  .sidebar {
+    width: 48px;
+    min-width: 48px;
+    padding-right: 0;
+  }
+  .sidebar-content {
+    display: none;
+  }
+  .sidebar-header-actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar-toggle-area {
+    left: 48px;
+  }
+  .main-content-cover-sidebar {
+    margin-left: -48px;
+  }
+}
+
+/* <900px: sidebar as overlay, agent panel as overlay drawer */
+@media (max-width: 899px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    padding-right: 16px;
+  }
+  .sidebar:not(.sidebar-collapsed) {
+    transform: translateX(0);
+  }
+  .sidebar-collapsed {
+    transform: translateX(-100%);
+  }
+  .sidebar-content {
+    display: flex;
+  }
+  .sidebar-header-actions {
+    flex-direction: row;
+    gap: 2px;
+  }
+  .sidebar-toggle-area {
+    left: 8px;
+    z-index: 301;
+  }
+  .main-content {
+    margin-left: 0;
+    border-radius: 0;
+  }
+  .main-content-cover-sidebar {
+    margin-left: 0;
+  }
+  .main-content-header-cover-sidebar {
+    padding-left: 44px;
+  }
+  .agent-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    max-width: 100vw;
+    width: 100vw;
+    z-index: 200;
+    border-radius: 0;
+    margin-left: 0;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
+  }
+  .agent-panel-collapsed {
+    max-width: 36px;
+    width: 36px;
+  }
+}

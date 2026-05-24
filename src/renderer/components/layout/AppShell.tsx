@@ -74,6 +74,23 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // Responsive: auto-collapse sidebar/agent panel at small widths
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth
+      if (w < 900) {
+        setSidebarCollapsed(true)
+        setAgentCollapsed(true)
+      } else if (w < 1200) {
+        setSidebarCollapsed(true)
+        setAgentCollapsed(false)
+      }
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // Auto-hide sidebar toggle button after 3s
   useEffect(() => {
     toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
@@ -327,6 +344,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   return (
     <div className="app-shell">
+      <nav aria-label="侧边栏" style={{ display: 'flex', height: '100%' }}>
       <Sidebar
         files={files}
         workspacePaths={workspacePaths}
@@ -356,9 +374,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
       />
-      <div
-        className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${layoutMode === 'chat-first' ? ' main-content-secondary' : ''}`}
-      >
+      </nav>
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${layoutMode === 'chat-first' ? ' main-content-secondary' : ''}`}
+           aria-label="编辑器">
         <div className={`main-content-header${sidebarCollapsed ? ' main-content-header-cover-sidebar' : ''}`}>
           {openTabs.length > 0 && (
             <EditorTabs
@@ -403,14 +421,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         )}
         </div>
         {activeTab && (
-          <div className="editor-status-bar">
+          <div className="editor-status-bar" role="status">
             <span>{editorStats.words} words</span>
             <span>{editorStats.chars} characters</span>
             {sourceMode && <span>Source</span>}
             {focusMode && <span>Focus</span>}
           </div>
         )}
-      </div>
+      </main>
+      <aside aria-label="Agent 面板" style={{ display: 'flex', height: '100%' }}>
       <AgentPanel
         collapsed={agentCollapsed}
         onToggleCollapse={() => setAgentCollapsed(!agentCollapsed)}
@@ -442,6 +461,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <ChatView onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
         </ErrorBoundary>
       </AgentPanel>
+      </aside>
       {showSearch && (
         <SearchPanel
           onOpenFile={handleFileSelect}
@@ -458,13 +478,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           className={`sidebar-toggle-btn${toggleVisible ? ' sidebar-toggle-btn-visible' : ''}`}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+          aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
         >
           <SidebarSimple size={14} weight="light" />
         </button>
       </div>
       {showNewWorkspaceModal && (
         <div className={`app-modal-overlay${modalVisible ? ' app-modal-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
-          <div className={`app-modal${modalVisible ? ' app-modal-visible' : ''}`} onClick={(e) => e.stopPropagation()}>
+          <div className={`app-modal${modalVisible ? ' app-modal-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}>
             <div className="app-modal-title">新建工作区</div>
             <input
               className="app-modal-input"
