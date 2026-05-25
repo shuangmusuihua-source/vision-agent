@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sidebar as SidebarOpenIcon, SidebarSimple as SidebarIcon, ArrowsLeftRight, Plus, CaretDown, Spinner, X } from '@phosphor-icons/react'
+import { Plus, CaretDown, Spinner, X } from '@phosphor-icons/react'
 import type { UsageInfo, PermissionRequestIPC as PermissionRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
 import type { SkillMeta } from '../../../shared/types'
@@ -16,10 +16,8 @@ const MODELS: Record<string, string> = {
 }
 
 interface AgentPanelProps {
-  collapsed: boolean
-  onToggleCollapse: () => void
-  onSwapLayout: () => void
-  layoutMode: 'edit-first' | 'chat-first'
+  width: number
+  edgeClass: string
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
@@ -38,7 +36,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ width, edgeClass, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -52,12 +50,10 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
     window.api.settings.get().then(setSettings)
   }, [])
 
-  // Open ask drawer when request arrives
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
   }, [askUserRequest])
 
-  // Derive active skill meta from messages
   const activeSkillMeta = useAgentStore((s) => {
     if (!activeSkillId) return null
     for (let i = s.messages.length - 1; i >= 0; i--) {
@@ -66,12 +62,10 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
     return null
   })
 
-  // Reset skill drawer visibility when a new skill starts
   useEffect(() => {
     if (activeSkillMeta?.status === 'running') setSkillDrawerHidden(false)
   }, [activeSkillMeta])
 
-  // Send pending answer after close animation completes
   useEffect(() => {
     if (pendingAskAnswer && !askDrawerOpen) {
       onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answer)
@@ -85,10 +79,10 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
     setAskDrawerOpen(false)
   }, [askUserRequest])
 
-  // Expose handleAskUserRespond to parent via callback ref
   useEffect(() => {
     onAskUserDrawerRespond?.(handleAskUserRespond)
   }, [handleAskUserRespond, onAskUserDrawerRespond])
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (showModelDropdown && modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
@@ -120,15 +114,9 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
   }, [onRefreshSessions])
 
   return (
-    <div className={`agent-panel${collapsed ? ' agent-panel-collapsed' : ''}${layoutMode === 'chat-first' ? ' agent-panel-primary' : ''}`}>
-      {collapsed && (
-        <button className="agent-panel-expand-btn" onClick={onToggleCollapse} title="展开面板" aria-label="展开面板">
-          <SidebarOpenIcon size={14} weight="bold" />
-        </button>
-      )}
+    <div className={`agent-panel ${edgeClass}`} style={{ width, minWidth: width, maxWidth: width }}>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
-          {/* Model selector */}
           <div className="agent-header-model" ref={modelDropdownRef}>
             <button className="agent-header-model-btn" onClick={() => setShowModelDropdown(!showModelDropdown)} aria-label="选择模型">
               {modelLabel}
@@ -149,7 +137,6 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
             )}
           </div>
 
-          {/* New session + history */}
           <div className="agent-header-session" ref={historyDropdownRef}>
             <button className="agent-header-session-btn" onClick={onNewSession} title="新建会话" aria-label="新建会话">
               <Plus size={14} weight="bold" />
@@ -179,16 +166,7 @@ function AgentPanel({ collapsed, onToggleCollapse, onSwapLayout, layoutMode, usa
             )}
           </div>
 
-          {/* Spacer */}
           <div className="agent-header-spacer" />
-
-          {/* Swap + Collapse */}
-          <button className="agent-header-btn" onClick={onSwapLayout} title="交换布局" aria-label="交换布局">
-            <ArrowsLeftRight size={14} weight="bold" />
-          </button>
-          <button className="agent-header-btn" onClick={onToggleCollapse} title="折叠面板" aria-label="折叠面板">
-            <SidebarIcon size={14} weight="bold" />
-          </button>
         </div>
         <div className="agent-panel-body">
           <div className="agent-panel-content">

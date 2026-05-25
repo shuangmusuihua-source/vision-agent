@@ -73,21 +73,6 @@
   min-width: 0;
 }
 
-.agent-header-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-primary);
-  -webkit-app-region: no-drag;
-}
-
-.agent-header-btn:hover {
-  background: var(--color-bg-tertiary);
-}
-
 .agent-header-dropdown {
   position: absolute;
   top: 100%;

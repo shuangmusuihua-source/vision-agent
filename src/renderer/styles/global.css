@@ -173,7 +173,12 @@
   /* ── Sidebar layout ────────────────────────────────────────── */
 
   --sidebar-width: 220px;
-  --agent-panel-width: 380px;
+  --agent-panel-default-width: 360px;
+  --agent-panel-min-width: 240px;
+  --agent-panel-max-width: 500px;
+  --agent-panel-collapse-threshold: 180px;
+  --editor-min-ratio: 0.30;
+  --divider-zone-width: 12px;
   --sidebar-glass-border: var(--color-border-soft);
 
   /* ── Editor tokens (Layer 3: Component) ─────────────────────── */
