@@ -118,6 +118,19 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('workspace:renameFile', async (_event, filePath: string, newName: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
+    try {
+      const dir = filePath.substring(0, filePath.lastIndexOf('/'))
+      const destPath = join(dir, newName)
+      if (existsSync(destPath)) return { success: false, error: '同名文件已存在' }
+      await rename(filePath, destPath)
+      return { success: true, newPath: destPath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('workspace:moveFile', async (_event, sourcePath: string, targetDir: string) => {
     if (!isPathAuthorized(sourcePath) || !isPathAuthorized(targetDir)) return { success: false, error: 'Path not authorized' }
     try {

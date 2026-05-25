@@ -22,6 +22,8 @@ const api = {
       ipcRenderer.invoke('workspace:createFile', dirPath, fileName),
     deleteFile: (filePath: string) =>
       ipcRenderer.invoke('workspace:deleteFile', filePath),
+    renameFile: (filePath: string, newName: string) =>
+      ipcRenderer.invoke('workspace:renameFile', filePath, newName),
     moveFile: (sourcePath: string, targetDir: string) =>
       ipcRenderer.invoke('workspace:moveFile', sourcePath, targetDir),
     deleteWorkspace: (dirPath: string) =>

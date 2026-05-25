@@ -373,6 +373,28 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
   }, [openTabs, handleTabClose])
 
+  const handleFileRename = useCallback(async (filePath: string, newName: string) => {
+    const result = await window.api.workspace.renameFile(filePath, newName)
+    if (result.success) {
+      if (openTabs.includes(filePath)) {
+        const wsIdx = filePath.lastIndexOf('/')
+        const wsPrefix = filePath.substring(0, wsIdx + 1)
+        handleTabClose(filePath)
+        if (result.newPath) {
+          handleFileSelect(result.newPath)
+        }
+      }
+      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
+      const entries: Record<string, FileEntry[]> = {}
+      await Promise.all(dirs.map(async (dir: string) => {
+        entries[dir] = await window.api.workspace.listFiles(dir)
+      }))
+      setFiles(entries)
+    } else {
+      window.alert(result.error || '重命名失败')
+    }
+  }, [openTabs, handleTabClose, handleFileSelect])
+
   const handleFileMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const result = await window.api.workspace.moveFile(sourcePath, targetDir)
     if (result.success) {
@@ -482,6 +504,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onNewWorkspace={handleOpenNewWorkspaceModal}
         onFileDelete={handleFileDelete}
         onFileMove={handleFileMove}
+        onFileRename={handleFileRename}
         onRefreshWorkspace={handleRefreshWorkspace}
         onRemoveWorkspace={(path) => { setDeleteWsPath(path); setDeleteWsConfirm('') }}
         onOpenSettings={onOpenSettings}

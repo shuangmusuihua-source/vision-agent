@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal, Pencil } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -17,6 +17,7 @@ interface SidebarProps {
   onNewWorkspace: () => void
   onFileDelete: (filePath: string) => void
   onFileMove: (filePath: string, targetDir: string) => void
+  onFileRename: (filePath: string, newName: string) => void
   onRemoveWorkspace: (path: string) => void
   onRefreshWorkspace: (path: string) => void
   onReorderWorkspaces: (paths: string[]) => void
@@ -37,6 +38,7 @@ function Sidebar({
   onNewWorkspace,
   onFileDelete,
   onFileMove,
+  onFileRename,
   onRemoveWorkspace,
   onRefreshWorkspace,
   onReorderWorkspaces,
@@ -56,6 +58,8 @@ function Sidebar({
   const [newFileName, setNewFileName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
   const [movingFilePath, setMovingFilePath] = useState<string | null>(null)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [moveDropdownPos, setMoveDropdownPos] = useState({ left: 0, top: 0 })
   const moveDropdownRef = useRef<HTMLDivElement>(null)
   const newFileInputRef = useRef<HTMLInputElement>(null)
@@ -124,6 +128,19 @@ function Sidebar({
     return () => document.removeEventListener('mousedown', handler)
   }, [movingFilePath])
 
+  const handleStartRename = useCallback((filePath: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setRenamingPath(filePath)
+    setRenameValue(filePath.split('/').pop() || '')
+  }, [])
+
+  const handleFinishRename = useCallback(() => {
+    if (renamingPath && renameValue.trim() && renameValue !== renamingPath.split('/')?.pop()) {
+      onFileRename(renamingPath, renameValue.trim())
+    }
+    setRenamingPath(null)
+  }, [renamingPath, renameValue, onFileRename])
+
   const toggleDir = useCallback((path: string) => {
     setExpandedDirs((prev) => {
       const next = new Set(prev)
@@ -180,11 +197,27 @@ function Sidebar({
           key={entry.path}
           className="sidebar-entry sidebar-file"
           style={{ paddingLeft: paddingLeft + 14 }}
-          onClick={() => onFileSelect(entry.path)}
+          onClick={() => {
+            if (renamingPath !== entry.path) onFileSelect(entry.path)
+          }}
         >
           <File size={14} weight="bold" />
-          <span className="sidebar-file-name">{entry.name}</span>
-          {workspacePaths.length > 1 && (
+          {renamingPath === entry.path ? (
+            <input
+              className="sidebar-rename-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.isComposing) handleFinishRename()
+                if (e.key === 'Escape') setRenamingPath(null)
+              }}
+              onBlur={handleFinishRename}
+              autoFocus
+            />
+          ) : (
+            <span className="sidebar-file-name">{entry.name}</span>
+          )}
+          {renamingPath !== entry.path && workspacePaths.length > 1 && (
             <button
               className="sidebar-file-action"
               onClick={(e) => handleShowMoveDropdown(entry.path, e)}
@@ -192,6 +225,16 @@ function Sidebar({
               aria-label="移动到其他工作区"
             >
               <ArrowsOutCardinal size={12} weight="bold" />
+            </button>
+          )}
+          {renamingPath !== entry.path && (
+            <button
+              className="sidebar-file-action"
+              onClick={(e) => handleStartRename(entry.path, e)}
+              title="重命名"
+              aria-label="重命名"
+            >
+              <Pencil size={12} weight="bold" />
             </button>
           )}
           <button

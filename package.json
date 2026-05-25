@@ -44,6 +44,7 @@
     "react-flip-toolkit": "^7.2.4",
     "react-force-graph-2d": "^1.29.1",
     "react-markdown": "^9.0.0",
+    "react-zoom-pan-pinch": "^4.0.3",
     "remark-gfm": "^4.0.0",
     "tippy.js": "^6.3.7",
     "zustand": "^5.0.0"

@@ -75,6 +75,10 @@ interface WorkspaceApi {
   newDirectoryDialog: () => Promise<string | null>
   createWorkspace: (name: string) => Promise<string | null>
   createFile: (dirPath: string, fileName: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  deleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
+  renameFile: (filePath: string, newName: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
+  moveFile: (sourcePath: string, targetDir: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
+  deleteWorkspace: (dirPath: string) => Promise<{ success: boolean; error?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
