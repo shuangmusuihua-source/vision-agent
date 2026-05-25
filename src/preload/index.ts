@@ -19,7 +19,13 @@ const api = {
     newDirectoryDialog: () => ipcRenderer.invoke('workspace:newDirectoryDialog'),
     createWorkspace: (name: string) => ipcRenderer.invoke('workspace:createWorkspace', name),
     createFile: (dirPath: string, fileName: string) =>
-      ipcRenderer.invoke('workspace:createFile', dirPath, fileName)
+      ipcRenderer.invoke('workspace:createFile', dirPath, fileName),
+    deleteFile: (filePath: string) =>
+      ipcRenderer.invoke('workspace:deleteFile', filePath),
+    moveFile: (sourcePath: string, targetDir: string) =>
+      ipcRenderer.invoke('workspace:moveFile', sourcePath, targetDir),
+    deleteWorkspace: (dirPath: string) =>
+      ipcRenderer.invoke('workspace:deleteWorkspace', dirPath)
   },
 
   settings: {

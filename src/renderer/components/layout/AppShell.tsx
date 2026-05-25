@@ -57,6 +57,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
   const [linkedFile, setLinkedFile] = useState<string | null>(null)
   const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false)
+  const [deleteWsPath, setDeleteWsPath] = useState<string | null>(null)
+  const [deleteWsConfirm, setDeleteWsConfirm] = useState('')
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
   const [newWorkspaceError, setNewWorkspaceError] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
@@ -280,16 +282,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     ).then(() => setFiles(fileEntries))
   }, [settings])
 
-  const handleOpenDirectory = async () => {
-    const path = await window.api.workspace.openDirectoryDialog()
-    if (path && !workspacePaths.includes(path)) {
-      setWorkspacePaths((prev) => [path, ...prev])
-      const entries = await window.api.workspace.listFiles(path)
-      setFiles((prev) => ({ ...prev, [path]: entries }))
-      await window.api.settings.addDirectory(path)
-    }
-  }
-
   const handleOpenNewWorkspaceModal = () => {
     setNewWorkspaceName('')
     setNewWorkspaceError('')
@@ -363,6 +355,43 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       return next
     })
   }, [activeTab])
+
+  const handleFileDelete = useCallback(async (filePath: string) => {
+    const result = await window.api.workspace.deleteFile(filePath)
+    if (result.success) {
+      if (openTabs.includes(filePath)) {
+        handleTabClose(filePath)
+      }
+      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
+      const entries: Record<string, FileEntry[]> = {}
+      await Promise.all(dirs.map(async (dir: string) => {
+        entries[dir] = await window.api.workspace.listFiles(dir)
+      }))
+      setFiles(entries)
+    } else {
+      window.alert(result.error || '删除失败')
+    }
+  }, [openTabs, handleTabClose])
+
+  const handleFileMove = useCallback(async (sourcePath: string, targetDir: string) => {
+    const result = await window.api.workspace.moveFile(sourcePath, targetDir)
+    if (result.success) {
+      if (openTabs.includes(sourcePath)) {
+        handleTabClose(sourcePath)
+        if (result.newPath) {
+          handleFileSelect(result.newPath)
+        }
+      }
+      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
+      const entries: Record<string, FileEntry[]> = {}
+      await Promise.all(dirs.map(async (dir: string) => {
+        entries[dir] = await window.api.workspace.listFiles(dir)
+      }))
+      setFiles(entries)
+    } else {
+      window.alert(result.error || '移动失败')
+    }
+  }, [openTabs, handleTabClose, handleFileSelect])
 
   const handleTabSwitch = useCallback((path: string) => {
     setActiveTab(path)
@@ -450,19 +479,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         workspacePaths={workspacePaths}
         memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
-        onOpenDirectory={handleOpenDirectory}
         onNewWorkspace={handleOpenNewWorkspaceModal}
+        onFileDelete={handleFileDelete}
+        onFileMove={handleFileMove}
         onRefreshWorkspace={handleRefreshWorkspace}
-        onRemoveWorkspace={async (path) => {
-          if (!window.confirm('确定移除此工作区？文件不会被删除，仅从侧栏移除。')) return
-          setWorkspacePaths((prev) => prev.filter((p) => p !== path))
-          setFiles((prev) => {
-            const next = { ...prev }
-            delete next[path]
-            return next
-          })
-          await window.api.settings.removeDirectory(path)
-        }}
+        onRemoveWorkspace={(path) => { setDeleteWsPath(path); setDeleteWsConfirm('') }}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
         onReorderWorkspaces={async (paths) => {
@@ -631,7 +652,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
               value={newWorkspaceName}
               onChange={(e) => { setNewWorkspaceName(e.target.value); setNewWorkspaceError('') }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateWorkspace()
+                if (e.key === 'Enter' && !e.isComposing) handleCreateWorkspace()
                 if (e.key === 'Escape') handleCloseNewWorkspaceModal()
               }}
               autoFocus
@@ -640,6 +661,69 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <div className="app-modal-actions">
               <button className="app-modal-cancel" onClick={handleCloseNewWorkspaceModal}>取消</button>
               <button className="app-modal-confirm" onClick={handleCreateWorkspace}>创建</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteWsPath && (
+        <div className="app-modal-overlay app-modal-visible" onClick={() => setDeleteWsPath(null)}>
+          <div className="app-modal app-modal-visible" role="dialog" aria-modal="true" aria-label="删除工作区" onClick={(e) => e.stopPropagation()}>
+            <div className="app-modal-title">删除工作区</div>
+            <div className="app-modal-warning">
+              此操作将永久删除工作区 <strong>{deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
+            </div>
+            <div className="app-modal-hint">请输入工作区名称以确认删除：</div>
+            <input
+              className="app-modal-input"
+              placeholder={deleteWsPath.split('/').pop()}
+              value={deleteWsConfirm}
+              onChange={(e) => setDeleteWsConfirm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setDeleteWsPath(null)
+                if (e.key === 'Enter' && !e.isComposing && deleteWsConfirm === deleteWsPath.split('/')?.pop()) {
+                  (async () => {
+                    const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
+                    if (result.success) {
+                      setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
+                      setFiles((prev) => {
+                        const next = { ...prev }
+                        delete next[deleteWsPath!]
+                        return next
+                      })
+                      // Close tabs from deleted workspace
+                      const wsPrefix = deleteWsPath + '/'
+                      setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
+                      setDeleteWsPath(null)
+                    } else {
+                      window.alert(result.error || '删除失败')
+                    }
+                  })()
+                }
+              }}
+              autoFocus
+            />
+            <div className="app-modal-actions">
+              <button className="app-modal-cancel" onClick={() => setDeleteWsPath(null)}>取消</button>
+              <button
+                className="app-modal-confirm app-modal-danger"
+                disabled={deleteWsConfirm !== deleteWsPath.split('/')?.pop()}
+                onClick={async () => {
+                  const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
+                  if (result.success) {
+                    setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
+                    setFiles((prev) => {
+                      const next = { ...prev }
+                      delete next[deleteWsPath!]
+                      return next
+                    })
+                    const wsPrefix = deleteWsPath + '/'
+                    setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
+                    setDeleteWsPath(null)
+                  } else {
+                    window.alert(result.error || '删除失败')
+                  }
+                }}
+              >删除</button>
             </div>
           </div>
         </div>

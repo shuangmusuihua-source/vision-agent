@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -14,8 +14,9 @@ interface SidebarProps {
   workspacePaths: string[]
   memoryRefreshKey: number
   onFileSelect: (path: string) => void
-  onOpenDirectory: () => void
   onNewWorkspace: () => void
+  onFileDelete: (filePath: string) => void
+  onFileMove: (filePath: string, targetDir: string) => void
   onRemoveWorkspace: (path: string) => void
   onRefreshWorkspace: (path: string) => void
   onReorderWorkspaces: (paths: string[]) => void
@@ -33,8 +34,9 @@ function Sidebar({
   workspacePaths,
   memoryRefreshKey,
   onFileSelect,
-  onOpenDirectory,
   onNewWorkspace,
+  onFileDelete,
+  onFileMove,
   onRemoveWorkspace,
   onRefreshWorkspace,
   onReorderWorkspaces,
@@ -53,6 +55,9 @@ function Sidebar({
   const [creatingFileIn, setCreatingFileIn] = useState<string | null>(null)
   const [newFileName, setNewFileName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
+  const [movingFilePath, setMovingFilePath] = useState<string | null>(null)
+  const [moveDropdownPos, setMoveDropdownPos] = useState({ left: 0, top: 0 })
+  const moveDropdownRef = useRef<HTMLDivElement>(null)
   const newFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -90,6 +95,35 @@ function Sidebar({
     refreshMemory()
   }, [refreshMemory])
 
+  const handleDeleteFile = useCallback((filePath: string) => {
+    if (!window.confirm('确定删除此文件？此操作不可撤销。')) return
+    onFileDelete(filePath)
+  }, [onFileDelete])
+
+  const handleShowMoveDropdown = useCallback((filePath: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const rect = (e.target as HTMLElement).getBoundingClientRect()
+    setMoveDropdownPos({ left: rect.left, top: rect.bottom + 4 })
+    setMovingFilePath(filePath)
+  }, [])
+
+  const handleMoveToWorkspace = useCallback((targetDir: string) => {
+    if (movingFilePath) {
+      onFileMove(movingFilePath, targetDir)
+    }
+    setMovingFilePath(null)
+  }, [movingFilePath, onFileMove])
+
+  useEffect(() => {
+    if (!movingFilePath) return
+    const handler = (e: MouseEvent) => {
+      if (moveDropdownRef.current && moveDropdownRef.current.contains(e.target as Node)) return
+      setMovingFilePath(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [movingFilePath])
+
   const toggleDir = useCallback((path: string) => {
     setExpandedDirs((prev) => {
       const next = new Set(prev)
@@ -119,7 +153,7 @@ function Sidebar({
 
   const workspaceName = (path: string) => path.split('/').pop() || path
 
-  const renderTree = (entries: FileEntry[], depth: number): React.ReactElement[] => {
+  const renderTree = (entries: FileEntry[], depth: number, wsPath: string): React.ReactElement[] => {
     return entries.map((entry) => {
       const isExpanded = expandedDirs.has(entry.path)
       const paddingLeft = 8 + depth * 16
@@ -136,7 +170,7 @@ function Sidebar({
               {isExpanded ? <FolderOpen size={14} weight="bold" /> : <Folder size={14} weight="bold" />}
               <span>{entry.name}</span>
             </div>
-            {isExpanded && entry.children && renderTree(entry.children, depth + 1)}
+            {isExpanded && entry.children && renderTree(entry.children, depth + 1, wsPath)}
           </div>
         )
       }
@@ -149,7 +183,25 @@ function Sidebar({
           onClick={() => onFileSelect(entry.path)}
         >
           <File size={14} weight="bold" />
-          <span>{entry.name}</span>
+          <span className="sidebar-file-name">{entry.name}</span>
+          {workspacePaths.length > 1 && (
+            <button
+              className="sidebar-file-action"
+              onClick={(e) => handleShowMoveDropdown(entry.path, e)}
+              title="移动到其他工作区"
+              aria-label="移动到其他工作区"
+            >
+              <ArrowsOutCardinal size={12} weight="bold" />
+            </button>
+          )}
+          <button
+            className="sidebar-file-action"
+            onClick={(e) => { e.stopPropagation(); handleDeleteFile(entry.path) }}
+            title="删除文件"
+            aria-label="删除文件"
+          >
+            <Trash size={12} weight="bold" />
+          </button>
         </div>
       )
     })
@@ -191,9 +243,6 @@ function Sidebar({
             <Graph size={14} weight="bold" />
             {changedFileCount >= 2 && <span className="sidebar-badge-dot" />}
           </button>
-          <button className="sidebar-icon-btn" onClick={onOpenDirectory} title="打开工作区" aria-label="打开工作区">
-            <FolderOpen size={14} weight="bold" />
-          </button>
           <button className="sidebar-icon-btn" onClick={onNewWorkspace} title="新建工作区" aria-label="新建工作区">
             <PlusSquare size={14} weight="bold" />
           </button>
@@ -209,9 +258,6 @@ function Sidebar({
       <div className="sidebar-content">
         {workspacePaths.length === 0 ? (
           <div className="sidebar-empty-workspace">
-            <button className="sidebar-open-dir-btn" onClick={onOpenDirectory}>
-              打开工作区
-            </button>
             <button className="sidebar-new-dir-btn" onClick={onNewWorkspace}>
               新建工作区
             </button>
@@ -274,14 +320,14 @@ function Sidebar({
                               value={newFileName}
                               onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleCreateFile(wsPath)
+                                if (e.key === 'Enter' && !e.isComposing) handleCreateFile(wsPath)
                                 if (e.key === 'Escape') setCreatingFileIn(null)
                               }}
                             />
                             {createError && <span className="sidebar-new-file-error">{createError}</span>}
                           </div>
                         )}
-                        {renderTree(files[wsPath] || [], 0)}
+                        {renderTree(files[wsPath] || [], 0, wsPath)}
                       </div>
                     )}
                   </div>
@@ -345,6 +391,29 @@ function Sidebar({
           <span className="daydream-picker-preview rain-preview" />
           <span>绿野甘霖</span>
         </button>
+      </div>,
+      document.body
+    )}
+    {movingFilePath && createPortal(
+      <div
+        ref={moveDropdownRef}
+        className="move-dropdown"
+        style={{ left: moveDropdownPos.left, top: moveDropdownPos.top }}
+      >
+        <div className="move-dropdown-title">移动到工作区</div>
+        {workspacePaths
+          .filter(ws => !movingFilePath.startsWith(ws + '/'))
+          .map(ws => (
+            <button
+              key={ws}
+              className="move-dropdown-item"
+              onClick={() => handleMoveToWorkspace(ws)}
+            >
+              <Folder size={14} weight="bold" />
+              <span>{workspaceName(ws)}</span>
+            </button>
+          ))
+        }
       </div>,
       document.body
     )}

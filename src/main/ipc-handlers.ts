@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, nativeTheme, app } from 'electron'
-import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
+import { readFile, writeFile, readdir, mkdir, unlink, rename, rm } from 'fs/promises'
 import { join, extname, relative, basename } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
@@ -108,6 +108,29 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('workspace:deleteFile', async (_event, filePath: string) => {
+    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
+    try {
+      await unlink(filePath)
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('workspace:moveFile', async (_event, sourcePath: string, targetDir: string) => {
+    if (!isPathAuthorized(sourcePath) || !isPathAuthorized(targetDir)) return { success: false, error: 'Path not authorized' }
+    try {
+      const fileName = basename(sourcePath)
+      const destPath = join(targetDir, fileName)
+      if (existsSync(destPath)) return { success: false, error: '目标目录已存在同名文件' }
+      await rename(sourcePath, destPath)
+      return { success: true, newPath: destPath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('workspace:openDirectoryDialog', async () => {
     try {
       const window = getMainWindow()
@@ -154,6 +177,24 @@ export function registerIpcHandlers(): void {
     } catch (err) {
       console.error('Failed to create workspace:', err)
       return null
+    }
+  })
+
+  ipcMain.handle('workspace:deleteWorkspace', async (_event, dirPath: string) => {
+    if (!isPathAuthorized(dirPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      await rm(dirPath, { recursive: true, force: true })
+      removeAuthorizedDirectory(dirPath)
+      const dirs = getAuthorizedDirectories()
+      if (dirs.length > 0) {
+        await fileIndexService.init(dirs[0])
+      } else {
+        fileIndexService.destroy()
+      }
+      pushSettingsToRenderer()
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
     }
   })
 
