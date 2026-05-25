@@ -824,6 +824,117 @@
   height: auto;
 }
 
+.mermaid-diagram-wrapper {
+  position: relative;
+}
+
+.mermaid-diagram-wrapper:hover .mermaid-expand-btn {
+  opacity: 1;
+}
+
+.mermaid-expand-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+  cursor: pointer;
+}
+
+.mermaid-expand-btn:hover {
+  color: var(--color-action);
+  background: var(--color-bg-tertiary);
+}
+
+/* Mermaid overlay */
+.mermaid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-overlay-heavy);
+  user-select: none;
+  -webkit-user-select: none;
+  animation: mermaid-overlay-in 0.2s ease-out;
+}
+
+@keyframes mermaid-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mermaid-overlay-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  margin: var(--space-lg) auto 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  z-index: 1;
+  flex-shrink: 0;
+  width: fit-content;
+}
+
+.mermaid-overlay-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.mermaid-overlay-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.mermaid-overlay-scale {
+  min-width: 44px;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mermaid-overlay-canvas {
+  flex: 1 !important;
+  width: 100% !important;
+  height: auto !important;
+  cursor: grab;
+}
+
+.mermaid-overlay-canvas:active {
+  cursor: grabbing;
+}
+
+.mermaid-overlay-content {
+  pointer-events: none;
+}
+
+.mermaid-overlay-content svg {
+  max-width: none !important;
+  max-height: none !important;
+  pointer-events: none !important;
+}
+
 .mermaid-error {
   padding: 8px 12px;
   font-family: var(--font-mono);

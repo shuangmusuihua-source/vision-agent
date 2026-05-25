@@ -1,6 +1,8 @@
 import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react'
+import { createPortal } from 'react-dom'
 import { useCallback, useState, useRef, useEffect } from 'react'
-import { Copy, ChartBar } from '@phosphor-icons/react'
+import { Copy, ChartBar, ArrowsOutSimple, X, MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 // Lazy-loaded mermaid — only imported when a mermaid code block is encountered
 let mermaidModule: typeof import('mermaid').default | null = null
@@ -20,10 +22,58 @@ function getMermaidTheme(): 'dark' | 'default' {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
 }
 
+function MermaidOverlay({ svg, onClose }: { svg: string; onClose: () => void }): React.ReactElement {
+  const stableOnClose = useCallback(onClose, [])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') stableOnClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [stableOnClose])
+
+  return createPortal(
+    <div className="mermaid-overlay">
+      <TransformWrapper
+        initialScale={1}
+        minScale={0.2}
+        maxScale={10}
+        centerOnInit
+        limitToBounds={false}
+      >
+        {({ zoomIn, zoomOut, resetTransform, state }) => (
+          <>
+            <div className="mermaid-overlay-toolbar">
+              <button className="mermaid-overlay-btn" onClick={() => zoomIn()} title="放大">
+                <MagnifyingGlassPlus size={16} weight="bold" />
+              </button>
+              <span className="mermaid-overlay-scale">{Math.round(state.scale * 100)}%</span>
+              <button className="mermaid-overlay-btn" onClick={() => zoomOut()} title="缩小">
+                <MagnifyingGlassMinus size={16} weight="bold" />
+              </button>
+              <button className="mermaid-overlay-btn" onClick={() => resetTransform()} title="重置">1:1</button>
+              <button className="mermaid-overlay-btn" onClick={stableOnClose} title="关闭 (Esc)">
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+            <TransformComponent
+                wrapperClass="mermaid-overlay-canvas"
+                contentClass="mermaid-overlay-content"
+              >
+                <div dangerouslySetInnerHTML={{ __html: svg }} />
+              </TransformComponent>
+          </>
+        )}
+      </TransformWrapper>
+    </div>,
+    document.body
+  )
+}
+
 function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement {
   const [copied, setCopied] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [mermaidError, setMermaidError] = useState<string | null>(null)
+  const [overlaySvg, setOverlaySvg] = useState<string | null>(null)
   const codeRef = useRef<HTMLPreElement>(null)
   const mermaidRef = useRef<HTMLDivElement>(null)
   const language = node.attrs.language as string | null
@@ -132,7 +182,16 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
               <pre>{mermaidError}</pre>
             </div>
           ) : (
-            <div ref={mermaidRef} className="mermaid-diagram" />
+            <div ref={mermaidRef} className="mermaid-diagram" onClick={() => {
+              if (mermaidRef.current?.innerHTML) setOverlaySvg(mermaidRef.current.innerHTML)
+            }} />
+          )}
+          {!mermaidError && !showSource && (
+            <button className="mermaid-expand-btn" onClick={() => {
+              if (mermaidRef.current?.innerHTML) setOverlaySvg(mermaidRef.current.innerHTML)
+            }} title="放大预览">
+              <ArrowsOutSimple size={14} weight="bold" />
+            </button>
           )}
         </div>
       ) : (
@@ -140,6 +199,7 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
           <NodeViewContent className="code-block-content" />
         </pre>
       )}
+      {overlaySvg && <MermaidOverlay svg={overlaySvg} onClose={() => setOverlaySvg(null)} />}
     </NodeViewWrapper>
   )
 }
