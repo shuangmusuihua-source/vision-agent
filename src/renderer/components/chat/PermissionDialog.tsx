@@ -13,8 +13,7 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') onRespond(request.id, 'allow')
-      else if (e.key === 'Escape') onRespond(request.id, 'deny')
+      if (e.key === 'Escape') onRespond(request.id, 'deny')
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)

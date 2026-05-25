@@ -1,5 +1,6 @@
 import Store from 'electron-store'
 import { safeStorage } from 'electron'
+import type { ModelProfile } from '../shared/types'
 
 const ENCRYPTION_PREFIX = 'enc:'
 
@@ -23,15 +24,6 @@ function decryptValue(encrypted: string): string {
 function maskApiKey(key: string): string {
   if (!key || key.length < 8) return '***'
   return key.slice(0, 4) + '***' + key.slice(-4)
-}
-
-interface ModelProfile {
-  id: string
-  name: string
-  apiKey: string
-  apiProvider: string
-  baseUrl: string
-  model: string
 }
 
 export interface CronTask {

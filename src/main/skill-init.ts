@@ -33,8 +33,6 @@ export function initAppSkills(): void {
     // Copy entire skill directory
     copyDirRecursive(srcDir, destDir)
   }
-
-  console.log(`[SkillInit] Skills initialized at ${appSkillsDir}`)
 }
 
 function getBuiltInSkillsRoot(): string {

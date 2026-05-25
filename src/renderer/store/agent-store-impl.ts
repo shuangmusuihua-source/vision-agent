@@ -168,6 +168,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   // State
   messages: [],
   isStreaming: false,
+  isResumingSession: false,
   agentState: 'idle',
   currentSessionId: null,
   usageInfo: null,

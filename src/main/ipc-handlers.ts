@@ -3,7 +3,7 @@ import { readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises'
 import { join, extname, relative, basename } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
-import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages } from './agent-manager'
+import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, abortActiveQuery } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { getBuiltinSkills } from './skills/builtin'
 import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './semantic-extractor'
@@ -279,7 +279,6 @@ export function registerIpcHandlers(): void {
 
   // --- Agent ---
   ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string) => {
-    console.log('[IPC] agent:sendMessage called, prompt length:', prompt?.length, 'sessionId:', sessionId)
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
     sendMessage(window, prompt, sessionId, activeFilePath)
@@ -304,6 +303,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('agent:loadSessionMessages', async (_event, sessionId: string) => {
     return await loadSdkSessionMessages(sessionId)
+  })
+
+  ipcMain.handle('agent:abort', () => {
+    abortActiveQuery()
+    return { success: true }
   })
 
   // --- Memory ---

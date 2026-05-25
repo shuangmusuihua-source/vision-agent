@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } from '@phosphor-icons/react'
@@ -30,7 +30,7 @@ interface MessageBubbleProps {
   workspacePath?: string
 }
 
-function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
+const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
@@ -214,6 +214,6 @@ function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: Mes
       )}
     </div>
   )
-}
+})
 
 export default MessageBubble

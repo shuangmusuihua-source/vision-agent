@@ -21,7 +21,6 @@ export function restorePersistedTasks(): void {
     } as any)
     tasks.set(task.id, { task, job })
   }
-  console.log(`[CronManager] Restored ${persisted.length} persisted tasks`)
 }
 
 export function registerTask(
@@ -101,8 +100,9 @@ export async function executeTask(task: CronTask): Promise<void> {
     let result = ''
     for await (const message of messageStream) {
       if (message.type === 'assistant') {
-        for (const block of (message as any).content) {
-          if (block.type === 'text') result += block.text
+        const blocks: Array<{ type: string; text?: string }> = (message as any).content ?? []
+        for (const block of blocks) {
+          if (block.type === 'text' && block.text) result += block.text
         }
       }
     }

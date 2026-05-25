@@ -9,18 +9,10 @@ import type {
   GraphNode,
   GraphEdge,
   FileEntry,
+  ModelProfile,
 } from '../../shared/types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
-
-interface ModelProfile {
-  id: string
-  name: string
-  apiKey: string
-  apiProvider: string
-  baseUrl: string
-  model: string
-}
 
 // ─── App Settings ────────────────────────────────────────────────────
 
@@ -110,6 +102,7 @@ interface AgentApi {
   respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
   listSdkSessions: () => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
+  abort: () => Promise<{ success: boolean }>
 
   // Unified event channel
   onEvent: (callback: (msg: AgentIPCMessage) => void) => () => void

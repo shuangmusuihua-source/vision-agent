@@ -363,6 +363,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onNewWorkspace={handleOpenNewWorkspaceModal}
         onRefreshWorkspace={handleRefreshWorkspace}
         onRemoveWorkspace={async (path) => {
+          if (!window.confirm('确定移除此工作区？文件不会被删除，仅从侧栏移除。')) return
           setWorkspacePaths((prev) => prev.filter((p) => p !== path))
           setFiles((prev) => {
             const next = { ...prev }

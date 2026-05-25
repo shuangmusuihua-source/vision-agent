@@ -20,6 +20,7 @@ export type AgentStore = {
   // Public state
   messages: ConversationMessage[]
   isStreaming: boolean
+  isResumingSession: boolean
   agentState: AgentState
   currentSessionId: string | null
   usageInfo: UsageInfo | null

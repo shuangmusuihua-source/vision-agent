@@ -1,6 +1,17 @@
 // Shared types for Agent Panel — used by Main, Preload, and Renderer
 // All discriminated unions defined here; no `Record<string, unknown>` downstream.
 
+// ─── Model Profile ──────────────────────────────────────────────────
+
+export interface ModelProfile {
+  id: string
+  name: string
+  apiKey: string
+  apiProvider: string
+  baseUrl: string
+  model: string
+}
+
 // ─── Content Blocks ──────────────────────────────────────────────────
 
 export type TextBlock = {

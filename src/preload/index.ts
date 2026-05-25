@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentIPCMessage, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo } from '../shared/types'
+import type { AgentIPCMessage, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile } from '../shared/types'
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -56,6 +56,7 @@ const api = {
     listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
+    abort: () => ipcRenderer.invoke('agent:abort'),
 
     // ── Unified event channel ────────────────────────────────────────
     // All SDK messages (assistant, user, result, stream_event, system)
@@ -167,15 +168,6 @@ const api = {
       return () => { ipcRenderer.removeListener('update:downloaded', handler) }
     }
   }
-}
-
-interface ModelProfile {
-  id: string
-  name: string
-  apiKey: string
-  apiProvider: string
-  baseUrl: string
-  model: string
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -36,6 +36,7 @@
   --color-bg-primary:   var(--color-white);
   --color-bg-secondary: var(--color-gray-50);
   --color-bg-tertiary:  var(--color-gray-100);
+  --color-bg-elevated:  var(--color-white);
   --color-bg-hover:     var(--color-gray-200);
   --color-bg-glass:     rgba(255, 255, 255, 0.42);
 
@@ -58,6 +59,13 @@
   --color-success: var(--color-green-500);
   --color-error:   var(--color-red-500);
   --color-warning: var(--color-amber-500);
+  --color-danger:  var(--color-error);
+  --color-danger-bg: rgba(239, 68, 68, 0.08);
+
+  /* Surface & Accent */
+  --color-surface: var(--color-bg-primary);
+  --color-accent:  #2383e2;
+  --color-mark:    rgba(37, 99, 235, 0.15);
 
   /* ── Layer 3: Component Tokens ─────────────────────────────── */
 
@@ -141,6 +149,10 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-xs: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-sidebar: -2px 0 12px rgba(0, 0, 0, 0.06);
+  --color-overlay: rgba(0, 0, 0, 0.3);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.5);
 
   /* ── Motion ────────────────────────────────────────────────── */
 
@@ -198,6 +210,7 @@
   --color-bg-primary:   #1e1e1e;
   --color-bg-secondary: #252525;
   --color-bg-tertiary:  #2a2a2a;
+  --color-bg-elevated:  #303030;
   --color-bg-hover:     #333333;
   --color-bg-glass:     rgba(30, 30, 30, 0.42);
 
@@ -216,6 +229,10 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.16);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.24);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.32);
+  --shadow-xs: 0 2px 8px rgba(0, 0, 0, 0.16);
+  --shadow-sidebar: -2px 0 12px rgba(0, 0, 0, 0.15);
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.7);
 
   --sidebar-glass-border: var(--color-border-soft);
 }

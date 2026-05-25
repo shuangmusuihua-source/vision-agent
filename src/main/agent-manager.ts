@@ -139,7 +139,6 @@ export function resolveAskUser(requestId: string, answer: string): void {
   }
   pendingAskUser.delete(requestId)
   clearTimeout(pending.timeout)
-  try { console.log(`[AgentManager] resolveAskUser: ${requestId} — answer: "${answer}"`) } catch {}
 
   // Build answers map keyed by question text
   const questions = pending.originalInput.questions as Array<Record<string, unknown>> | undefined
@@ -231,8 +230,6 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
         })) || []
         const multiSelect = (firstQ?.multiSelect as boolean) || false
 
-        console.log(`[AgentManager] AskUserQuestion: ${requestId} — "${question}"`)
-
         mainWindow.webContents.send('agent:askUser', {
           id: requestId,
           question,
@@ -308,6 +305,19 @@ function extractPathFromToolInput(
 
 // Guard against concurrent sendMessage calls
 let _activeQuery: Query | null = null
+let _activeAbortController: AbortController | null = null
+
+export function abortActiveQuery(): void {
+  if (_activeQuery) {
+    try { (_activeQuery as any).abort() } catch {}
+    _activeQuery = null
+    _activeAbortController = null
+  }
+  if (_activeAbortController) {
+    _activeAbortController.abort()
+    _activeAbortController = null
+  }
+}
 
 export async function sendMessage(
   mainWindow: BrowserWindow,
@@ -319,6 +329,7 @@ export async function sendMessage(
   if (_activeQuery) {
     try { (_activeQuery as any).abort() } catch {}
     _activeQuery = null
+    _activeAbortController = null
   }
 
   const options = buildOptions(mainWindow, activeFilePath)
@@ -333,8 +344,6 @@ export async function sendMessage(
       }
     })
     _activeQuery = messageStream as Query
-
-    console.log('[AgentManager] query started, waiting for messages...')
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
@@ -362,17 +371,28 @@ export async function sendMessage(
     // Send a session-level completion notification only.
     notifyAgentComplete(currentSessionId || '')
   } catch (err) {
-    // Query itself threw (not an SDK error result) — emit error via unified channel
+    const errMsg = (err as Error).message || String(err)
+    let userMessage = errMsg
+    if (!getApiKey() && !process.env.ANTHROPIC_API_KEY) {
+      userMessage = '未配置 API Key。请在设置中添加 Anthropic API Key 后重试。'
+    } else if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|net::/i.test(errMsg)) {
+      userMessage = '网络连接失败，请检查网络后重试。'
+    } else if (/401|authentication|invalid.api.key|invalid_api_key/i.test(errMsg)) {
+      userMessage = 'API Key 无效，请在设置中检查配置。'
+    } else if (/429|rate.limit|quota/i.test(errMsg)) {
+      userMessage = '请求频率过高，请稍后重试。'
+    }
     mainWindow.webContents.send('agent:event', {
       type: 'result',
       subtype: 'error',
-      errors: [(err as Error).message],
+      errors: [userMessage],
       usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
       total_cost_usd: 0,
       duration_ms: 0,
     } as AgentIPCMessage)
   } finally {
     _activeQuery = null
+    _activeAbortController = null
   }
 }
 
@@ -515,7 +535,6 @@ export async function listSdkSessions(): Promise<Array<{ id: string; title?: str
   const cwd = getAppSkillsCwd()
   try {
     const result = await listSessions({ dir: cwd })
-    console.log('[AgentManager] listSessions returned', result.length, 'sessions from cwd:', cwd)
     return result.map((s) => ({
       id: s.sessionId,
       title: s.customTitle || s.summary || s.firstPrompt,

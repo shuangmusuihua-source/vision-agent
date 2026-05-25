@@ -326,6 +326,43 @@
   color: var(--color-text-tertiary);
 }
 
+.chat-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.chat-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.chat-load-more:hover {
+  color: var(--color-text-primary);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* --- Message Bubble --- */
 
 .message-bubble {
@@ -530,6 +567,15 @@
 
 .chat-input-container {
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-input-disabled-hint {
+  text-align: center;
+  padding: 4px 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
 }
 
 .chat-input-wrapper {

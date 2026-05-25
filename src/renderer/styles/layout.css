@@ -932,7 +932,7 @@
 .daydream-picker {
   position: fixed;
   background: #ffffff;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 6px;
   min-width: 140px;
@@ -946,7 +946,7 @@
 }
 .daydream-picker-title {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   padding: 4px 8px 6px;
   font-weight: 500;
 }
@@ -958,14 +958,14 @@
   padding: 6px 8px;
   border: none;
   background: none;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-size: 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
 }
 .daydream-picker-item:hover {
-  background: var(--bg-hover);
+  background: var(--color-bg-hover);
 }
 .daydream-picker-preview {
   width: 24px;

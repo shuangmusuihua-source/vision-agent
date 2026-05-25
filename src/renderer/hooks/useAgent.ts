@@ -41,6 +41,7 @@ export function useAgent() {
     if (state.agentState === 'thinking' || state.agentState === 'running' || state.agentState === 'compacting') {
       watchdogRef.current = setTimeout(() => {
         console.warn('[useAgent] Watchdog: agent stuck for 120s, forcing abort')
+        window.api.agent.abort()
         store.getState().dispatchAgentEvent({ type: 'ABORT' })
         store.setState((s) => ({
           messages: [...s.messages, {
@@ -100,10 +101,11 @@ export function useAgent() {
 
   // ─── Actions ────────────────────────────────────────────────────────
 
-  const sendMessage = useCallback((prompt: string, activeFilePath?: string) => {
+  const sendMessage = useCallback(async (prompt: string, activeFilePath?: string) => {
     const state = store.getState()
     if (state.agentState !== 'idle' && state.agentState !== 'error') {
       state.dispatchAgentEvent({ type: 'ABORT' })
+      await window.api.agent.abort()
     }
     // Add user message bubble immediately
     store.setState((s) => ({
@@ -119,8 +121,8 @@ export function useAgent() {
       isStreaming: true,
       agentState: 'thinking',
     }))
-    state.dispatchAgentEvent({ type: 'SEND_MESSAGE' })
-    window.api.agent.sendMessage(prompt, state.currentSessionId || undefined, activeFilePath)
+    store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' })
+    window.api.agent.sendMessage(prompt, store.getState().currentSessionId || undefined, activeFilePath)
     resetWatchdog()
   }, [store])
 
@@ -139,6 +141,7 @@ export function useAgent() {
     store.setState({
       messages: [],
       isStreaming: false,
+      isResumingSession: false,
       currentSessionId: null,
       usageInfo: null,
       agentState: 'idle',
@@ -154,7 +157,6 @@ export function useAgent() {
   const loadSessions = useCallback(async () => {
     try {
       const sessions = await window.api.agent.listSdkSessions()
-      console.log('[useAgent] loadSessions returned', sessions.length, 'sessions')
       store.setState({ sessionList: sessions })
     } catch (err) {
       console.error('[useAgent] Failed to load sessions:', err)
@@ -165,6 +167,7 @@ export function useAgent() {
     store.setState({
       messages: [],
       isStreaming: false,
+      isResumingSession: true,
       currentSessionId: sessionId,
       usageInfo: null,
       agentState: 'idle',
@@ -180,6 +183,8 @@ export function useAgent() {
       }
     } catch (err) {
       console.error('[useAgent] Failed to resume session:', err)
+    } finally {
+      store.setState({ isResumingSession: false })
     }
   }, [store])
 
@@ -205,3 +210,4 @@ export const useAskUserRequest = () => useAgentStore((s) => s.askUserRequest)
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useLastEditedFile = () => useAgentStore((s) => s.lastEditedFile)
 export const useActiveSkillId = () => useAgentStore((s) => s.activeSkillId)
+export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)

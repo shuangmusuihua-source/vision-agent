@@ -125,6 +125,9 @@ function ChatInput({ onSend, onSkillSelect, disabled, placeholder, prefill, onPr
 
   return (
     <div className="chat-input-container">
+      {disabled && (
+        <div className="chat-input-disabled-hint">Agent 正在思考…</div>
+      )}
       <div className="chat-input-wrapper">
         <textarea
           ref={inputRef}

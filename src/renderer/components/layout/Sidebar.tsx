@@ -85,6 +85,7 @@ function Sidebar({
   }, [memoryRefreshKey, refreshMemory])
 
   const handleDeleteMemory = useCallback(async (filePath: string) => {
+    if (!window.confirm('确定删除此记忆文件？此操作不可撤销。')) return
     await window.api.memory.delete(filePath)
     refreshMemory()
   }, [refreshMemory])
