@@ -197,9 +197,6 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
               </ReactMarkdown>
             </div>
           )}
-          {isStreaming && !displayContent && !message.toolCalls?.length && !skillOutput && (
-            <span className="message-streaming-dots">· · ·</span>
-          )}
         </div>
       )}
       {selectionBtn && onSelectText && (

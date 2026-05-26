@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
 import { ChatCircleDots, CaretUp, Spinner } from '@phosphor-icons/react'
-import { useMessages, useIsStreaming, useIsResumingSession } from '../../hooks/useAgent'
+import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
 import type { ConversationMessage } from '../../../shared/types'
 
@@ -16,6 +16,7 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
   const messages = useMessages()
   const isStreaming = useIsStreaming()
   const isResuming = useIsResumingSession()
+  const agentState = useAgentStatus()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState(RENDER_BATCH)
 
@@ -33,6 +34,13 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
     }
     prevMsgCount.current = messages.length
   }, [messages.length])
+
+  // Scroll when thinking indicator appears
+  useEffect(() => {
+    if (isStreaming && agentState === 'thinking') {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [isStreaming && agentState === 'thinking'])
 
   useEffect(() => {
     setVisibleCount(RENDER_BATCH)
@@ -65,6 +73,16 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
           workspacePath={workspacePath}
         />
       ))}
+      {isStreaming && agentState === 'thinking' && (
+        <div className="message-bubble message-assistant message-thinking-indicator">
+          <div className="message-status-indicator">
+            思考中
+            <span className="status-dot" />
+            <span className="status-dot" />
+            <span className="status-dot" />
+          </div>
+        </div>
+      )}
       <div ref={bottomRef} />
     </div>
   )

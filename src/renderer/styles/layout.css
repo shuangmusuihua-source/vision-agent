@@ -937,35 +937,40 @@
   flex-direction: column;
   overflow: hidden;
   padding: 0 16px;
-  position: relative;
 }
 
 .agent-panel-content {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-bottom: 80px;
 }
 
 .agent-panel-messages {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .agent-panel-footer {
-  position: absolute;
-  bottom: 16px;
-  left: 10%;
-  right: 10%;
+  flex-shrink: 0;
+  pointer-events: none;
   padding: 6px 12px;
+  margin: 8px 10% 12px;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-xl);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   -electron-corner-smoothing: system-ui;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-panel-footer > * {
+  pointer-events: auto;
 }
 
 .sidebar-toggle-btn:focus-visible,

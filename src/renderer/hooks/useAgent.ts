@@ -21,6 +21,14 @@ import type {
 
 const WATCHDOG_TIMEOUT = 120_000 // 2 minutes
 
+type ActiveAgentState = 'thinking' | 'running' | 'compacting'
+
+const ACTIVE_STATES: Set<string> = new Set(['thinking', 'running', 'compacting'])
+
+function isAgentActive(state: string): state is ActiveAgentState {
+  return ACTIVE_STATES.has(state)
+}
+
 /**
  * useAgent — thin IPC subscription layer with watchdog timer.
  *
@@ -28,17 +36,26 @@ const WATCHDOG_TIMEOUT = 120_000 // 2 minutes
  * This hook's only job:
  *   1. Subscribe to IPC events on mount
  *   2. Forward typed messages to store.processIPCMessage
- *   3. Reset watchdog on each IPC event (proof agent is alive)
+ *   3. Manage watchdog lifecycle driven by agentState
  *   4. Expose concise action functions for UI components
+ *
+ * Watchdog lifecycle:
+ *   - Start/restart: when agentState enters an active state (thinking/running/compacting)
+ *   - Kill:         when agentState enters a terminal state (idle/error/waitingForUserInput)
+ *   - Refresh:      on each IPC event while active (resets the countdown)
+ *   No IPC event can start a watchdog — only the state transition does.
  */
 export function useAgent() {
   const store = useAgentStore
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const resetWatchdog = useCallback(() => {
-    if (watchdogRef.current) clearTimeout(watchdogRef.current)
-    const state = store.getState()
-    if (state.agentState === 'thinking' || state.agentState === 'running' || state.agentState === 'compacting') {
+  // ─── Watchdog: start / kill driven by agentState ─────────────────────
+  const agentState = store((s) => s.agentState)
+
+  useEffect(() => {
+    if (isAgentActive(agentState)) {
+      // Agent is active — ensure watchdog is running
+      if (watchdogRef.current) clearTimeout(watchdogRef.current)
       watchdogRef.current = setTimeout(() => {
         console.warn('[useAgent] Watchdog: agent stuck for 120s, forcing abort')
         window.api.agent.abort()
@@ -55,38 +72,68 @@ export function useAgent() {
           }],
         }))
       }, WATCHDOG_TIMEOUT)
+    } else {
+      // Agent is idle/error/waitingForUserInput — kill watchdog
+      if (watchdogRef.current) {
+        clearTimeout(watchdogRef.current)
+        watchdogRef.current = null
+      }
     }
+
+    return () => {
+      if (watchdogRef.current) {
+        clearTimeout(watchdogRef.current)
+        watchdogRef.current = null
+      }
+    }
+  }, [agentState, store])
+
+  // ─── Watchdog: refresh on IPC events (only while active) ────────────
+  const refreshWatchdog = useCallback(() => {
+    if (!watchdogRef.current) return // not active, nothing to refresh
+    clearTimeout(watchdogRef.current)
+    watchdogRef.current = setTimeout(() => {
+      console.warn('[useAgent] Watchdog: agent stuck for 120s, forcing abort')
+      window.api.agent.abort()
+      store.getState().dispatchAgentEvent({ type: 'ABORT' })
+      store.setState((s) => ({
+        messages: [...s.messages, {
+          id: `watchdog-${Date.now()}`,
+          role: 'system',
+          phase: 'complete',
+          textContent: '⏱ Agent 响应超时，已自动终止',
+          content: [{ type: 'text', text: '⏱ Agent 响应超时，已自动终止' }],
+          toolCalls: [],
+          createdAt: Date.now(),
+        }],
+      }))
+    }, WATCHDOG_TIMEOUT)
   }, [store])
 
   // ─── IPC Subscriptions ──────────────────────────────────────────────
   useEffect(() => {
-    // Unified agent:event channel
     const unsubEvent = window.api.agent.onEvent((msg: AgentIPCMessage) => {
       store.getState().processIPCMessage(msg)
-      resetWatchdog()
+      refreshWatchdog()
     })
 
-    // Permission request (separate channel for request/response pattern)
     const unsubPerm = window.api.agent.onPermissionRequest((req: PermissionRequestIPC) => {
       store.getState().handlePermissionRequest(req)
-      resetWatchdog()
+      refreshWatchdog()
     })
 
-    // AskUser request
     const unsubAsk = window.api.agent.onAskUser((req: AskUserRequestIPC) => {
       store.getState().handleAskUserRequest(req)
-      resetWatchdog()
+      refreshWatchdog()
     })
 
-    // AskUser timeout
     const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: { requestId: string }) => {
       store.getState().handleAskUserTimeout(data.requestId)
     })
 
-    // Session created
     const unsubSession = window.api.agent.onSessionCreated((sessionId: string) => {
       store.setState({ currentSessionId: sessionId })
-      resetWatchdog()
+      refreshWatchdog()
     })
 
     return () => {
@@ -95,9 +142,8 @@ export function useAgent() {
       unsubAsk()
       unsubAskTimeout()
       unsubSession()
-      if (watchdogRef.current) clearTimeout(watchdogRef.current)
     }
-  }, [store, resetWatchdog])
+  }, [store, refreshWatchdog])
 
   // ─── Actions ────────────────────────────────────────────────────────
 
@@ -107,7 +153,6 @@ export function useAgent() {
       state.dispatchAgentEvent({ type: 'ABORT' })
       await window.api.agent.abort()
     }
-    // Add user message bubble immediately
     store.setState((s) => ({
       messages: [...s.messages, {
         id: `user-${Date.now()}`,
@@ -123,7 +168,6 @@ export function useAgent() {
     }))
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' })
     window.api.agent.sendMessage(prompt, store.getState().currentSessionId || undefined, activeFilePath)
-    resetWatchdog()
   }, [store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
@@ -177,7 +221,6 @@ export function useAgent() {
 
     try {
       const messages = await window.api.agent.loadSessionMessages(sessionId)
-      // Replay historical messages as complete (no streaming)
       for (const msg of messages) {
         store.getState().processIPCMessage(msg, { isReplay: true })
       }

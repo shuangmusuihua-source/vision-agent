@@ -199,10 +199,21 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         updates.isStreaming = false
         updates._acc = null
         updates._firstContentSeen = false
+        updates.activeSkillId = null
         // Finalize any messages still in non-complete phase
         const msgs = (updates.messages || state.messages).map((m) =>
           m.phase !== 'complete' && m.phase !== 'error' ? { ...m, phase: 'complete' as const } : m
         )
+        // Update skillMeta status on skill completion
+        const skillId = state.activeSkillId
+        if (skillId) {
+          for (let i = 0; i < msgs.length; i++) {
+            if (msgs[i].skillMeta?.id === skillId) {
+              msgs[i] = { ...msgs[i], skillMeta: { ...msgs[i].skillMeta!, status: 'completed' } }
+              break
+            }
+          }
+        }
         // Extract artifacts
         const finalMsgs = [...msgs]
         for (let i = msgs.length - 1; i >= 0; i--) {
@@ -227,9 +238,19 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         updates.isStreaming = false
         updates._acc = null
         updates._firstContentSeen = false
+        updates.activeSkillId = null
         const msgs = state.messages.map((m) =>
           m.phase !== 'complete' ? { ...m, phase: 'error' as const } : m
         )
+        const skillId = state.activeSkillId
+        if (skillId) {
+          for (let i = 0; i < msgs.length; i++) {
+            if (msgs[i].skillMeta?.id === skillId) {
+              msgs[i] = { ...msgs[i], skillMeta: { ...msgs[i].skillMeta!, status: 'error' } }
+              break
+            }
+          }
+        }
         updates.messages = msgs
       }
 

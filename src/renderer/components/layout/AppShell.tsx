@@ -424,10 +424,25 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     setTabContents((prev) => ({ ...prev, [filePath]: content }))
   }, [])
 
-  // Auto-reload editor and memory when Agent finishes
+  // Auto-reload editor, memory, and sidebar file list when Agent finishes
   useEffect(() => {
     if (!isStreaming && useAgentStore.getState().messages.length > 0) {
       setMemoryRefreshKey((k) => k + 1)
+      // Refresh sidebar file lists for all workspaces
+      Promise.all(
+        workspacePaths.map(async (dir) => {
+          const entries = await window.api.workspace.listFiles(dir)
+          return { dir, entries }
+        })
+      ).then((results) => {
+        setFiles((prev) => {
+          const next = { ...prev }
+          for (const { dir, entries } of results) {
+            next[dir] = entries
+          }
+          return next
+        })
+      })
       if (activeTab) {
         const timer = setTimeout(() => {
           window.api.workspace.readFile(activeTab).then((result) => {
@@ -444,7 +459,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         return () => clearTimeout(timer)
       }
     }
-  }, [isStreaming, activeTab])
+  }, [isStreaming, activeTab, workspacePaths])
 
   const handleSelectText = useCallback((text: string) => {
     setPrefillText(text)
