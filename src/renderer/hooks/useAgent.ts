@@ -66,8 +66,8 @@ export function useAgent() {
             id: `watchdog-${Date.now()}`,
             role: 'system',
             phase: 'complete',
-            textContent: '⏱ Agent 响应超时，已自动终止',
-            content: [{ type: 'text', text: '⏱ Agent 响应超时，已自动终止' }],
+            textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+            content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
             toolCalls: [],
             createdAt: Date.now(),
           }],
@@ -102,8 +102,8 @@ export function useAgent() {
           id: `watchdog-${Date.now()}`,
           role: 'system',
           phase: 'complete',
-          textContent: '⏱ Agent 响应超时，已自动终止',
-          content: [{ type: 'text', text: '⏱ Agent 响应超时，已自动终止' }],
+          textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+          content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
           toolCalls: [],
           createdAt: Date.now(),
         }],
@@ -139,6 +139,7 @@ export function useAgent() {
 
     const unsubSkillOutput = window.api.agent.onSkillOutput((state) => {
       store.getState().handleSkillOutput(state)
+      refreshWatchdog()
     })
 
     return () => {

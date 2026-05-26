@@ -25,6 +25,14 @@ const builtinSkills: SkillDefinition[] = [
     promptTemplate: `使用 guizang-ppt-skill skill 接下来制作 PPT... {activeFile}`,
     outputMode: 'write',
   },
+  {
+    id: 'frontend-slides',
+    name: 'Slides · 前端',
+    description: '创建动画丰富的 HTML 演示文稿，支持 PPT 转换和 34 种风格模板',
+    icon: 'PresentationChart',
+    promptTemplate: `使用 frontend-slides skill 接下来制作演示文稿... {activeFile}`,
+    outputMode: 'write',
+  },
 ]
 
 export function getBuiltinSkills(): SkillDefinition[] {
