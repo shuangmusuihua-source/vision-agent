@@ -9,6 +9,7 @@ import { getSettings, getAuthorizedDirectories } from './store'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
+import { setSkillOutputWindow } from './agent-manager'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -106,6 +107,9 @@ app.whenReady().then(() => {
   restorePersistedTasks()
 
   createWindow()
+
+  const win = getMainWindow()
+  if (win) setSkillOutputWindow(win)
 
   // Auto-updater: check for updates after launch (production only)
   if (app.isPackaged) {

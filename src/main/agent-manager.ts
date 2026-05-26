@@ -6,6 +6,7 @@ import { join } from 'path'
 import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
+import { SkillOutputBridge } from './skill-output-bridge'
 import type { AgentIPCMessage, AskUserQuestionOption } from '../shared/types'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
@@ -306,6 +307,8 @@ function extractPathFromToolInput(
 // Guard against concurrent sendMessage calls
 let _activeQuery: Query | null = null
 let _activeAbortController: AbortController | null = null
+let _activeSkillId: string | null = null
+const _skillOutputBridge = new SkillOutputBridge()
 
 export function abortActiveQuery(): void {
   if (_activeQuery) {
@@ -317,6 +320,14 @@ export function abortActiveQuery(): void {
     _activeAbortController.abort()
     _activeAbortController = null
   }
+}
+
+export function setSkillOutputWindow(win: BrowserWindow): void {
+  _skillOutputBridge.setWindow(win)
+}
+
+export function setActiveSkillId(skillId: string | null): void {
+  _activeSkillId = skillId
 }
 
 export async function sendMessage(
@@ -331,6 +342,8 @@ export async function sendMessage(
     _activeQuery = null
     _activeAbortController = null
   }
+
+  _skillOutputBridge.reset()
 
   const options = buildOptions(mainWindow, activeFilePath)
   let currentSessionId = sessionId
@@ -347,6 +360,10 @@ export async function sendMessage(
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
+
+      // Feed raw SDK event to skill output bridge (before conversion)
+      _skillOutputBridge.processRawEvent(message as Record<string, unknown>, _activeSkillId)
+
       // Convert and emit via unified agent:event channel
       const ipcMsg = toAgentIPCMessage(message)
       if (ipcMsg) {

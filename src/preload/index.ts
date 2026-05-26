@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentIPCMessage, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile } from '../shared/types'
+import type { AgentIPCMessage, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile, SkillOutputState } from '../shared/types'
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -54,8 +54,8 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string) =>
+      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId),
     getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
@@ -98,6 +98,12 @@ const api = {
       const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string }) => callback(data)
       ipcRenderer.on('agent:askUserTimeout', handler)
       return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
+    },
+
+    onSkillOutput: (callback: (state: SkillOutputState) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: SkillOutputState) => callback(state)
+      ipcRenderer.on('skill:output', handler)
+      return () => { ipcRenderer.removeListener('skill:output', handler) }
     },
 
     onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => {

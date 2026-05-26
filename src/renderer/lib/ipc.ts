@@ -23,6 +23,13 @@ interface AppSettings {
   theme: 'light' | 'dark' | 'system'
 }
 
+interface SkillOutputState {
+  skillId: string | null
+  content: string
+  isStreaming: boolean
+  language: string
+}
+
 // ─── Skill Definition ────────────────────────────────────────────────
 
 interface SkillDefinition {
@@ -32,6 +39,7 @@ interface SkillDefinition {
   icon: string
   promptTemplate: string
   argumentHint?: string
+  outputMode?: 'skill-output' | 'write'
 }
 
 // ─── Search Result ──────────────────────────────────────────────────
@@ -101,7 +109,7 @@ interface SettingsApi {
 }
 
 interface AgentApi {
-  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string) => Promise<{ started: boolean }>
+  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string) => Promise<{ started: boolean }>
   respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
   respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
   listSdkSessions: () => Promise<SdkSessionInfo[]>
@@ -117,6 +125,7 @@ interface AgentApi {
   onAskUser: (callback: (request: AskUserRequestIPC) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string }) => void) => () => void
   onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => () => void
+  onSkillOutput: (callback: (state: SkillOutputState) => void) => () => void
 }
 
 interface GraphApi {

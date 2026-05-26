@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } from '@phosphor-icons/react'
-import type { ConversationMessage, ToolCallState } from '../../../shared/types'
+import type { ConversationMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillOutputCard from './SkillOutputCard'
@@ -13,14 +13,6 @@ function stripSkillOutputBlock(content: string): string {
   let result = content.replace(/```skill-output\n[\s\S]*?```/g, '')
   result = result.replace(/```skill-output\n[\s\S]*$/g, '')
   return result.trim()
-}
-
-function extractSkillOutputContent(content: string): string | null {
-  const match = content.match(/```skill-output\n([\s\S]*?)```/)
-  if (match) return match[1]
-  const partialMatch = content.match(/```skill-output\n([\s\S]*)$/)
-  if (partialMatch) return partialMatch[1]
-  return null
 }
 
 interface MessageBubbleProps {
@@ -34,10 +26,15 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
-  // In the new model, textContent always holds the current text
   const displayContent = message.textContent
   const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
-  const skillOutput = extractSkillOutputContent(displayContent)
+
+  // Unified skill output from main process bridge (via store)
+  const skillOutput = useAgentStore((s) => s.skillOutput)
+
+  // Only show SkillOutputCard for the last assistant message during streaming
+  const isLastMessage = useAgentStore((s) => s.messages[s.messages.length - 1]?.id === message.id)
+  const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutput.content.length > 0
 
   // Status indicator: system messages with 'thinking' text during streaming
   const isStatusIndicator = message.role === 'system' && message.phase === 'streaming'
@@ -183,11 +180,11 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
               ))}
             </div>
           )}
-          {skillOutput && (
+          {showSkillOutput && (
             <SkillOutputCard
-              content={skillOutput}
-              isStreaming={isStreaming}
-              language="html"
+              content={skillOutput.content}
+              isStreaming={skillOutput.isStreaming}
+              language={skillOutput.language}
             />
           )}
           {displayContent && (

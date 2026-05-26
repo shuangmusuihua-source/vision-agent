@@ -12,6 +12,7 @@ import type {
   AskUserRequestIPC,
   SdkSessionInfo,
   StreamingAccumulator,
+  SkillOutputState,
 } from '../../shared/types'
 
 // ─── Agent Store Interface ─────────────────────────────────────────
@@ -25,6 +26,7 @@ export type AgentStore = {
   currentSessionId: string | null
   usageInfo: UsageInfo | null
   lastEditedFile: string | null
+  skillOutput: SkillOutputState | null
   permissionRequest: PermissionRequestIPC | null
   askUserRequest: AskUserRequestIPC | null
   activeSkillId: string | null
@@ -42,6 +44,7 @@ export type AgentStore = {
   handleAskUserRequest: (req: AskUserRequestIPC) => void
   handleAskUserResponse: (requestId: string, answer: string) => void
   handleAskUserTimeout: (requestId: string) => void
+  handleSkillOutput: (state: SkillOutputState) => void
 }
 
 // ─── Backward-compatible type aliases ────────────────────────────────
@@ -61,4 +64,5 @@ export type {
 // Re-export types that components reference from this module
 export type {
   AskUserQuestionOption,
+  SkillOutputState,
 } from '../../shared/types'

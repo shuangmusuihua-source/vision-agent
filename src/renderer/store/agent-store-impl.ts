@@ -16,6 +16,7 @@ import type {
   AskUserRequestIPC,
   SdkSessionInfo,
   StreamingAccumulator,
+  SkillOutputState,
   SystemInitPayload,
   SystemStatusPayload,
   SystemCompactBoundaryPayload,
@@ -173,6 +174,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   currentSessionId: null,
   usageInfo: null,
   lastEditedFile: null,
+  skillOutput: null,
   permissionRequest: null,
   askUserRequest: null,
   activeSkillId: null,
@@ -200,6 +202,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         updates._acc = null
         updates._firstContentSeen = false
         updates.activeSkillId = null
+        updates.skillOutput = null
         // Finalize any messages still in non-complete phase
         const msgs = (updates.messages || state.messages).map((m) =>
           m.phase !== 'complete' && m.phase !== 'error' ? { ...m, phase: 'complete' as const } : m
@@ -239,6 +242,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         updates._acc = null
         updates._firstContentSeen = false
         updates.activeSkillId = null
+        updates.skillOutput = null
         const msgs = state.messages.map((m) =>
           m.phase !== 'complete' ? { ...m, phase: 'error' as const } : m
         )
@@ -699,5 +703,9 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       askUserRequest: null,
     }))
     get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' })
+  },
+
+  handleSkillOutput(state: SkillOutputState) {
+    set({ skillOutput: state })
   },
 }))

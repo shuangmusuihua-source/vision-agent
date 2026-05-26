@@ -270,6 +270,15 @@ export type StreamingAccumulator = {
   thinkingText: string
 }
 
+// ─── Skill Output State (unified capture layer) ─────────────────────
+
+export type SkillOutputState = {
+  skillId: string | null
+  content: string
+  isStreaming: boolean
+  language: string
+}
+
 // ─── Permission / AskUser ────────────────────────────────────────────
 
 export type PermissionRequestIPC = {

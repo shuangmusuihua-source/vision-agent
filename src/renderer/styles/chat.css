@@ -1245,6 +1245,7 @@
   margin: 8px 0;
   background: white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  min-width: 0;
 }
 
 .skill-output-card-streaming {
@@ -1365,6 +1366,8 @@
   tab-size: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+  word-break: break-all;
+  max-width: 100%;
 }
 
 /* Lowlight syntax highlighting */

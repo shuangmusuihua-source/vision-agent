@@ -17,6 +17,7 @@ import type {
   SystemPermissionDeniedPayload,
   AskUserRequestIPC,
   PermissionRequestIPC,
+  SkillOutputState,
 } from '../../shared/types'
 
 const WATCHDOG_TIMEOUT = 120_000 // 2 minutes
@@ -136,12 +137,17 @@ export function useAgent() {
       refreshWatchdog()
     })
 
+    const unsubSkillOutput = window.api.agent.onSkillOutput((state) => {
+      store.getState().handleSkillOutput(state)
+    })
+
     return () => {
       unsubEvent()
       unsubPerm()
       unsubAsk()
       unsubAskTimeout()
       unsubSession()
+      unsubSkillOutput()
     }
   }, [store, refreshWatchdog])
 
@@ -167,7 +173,8 @@ export function useAgent() {
       agentState: 'thinking',
     }))
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' })
-    window.api.agent.sendMessage(prompt, store.getState().currentSessionId || undefined, activeFilePath)
+    const skillId = store.getState().activeSkillId
+    window.api.agent.sendMessage(prompt, store.getState().currentSessionId || undefined, activeFilePath, skillId || undefined)
   }, [store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
@@ -193,6 +200,7 @@ export function useAgent() {
       askUserRequest: null,
       lastEditedFile: null,
       activeSkillId: null,
+      skillOutput: null,
       _acc: null,
       _firstContentSeen: false,
     })
@@ -254,3 +262,4 @@ export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useLastEditedFile = () => useAgentStore((s) => s.lastEditedFile)
 export const useActiveSkillId = () => useAgentStore((s) => s.activeSkillId)
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
+export const useSkillOutput = () => useAgentStore((s) => s.skillOutput)
