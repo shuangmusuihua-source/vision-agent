@@ -42,6 +42,13 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
     }
   }, [isStreaming && agentState === 'thinking'])
 
+  // Auto-scroll to bottom during streaming
+  useEffect(() => {
+    if (isStreaming) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, isStreaming])
+
   useEffect(() => {
     setVisibleCount(RENDER_BATCH)
   }, [messages.length > RENDER_BATCH ? 'long' : 'short'])
