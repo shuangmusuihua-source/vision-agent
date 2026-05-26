@@ -56,17 +56,12 @@ export class SkillOutputBridge {
    */
   processRawEvent(rawMessage: Record<string, unknown>, activeSkillId: string | null): void {
     const type = (rawMessage.type as string) || ''
-    if (type !== 'stream_event') {
-      console.log('[Bridge] skipping non-stream_event, type=', type)
-      return
-    }
+    if (type !== 'stream_event') return
 
     const event = rawMessage.event as Record<string, unknown> | undefined
     if (!event) return
 
     const eventType = (event.type as string) || ''
-    console.log('[Bridge] stream_event, type=', eventType, 'deltaType=', (event.delta as any)?.type, 'skillId=', activeSkillId)
-
     switch (eventType) {
       case 'content_block_delta': {
         const delta = event.delta as Record<string, unknown> | undefined
@@ -90,7 +85,6 @@ export class SkillOutputBridge {
           const name = (block.name as string) || ''
           if (name === 'Write' || name === 'Edit') {
             const id = (block.id as string) || `tu-${Date.now()}`
-            console.log('[Bridge] detected tool_use start:', name, 'id=', id)
             this.writeAccumulators.set(id, { toolName: name, json: '' })
           }
         }
@@ -283,7 +277,6 @@ export class SkillOutputBridge {
 
   private pushOutput(state: SkillOutputState): void {
     this.state = state
-    console.log('[Bridge] pushOutput, isStreaming=', state.isStreaming, 'contentLen=', state.content.length, 'lang=', state.language)
     if (!this.win || this.win.isDestroyed()) return
     this.win.webContents.send('skill:output', {
       skillId: state.skillId,

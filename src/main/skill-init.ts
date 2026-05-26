@@ -1,13 +1,11 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync } from 'fs'
+import { BUILTIN_SKILLS } from './skills/skills-manifest'
 
 const userData = app.getPath('userData')
 const appClaudeDir = join(userData, '.claude')
 const appSkillsDir = join(appClaudeDir, 'skills')
-
-// Built-in skill directory names (must match .claude/skills/ structure)
-const BUILTIN_SKILL_NAMES = ['slides']
 
 /**
  * Copy built-in skill files to userData/.claude/skills/ on app startup.
@@ -16,29 +14,26 @@ const BUILTIN_SKILL_NAMES = ['slides']
 export function initAppSkills(): void {
   mkdirSync(appSkillsDir, { recursive: true })
 
-  // Source: the app's .claude/skills/ directory (bundled with the app)
-  // In dev: points to project root .claude/skills/
-  // In production: would need to be unpacked from asar or bundled separately
   const builtInSkillsRoot = getBuiltInSkillsRoot()
 
-  for (const skillName of BUILTIN_SKILL_NAMES) {
-    const srcDir = join(builtInSkillsRoot, skillName)
-    const destDir = join(appSkillsDir, skillName)
+  for (const skill of BUILTIN_SKILLS) {
+    if (!skill.hasResources) continue
+
+    const srcDir = join(builtInSkillsRoot, skill.id)
+    const destDir = join(appSkillsDir, skill.id)
 
     if (!existsSync(srcDir)) {
       console.warn(`[SkillInit] Built-in skill source not found: ${srcDir}`)
       continue
     }
 
-    // Copy entire skill directory
     copyDirRecursive(srcDir, destDir)
   }
 }
 
 function getBuiltInSkillsRoot(): string {
-  // Development: use project .claude/skills/
-  // Production: use app resource path (needs asar.unpacked config)
-  const devPath = join(process.cwd(), '.claude', 'skills')
+  // Development: use project src/main/skills/
+  const devPath = join(process.cwd(), 'src', 'main', 'skills')
   if (existsSync(devPath)) return devPath
 
   // Production fallback: app resources
@@ -75,5 +70,5 @@ export function getAppSkillsCwd(): string {
  * Get the list of built-in skill names for the SDK skills whitelist.
  */
 export function getBuiltinSkillNames(): string[] {
-  return BUILTIN_SKILL_NAMES
+  return BUILTIN_SKILLS.filter(s => s.hasResources).map(s => s.id)
 }
