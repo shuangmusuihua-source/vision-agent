@@ -17,6 +17,14 @@ const builtinSkills: SkillDefinition[] = [
     promptTemplate: `使用 kami skill 接下来排版... {activeFile}`,
     outputMode: 'write',
   },
+  {
+    id: 'guizang-ppt-skill',
+    name: 'PPT · 歸藏',
+    description: '生成横向翻页网页 PPT：电子杂志风 / 瑞士国际主义风',
+    icon: 'PresentationChart',
+    promptTemplate: `使用 guizang-ppt-skill skill 接下来制作 PPT... {activeFile}`,
+    outputMode: 'write',
+  },
 ]
 
 export function getBuiltinSkills(): SkillDefinition[] {
