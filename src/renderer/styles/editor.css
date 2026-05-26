@@ -959,3 +959,43 @@
   color: #ff6b6b;
   background: rgba(255, 107, 107, 0.1);
 }
+
+/* --- Math (KaTeX) --- */
+
+.math-inline {
+  display: inline;
+  cursor: default;
+}
+
+.math-inline .katex {
+  font-size: 1em;
+}
+
+.math-block {
+  text-align: center;
+  margin: 1em 0;
+  padding: 0.5em 0;
+  cursor: default;
+}
+
+.math-block .katex-display {
+  margin: 0;
+}
+
+.math-block .katex-display > .katex {
+  text-align: center;
+}
+
+.math-error {
+  color: var(--color-error, #e74c3c);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+[data-theme="dark"] .math-block .katex {
+  color: var(--color-text, #e5e5e5);
+}
+
+[data-theme="dark"] .math-error {
+  color: #ff6b6b;
+}

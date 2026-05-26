@@ -1,13 +1,17 @@
 import { useState, useCallback, useEffect, useRef, memo } from 'react'
+import 'katex/dist/katex.min.css'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } from '@phosphor-icons/react'
 import type { ConversationMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillOutputCard from './SkillOutputCard'
 
-const REMARK_PLUGINS = [remarkGfm]
+const REMARK_PLUGINS = [remarkGfm, remarkMath]
+const REHYPE_PLUGINS = [rehypeKatex]
 
 function stripSkillOutputBlock(content: string): string {
   let result = content.replace(/```skill-output\n[\s\S]*?```/g, '')
@@ -189,7 +193,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
           )}
           {displayContent && (
             <div className="message-markdown">
-              <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
+              <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
                 {stripSkillOutputBlock(displayContent)}
               </ReactMarkdown>
             </div>

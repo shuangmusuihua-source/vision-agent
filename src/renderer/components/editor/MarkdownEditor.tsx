@@ -20,6 +20,8 @@ import { FocusMode } from './extensions/focus-mode'
 import { HeadingAnchor } from './extensions/heading-anchor'
 import { ImagePaste } from './extensions/image-paste'
 import { Frontmatter } from './extensions/frontmatter'
+import { MathInline } from './extensions/math-inline'
+import { MathBlock } from './extensions/math-block'
 import Image from '@tiptap/extension-image'
 import { Extension } from '@tiptap/core'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
@@ -153,6 +155,8 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       Image,
       ImagePaste,
       Frontmatter,
+      MathInline,
+      MathBlock,
       Placeholder.configure({
         placeholder: '开始输入...'
       }),
