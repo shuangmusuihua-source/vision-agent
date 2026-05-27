@@ -628,17 +628,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
+  -electron-corner-smoothing: system-ui;
   background: rgba(0, 0, 0, 0.3);
   color: #fff !important;
   cursor: default;
+  transition: background 0.2s, box-shadow 0.2s;
 }
 
 .chat-send-btn-active {
-  background: var(--color-action);
-  color: var(--color-action-text) !important;
+  background: linear-gradient(135deg, #ff58b2, #6657ff);
+  box-shadow: 0 8px 20px rgba(102, 87, 255, 0.25);
+  color: #fff !important;
   cursor: pointer;
 }
 
@@ -1075,7 +1078,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  margin: 0 auto 8px;
+  margin: 0 auto;
   align-self: center;
   width: fit-content;
   background: rgba(255, 255, 255, 0.72);
@@ -1083,7 +1086,7 @@
   -webkit-backdrop-filter: blur(16px);
   border-radius: 24px;
   -electron-corner-smoothing: system-ui;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(102, 87, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .skill-status-icon {
@@ -1092,9 +1095,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #111;
+  background: linear-gradient(135deg, #ff58b2, #6657ff);
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(102, 87, 255, 0.25);
 }
 
 .skill-status-spinner {
