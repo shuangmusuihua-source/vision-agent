@@ -1,5 +1,7 @@
 import type {
   AgentIPCMessage,
+  AgentIPCMessageWithContext,
+  AgentContext,
   AskUserRequestIPC,
   PermissionRequestIPC,
   ContentBlock,
@@ -111,21 +113,21 @@ interface SettingsApi {
 }
 
 interface AgentApi {
-  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string) => Promise<{ started: boolean }>
+  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext) => Promise<{ started: boolean }>
   respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
   respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
   listSdkSessions: () => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
-  abort: () => Promise<{ success: boolean }>
+  abort: (context?: AgentContext) => Promise<{ success: boolean }>
 
   // Unified event channel
-  onEvent: (callback: (msg: AgentIPCMessage) => void) => () => void
+  onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void
 
   // Lifecycle channels
-  onSessionCreated: (callback: (sessionId: string) => void) => () => void
-  onPermissionRequest: (callback: (request: PermissionRequestIPC) => void) => () => void
-  onAskUser: (callback: (request: AskUserRequestIPC) => void) => () => void
-  onAskUserTimeout: (callback: (data: { requestId: string }) => void) => () => void
+  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string }) => void) => () => void
+  onPermissionRequest: (callback: (data: { id: string; toolName: string; input: unknown; context: AgentContext }) => void) => () => void
+  onAskUser: (callback: (data: { id: string; question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean; context: AgentContext }) => void) => () => void
+  onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
   onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => () => void
   onSkillOutput: (callback: (state: SkillOutputState) => void) => () => void
 }
@@ -161,6 +163,13 @@ interface NotificationApi {
   getHistory: () => Promise<NotificationHistoryItem[]>
 }
 
+interface UpdateApi {
+  download: () => Promise<void>
+  install: () => Promise<void>
+  onAvailable: (callback: (info: { version: string }) => void) => () => void
+  onDownloaded: (callback: () => void) => () => void
+}
+
 // ─── Window API ──────────────────────────────────────────────────────
 
 interface WindowApi {
@@ -175,6 +184,7 @@ interface WindowApi {
   search: SearchApi
   menu: MenuApi
   notification: NotificationApi
+  update: UpdateApi
 }
 
 interface MemoryApi {
@@ -208,6 +218,7 @@ export type {
   SearchApi,
   MenuApi,
   NotificationApi,
+  UpdateApi,
   NotificationHistoryItem,
   FileEntry,
   ModelProfile,

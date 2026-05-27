@@ -56,8 +56,9 @@ function AgentPanel({ width, edgeClass, usageInfo, permissionRequest, onPermissi
 
   const activeSkillMeta = useAgentStore((s) => {
     if (!activeSkillId) return null
-    for (let i = s.messages.length - 1; i >= 0; i--) {
-      if (s.messages[i].skillMeta?.id === activeSkillId) return s.messages[i].skillMeta
+    const msgs = s.slots.editor.messages
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].skillMeta?.id === activeSkillId) return msgs[i].skillMeta
     }
     return null
   })

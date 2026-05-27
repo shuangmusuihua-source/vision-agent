@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentIPCMessage, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile, SkillOutputState } from '../shared/types'
+import type { AgentIPCMessageWithContext, AgentContext, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile, SkillOutputState } from '../shared/types'
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -55,8 +55,8 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string) =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask') =>
+      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context),
     getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
@@ -65,20 +65,20 @@ const api = {
     listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
-    abort: () => ipcRenderer.invoke('agent:abort'),
+    abort: (context?: 'editor' | 'ask') => ipcRenderer.invoke('agent:abort', context),
 
     // ── Unified event channel ────────────────────────────────────────
     // All SDK messages (assistant, user, result, stream_event, system)
     // arrive through this single channel as typed AgentIPCMessage.
-    onEvent: (callback: (msg: AgentIPCMessage) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, msg: AgentIPCMessage) => callback(msg)
+    onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, msg: AgentIPCMessageWithContext) => callback(msg)
       ipcRenderer.on('agent:event', handler)
       return () => { ipcRenderer.removeListener('agent:event', handler) }
     },
 
     // ── Lifecycle channels (separate for request/response patterns) ──
-    onSessionCreated: (callback: (sessionId: string) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, sessionId: string) => callback(sessionId)
+    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string }) => callback(data)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
@@ -95,8 +95,8 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:askUser', handler) }
     },
 
-    onAskUserTimeout: (callback: (data: { requestId: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string }) => callback(data)
+    onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string; context: AgentContext }) => callback(data)
       ipcRenderer.on('agent:askUserTimeout', handler)
       return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
     },

@@ -1,10 +1,12 @@
 import { BrowserWindow } from 'electron'
+import type { AgentContext } from '../shared/types'
 
 interface SkillOutputState {
   skillId: string | null
   content: string
   isStreaming: boolean
   language: string
+  context?: AgentContext
 }
 
 /**
@@ -22,6 +24,15 @@ interface SkillOutputState {
  */
 export class SkillOutputBridge {
   private win: BrowserWindow | null = null
+  private context: AgentContext = 'editor'
+
+  setWindow(win: BrowserWindow) {
+    this.win = win
+  }
+
+  setContext(context: AgentContext) {
+    this.context = context
+  }
   private state: SkillOutputState = {
     skillId: null,
     content: '',
@@ -37,10 +48,6 @@ export class SkillOutputBridge {
   private skillOutputAccumulator = ''
   // Buffer for detecting fence markers split across deltas
   private textBuffer = ''
-
-  setWindow(win: BrowserWindow) {
-    this.win = win
-  }
 
   reset() {
     this.state = { skillId: null, content: '', isStreaming: false, language: 'html' }
@@ -283,6 +290,7 @@ export class SkillOutputBridge {
       content: state.content,
       isStreaming: state.isStreaming,
       language: state.language,
+      context: this.context,
     })
   }
 }

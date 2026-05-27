@@ -7,11 +7,13 @@ import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
+import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
-import { useAgent, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
+import type { AgentContext } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { ChatMessage as ConversationMessage } from '../../store/agent-store'
@@ -71,6 +73,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [modalVisible, setModalVisible] = useState(false)
   const [showDaydream, setShowDaydream] = useState(false)
   const [daydreamMode, setDaydreamMode] = useState('matrix')
+  const [showAskZuovis, setShowAskZuovis] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
@@ -253,23 +256,42 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     return unsub
   }, [onOpenSettings])
 
+  // Singleton IPC subscription — routes all events to correct store slot
+  useIPCSubscriptions()
+
   const {
-    sendMessage,
+    sendMessage: editorSendMessage,
     newSession,
     loadSessions,
     resumeSession,
     respondPermission,
-    respondAskUser,
-  } = useAgent()
-  const isStreaming = useIsStreaming()
-  const permissionRequest = usePermissionRequest()
-  const askUserRequest = useAskUserRequest()
-  const currentSessionId = useCurrentSessionId()
-  const usageInfo = useUsageInfo()
+    respondAskUser: editorRespondAskUser,
+  } = useAgent('editor')
+  const {
+    sendMessage: askSendMessage,
+    respondAskUser: askRespondAskUser,
+  } = useAgent('ask')
+  const isStreaming = useIsStreaming('editor')
+  const askIsStreaming = useIsStreaming('ask')
+  const editorPermission = usePermissionRequest('editor')
+  const askPermission = usePermissionRequest('ask')
+  const editorAskUser = useAskUserRequest('editor')
+  const askAskUser = useAskUserRequest('ask')
+  // Ask context takes priority (modal overlay), then editor
+  const permissionRequest = askPermission || editorPermission
+  const askUserRequest = askAskUser || editorAskUser
+  // Route responses to the correct context
+  const respondAskUser = useCallback((requestId: string, answer: string) => {
+    if (askAskUser?.id === requestId) askRespondAskUser(requestId, answer)
+    else editorRespondAskUser(requestId, answer)
+  }, [askAskUser, askRespondAskUser, editorRespondAskUser])
+  const currentSessionId = useCurrentSessionId('editor')
+  const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
-  const agentStatus = useAgentStatus()
-  const lastEditedFile = useLastEditedFile()
-  const activeSkillId = useActiveSkillId()
+  const agentStatus = useAgentStatus('editor')
+  const askAgentStatus = useAgentStatus('ask')
+  const lastEditedFile = useLastEditedFile('editor')
+  const activeSkillId = useActiveSkillId('editor')
 
   // Restore/refresh workspaces from cached settings
   const settings = useSettings()
@@ -330,6 +352,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }
 
   const handleFileSelect = useCallback(async (path: string) => {
+    // Switch back to editor context when leaving Ask Zuovis
+    if (showAskZuovis) {
+      useAgentStore.setState({ context: 'editor' })
+      setShowAskZuovis(false)
+    }
     // If file is already open, just switch to it
     if (openTabs.includes(path)) {
       setActiveTab(path)
@@ -343,7 +370,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       setActiveTab(path)
       setTabContents((prev) => ({ ...prev, [path]: result.content! }))
     }
-  }, [openTabs])
+  }, [openTabs, showAskZuovis])
 
   const handleTabClose = useCallback((path: string) => {
     setOpenTabs((prev) => {
@@ -433,7 +460,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   // Auto-reload editor, memory, and sidebar file list when Agent finishes
   useEffect(() => {
-    if (!isStreaming && useAgentStore.getState().messages.length > 0) {
+    if (!isStreaming && useAgentStore.getState().slots.editor.messages.length > 0) {
       setMemoryRefreshKey((k) => k + 1)
       // Refresh sidebar file lists for all workspaces
       Promise.all(
@@ -485,10 +512,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       if (action === 'ask') {
         setPrefillText(prompts.ask)
       } else {
-        sendMessage(prompts[action], filePath)
+        editorSendMessage(prompts[action], filePath)
       }
     },
-    [sendMessage]
+    [editorSendMessage]
   )
 
   const handleStatsUpdate = useCallback((words: number, chars: number) => {
@@ -497,21 +524,27 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const handleSkillSelect = useCallback((skill: SkillDefinition) => {
     const prompt = skill.promptTemplate.replace('{activeFile}', linkedFile || '')
-    useAgentStore.setState({ activeSkillId: skill.id })
     useAgentStore.setState((s) => ({
-      messages: [...s.messages, {
-        id: `skill-${Date.now()}`,
-        role: 'user',
-        phase: 'complete',
-        textContent: `执行 Skill: ${skill.name}`,
-        content: [{ type: 'text', text: `执行 Skill: ${skill.name}` }],
-        toolCalls: [],
-        skillMeta: { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' },
-        createdAt: Date.now(),
-      }],
+      slots: {
+        ...s.slots,
+        editor: {
+          ...s.slots.editor,
+          activeSkillId: skill.id,
+          messages: [...s.slots.editor.messages, {
+            id: `skill-${Date.now()}`,
+            role: 'user',
+            phase: 'complete',
+            textContent: `执行 Skill: ${skill.name}`,
+            content: [{ type: 'text', text: `执行 Skill: ${skill.name}` }],
+            toolCalls: [],
+            skillMeta: { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' },
+            createdAt: Date.now(),
+          }],
+        },
+      },
     }))
-    sendMessage(prompt, linkedFile || undefined)
-  }, [sendMessage, linkedFile])
+    editorSendMessage(prompt, linkedFile || undefined)
+  }, [editorSendMessage, linkedFile])
 
   const activeContent = activeTab ? tabContents[activeTab] || '' : ''
 
@@ -538,14 +571,28 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         }}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
+        onAskZuovis={() => {
+            useAgentStore.setState({ context: 'ask' })
+            setShowAskZuovis(true)
+          }}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${showAskZuovis ? ' main-content-ask-zuovis' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
+        {showAskZuovis ? (
+          <AskZuovis
+            onSend={(msg) => { askSendMessage(msg) }}
+            disabled={askIsStreaming && askAgentStatus !== 'waitingForUserInput'}
+            onOpenFile={handleFileSelect}
+            onSelectText={handleSelectText}
+            workspacePath={workspacePaths[0]}
+          />
+        ) : (
+        <>
         <div className={`main-content-header${sidebarCollapsed ? ' main-content-header-cover-sidebar' : ''}`}>
           {openTabs.length > 0 && (
             <EditorTabs
@@ -597,8 +644,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             {focusMode && <span>Focus</span>}
           </div>
         )}
+        </>
+        )}
       </main>
-      {/* ── Divider Zone ── */}
+      {/* ── Divider Zone + Agent Panel (only in editor mode) ── */}
+      {!showAskZuovis && (
+      <>
       <div
         className={`divider-zone${dividerHovered ? ' divider-zone-hover' : ''}${isDragging ? ' divider-zone-dragging' : ''}${agentCollapsed ? ' divider-zone-collapsed' : ''}`}
         style={{ order: agentCollapsed ? (isChatFirst ? 0 : 2) : 1 }}
@@ -639,7 +690,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           if (askUserRequest && askDrawerRespondRef.current) {
             askDrawerRespondRef.current(msg)
           } else {
-            sendMessage(msg, linkedFile || undefined)
+            editorSendMessage(msg, linkedFile || undefined)
           }
         }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
         linkedFile={linkedFile}
@@ -650,6 +701,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         </ErrorBoundary>
       </AgentPanel>
       </aside>
+      </>
+      )}
       {updateAvailable && !updateDownloaded && (
         <div className="update-banner">
           <span>新版本 v{updateAvailable.version} 可用</span>

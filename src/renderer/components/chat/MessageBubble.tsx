@@ -24,9 +24,10 @@ interface MessageBubbleProps {
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string) => void
   workspacePath?: string
+  context: 'editor' | 'ask'
 }
 
-const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath }: MessageBubbleProps): React.ReactElement {
+const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
@@ -34,10 +35,10 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
   const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
 
   // Unified skill output from main process bridge (via store)
-  const skillOutput = useAgentStore((s) => s.skillOutput)
+  const skillOutput = useAgentStore((s) => s.slots[context].skillOutput)
 
   // Only show SkillOutputCard for the last assistant message during streaming
-  const isLastMessage = useAgentStore((s) => s.messages[s.messages.length - 1]?.id === message.id)
+  const isLastMessage = useAgentStore((s) => s.slots[context].messages[s.slots[context].messages.length - 1]?.id === message.id)
   const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutput.content.length > 0
 
   // Status indicator: system messages with 'thinking' text during streaming
@@ -128,14 +129,19 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
       })
       if (result.success && result.filePath) {
         // Update artifact path in the message
-        const msgs = [...useAgentStore.getState().messages]
+        const msgs = [...useAgentStore.getState().slots[context].messages]
         const idx = msgs.findIndex((m) => m.id === message.id)
         if (idx >= 0 && msgs[idx].artifact) {
           msgs[idx] = {
             ...msgs[idx],
             artifact: { ...msgs[idx].artifact!, filePath: result.filePath, content: undefined }
           }
-          useAgentStore.setState({ messages: msgs })
+          useAgentStore.setState((s) => ({
+            slots: {
+              ...s.slots,
+              [context]: { ...s.slots[context], messages: msgs }
+            }
+          }))
         }
       }
     }
@@ -192,10 +198,12 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
             />
           )}
           {displayContent && (
-            <div className="message-markdown">
-              <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
-                {stripSkillOutputBlock(displayContent)}
-              </ReactMarkdown>
+            <div className="message-assistant-text">
+              <div className="message-markdown">
+                <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
+                  {stripSkillOutputBlock(displayContent)}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
         </div>

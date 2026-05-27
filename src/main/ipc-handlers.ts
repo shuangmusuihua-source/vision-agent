@@ -7,7 +7,7 @@ import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdk
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { getBuiltinSkills } from './skills/builtin'
 import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './semantic-extractor'
-import type { GraphNode, GraphEdge, GraphData, FileEntry } from '../shared/types'
+import type { AgentContext, GraphNode, GraphEdge, GraphData, FileEntry } from '../shared/types'
 import {
   getSettings,
   addProfile,
@@ -20,7 +20,6 @@ import {
   getAuthorizedDirectories,
   getKnowledgeBaseDir,
   getFixedDirectories,
-  getKnowledgeBaseDir,
   getTheme,
   setTheme
 } from './store'
@@ -337,11 +336,11 @@ export function registerIpcHandlers(): void {
   })
 
   // --- Agent ---
-  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string) => {
+  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    setActiveSkillId(skillId || null)
-    sendMessage(window, prompt, sessionId, activeFilePath)
+    setActiveSkillId(skillId || null, context || 'editor')
+    sendMessage(window, prompt, sessionId, activeFilePath, context || 'editor')
     return { started: true }
   })
 
@@ -365,8 +364,8 @@ export function registerIpcHandlers(): void {
     return await loadSdkSessionMessages(sessionId)
   })
 
-  ipcMain.handle('agent:abort', () => {
-    abortActiveQuery()
+  ipcMain.handle('agent:abort', (_event, context?: AgentContext) => {
+    abortActiveQuery(context)
     return { success: true }
   })
 

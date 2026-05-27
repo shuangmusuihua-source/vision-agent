@@ -1,12 +1,9 @@
 import type {
+  AgentContext,
   AgentIPCMessage,
   AgentState,
   AgentEvent,
   ConversationMessage,
-  ContentBlock,
-  ToolCallState,
-  ArtifactData,
-  ArtifactFileType,
   UsageInfo,
   PermissionRequestIPC,
   AskUserRequestIPC,
@@ -15,30 +12,58 @@ import type {
   SkillOutputState,
 } from '../../shared/types'
 
-// ─── Agent Store Interface ─────────────────────────────────────────
+// ─── Context Slot (per agent instance) ────────────────────────────────────
 
-export type AgentStore = {
-  // Public state
+export type ContextSlot = {
   messages: ConversationMessage[]
-  isStreaming: boolean
-  isResumingSession: boolean
-  agentState: AgentState
   currentSessionId: string | null
+  isStreaming: boolean
+  agentState: AgentState
   usageInfo: UsageInfo | null
-  lastEditedFile: string | null
-  skillOutput: SkillOutputState | null
   permissionRequest: PermissionRequestIPC | null
   askUserRequest: AskUserRequestIPC | null
+  skillOutput: SkillOutputState | null
   activeSkillId: string | null
-  sessionList: SdkSessionInfo[]
-
-  // Internal state (not for UI consumption)
+  lastEditedFile: string | null
   _acc: StreamingAccumulator | null
   _firstContentSeen: boolean
+}
+
+function emptySlot(): ContextSlot {
+  return {
+    messages: [],
+    currentSessionId: null,
+    isStreaming: false,
+    agentState: 'idle',
+    usageInfo: null,
+    permissionRequest: null,
+    askUserRequest: null,
+    skillOutput: null,
+    activeSkillId: null,
+    lastEditedFile: null,
+    _acc: null,
+    _firstContentSeen: false,
+  }
+}
+
+export { emptySlot }
+
+// ─── Agent Store Interface ─────────────────────────────────────────────
+
+export type AgentStore = {
+  // Active context — determines which slot is "current"
+  context: AgentContext
+
+  // Per-context state slots
+  slots: Record<AgentContext, ContextSlot>
+
+  // Shared state (not context-specific)
+  isResumingSession: boolean
+  sessionList: SdkSessionInfo[]
 
   // Actions
-  dispatchAgentEvent: (event: AgentEvent) => void
-  processIPCMessage: (msg: AgentIPCMessage, options?: { isReplay?: boolean }) => void
+  dispatchAgentEvent: (event: AgentEvent, context?: AgentContext) => void
+  processIPCMessage: (msg: AgentIPCMessage & { context?: AgentContext }, options?: { isReplay?: boolean }) => void
   handlePermissionRequest: (req: PermissionRequestIPC) => void
   handlePermissionResponse: (requestId: string, behavior: 'allow' | 'deny') => void
   handleAskUserRequest: (req: AskUserRequestIPC) => void
@@ -47,7 +72,7 @@ export type AgentStore = {
   handleSkillOutput: (state: SkillOutputState) => void
 }
 
-// ─── Backward-compatible type aliases ────────────────────────────────
+// ─── Backward-compatible type aliases ────────────────────────────────────
 
 export type {
   ConversationMessage as ChatMessage,
@@ -63,6 +88,7 @@ export type {
 
 // Re-export types that components reference from this module
 export type {
+  AgentContext,
   AskUserQuestionOption,
   SkillOutputState,
 } from '../../shared/types'

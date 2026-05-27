@@ -1,20 +1,8 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
+import { emptySlot } from '../store/agent-store'
+import type { AgentContext } from '../../shared/types'
 import type {
-  AgentIPCMessage,
-  AssistantPayload,
-  StreamEventPayloadIPC,
-  StreamContentBlockDelta,
-  StreamContentBlockStart,
-  TextDelta,
-  InputJsonDelta,
-  UserPayload,
-  ResultSuccessPayload,
-  ResultErrorPayload,
-  SystemInitPayload,
-  SystemStatusPayload,
-  SystemCompactBoundaryPayload,
-  SystemPermissionDeniedPayload,
   AskUserRequestIPC,
   PermissionRequestIPC,
   SkillOutputState,
@@ -30,116 +18,55 @@ function isAgentActive(state: string): state is ActiveAgentState {
   return ACTIVE_STATES.has(state)
 }
 
-/**
- * useAgent — thin IPC subscription layer with watchdog timer.
- *
- * All message processing logic lives in the store (processIPCMessage).
- * This hook's only job:
- *   1. Subscribe to IPC events on mount
- *   2. Forward typed messages to store.processIPCMessage
- *   3. Manage watchdog lifecycle driven by agentState
- *   4. Expose concise action functions for UI components
- *
- * Watchdog lifecycle:
- *   - Start/restart: when agentState enters an active state (thinking/running/compacting)
- *   - Kill:         when agentState enters a terminal state (idle/error/waitingForUserInput)
- *   - Refresh:      on each IPC event while active (resets the countdown)
- *   No IPC event can start a watchdog — only the state transition does.
- */
-export function useAgent() {
-  const store = useAgentStore
-  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+// ─── Singleton IPC subscription ────────────────────────────────────────
+// MUST be called only once (in AppShell). Subscribes to all IPC channels
+// and routes events to the correct store slot via msg.context.
+// Calling useAgent('editor') + useAgent('ask') no longer duplicates subscriptions.
 
-  // ─── Watchdog: start / kill driven by agentState ─────────────────────
-  const agentState = store((s) => s.agentState)
-
+export function useIPCSubscriptions() {
   useEffect(() => {
-    if (isAgentActive(agentState)) {
-      // Agent is active — ensure watchdog is running
-      if (watchdogRef.current) clearTimeout(watchdogRef.current)
-      watchdogRef.current = setTimeout(() => {
-        console.warn('[useAgent] Watchdog: agent stuck for 120s, forcing abort')
-        window.api.agent.abort()
-        store.getState().dispatchAgentEvent({ type: 'ABORT' })
-        store.setState((s) => ({
-          messages: [...s.messages, {
-            id: `watchdog-${Date.now()}`,
-            role: 'system',
-            phase: 'complete',
-            textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-            content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
-            toolCalls: [],
-            createdAt: Date.now(),
-          }],
-        }))
-      }, WATCHDOG_TIMEOUT)
-    } else {
-      // Agent is idle/error/waitingForUserInput — kill watchdog
-      if (watchdogRef.current) {
-        clearTimeout(watchdogRef.current)
-        watchdogRef.current = null
-      }
-    }
+    const store = useAgentStore
 
-    return () => {
-      if (watchdogRef.current) {
-        clearTimeout(watchdogRef.current)
-        watchdogRef.current = null
-      }
-    }
-  }, [agentState, store])
-
-  // ─── Watchdog: refresh on IPC events (only while active) ────────────
-  const refreshWatchdog = useCallback(() => {
-    if (!watchdogRef.current) return // not active, nothing to refresh
-    clearTimeout(watchdogRef.current)
-    watchdogRef.current = setTimeout(() => {
-      console.warn('[useAgent] Watchdog: agent stuck for 120s, forcing abort')
-      window.api.agent.abort()
-      store.getState().dispatchAgentEvent({ type: 'ABORT' })
-      store.setState((s) => ({
-        messages: [...s.messages, {
-          id: `watchdog-${Date.now()}`,
-          role: 'system',
-          phase: 'complete',
-          textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-          content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
-          toolCalls: [],
-          createdAt: Date.now(),
-        }],
-      }))
-    }, WATCHDOG_TIMEOUT)
-  }, [store])
-
-  // ─── IPC Subscriptions ──────────────────────────────────────────────
-  useEffect(() => {
-    const unsubEvent = window.api.agent.onEvent((msg: AgentIPCMessage) => {
-      store.getState().processIPCMessage(msg)
-      refreshWatchdog()
+    const unsubEvent = window.api.agent.onEvent((msg) => {
+      store.getState().processIPCMessage(msg, undefined)
+      // Refresh watchdog for the context that received this event
+      const ctx = msg.context as AgentContext | undefined
+      if (ctx) refreshWatchdogByContext(ctx)
     })
 
-    const unsubPerm = window.api.agent.onPermissionRequest((req: PermissionRequestIPC) => {
-      store.getState().handlePermissionRequest(req)
-      refreshWatchdog()
+    const unsubPerm = window.api.agent.onPermissionRequest((req) => {
+      store.getState().handlePermissionRequest(req as PermissionRequestIPC)
+      const ctx = (req as PermissionRequestIPC).context as AgentContext | undefined
+      if (ctx) refreshWatchdogByContext(ctx)
     })
 
-    const unsubAsk = window.api.agent.onAskUser((req: AskUserRequestIPC) => {
-      store.getState().handleAskUserRequest(req)
-      refreshWatchdog()
+    const unsubAsk = window.api.agent.onAskUser((req) => {
+      store.getState().handleAskUserRequest(req as AskUserRequestIPC)
+      const ctx = (req as AskUserRequestIPC).context as AgentContext | undefined
+      if (ctx) refreshWatchdogByContext(ctx)
     })
 
-    const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: { requestId: string }) => {
+    const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: { requestId: string; context: AgentContext }) => {
       store.getState().handleAskUserTimeout(data.requestId)
     })
 
-    const unsubSession = window.api.agent.onSessionCreated((sessionId: string) => {
-      store.setState({ currentSessionId: sessionId })
-      refreshWatchdog()
+    const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string }) => {
+      store.setState((state) => ({
+        slots: {
+          ...state.slots,
+          [data.context]: {
+            ...state.slots[data.context],
+            currentSessionId: data.sessionId,
+          },
+        },
+      }))
+      refreshWatchdogByContext(data.context)
     })
 
-    const unsubSkillOutput = window.api.agent.onSkillOutput((state) => {
+    const unsubSkillOutput = window.api.agent.onSkillOutput((state: SkillOutputState) => {
       store.getState().handleSkillOutput(state)
-      refreshWatchdog()
+      const ctx = state.context as AgentContext | undefined
+      if (ctx) refreshWatchdogByContext(ctx)
     })
 
     return () => {
@@ -150,33 +77,121 @@ export function useAgent() {
       unsubSession()
       unsubSkillOutput()
     }
-  }, [store, refreshWatchdog])
+  }, [])
+}
 
-  // ─── Actions ────────────────────────────────────────────────────────
+// ─── Watchdog registry (shared across hooks) ─────────────────────────────
+
+const watchdogTimers: Record<AgentContext, ReturnType<typeof setTimeout> | null> = { editor: null, ask: null }
+
+function refreshWatchdogByContext(ctx: AgentContext) {
+  const timer = watchdogTimers[ctx]
+  if (!timer) return
+  clearTimeout(timer)
+  watchdogTimers[ctx] = setTimeout(() => {
+    console.warn(`[Watchdog] agent stuck for 120s in ${ctx}, forcing abort`)
+    window.api.agent.abort(ctx)
+    useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, ctx)
+    const s = useAgentStore.getState().slots[ctx]
+    useAgentStore.setState((state) => ({
+      slots: {
+        ...state.slots,
+        [ctx]: {
+          ...state.slots[ctx],
+          messages: [...s.messages, {
+            id: `watchdog-${Date.now()}`,
+            role: 'system',
+            phase: 'complete',
+            textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+            content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
+            toolCalls: [],
+            createdAt: Date.now(),
+          }],
+        },
+      },
+    }))
+  }, WATCHDOG_TIMEOUT)
+}
+
+export function useAgent(context: AgentContext = 'editor') {
+  const store = useAgentStore
+
+  // ─── Watchdog: start / kill driven by agentState for this context ────────
+  const agentState = store((s) => s.slots[context].agentState)
+
+  useEffect(() => {
+    if (isAgentActive(agentState)) {
+      if (watchdogTimers[context]) clearTimeout(watchdogTimers[context])
+      watchdogTimers[context] = setTimeout(() => {
+        console.warn(`[Watchdog] agent stuck for 120s in ${context}, forcing abort`)
+        window.api.agent.abort(context)
+        store.getState().dispatchAgentEvent({ type: 'ABORT' }, context)
+        const s = store.getState().slots[context]
+        store.setState((state) => ({
+          slots: {
+            ...state.slots,
+            [context]: {
+              ...state.slots[context],
+              messages: [...s.messages, {
+                id: `watchdog-${Date.now()}`,
+                role: 'system',
+                phase: 'complete',
+                textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+                content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
+                toolCalls: [],
+                createdAt: Date.now(),
+              }],
+            },
+          },
+        }))
+      }, WATCHDOG_TIMEOUT)
+    } else {
+      if (watchdogTimers[context]) {
+        clearTimeout(watchdogTimers[context])
+        watchdogTimers[context] = null
+      }
+    }
+
+    return () => {
+      if (watchdogTimers[context]) {
+        clearTimeout(watchdogTimers[context])
+        watchdogTimers[context] = null
+      }
+    }
+  }, [agentState, context, store])
+
+  // ─── Actions ─────────────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(async (prompt: string, activeFilePath?: string) => {
     const state = store.getState()
-    if (state.agentState !== 'idle' && state.agentState !== 'error') {
-      state.dispatchAgentEvent({ type: 'ABORT' })
-      await window.api.agent.abort()
+    const slot = state.slots[context]
+    if (slot.agentState !== 'idle' && slot.agentState !== 'error') {
+      state.dispatchAgentEvent({ type: 'ABORT' }, context)
+      await window.api.agent.abort(context)
     }
     store.setState((s) => ({
-      messages: [...s.messages, {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        phase: 'complete',
-        textContent: prompt,
-        content: [{ type: 'text', text: prompt }],
-        toolCalls: [],
-        createdAt: Date.now(),
-      }],
-      isStreaming: true,
-      agentState: 'thinking',
+      slots: {
+        ...s.slots,
+        [context]: {
+          ...s.slots[context],
+          messages: [...s.slots[context].messages, {
+            id: `user-${Date.now()}`,
+            role: 'user',
+            phase: 'complete',
+            textContent: prompt,
+            content: [{ type: 'text', text: prompt }],
+            toolCalls: [],
+            createdAt: Date.now(),
+          }],
+          isStreaming: true,
+          agentState: 'thinking',
+        },
+      },
     }))
-    store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' })
-    const skillId = store.getState().activeSkillId
-    window.api.agent.sendMessage(prompt, store.getState().currentSessionId || undefined, activeFilePath, skillId || undefined)
-  }, [store])
+    store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context)
+    const skillId = store.getState().slots[context].activeSkillId
+    window.api.agent.sendMessage(prompt, store.getState().slots[context].currentSessionId || undefined, activeFilePath, skillId || undefined, context)
+  }, [context, store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
     store.getState().handlePermissionResponse(requestId, behavior)
@@ -185,27 +200,18 @@ export function useAgent() {
 
   const respondAskUser = useCallback((requestId: string, answer: string) => {
     store.getState().handleAskUserResponse(requestId, answer)
-    store.getState().dispatchAgentEvent({ type: 'ASK_USER_RESPONDED' })
+    store.getState().dispatchAgentEvent({ type: 'ASK_USER_RESPONDED' }, context)
     window.api.agent.respondAskUser(requestId, answer)
-  }, [store])
+  }, [context, store])
 
   const newSession = useCallback(() => {
-    store.setState({
-      messages: [],
-      isStreaming: false,
-      isResumingSession: false,
-      currentSessionId: null,
-      usageInfo: null,
-      agentState: 'idle',
-      permissionRequest: null,
-      askUserRequest: null,
-      lastEditedFile: null,
-      activeSkillId: null,
-      skillOutput: null,
-      _acc: null,
-      _firstContentSeen: false,
-    })
-  }, [store])
+    store.setState((s) => ({
+      slots: {
+        ...s.slots,
+        [context]: emptySlot(),
+      },
+    }))
+  }, [context, store])
 
   const loadSessions = useCallback(async () => {
     try {
@@ -217,16 +223,15 @@ export function useAgent() {
   }, [store])
 
   const resumeSession = useCallback(async (sessionId: string) => {
-    store.setState({
-      messages: [],
-      isStreaming: false,
-      isResumingSession: true,
-      currentSessionId: sessionId,
-      usageInfo: null,
-      agentState: 'idle',
-      permissionRequest: null,
-      askUserRequest: null,
-    })
+    store.setState((s) => ({
+      slots: {
+        ...s.slots,
+        [context]: {
+          ...emptySlot(),
+          currentSessionId: sessionId,
+        },
+      },
+    }))
 
     try {
       const messages = await window.api.agent.loadSessionMessages(sessionId)
@@ -236,9 +241,17 @@ export function useAgent() {
     } catch (err) {
       console.error('[useAgent] Failed to resume session:', err)
     } finally {
-      store.setState({ isResumingSession: false })
+      store.setState((s) => ({
+        slots: {
+          ...s.slots,
+          [context]: {
+            ...s.slots[context],
+            isResumingSession: false,
+          },
+        },
+      }))
     }
-  }, [store])
+  }, [context, store])
 
   return {
     sendMessage,
@@ -250,17 +263,18 @@ export function useAgent() {
   }
 }
 
-// ─── Selectors ────────────────────────────────────────────────────────
+// ─── Context-aware Selectors ────────────────────────────────────────────
 
-export const useMessages = () => useAgentStore((s) => s.messages)
-export const useIsStreaming = () => useAgentStore((s) => s.isStreaming)
-export const useCurrentSessionId = () => useAgentStore((s) => s.currentSessionId)
-export const useAgentStatus = () => useAgentStore((s) => s.agentState)
-export const useUsageInfo = () => useAgentStore((s) => s.usageInfo)
-export const usePermissionRequest = () => useAgentStore((s) => s.permissionRequest)
-export const useAskUserRequest = () => useAgentStore((s) => s.askUserRequest)
+export const useSlot = (context: AgentContext) => useAgentStore((s) => s.slots[context])
+export const useMessages = (context: AgentContext) => useAgentStore((s) => s.slots[context].messages)
+export const useIsStreaming = (context: AgentContext) => useAgentStore((s) => s.slots[context].isStreaming)
+export const useCurrentSessionId = (context: AgentContext) => useAgentStore((s) => s.slots[context].currentSessionId)
+export const useAgentStatus = (context: AgentContext) => useAgentStore((s) => s.slots[context].agentState)
+export const useUsageInfo = (context: AgentContext) => useAgentStore((s) => s.slots[context].usageInfo)
+export const usePermissionRequest = (context: AgentContext) => useAgentStore((s) => s.slots[context].permissionRequest)
+export const useAskUserRequest = (context: AgentContext) => useAgentStore((s) => s.slots[context].askUserRequest)
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
-export const useLastEditedFile = () => useAgentStore((s) => s.lastEditedFile)
-export const useActiveSkillId = () => useAgentStore((s) => s.activeSkillId)
+export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) => s.slots[context].lastEditedFile)
+export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
-export const useSkillOutput = () => useAgentStore((s) => s.skillOutput)
+export const useSkillOutput = (context: AgentContext) => useAgentStore((s) => s.slots[context].skillOutput)

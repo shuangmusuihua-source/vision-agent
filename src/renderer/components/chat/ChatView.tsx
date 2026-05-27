@@ -13,10 +13,10 @@ interface ChatViewProps {
 }
 
 function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
-  const messages = useMessages()
-  const isStreaming = useIsStreaming()
+  const messages = useMessages('editor')
+  const isStreaming = useIsStreaming('editor')
   const isResuming = useIsResumingSession()
-  const agentState = useAgentStatus()
+  const agentState = useAgentStatus('editor')
   const bottomRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState(RENDER_BATCH)
 
@@ -75,6 +75,7 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
         <MessageBubble
           key={msg.id}
           message={msg}
+          context="editor"
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
           workspacePath={workspacePath}

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, Sparkle } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -26,6 +26,7 @@ interface SidebarProps {
   onOpenSearch: () => void
   onToggleGraph: () => void
   onDaydream: (mode: string) => void
+  onAskZuovis: () => void
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
@@ -48,6 +49,7 @@ function Sidebar({
   onOpenSearch,
   onToggleGraph,
   onDaydream,
+  onAskZuovis,
   showGraph,
   changedFileCount,
   collapsed
@@ -301,6 +303,11 @@ function Sidebar({
       </div>
 
       <div className="sidebar-content">
+        <button className="sidebar-ask-zuovis" onClick={onAskZuovis}>
+          <div className="sidebar-ask-zuovis-icon"><Sparkle size={12} weight="bold" /></div>
+          <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
+        </button>
+
         {workspacePaths.length === 0 ? (
           <div className="sidebar-empty-workspace">
             <button className="sidebar-new-dir-btn" onClick={onNewWorkspace}>

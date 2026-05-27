@@ -7,7 +7,7 @@ import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/cl
 import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
-import type { AgentIPCMessage, AskUserQuestionOption } from '../shared/types'
+import type { AgentIPCMessage, AgentContext, AskUserQuestionOption } from '../shared/types'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 
@@ -154,7 +154,7 @@ export function resolveAskUser(requestId: string, answer: string): void {
   }
 }
 
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Options {
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor'): Options {
   const apiKey = getApiKey()
   const model = getModel()
   const baseUrl = getBaseUrl()
@@ -237,13 +237,14 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
           header: (firstQ?.header as string) || '',
           options: optionsList,
           multiSelect,
+          context,
         })
 
         return new Promise<PermissionResult>((resolve) => {
           const timeout = setTimeout(() => {
             if (pendingAskUser.has(requestId)) {
               pendingAskUser.delete(requestId)
-              mainWindow.webContents.send('agent:askUserTimeout', { requestId })
+              mainWindow.webContents.send('agent:askUserTimeout', { requestId, context })
               resolve({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
             }
           }, 300000)
@@ -257,7 +258,8 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string): Optio
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,
         toolName,
-        input
+        input,
+        context,
       })
       schedulePermissionNotification(requestId, toolName)
 
@@ -304,21 +306,28 @@ function extractPathFromToolInput(
   return value
 }
 
-// Guard against concurrent sendMessage calls
-let _activeQuery: Query | null = null
-let _activeAbortController: AbortController | null = null
-let _activeSkillId: string | null = null
+interface ActiveQuery {
+  query: Query
+  skillId: string | null
+}
+
+// Guard against concurrent sendMessage calls — per context slot
+const activeQueries = new Map<AgentContext, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
-export function abortActiveQuery(): void {
-  if (_activeQuery) {
-    try { (_activeQuery as any).abort() } catch {}
-    _activeQuery = null
-    _activeAbortController = null
-  }
-  if (_activeAbortController) {
-    _activeAbortController.abort()
-    _activeAbortController = null
+export function abortActiveQuery(context?: AgentContext): void {
+  if (context) {
+    const entry = activeQueries.get(context)
+    if (entry) {
+      try { (entry.query as any).abort() } catch {}
+      activeQueries.delete(context)
+    }
+  } else {
+    // Abort all
+    for (const [, entry] of activeQueries) {
+      try { (entry.query as any).abort() } catch {}
+    }
+    activeQueries.clear()
   }
 }
 
@@ -326,26 +335,31 @@ export function setSkillOutputWindow(win: BrowserWindow): void {
   _skillOutputBridge.setWindow(win)
 }
 
-export function setActiveSkillId(skillId: string | null): void {
-  _activeSkillId = skillId
+export function setActiveSkillId(skillId: string | null, context: AgentContext = 'editor'): void {
+  const entry = activeQueries.get(context)
+  if (entry) {
+    entry.skillId = skillId
+  }
 }
 
 export async function sendMessage(
   mainWindow: BrowserWindow,
   prompt: string,
   sessionId?: string,
-  activeFilePath?: string
+  activeFilePath?: string,
+  context: AgentContext = 'editor'
 ): Promise<void> {
-  // Abort any still-running query before starting a new one
-  if (_activeQuery) {
-    try { (_activeQuery as any).abort() } catch {}
-    _activeQuery = null
-    _activeAbortController = null
+  // Abort any active query in the same context slot
+  const existing = activeQueries.get(context)
+  if (existing) {
+    try { (existing.query as any).abort() } catch {}
+    activeQueries.delete(context)
   }
 
   _skillOutputBridge.reset()
 
-  const options = buildOptions(mainWindow, activeFilePath)
+  _skillOutputBridge.setContext(context)
+  const options = buildOptions(mainWindow, activeFilePath, context)
   let currentSessionId = sessionId
 
   try {
@@ -356,21 +370,23 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
-    _activeQuery = messageStream as Query
+    const activeSkillId = activeQueries.get(context)?.skillId ?? null
+    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
 
       // Feed raw SDK event to skill output bridge (before conversion)
-      _skillOutputBridge.processRawEvent(message as Record<string, unknown>, _activeSkillId)
+      const skillId = activeQueries.get(context)?.skillId ?? null
+      _skillOutputBridge.processRawEvent(message as Record<string, unknown>, skillId)
 
-      // Convert and emit via unified agent:event channel
+      // Convert and emit via unified agent:event channel — tagged with context
       const ipcMsg = toAgentIPCMessage(message)
       if (ipcMsg) {
-        mainWindow.webContents.send('agent:event', ipcMsg)
+        mainWindow.webContents.send('agent:event', { context, ...ipcMsg })
       }
 
-      // Session creation still gets its own lifecycle channel
+      // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
         sessions.set(currentSessionId, {
@@ -378,12 +394,12 @@ export async function sendMessage(
           createdAt: Date.now(),
           messageCount: 0
         })
-        mainWindow.webContents.send('agent:sessionCreated', currentSessionId)
+        mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId })
         evictOldSessions()
       }
     }
 
-        // The SDK stream has completed — the result message was already
+    // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
     // Send a session-level completion notification only.
     notifyAgentComplete(currentSessionId || '')
@@ -400,16 +416,16 @@ export async function sendMessage(
       userMessage = '请求频率过高，请稍后重试。'
     }
     mainWindow.webContents.send('agent:event', {
+      context,
       type: 'result',
       subtype: 'error',
       errors: [userMessage],
       usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
       total_cost_usd: 0,
       duration_ms: 0,
-    } as AgentIPCMessage)
+    } as AgentIPCMessage & { context: AgentContext })
   } finally {
-    _activeQuery = null
-    _activeAbortController = null
+    activeQueries.delete(context)
   }
 }
 

@@ -1,6 +1,10 @@
 // Shared types for Agent Panel — used by Main, Preload, and Renderer
 // All discriminated unions defined here; no `Record<string, unknown>` downstream.
 
+// ─── Agent Context ────────────────────────────────────────────────────
+
+export type AgentContext = 'editor' | 'ask'
+
 // ─── Model Profile ──────────────────────────────────────────────────
 
 export interface ModelProfile {
@@ -170,6 +174,8 @@ export type AgentIPCMessage =
   | ResultErrorPayload
   | StreamEventPayloadIPC
 
+export type AgentIPCMessageWithContext = AgentIPCMessage & { context: AgentContext }
+
 // ─── Usage Info ──────────────────────────────────────────────────────
 
 export type UsageInfo = {
@@ -277,6 +283,7 @@ export type SkillOutputState = {
   content: string
   isStreaming: boolean
   language: string
+  context?: AgentContext
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────
@@ -286,6 +293,7 @@ export type PermissionRequestIPC = {
   toolName: string
   input: Record<string, unknown>
   description?: string
+  context?: AgentContext
 }
 
 export type AskUserQuestionOption = {
@@ -300,6 +308,7 @@ export type AskUserRequestIPC = {
   header?: string
   options: AskUserQuestionOption[]
   multiSelect: boolean
+  context?: AgentContext
 }
 
 // ─── Session Info ────────────────────────────────────────────────────
