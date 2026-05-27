@@ -18,6 +18,9 @@ import {
   removeAuthorizedDirectory,
   reorderAuthorizedDirectories,
   getAuthorizedDirectories,
+  getKnowledgeBaseDir,
+  getFixedDirectories,
+  getKnowledgeBaseDir,
   getTheme,
   setTheme
 } from './store'
@@ -261,6 +264,8 @@ export function registerIpcHandlers(): void {
     return { success: true, filePath }
   })
 
+  ipcMain.handle('workspace:knowledgeDir', () => getKnowledgeBaseDir())
+
   // --- Settings ---
   ipcMain.handle('settings:get', () => getSettings())
 
@@ -453,20 +458,18 @@ export function registerIpcHandlers(): void {
       nodes: rawWikilinkData.nodes as GraphNode[],
       edges: rawWikilinkData.edges.map(e => ({ ...e, type: 'reference' as const }))
     }
-    const dirs = getAuthorizedDirectories()
-    const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
-    const semanticRaw = await loadSemanticGraph(cwd)
+    const knowledgeDir = getKnowledgeBaseDir()
+    const semanticRaw = await loadSemanticGraph(knowledgeDir)
     const semanticData = semanticDataToGraph(semanticRaw)
     return mergeGraphData(wikilinkData, semanticData)
   })
 
   ipcMain.handle('graph:extractSemantic', async () => {
-    const dirs = getAuthorizedDirectories()
-    const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
+    const knowledgeDir = getKnowledgeBaseDir()
+    const changedFiles = fileIndexService.getAndClearKnowledgeChangedFiles()
     const window = getMainWindow()
-    const changedFiles = fileIndexService.getAndClearChangedFiles()
     try {
-      const result = await extractSemanticGraph(cwd, changedFiles, (phase, progress) => {
+      const result = await extractSemanticGraph(knowledgeDir, changedFiles, (phase, progress) => {
         if (window) {
           window.webContents.send('graph:semanticProgress', { phase, progress })
         }

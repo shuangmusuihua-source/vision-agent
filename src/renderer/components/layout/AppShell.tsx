@@ -29,6 +29,13 @@ interface AppShellProps {
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
+  const [fixedWorkspacePaths, setFixedWorkspacePaths] = useState<string[]>([])
+
+  useEffect(() => {
+    window.api.workspace.knowledgeDir().then(dir => {
+      setFixedWorkspacePaths([dir])
+    })
+  }, [])
   const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [toggleVisible, setToggleVisible] = useState(true)
@@ -514,6 +521,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <Sidebar
         files={files}
         workspacePaths={workspacePaths}
+        fixedWorkspacePaths={fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
         onNewWorkspace={handleOpenNewWorkspaceModal}

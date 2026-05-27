@@ -27,7 +27,8 @@ const api = {
     moveFile: (sourcePath: string, targetDir: string) =>
       ipcRenderer.invoke('workspace:moveFile', sourcePath, targetDir),
     deleteWorkspace: (dirPath: string) =>
-      ipcRenderer.invoke('workspace:deleteWorkspace', dirPath)
+      ipcRenderer.invoke('workspace:deleteWorkspace', dirPath),
+    knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir')
   },
 
   settings: {

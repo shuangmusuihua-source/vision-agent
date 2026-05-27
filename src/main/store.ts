@@ -1,4 +1,13 @@
 import Store from 'electron-store'
+import { mkdirSync } from 'fs'
+import path from 'path'
+import { app } from 'electron'
+
+const KNOWLEDGE_BASE_NAME = 'Knowledge'
+
+export function getKnowledgeBaseDir(): string {
+  return path.join(app.getPath('documents'), 'VisionAgent', KNOWLEDGE_BASE_NAME)
+}
 import { safeStorage } from 'electron'
 import type { ModelProfile } from '../shared/types'
 
@@ -41,6 +50,7 @@ interface AppSettings {
   profiles: ModelProfile[]
   activeProfileId: string | null
   authorizedDirectories: string[]
+  fixedDirectories: string[]
   theme: 'light' | 'dark' | 'system'
   cronTasks: CronTask[]
 }
@@ -50,6 +60,7 @@ const store = new Store<AppSettings>({
     profiles: [],
     activeProfileId: null,
     authorizedDirectories: [],
+    fixedDirectories: [],
     theme: 'system',
     cronTasks: []
   }
@@ -165,15 +176,21 @@ export function addAuthorizedDirectory(dir: string): void {
 }
 
 export function removeAuthorizedDirectory(dir: string): void {
+  const fixed = store.get('fixedDirectories')
+  if (fixed.includes(dir)) return
   const dirs = store.get('authorizedDirectories')
   store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
 }
 
 export function reorderAuthorizedDirectories(paths: string[]): void {
+  const fixed = store.get('fixedDirectories')
   const current = store.get('authorizedDirectories')
   if (paths.length !== current.length) return
   if (!paths.every((p) => current.includes(p))) return
-  store.set('authorizedDirectories', paths)
+  // Fixed dirs always stay at the front, only non-fixed dirs can be reordered
+  const fixedInPaths = fixed.filter(f => paths.includes(f))
+  const nonFixed = paths.filter(p => !fixed.includes(p))
+  store.set('authorizedDirectories', [...fixedInPaths, ...nonFixed])
 }
 
 export function getTheme(): 'light' | 'dark' | 'system' {
@@ -190,6 +207,31 @@ export function getCronTasks(): CronTask[] {
 
 export function saveCronTasks(tasks: CronTask[]): void {
   store.set('cronTasks', tasks)
+}
+
+export function getFixedDirectories(): string[] {
+  return store.get('fixedDirectories')
+}
+
+export function ensureKnowledgeBase(): string {
+  const kbDir = getKnowledgeBaseDir()
+  mkdirSync(kbDir, { recursive: true })
+  mkdirSync(path.join(kbDir, '.vision'), { recursive: true })
+
+  const fixed = store.get('fixedDirectories')
+  if (!fixed.includes(kbDir)) {
+    store.set('fixedDirectories', [...fixed, kbDir])
+  }
+
+  const dirs = store.get('authorizedDirectories')
+  if (!dirs.includes(kbDir)) {
+    store.set('authorizedDirectories', [kbDir, ...dirs])
+  } else if (dirs[0] !== kbDir) {
+    const reordered = [kbDir, ...dirs.filter((d) => d !== kbDir)]
+    store.set('authorizedDirectories', reordered)
+  }
+
+  return kbDir
 }
 
 export type { ModelProfile, AppSettings }

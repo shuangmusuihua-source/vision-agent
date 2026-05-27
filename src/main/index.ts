@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/electron/main'
 import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
-import { getSettings, getAuthorizedDirectories } from './store'
+import { getSettings, getAuthorizedDirectories, ensureKnowledgeBase, getKnowledgeBaseDir } from './store'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
@@ -90,6 +90,10 @@ export function getMainWindow(): BrowserWindow | null {
 
 app.whenReady().then(() => {
   setupMenu()
+
+  // Ensure knowledge base directory exists and is registered
+  const knowledgeDir = ensureKnowledgeBase()
+
   registerIpcHandlers()
   initAppSkills()
 
@@ -103,6 +107,9 @@ app.whenReady().then(() => {
   if (dirs.length > 0) {
     fileIndexService.init(dirs[0]).catch(() => {})
   }
+
+  // Initialize knowledge base file index for semantic graph
+  fileIndexService.initKnowledgeIndex(knowledgeDir).catch(() => {})
 
   restorePersistedTasks()
 

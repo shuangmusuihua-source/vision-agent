@@ -18,6 +18,8 @@ class FileIndexService {
   private ready = false
   private readyCallbacks: Array<() => void> = []
   private changedFiles = new Set<string>()
+  private knowledgeWatcher: FSWatcher | null = null
+  private knowledgeChangedFiles = new Set<string>()
 
   /** Initialize index for a workspace directory */
   async init(workspaceDir: string): Promise<void> {
@@ -183,6 +185,39 @@ class FileIndexService {
     return files
   }
 
+  /** Initialize knowledge base watcher (separate from main workspace) */
+  async initKnowledgeIndex(knowledgeDir: string): Promise<void> {
+    if (this.knowledgeWatcher) {
+      await this.knowledgeWatcher.close()
+      this.knowledgeWatcher = null
+    }
+    this.knowledgeChangedFiles.clear()
+
+    this.knowledgeWatcher = chokidar.watch(knowledgeDir, {
+      ignored: /(^|[\/\\])\.(git|vision|claude)|node_modules|out|dist/,
+      persistent: true,
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 100 },
+    })
+
+    this.knowledgeWatcher.on('add', (filePath) => {
+      if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+    })
+    this.knowledgeWatcher.on('change', (filePath) => {
+      if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+    })
+    this.knowledgeWatcher.on('unlink', (filePath) => {
+      if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+    })
+  }
+
+  /** Get knowledge base changed files and clear the set */
+  getAndClearKnowledgeChangedFiles(): string[] {
+    const files = Array.from(this.knowledgeChangedFiles)
+    this.knowledgeChangedFiles.clear()
+    return files
+  }
+
   /** Get graph data: nodes and edges from wikilinks */
   getGraphData(): GraphData {
     const nodes: GraphNode[] = []
@@ -262,11 +297,16 @@ class FileIndexService {
       this.watcher.close()
       this.watcher = null
     }
+    if (this.knowledgeWatcher) {
+      this.knowledgeWatcher.close()
+      this.knowledgeWatcher = null
+    }
     this.index.clear()
     this.workspaceDir = null
     this.ready = false
     this.readyCallbacks = []
     this.changedFiles.clear()
+    this.knowledgeChangedFiles.clear()
   }
 }
 

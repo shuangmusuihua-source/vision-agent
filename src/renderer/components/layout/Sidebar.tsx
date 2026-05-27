@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal, Pencil } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -12,6 +12,7 @@ interface MemoryEntry {
 interface SidebarProps {
   files: Record<string, FileEntry[]>
   workspacePaths: string[]
+  fixedWorkspacePaths: string[]
   memoryRefreshKey: number
   onFileSelect: (path: string) => void
   onNewWorkspace: () => void
@@ -33,6 +34,7 @@ interface SidebarProps {
 function Sidebar({
   files,
   workspacePaths,
+  fixedWorkspacePaths,
   memoryRefreshKey,
   onFileSelect,
   onNewWorkspace,
@@ -313,9 +315,10 @@ function Sidebar({
           >
             {workspacePaths.map((wsPath, idx) => {
               const isCollapsed = collapsedWorkspaces.has(wsPath)
+              const isFixed = fixedWorkspacePaths.includes(wsPath)
               return (
                 <Flipped key={wsPath} flipId={wsPath}>
-                  <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
+                  <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}${isFixed ? ' sidebar-workspace-fixed' : ''}`}>
                     <div className="sidebar-workspace-header">
                       <button
                         className="sidebar-workspace-toggle"
@@ -324,8 +327,9 @@ function Sidebar({
                       >
                         {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
                       </button>
-                      <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
-                      {idx > 0 && (
+                      {isFixed && <BookOpen size={14} weight="bold" className="sidebar-workspace-fixed-icon" />}
+                      <span className="sidebar-workspace-name">{isFixed ? '知识库' : workspaceName(wsPath)}</span>
+                      {!isFixed && idx > 0 && (
                         <button
                           className="sidebar-workspace-pin"
                           onClick={() => handlePinToTop(wsPath)}
@@ -335,14 +339,16 @@ function Sidebar({
                           <PushPin size={12} weight="bold" />
                         </button>
                       )}
-                      <button
-                        className="sidebar-workspace-remove"
-                        onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
-                        title="移除工作区"
-                        aria-label="移除工作区"
-                      >
-                        <X size={12} weight="bold" />
-                      </button>
+                      {!isFixed && (
+                        <button
+                          className="sidebar-workspace-remove"
+                          onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
+                          title="移除工作区"
+                          aria-label="移除工作区"
+                        >
+                          <X size={12} weight="bold" />
+                        </button>
+                      )}
                       <button
                         className="sidebar-workspace-add-file"
                         onClick={() => setCreatingFileIn(wsPath)}
@@ -446,16 +452,19 @@ function Sidebar({
         <div className="move-dropdown-title">移动到工作区</div>
         {workspacePaths
           .filter(ws => !movingFilePath.startsWith(ws + '/'))
-          .map(ws => (
-            <button
-              key={ws}
-              className="move-dropdown-item"
-              onClick={() => handleMoveToWorkspace(ws)}
-            >
-              <Folder size={14} weight="bold" />
-              <span>{workspaceName(ws)}</span>
-            </button>
-          ))
+          .map(ws => {
+            const wsIsFixed = fixedWorkspacePaths.includes(ws)
+            return (
+              <button
+                key={ws}
+                className="move-dropdown-item"
+                onClick={() => handleMoveToWorkspace(ws)}
+              >
+                {wsIsFixed ? <BookOpen size={14} weight="bold" /> : <Folder size={14} weight="bold" />}
+                <span>{wsIsFixed ? '知识库' : workspaceName(ws)}</span>
+              </button>
+            )
+          })
         }
       </div>,
       document.body

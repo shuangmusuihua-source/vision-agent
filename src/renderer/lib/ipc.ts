@@ -20,6 +20,7 @@ interface AppSettings {
   profiles: ModelProfile[]
   activeProfileId: string | null
   authorizedDirectories: string[]
+  fixedDirectories: string[]
   theme: 'light' | 'dark' | 'system'
 }
 
@@ -87,6 +88,7 @@ interface WorkspaceApi {
   renameFile: (filePath: string, newName: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
   moveFile: (sourcePath: string, targetDir: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
   deleteWorkspace: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+  knowledgeDir: () => Promise<string>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
