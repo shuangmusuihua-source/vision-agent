@@ -173,9 +173,10 @@ function AgentPanel({ width, edgeClass, usageInfo, permissionRequest, onPermissi
             <div className="agent-panel-messages">
             {activeSkillMeta && activeSkillMeta.status === 'running' && !skillDrawerHidden && (
               <div className="skill-status-bar">
-                <Spinner size={14} className="skill-status-spinner" />
+                <div className="skill-status-icon"><div className="skill-status-spinner" /></div>
                 <span className="skill-status-name">{activeSkillMeta.name}</span>
-                <span className="skill-status-progress">执行中<span className="skill-status-dots"><span>.</span><span>.</span><span>.</span></span></span>
+                <div className="skill-status-divider" />
+                <span className="skill-status-phase">执行中<span className="skill-status-phase-dots"><span>.</span><span>.</span><span>.</span></span></span>
                 <button className="skill-status-close" onClick={() => setSkillDrawerHidden(true)}>
                   <X size={14} />
                 </button>

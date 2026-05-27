@@ -19,7 +19,7 @@ const builtinSkills: SkillDefinition[] = [
   },
   {
     id: 'guizang-ppt-skill',
-    name: 'PPT · 歸藏',
+    name: 'guizang-ppt-skill',
     description: '生成横向翻页网页 PPT：电子杂志风 / 瑞士国际主义风',
     icon: 'PresentationChart',
     promptTemplate: `使用 guizang-ppt-skill skill 接下来制作 PPT... {activeFile}`,
@@ -27,7 +27,7 @@ const builtinSkills: SkillDefinition[] = [
   },
   {
     id: 'frontend-slides',
-    name: 'Slides · 前端',
+    name: 'frontend-slides',
     description: '创建动画丰富的 HTML 演示文稿，支持 PPT 转换和 34 种风格模板',
     icon: 'PresentationChart',
     promptTemplate: `使用 frontend-slides skill 接下来制作演示文稿... {activeFile}`,

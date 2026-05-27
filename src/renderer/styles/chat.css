@@ -1071,41 +1071,67 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  margin: 0 5% 8px;
-  background: var(--color-bg-primary);
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 8px 16px;
+  margin: 0 0 8px;
+  width: fit-content;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 24px;
+  -electron-corner-smoothing: system-ui;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.skill-status-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .skill-status-spinner {
-  animation: spin 1s linear infinite;
-  color: var(--color-action);
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .skill-status-name {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
+  padding-left: 4px;
 }
 
-.skill-status-progress {
+.skill-status-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.skill-status-phase {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   margin-left: auto;
+  padding-right: 4px;
 }
 
-.skill-status-dots span {
+.skill-status-phase-dots span {
   animation: dot-bounce 1.4s ease-in-out infinite;
 }
 
-.skill-status-dots span:nth-child(1) { animation-delay: 0s; }
-.skill-status-dots span:nth-child(2) { animation-delay: 0.2s; }
-.skill-status-dots span:nth-child(3) { animation-delay: 0.4s; }
+.skill-status-phase-dots span:nth-child(1) { animation-delay: 0s; }
+.skill-status-phase-dots span:nth-child(2) { animation-delay: 0.2s; }
+.skill-status-phase-dots span:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes dot-bounce {
   0%, 80%, 100% { opacity: 0.2; }
@@ -1454,6 +1480,19 @@
 
 [data-theme="dark"] .input-drawer__content {
   border-bottom-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .skill-status-bar {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+[data-theme="dark"] .skill-status-icon {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .skill-status-divider {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 [data-theme="dark"] .tool-call-display {
