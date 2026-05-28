@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, MagicWand } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, DotsThreeCircle } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -309,7 +309,7 @@ function Sidebar({
 
       <div className="sidebar-content">
         <button className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`} onClick={onAskZuovis}>
-          <div className="sidebar-ask-zuovis-icon"><MagicWand size={12} weight="bold" /></div>
+          <div className="sidebar-ask-zuovis-icon"><DotsThreeCircle size={12} weight="bold" /></div>
           <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
         </button>
 
@@ -466,20 +466,17 @@ function Sidebar({
 
         {memoryFiles.length > 0 && (
           <div className="sidebar-memory-section">
-            <div
-              className="sidebar-entry sidebar-folder"
-              style={{ paddingLeft: 8 }}
-              onClick={() => setMemoryExpanded((v) => !v)}
-            >
-              {memoryExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
-              <Brain size={14} weight="bold" />
-              <span>Memory</span>
+            <div className="sidebar-workspace-module-header" onClick={() => setMemoryExpanded((v) => !v)} style={{ cursor: 'pointer' }}>
+              <span className="sidebar-workspace-module-title">Memory</span>
+              <div className="sidebar-workspace-module-actions">
+                {memoryExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+              </div>
             </div>
             {memoryExpanded && memoryFiles.map((file) => (
               <div
                 key={file.path}
-                className="sidebar-entry sidebar-file sidebar-memory-entry"
-                style={{ paddingLeft: 24 }}
+                className={`sidebar-entry sidebar-file sidebar-memory-entry${activeFile === file.path ? ' sidebar-entry-active' : ''}`}
+                style={{ paddingLeft: 20 }}
                 onClick={() => onFileSelect(file.path)}
               >
                 <File size={14} weight="bold" />

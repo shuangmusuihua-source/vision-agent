@@ -109,7 +109,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px 10% 16px;
+  padding: 16px 15% 24px;
 }
 
 /* ChatView inside AskZuovis — uses CSS Module, target by generic child selector */
@@ -117,6 +117,17 @@
   overflow: visible;
   height: auto;
   flex: none;
+}
+
+/* Ask Zuovis agent bubbles — more vertical breathing room */
+.ask-zuovis-messages-inner .message-assistant-text {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.ask-zuovis-messages-inner .message-user-content {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 /* ── Footer / Input Capsule ── */
@@ -130,6 +141,20 @@
 .ask-zuovis-footer .permission-dialog,
 .ask-zuovis-footer .ask-user-drawer {
   margin: 0;
+}
+
+/* Permission/AskUser drawer — visible background in Ask Zuovis */
+.ask-zuovis-footer .input-drawer__content {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .ask-zuovis-footer .input-drawer__content {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .ask-zuovis-capsule-wrapper {
@@ -152,10 +177,6 @@
   pointer-events: auto;
 }
 
-.ask-zuovis-capsule:focus-within {
-  border-color: var(--color-accent);
-}
-
 .ask-zuovis-input {
   flex: 1;
   border: none;
@@ -164,6 +185,12 @@
   font-size: 14px;
   color: var(--color-text-primary);
   font-family: inherit;
+  box-shadow: none;
+}
+
+.ask-zuovis-input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .ask-zuovis-input::placeholder {

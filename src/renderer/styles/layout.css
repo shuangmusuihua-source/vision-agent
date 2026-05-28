@@ -616,7 +616,8 @@
   width: calc(100% - 16px);
   margin-left: 8px;
   margin-right: 8px;
-  border-radius: var(--radius-md);
+  border-radius: 14px;
+  -electron-corner-smoothing: system-ui;
 }
 
 .sidebar-entry-active:hover {
@@ -631,7 +632,8 @@
   width: calc(100% - 16px);
   margin-left: 8px;
   margin-right: 8px;
-  border-radius: var(--radius-md);
+  border-radius: 14px;
+  -electron-corner-smoothing: system-ui;
 }
 
 [data-theme="dark"] .sidebar-entry-active:hover {
@@ -687,8 +689,7 @@
 }
 
 .sidebar-memory-section {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 4px;
 }
 
 .sidebar-memory-entry {
@@ -1090,8 +1091,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  width: calc(100% - 6px);
-  margin: 0 0 12px 6px;
+  width: calc(100% - 16px);
+  margin: 0 8px 12px;
   padding: 8px 12px;
   border-radius: 14px;
   -electron-corner-smoothing: system-ui;
@@ -1132,7 +1133,7 @@
 
 .sidebar-ask-zuovis-label {
   font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
@@ -1331,7 +1332,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px 10% 8px;
+  padding: 16px 15% 24px;
 }
 
 /* --- Dark mode layout polish --- */
