@@ -1159,6 +1159,10 @@
   pointer-events: none;
 }
 
+.ask-zuovis-footer > * {
+  pointer-events: auto;
+}
+
 .ask-zuovis-capsule {
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(28px);

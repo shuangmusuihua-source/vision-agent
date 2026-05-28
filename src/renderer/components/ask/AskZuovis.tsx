@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar } from '@phosphor-icons/react'
-import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, useAskUserRequest } from '../../hooks/useAgent'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
-import type { AgentContext } from '../../../shared/types'
-import type { SkillDefinition } from '../../lib/ipc'
+import PermissionDialog from '../chat/PermissionDialog'
+import AskUserDrawer from '../chat/AskUserDrawer'
 import { useAgentStore } from '../../store/agent-store-impl'
 import './ask-zuovis.css'
 
@@ -28,25 +28,55 @@ const FEATURES: FeatureCard[] = [
 ]
 
 interface AskZuovisProps {
-  onSend: (message: string) => void
-  onSkillSelect?: (skill: SkillDefinition) => void
-  disabled?: boolean
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
 }
 
-function AskZuovis({ onSend, onSkillSelect, disabled, onOpenFile, onSelectText, workspacePath }: AskZuovisProps): React.ReactElement {
+function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps): React.ReactElement {
+  const { sendMessage, respondPermission, respondAskUser } = useAgent('ask')
   const messages = useMessages('ask')
   const isStreaming = useIsStreaming('ask')
+  const agentStatus = useAgentStatus('ask')
   const isResuming = useIsResumingSession()
+  const permissionRequest = usePermissionRequest('ask')
+  const askUserRequest = useAskUserRequest('ask')
   const hasMessages = messages.length > 0
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // ── AskUser interaction ──
+  const [askDrawerOpen, setAskDrawerOpen] = useState(false)
+  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
+  const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
+
+  useEffect(() => {
+    if (askUserRequest) setAskDrawerOpen(true)
+  }, [askUserRequest])
+
+  useEffect(() => {
+    if (pendingAskAnswer && !askDrawerOpen) {
+      respondAskUser(pendingAskAnswer.requestId, pendingAskAnswer.answer)
+      setPendingAskAnswer(null)
+    }
+  }, [pendingAskAnswer, askDrawerOpen, respondAskUser])
+
+  const handlePermissionRespond = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
+    respondPermission(requestId, behavior)
+  }, [respondPermission])
+
+  const handleAskUserRespond = useCallback((answer: string) => {
+    if (!askUserRequest) return
+    setPendingAskAnswer({ requestId: askUserRequest.id, answer })
+    setAskDrawerOpen(false)
+  }, [askUserRequest])
+
+  useEffect(() => {
+    askDrawerRespondRef.current = handleAskUserRespond
+  }, [handleAskUserRespond])
+
   const handleCardClick = (card: FeatureCard) => {
-    if (disabled) return
+    if (isStreaming && agentStatus !== 'waitingForUserInput') return
     if (card.skillId) {
-      // Activate skill then send the card prompt
       useAgentStore.setState((prev) => ({
         slots: {
           ...prev.slots,
@@ -54,8 +84,16 @@ function AskZuovis({ onSend, onSkillSelect, disabled, onOpenFile, onSelectText, 
         },
       }))
     }
-    onSend(card.prompt)
+    sendMessage(card.prompt)
   }
+
+  const handleChatSend = useCallback((msg: string) => {
+    if (askUserRequest && askDrawerRespondRef.current) {
+      askDrawerRespondRef.current(msg)
+    } else {
+      sendMessage(msg)
+    }
+  }, [askUserRequest, sendMessage])
 
   return (
     <div className="ask-zuovis">
@@ -100,11 +138,25 @@ function AskZuovis({ onSend, onSkillSelect, disabled, onOpenFile, onSelectText, 
       </div>
 
       <div className="ask-zuovis-footer">
-        <ChatInput
+        {permissionRequest && (
+          <PermissionDialog
+            request={permissionRequest}
+            onRespond={handlePermissionRespond}
+          />
+        )}
+        {askUserRequest && (
+          <AskUserDrawer
+            request={askUserRequest}
+            open={askDrawerOpen}
+            onClose={() => setAskDrawerOpen(false)}
+            onRespond={handleAskUserRespond}
+          />
+        )}
+          <ChatInput
           context="ask"
-          onSend={onSend}
-          onSkillSelect={onSkillSelect}
-          disabled={!!disabled}
+          onSend={handleChatSend}
+          disabled={isStreaming && agentStatus !== 'waitingForUserInput'}
+          placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}
           variant="capsule"
         />
       </div>

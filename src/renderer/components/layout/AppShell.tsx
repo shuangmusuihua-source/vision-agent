@@ -75,7 +75,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [showAskZuovis, setShowAskZuovis] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
-  const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
   // Auto-link file when activeTab changes
@@ -266,29 +265,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     respondPermission,
     respondAskUser: editorRespondAskUser,
   } = useAgent('editor')
-  const {
-    sendMessage: askSendMessage,
-    respondAskUser: askRespondAskUser,
-  } = useAgent('ask')
   const isStreaming = useIsStreaming('editor')
-  const askIsStreaming = useIsStreaming('ask')
   const editorPermission = usePermissionRequest('editor')
-  const askPermission = usePermissionRequest('ask')
   const editorAskUser = useAskUserRequest('editor')
-  const askAskUser = useAskUserRequest('ask')
-  // Ask context takes priority (modal overlay), then editor
-  const permissionRequest = askPermission || editorPermission
-  const askUserRequest = askAskUser || editorAskUser
-  // Route responses to the correct context
-  const respondAskUser = useCallback((requestId: string, answer: string) => {
-    if (askAskUser?.id === requestId) askRespondAskUser(requestId, answer)
-    else editorRespondAskUser(requestId, answer)
-  }, [askAskUser, askRespondAskUser, editorRespondAskUser])
   const currentSessionId = useCurrentSessionId('editor')
   const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
   const agentStatus = useAgentStatus('editor')
-  const askAgentStatus = useAgentStatus('ask')
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
 
@@ -596,8 +579,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
            aria-label="编辑器">
         {showAskZuovis ? (
           <AskZuovis
-            onSend={(msg) => { askSendMessage(msg) }}
-            disabled={askIsStreaming && askAgentStatus !== 'waitingForUserInput'}
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
             workspacePath={workspacePaths[0]}
@@ -686,11 +667,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         width={agentWidth}
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
         usageInfo={usageInfo}
-        permissionRequest={permissionRequest}
+        permissionRequest={editorPermission}
         onPermissionRespond={respondPermission}
-        askUserRequest={askUserRequest}
-        onAskUserRespond={respondAskUser}
-        onAskUserDrawerRespond={(respond) => { askDrawerRespondRef.current = respond }}
+        askUserRequest={editorAskUser}
+        onAskUserRespond={editorRespondAskUser}
         sessionList={sessionList}
         currentSessionId={currentSessionId}
         onSelectSession={resumeSession}
@@ -698,11 +678,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onRefreshSessions={loadSessions}
         activeSkillId={activeSkillId}
         chatInput={<ChatInput context="editor" onSend={(msg) => {
-          if (askUserRequest && askDrawerRespondRef.current) {
-            askDrawerRespondRef.current(msg)
-          } else {
-            editorSendMessage(msg, linkedFile || undefined)
-          }
+          editorSendMessage(msg, linkedFile || undefined)
         }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
