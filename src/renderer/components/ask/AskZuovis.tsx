@@ -4,43 +4,57 @@ import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } fro
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import type { AgentContext } from '../../../shared/types'
+import type { SkillDefinition } from '../../lib/ipc'
+import { useAgentStore } from '../../store/agent-store-impl'
 import './ask-zuovis.css'
 
 interface FeatureCard {
+  id: string
   icon: React.ComponentType<{ size: number; weight: string; className?: string }>
   title: string
   desc: string
   colorClass: string
   prompt: string
+  skillId?: string
 }
 
 const FEATURES: FeatureCard[] = [
-  { icon: Monitor, title: '管理电脑', desc: '整理桌面、清理文件、管理应用', colorClass: 'ask-card-purple', prompt: '帮我管理电脑' },
-  { icon: FolderOpen, title: '整理文件', desc: '分类归档、批量重命名、去重', colorClass: 'ask-card-pink', prompt: '帮我整理文件' },
-  { icon: FileText, title: '写文档', desc: '简历、报告、方案、会议纪要', colorClass: 'ask-card-blue', prompt: '帮我写文档' },
-  { icon: PresentationChart, title: '做 PPT', desc: '演示文稿、产品展示、培训课件', colorClass: 'ask-card-green', prompt: '帮我做PPT' },
-  { icon: MagnifyingGlass, title: '搜索知识', desc: '知识库检索、信息整理、摘要', colorClass: 'ask-card-orange', prompt: '帮我搜索知识' },
-  { icon: ChartBar, title: '分析数据', desc: '数据解读、趋势分析、可视化', colorClass: 'ask-card-teal', prompt: '帮我分析数据' },
+  { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析桌面文件，给出整理方案', colorClass: 'ask-card-purple', prompt: '整理我的桌面', skillId: 'organize-desktop' },
+  { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '分类归档、批量重命名、去重', colorClass: 'ask-card-pink', prompt: '帮我整理文件' },
+  { id: 'write-doc', icon: FileText, title: '写文档', desc: '简历、报告、方案、会议纪要', colorClass: 'ask-card-blue', prompt: '帮我写文档' },
+  { id: 'make-ppt', icon: PresentationChart, title: '做 PPT', desc: '演示文稿、产品展示、培训课件', colorClass: 'ask-card-green', prompt: '帮我做PPT' },
+  { id: 'search-knowledge', icon: MagnifyingGlass, title: '搜索知识', desc: '知识库检索、信息整理、摘要', colorClass: 'ask-card-orange', prompt: '帮我搜索知识' },
+  { id: 'analyze-data', icon: ChartBar, title: '分析数据', desc: '数据解读、趋势分析、可视化', colorClass: 'ask-card-teal', prompt: '帮我分析数据' },
 ]
 
 interface AskZuovisProps {
   onSend: (message: string) => void
+  onSkillSelect?: (skill: SkillDefinition) => void
   disabled?: boolean
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
 }
 
-function AskZuovis({ onSend, disabled, onOpenFile, onSelectText, workspacePath }: AskZuovisProps): React.ReactElement {
+function AskZuovis({ onSend, onSkillSelect, disabled, onOpenFile, onSelectText, workspacePath }: AskZuovisProps): React.ReactElement {
   const messages = useMessages('ask')
   const isStreaming = useIsStreaming('ask')
   const isResuming = useIsResumingSession()
-  const agentState = useAgentStatus('ask')
   const hasMessages = messages.length > 0
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const handleCardClick = (prompt: string) => {
-    if (!disabled) onSend(prompt)
+  const handleCardClick = (card: FeatureCard) => {
+    if (disabled) return
+    if (card.skillId) {
+      // Activate skill then send the card prompt
+      useAgentStore.setState((prev) => ({
+        slots: {
+          ...prev.slots,
+          ask: { ...prev.slots.ask, activeSkillId: card.skillId },
+        },
+      }))
+    }
+    onSend(card.prompt)
   }
 
   return (
@@ -64,9 +78,9 @@ function AskZuovis({ onSend, disabled, onOpenFile, onSelectText, workspacePath }
                 const Icon = feature.icon
                 return (
                   <button
-                    key={feature.title}
+                    key={feature.id}
                     className={`ask-zuovis-card ${feature.colorClass}`}
-                    onClick={() => handleCardClick(feature.prompt)}
+                    onClick={() => handleCardClick(feature)}
                   >
                     <div className="ask-zuovis-card-icon">
                       <Icon size={16} weight="regular" />
@@ -89,6 +103,7 @@ function AskZuovis({ onSend, disabled, onOpenFile, onSelectText, workspacePath }
         <ChatInput
           context="ask"
           onSend={onSend}
+          onSkillSelect={onSkillSelect}
           disabled={!!disabled}
           variant="capsule"
         />
