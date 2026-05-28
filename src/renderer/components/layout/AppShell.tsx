@@ -55,7 +55,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
-  const [prefillText, setPrefillText] = useState<string | null>(null)
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const showGraph = useShowGraph()
   const [showSearch, setShowSearch] = useState(false)
@@ -495,8 +494,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
   }, [isStreaming, activeTab, workspacePaths])
 
-  const handleSelectText = useCallback((text: string) => {
-    setPrefillText(text)
+  const handleSelectText = useCallback((text: string, sourceContext?: string) => {
+    const target: AgentContext = sourceContext === 'ask' ? 'ask' : 'editor'
+    useAgentStore.setState((prev) => ({
+      slots: {
+        ...prev.slots,
+        [target]: { ...prev.slots[target], prefillText: text },
+      },
+    }))
   }, [])
 
   const handleAskAgent = useCallback(
@@ -510,7 +515,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }
 
       if (action === 'ask') {
-        setPrefillText(prompts.ask)
+        const target: AgentContext = showAskZuovis ? 'ask' : 'editor'
+        useAgentStore.setState((prev) => ({
+          slots: {
+            ...prev.slots,
+            [target]: { ...prev.slots[target], prefillText: prompts.ask },
+          },
+        }))
       } else {
         editorSendMessage(prompts[action], filePath)
       }
@@ -686,18 +697,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
         activeSkillId={activeSkillId}
-        chatInput={<ChatInput onSend={(msg) => {
+        chatInput={<ChatInput context="editor" onSend={(msg) => {
           if (askUserRequest && askDrawerRespondRef.current) {
             askDrawerRespondRef.current(msg)
           } else {
             editorSendMessage(msg, linkedFile || undefined)
           }
-        }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} prefill={prefillText} onPrefillConsumed={() => setPrefillText(null)} />}
+        }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
         <ErrorBoundary>
-        <ChatView onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
+        <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
         </ErrorBoundary>
       </AgentPanel>
       </aside>
