@@ -84,33 +84,35 @@ export function useIPCSubscriptions() {
 
 const watchdogTimers: Record<AgentContext, ReturnType<typeof setTimeout> | null> = { editor: null, ask: null }
 
+function triggerWatchdog(ctx: AgentContext) {
+  console.warn(`[Watchdog] agent stuck for 120s in ${ctx}, forcing abort`)
+  window.api.agent.abort(ctx)
+  useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, ctx)
+  const s = useAgentStore.getState().slots[ctx]
+  useAgentStore.setState((state) => ({
+    slots: {
+      ...state.slots,
+      [ctx]: {
+        ...state.slots[ctx],
+        messages: [...s.messages, {
+          id: `watchdog-${Date.now()}`,
+          role: 'system',
+          phase: 'complete',
+          textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+          content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
+          toolCalls: [],
+          createdAt: Date.now(),
+        }],
+      },
+    },
+  }))
+}
+
 function refreshWatchdogByContext(ctx: AgentContext) {
   const timer = watchdogTimers[ctx]
   if (!timer) return
   clearTimeout(timer)
-  watchdogTimers[ctx] = setTimeout(() => {
-    console.warn(`[Watchdog] agent stuck for 120s in ${ctx}, forcing abort`)
-    window.api.agent.abort(ctx)
-    useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, ctx)
-    const s = useAgentStore.getState().slots[ctx]
-    useAgentStore.setState((state) => ({
-      slots: {
-        ...state.slots,
-        [ctx]: {
-          ...state.slots[ctx],
-          messages: [...s.messages, {
-            id: `watchdog-${Date.now()}`,
-            role: 'system',
-            phase: 'complete',
-            textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-            content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
-            toolCalls: [],
-            createdAt: Date.now(),
-          }],
-        },
-      },
-    }))
-  }, WATCHDOG_TIMEOUT)
+  watchdogTimers[ctx] = setTimeout(() => triggerWatchdog(ctx), WATCHDOG_TIMEOUT)
 }
 
 export function useAgent(context: AgentContext = 'editor') {
@@ -122,29 +124,7 @@ export function useAgent(context: AgentContext = 'editor') {
   useEffect(() => {
     if (isAgentActive(agentState)) {
       if (watchdogTimers[context]) clearTimeout(watchdogTimers[context])
-      watchdogTimers[context] = setTimeout(() => {
-        console.warn(`[Watchdog] agent stuck for 120s in ${context}, forcing abort`)
-        window.api.agent.abort(context)
-        store.getState().dispatchAgentEvent({ type: 'ABORT' }, context)
-        const s = store.getState().slots[context]
-        store.setState((state) => ({
-          slots: {
-            ...state.slots,
-            [context]: {
-              ...state.slots[context],
-              messages: [...s.messages, {
-                id: `watchdog-${Date.now()}`,
-                role: 'system',
-                phase: 'complete',
-                textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-                content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
-                toolCalls: [],
-                createdAt: Date.now(),
-              }],
-            },
-          },
-        }))
-      }, WATCHDOG_TIMEOUT)
+      watchdogTimers[context] = setTimeout(() => triggerWatchdog(context), WATCHDOG_TIMEOUT)
     } else {
       if (watchdogTimers[context]) {
         clearTimeout(watchdogTimers[context])
@@ -226,14 +206,24 @@ export function useAgent(context: AgentContext = 'editor') {
       slots: {
         ...s.slots,
         [context]: {
-          ...emptySlot(),
-          currentSessionId: sessionId,
+          ...s.slots[context],
+          isResumingSession: true,
         },
       },
     }))
 
     try {
       const messages = await window.api.agent.loadSessionMessages(sessionId)
+      // Only clear the slot after successful load — preserve existing state on failure
+      store.setState((s) => ({
+        slots: {
+          ...s.slots,
+          [context]: {
+            ...emptySlot(),
+            currentSessionId: sessionId,
+          },
+        },
+      }))
       for (const msg of messages) {
         store.getState().processIPCMessage(msg, { isReplay: true })
       }

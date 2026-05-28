@@ -105,11 +105,17 @@ app.whenReady().then(() => {
   // Initialize file index for saved workspace
   const dirs = getAuthorizedDirectories()
   if (dirs.length > 0) {
-    fileIndexService.init(dirs[0]).catch(() => {})
+    fileIndexService.init(dirs[0]).catch((err) => {
+      console.error('[Init] fileIndexService failed:', err)
+      Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
+    })
   }
 
   // Initialize knowledge base file index for semantic graph
-  fileIndexService.initKnowledgeIndex(knowledgeDir).catch(() => {})
+  fileIndexService.initKnowledgeIndex(knowledgeDir).catch((err) => {
+    console.error('[Init] knowledgeIndex init failed:', err)
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
+  })
 
   restorePersistedTasks()
 

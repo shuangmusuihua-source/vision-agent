@@ -29,7 +29,7 @@ import type {
   InputJsonDelta,
   StreamContentBlockStart,
 } from '../../shared/types'
-import { AGENT_TRANSITIONS as TRANSITIONS } from '../../shared/types'
+import { AGENT_TRANSITIONS as TRANSITIONS, isTextBlock, isToolUseBlock, isToolResultBlock } from '../../shared/types'
 
 // ─── Slot helpers ────────────────────────────────────────────────────────
 
@@ -43,20 +43,6 @@ function updateSlot(
       ...state.slots,
       [ctx]: { ...state.slots[ctx], ...patch },
     },
-  }
-}
-
-function updateSlotWithMsgs(
-  ctx: AgentContext,
-  slot: ContextSlot,
-  messages: ConversationMessage[],
-  extra?: Partial<ContextSlot>
-): Partial<AgentStore> {
-  return {
-    slots: {
-      editor: ctx === 'editor' ? { ...slot, messages, ...extra } : undefined!,
-      ask: ctx === 'ask' ? { ...slot, messages, ...extra } : undefined!,
-    } as Record<AgentContext, ContextSlot>,
   }
 }
 
@@ -97,13 +83,12 @@ function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content
   updatedMessages[msgIdx] = {
     ...updatedMessages[msgIdx],
     phase,
-    textContent: hasText ? (content.find((b) => b.type === 'text') as any)?.text || textContent : textContent,
+    textContent: hasText ? (content.find(isTextBlock))?.text || textContent : textContent,
     content: content.length > 0 ? content : updatedMessages[msgIdx].content,
     toolCalls: hasToolUse
       ? content
-          .filter((b) => b.type === 'tool_use')
-          .map((b) => {
-            const tu = b as any
+          .filter(isToolUseBlock)
+          .map((tu) => {
             let input: Record<string, unknown> = {}
             if (tu.input && typeof tu.input === 'object') input = tu.input
             return {
@@ -352,14 +337,13 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           const phase: ConversationMessage['phase'] = 'complete'
 
           const textContent = content
-            .filter((b) => b.type === 'text')
-            .map((b) => (b as any).text || '')
+            .filter(isTextBlock)
+            .map((b) => b.text)
             .join('')
 
           const toolCalls: ToolCallState[] = content
-            .filter((b) => b.type === 'tool_use')
-            .map((b) => {
-              const tu = b as any
+            .filter(isToolUseBlock)
+            .map((tu) => {
               let input: Record<string, unknown> = {}
               if (tu.input && typeof tu.input === 'object') input = tu.input
               return {
@@ -505,12 +489,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
               }
 
               if (block.type === 'tool_use') {
-                const tu = block as any
-                acc.toolUseBlocks.set(tu.id, { name: tu.name, inputJson: '' })
+                const name = block.name || 'unknown'
+                acc.toolUseBlocks.set(block.id, { name, inputJson: '' })
 
                 const newToolCall: ToolCallState = {
-                  toolUseId: tu.id,
-                  toolName: tu.name,
+                  toolUseId: block.id,
+                  toolName: name,
                   input: {},
                   inputJsonPartial: '',
                   status: 'pending',
@@ -584,18 +568,18 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
         set((state) => {
           const s = state.slots[ctx]
-          const toolResults = content.filter((b) => b.type === 'tool_result') as any[]
-          const textBlocks = content.filter((b) => b.type === 'text') as any[]
+          const toolResults = content.filter(isToolResultBlock)
+          const textBlocks = content.filter(isTextBlock)
           const msgs = [...s.messages]
           let changed = false
 
           if (toolResults.length > 0) {
             for (const tr of toolResults) {
-              const toolUseId = tr.tool_use_id as string
+              const toolUseId = tr.tool_use_id
               const resultContent = typeof tr.content === 'string'
                 ? tr.content
                 : Array.isArray(tr.content)
-                  ? tr.content.map((c: any) => c.text || '').join('')
+                  ? tr.content.map((c) => (typeof c === 'object' && c && 'text' in c ? (c as { text: string }).text : '')).join('')
                   : JSON.stringify(tr.content)
               const isError = tr.is_error === true
 
@@ -617,7 +601,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           }
 
           if (isReplay && textBlocks.length > 0) {
-            const text = textBlocks.map((b: any) => b.text || '').join('')
+            const text = textBlocks.map((b) => b.text).join('')
             if (text && !msgs.some((m) => m.role === 'user' && m.textContent === text)) {
               msgs.push({
                 id: userMsg.uuid || `user-${Date.now()}`,

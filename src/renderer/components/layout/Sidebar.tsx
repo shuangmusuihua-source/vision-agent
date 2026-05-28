@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PlusSquare, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, Sparkle } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Brain, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, MagicWand } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -27,6 +27,8 @@ interface SidebarProps {
   onToggleGraph: () => void
   onDaydream: (mode: string) => void
   onAskZuovis: () => void
+  isAskZuovisActive: boolean
+  activeFile: string
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
@@ -50,6 +52,8 @@ function Sidebar({
   onToggleGraph,
   onDaydream,
   onAskZuovis,
+  isAskZuovisActive,
+  activeFile,
   showGraph,
   changedFileCount,
   collapsed
@@ -163,6 +167,10 @@ function Sidebar({
     })
   }, [])
 
+  const handleCollapseAll = useCallback(() => {
+    setCollapsedWorkspaces(new Set(workspacePaths))
+  }, [workspacePaths])
+
   const handlePinToTop = useCallback((wsPath: string) => {
     const idx = workspacePaths.indexOf(wsPath)
     if (idx <= 0) return
@@ -199,7 +207,7 @@ function Sidebar({
       return (
         <div
           key={entry.path}
-          className="sidebar-entry sidebar-file"
+          className={`sidebar-entry sidebar-file${activeFile === entry.path ? ' sidebar-entry-active' : ''}`}
           style={{ paddingLeft: paddingLeft + 14 }}
           onClick={() => {
             if (renamingPath !== entry.path) onFileSelect(entry.path)
@@ -290,9 +298,6 @@ function Sidebar({
             <Graph size={14} weight="bold" />
             {changedFileCount >= 2 && <span className="sidebar-badge-dot" />}
           </button>
-          <button className="sidebar-icon-btn" onClick={onNewWorkspace} title="新建工作区" aria-label="新建工作区">
-            <PlusSquare size={14} weight="bold" />
-          </button>
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置" aria-label="设置">
             <Gear size={14} weight="bold" />
           </button>
@@ -303,11 +308,81 @@ function Sidebar({
       </div>
 
       <div className="sidebar-content">
-        <button className="sidebar-ask-zuovis" onClick={onAskZuovis}>
-          <div className="sidebar-ask-zuovis-icon"><Sparkle size={12} weight="bold" /></div>
+        <button className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`} onClick={onAskZuovis}>
+          <div className="sidebar-ask-zuovis-icon"><MagicWand size={12} weight="bold" /></div>
           <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
         </button>
 
+        {/* 知识库 */}
+        {fixedWorkspacePaths.length > 0 && (
+          <>
+            <div className="sidebar-workspace-module-header">
+              <span className="sidebar-workspace-module-title">知识库</span>
+            </div>
+            {fixedWorkspacePaths.map((wsPath) => {
+              const isCollapsed = collapsedWorkspaces.has(wsPath)
+              return (
+                <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
+                  <div className="sidebar-workspace-header">
+                    <button
+                      className="sidebar-workspace-toggle"
+                      onClick={() => toggleWorkspace(wsPath)}
+                      aria-label={isCollapsed ? '展开知识库' : '折叠知识库'}
+                    >
+                      {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+                    </button>
+                    <BookOpen size={14} weight="bold" className="sidebar-workspace-fixed-icon" />
+                    <span className="sidebar-workspace-name">知识库</span>
+                    <button
+                      className="sidebar-workspace-add-file"
+                      onClick={() => setCreatingFileIn(wsPath)}
+                      title="新建文件"
+                      aria-label="新建文件"
+                    >
+                      <Plus size={12} weight="bold" />
+                    </button>
+                  </div>
+                  {!isCollapsed && (
+                    <div className="sidebar-workspace-body">
+                      {creatingFileIn === wsPath && (
+                        <div className="sidebar-new-file-input">
+                          <input
+                            ref={newFileInputRef}
+                            className="sidebar-new-file-field"
+                            placeholder="文件名（自动添加 .md）"
+                            value={newFileName}
+                            onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.isComposing) handleCreateFile(wsPath)
+                              if (e.key === 'Escape') setCreatingFileIn(null)
+                            }}
+                          />
+                          {createError && <span className="sidebar-new-file-error">{createError}</span>}
+                        </div>
+                      )}
+                      {renderTree(files[wsPath] || [], 0, wsPath)}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        {/* 工作区 */}
+        {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length > 0 && (
+          <div className="sidebar-workspace-module-header">
+            <span className="sidebar-workspace-module-title">工作区</span>
+            <div className="sidebar-workspace-module-actions">
+              <button className="sidebar-workspace-module-btn" onClick={handleCollapseAll} title="全部收起" aria-label="全部收起">
+                <CaretDoubleUp size={12} weight="bold" />
+              </button>
+              <button className="sidebar-workspace-module-btn" onClick={onNewWorkspace} title="新建工作区" aria-label="新建工作区">
+                <Plus size={12} weight="bold" />
+              </button>
+            </div>
+          </div>
+        )}
         {workspacePaths.length === 0 ? (
           <div className="sidebar-empty-workspace">
             <button className="sidebar-new-dir-btn" onClick={onNewWorkspace}>
@@ -316,16 +391,15 @@ function Sidebar({
           </div>
         ) : (
           <Flipper
-            flipKey={workspacePaths.join(',')}
+            flipKey={workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).join(',')}
             spring={{ stiffness: 200, damping: 28 } as any}
             className="sidebar-workspace-list"
           >
-            {workspacePaths.map((wsPath, idx) => {
+            {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).map((wsPath, idx) => {
               const isCollapsed = collapsedWorkspaces.has(wsPath)
-              const isFixed = fixedWorkspacePaths.includes(wsPath)
               return (
                 <Flipped key={wsPath} flipId={wsPath}>
-                  <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}${isFixed ? ' sidebar-workspace-fixed' : ''}`}>
+                  <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
                     <div className="sidebar-workspace-header">
                       <button
                         className="sidebar-workspace-toggle"
@@ -334,9 +408,8 @@ function Sidebar({
                       >
                         {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
                       </button>
-                      {isFixed && <BookOpen size={14} weight="bold" className="sidebar-workspace-fixed-icon" />}
-                      <span className="sidebar-workspace-name">{isFixed ? '知识库' : workspaceName(wsPath)}</span>
-                      {!isFixed && idx > 0 && (
+                      <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
+                      {idx > 0 && (
                         <button
                           className="sidebar-workspace-pin"
                           onClick={() => handlePinToTop(wsPath)}
@@ -346,16 +419,14 @@ function Sidebar({
                           <PushPin size={12} weight="bold" />
                         </button>
                       )}
-                      {!isFixed && (
-                        <button
-                          className="sidebar-workspace-remove"
-                          onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
-                          title="移除工作区"
-                          aria-label="移除工作区"
-                        >
-                          <X size={12} weight="bold" />
-                        </button>
-                      )}
+                      <button
+                        className="sidebar-workspace-remove"
+                        onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
+                        title="移除工作区"
+                        aria-label="移除工作区"
+                      >
+                        <X size={12} weight="bold" />
+                      </button>
                       <button
                         className="sidebar-workspace-add-file"
                         onClick={() => setCreatingFileIn(wsPath)}

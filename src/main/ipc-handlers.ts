@@ -1,6 +1,6 @@
 import { ipcMain, dialog, shell, nativeTheme, app } from 'electron'
 import { readFile, writeFile, readdir, mkdir, unlink, rename, rm } from 'fs/promises'
-import { join, extname, relative, basename } from 'path'
+import { join, extname, relative, basename, dirname } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, abortActiveQuery, setActiveSkillId } from './agent-manager'
@@ -21,7 +21,9 @@ import {
   getKnowledgeBaseDir,
   getFixedDirectories,
   getTheme,
-  setTheme
+  setTheme,
+  getApiKey,
+  getBaseUrl,
 } from './store'
 import { getNotificationHistory } from './notification-manager'
 import { fileIndexService } from './file-index-service'
@@ -123,7 +125,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('workspace:renameFile', async (_event, filePath: string, newName: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
-      const dir = filePath.substring(0, filePath.lastIndexOf('/'))
+      const dir = dirname(filePath)
       const destPath = join(dir, newName)
       if (existsSync(destPath)) return { success: false, error: '同名文件已存在' }
       await rename(filePath, destPath)
@@ -369,6 +371,14 @@ export function registerIpcHandlers(): void {
     return { success: true }
   })
 
+  ipcMain.handle('agent:selectFolder', async () => {
+    const window = getMainWindow()
+    if (!window) return { canceled: true, filePaths: [] }
+    return await dialog.showOpenDialog(window, {
+      properties: ['openDirectory'],
+    })
+  })
+
   // --- Memory ---
   ipcMain.handle('memory:list', async () => {
     const dirs = getAuthorizedDirectories()
@@ -509,13 +519,16 @@ export function registerIpcHandlers(): void {
   // --- Connection Test ---
   ipcMain.handle('settings:testConnection', async (_event, options: { baseUrl: string; apiKey: string; model: string }) => {
     try {
-      const baseUrl = options.baseUrl.replace(/\/+$/, '')
+      // Use the real API key from the store, not the masked key from the renderer
+      const apiKey = getApiKey()
+      if (!apiKey) return { success: false, message: '未找到有效的 API Key，请先在设置中配置' }
+      const baseUrl = (options.baseUrl || getBaseUrl()).replace(/\/+$/, '')
       const url = `${baseUrl}/v1/messages`
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': options.apiKey,
+          'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({

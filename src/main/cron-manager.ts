@@ -1,6 +1,7 @@
 import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options } from '@anthropic-ai/claude-agent-sdk'
+import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './index'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile, getCronTasks, saveCronTasks, type CronTask } from './store'
 import { resolveClaudeCodeExecutable } from './agent-manager'
@@ -123,6 +124,16 @@ export async function executeTask(task: CronTask): Promise<void> {
     task.lastRunAt = Date.now()
     task.lastResult = `Error: ${(err as Error).message}`
     persistTasks()
+    console.error(`[CronManager] Task "${task.name}" failed:`, err)
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
+    const window = getMainWindow()
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('agent:notification', {
+        type: 'error',
+        title: `定时任务失败: ${task.name}`,
+        message: (err as Error).message || '未知错误',
+      })
+    }
   }
 }
 
