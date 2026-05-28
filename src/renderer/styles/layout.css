@@ -1299,6 +1299,49 @@
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
+/* --- Ask Zuovis Modal Overlay (permission & askUser) --- */
+
+.ask-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  animation: ask-modal-fadein 0.15s ease;
+}
+
+@keyframes ask-modal-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ask-modal-card {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  min-width: 320px;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  animation: ask-modal-slidein 0.2s ease;
+}
+
+@keyframes ask-modal-slidein {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-theme="dark"] .ask-modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .ask-modal-card {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
 
 /* --- Daydream Mode --- */
 

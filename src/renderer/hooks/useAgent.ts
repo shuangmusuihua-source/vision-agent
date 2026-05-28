@@ -184,7 +184,6 @@ export function useAgent(context: AgentContext = 'editor') {
             createdAt: Date.now(),
           }],
           isStreaming: true,
-          agentState: 'thinking',
         },
       },
     }))

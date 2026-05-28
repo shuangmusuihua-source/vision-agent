@@ -751,4 +751,22 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     const ctx = skillState.context || get().context
     set((s) => updateSlot(s, ctx, { skillOutput: skillState }))
   },
+
+  setPrefill(context: AgentContext, text: string) {
+    set((s) => updateSlot(s, context, { prefillText: text }))
+  },
+
+  consumePrefill(context: AgentContext) {
+    set((s) => updateSlot(s, context, { prefillText: null }))
+  },
 }))
+
+// HMR: persist store across module reloads so getState() always has actions
+if (import.meta.hot) {
+  import.meta.hot.dispose((data) => {
+    data.state = useAgentStore.getState()
+  })
+  if (import.meta.hot.data?.state) {
+    useAgentStore.setState(import.meta.hot.data.state, true)
+  }
+}

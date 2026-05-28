@@ -2,21 +2,22 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { ChatCircleDots, CaretUp, Spinner } from '@phosphor-icons/react'
 import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
-import type { ConversationMessage } from '../../../shared/types'
+import type { AgentContext } from '../../../shared/types'
 
 const RENDER_BATCH = 100
 
 interface ChatViewProps {
+  context: AgentContext
   onOpenFile?: (path: string) => void
-  onSelectText?: (text: string) => void
+  onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
 }
 
-function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
-  const messages = useMessages('editor')
-  const isStreaming = useIsStreaming('editor')
+function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
+  const messages = useMessages(context)
+  const isStreaming = useIsStreaming(context)
   const isResuming = useIsResumingSession()
-  const agentState = useAgentStatus('editor')
+  const agentState = useAgentStatus(context)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState(RENDER_BATCH)
 
@@ -75,7 +76,7 @@ function ChatView({ onOpenFile, onSelectText, workspacePath }: ChatViewProps): R
         <MessageBubble
           key={msg.id}
           message={msg}
-          context="editor"
+          context={context}
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
           workspacePath={workspacePath}

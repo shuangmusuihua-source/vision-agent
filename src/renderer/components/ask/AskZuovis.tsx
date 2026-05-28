@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar, ArrowUp, ChatCircleDots, CaretUp, Spinner } from '@phosphor-icons/react'
+import { useEffect, useRef } from 'react'
+import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar } from '@phosphor-icons/react'
 import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
-import { useAgentStore } from '../../store/agent-store-impl'
-import MessageBubble from '../chat/MessageBubble'
-
-const RENDER_BATCH = 100
+import ChatView from '../chat/ChatView'
+import ChatInput from '../chat/ChatInput'
+import type { AgentContext } from '../../../shared/types'
+import './ask-zuovis.css'
 
 interface FeatureCard {
   icon: React.ComponentType<{ size: number; weight: string; className?: string }>
@@ -27,71 +27,28 @@ interface AskZuovisProps {
   onSend: (message: string) => void
   disabled?: boolean
   onOpenFile?: (path: string) => void
-  onSelectText?: (text: string) => void
+  onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
 }
 
 function AskZuovis({ onSend, disabled, onOpenFile, onSelectText, workspacePath }: AskZuovisProps): React.ReactElement {
-  const [inputText, setInputText] = useState('')
   const messages = useMessages('ask')
   const isStreaming = useIsStreaming('ask')
   const isResuming = useIsResumingSession()
   const agentState = useAgentStatus('ask')
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const [visibleCount, setVisibleCount] = useState(RENDER_BATCH)
-
   const hasMessages = messages.length > 0
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  const visibleMessages = useMemo(() => {
-    const start = Math.max(0, messages.length - visibleCount)
-    return { items: messages.slice(start), start }
-  }, [messages, visibleCount])
-
-  const hasMore = messages.length > visibleCount
-
-  // Auto-scroll
-  useEffect(() => {
-    if (messages.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages.length, isStreaming])
-
-  useEffect(() => {
-    if (isStreaming && agentState === 'thinking') {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [isStreaming, agentState])
-
-  useEffect(() => {
-    setVisibleCount(RENDER_BATCH)
-  }, [messages.length > RENDER_BATCH ? 'long' : 'short'])
-
-  const handleSend = useCallback(() => {
-    const text = inputText.trim()
-    if (text && !disabled) {
-      onSend(text)
-      setInputText('')
-    }
-  }, [inputText, onSend, disabled])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-      e.preventDefault()
-      handleSend()
-    }
-  }, [handleSend])
-
-  const handleCardClick = useCallback((prompt: string) => {
+  const handleCardClick = (prompt: string) => {
     if (!disabled) onSend(prompt)
-  }, [onSend, disabled])
+  }
 
   return (
     <div className="ask-zuovis">
       <div className="ask-zuovis-scroll" ref={scrollRef}>
         {isResuming && (
           <div className="ask-zuovis-resuming">
-            <Spinner size={20} className="spin" /> 加载会话历史…
+            <span className="spin" style={{ display: 'inline-block' }}>⏳</span> 加载会话历史…
           </div>
         )}
 
@@ -123,57 +80,18 @@ function AskZuovis({ onSend, disabled, onOpenFile, onSelectText, workspacePath }
           </div>
         ) : (
           <div className="ask-zuovis-messages-inner">
-            {hasMore && (
-              <button className="chat-load-more" onClick={() => setVisibleCount((c) => c + RENDER_BATCH)}>
-                <CaretUp size={14} weight="bold" /> 加载更早消息 ({messages.length - visibleCount} 条)
-              </button>
-            )}
-            {visibleMessages.items.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                context="ask"
-                onOpenFile={onOpenFile}
-                onSelectText={onSelectText}
-                workspacePath={workspacePath}
-              />
-            ))}
-            {isStreaming && agentState === 'thinking' && (
-              <div className="message-bubble message-assistant message-thinking-indicator">
-                <div className="message-status-indicator">
-                  思考中
-                  <span className="status-dot" />
-                  <span className="status-dot" />
-                  <span className="status-dot" />
-                </div>
-              </div>
-            )}
+            <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} />
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       <div className="ask-zuovis-footer">
-        <div className="ask-zuovis-capsule">
-          <input
-            type="text"
-            className="ask-zuovis-input"
-            placeholder="问 Zuovis 任何问题..."
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            autoFocus
-          />
-          <button
-            className={`ask-zuovis-send-btn ${inputText.trim() && !disabled ? 'ask-zuovis-send-btn-active' : ''}`}
-            onClick={handleSend}
-            disabled={!inputText.trim() || disabled}
-            type="button"
-          >
-            <ArrowUp size={16} weight="bold" />
-          </button>
-        </div>
+        <ChatInput
+          context="ask"
+          onSend={onSend}
+          disabled={!!disabled}
+          variant="capsule"
+        />
       </div>
     </div>
   )

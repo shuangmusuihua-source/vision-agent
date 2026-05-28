@@ -22,7 +22,7 @@ function stripSkillOutputBlock(content: string): string {
 interface MessageBubbleProps {
   message: ConversationMessage
   onOpenFile?: (path: string) => void
-  onSelectText?: (text: string) => void
+  onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
   context: 'editor' | 'ask'
 }
@@ -69,7 +69,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
 
   const handleClickAddToChat = useCallback(() => {
     if (selectionBtn && onSelectText) {
-      onSelectText(selectionBtn.text)
+      onSelectText(selectionBtn.text, context)
     }
     window.getSelection()?.removeAllRanges()
     setSelectionBtn(null)
