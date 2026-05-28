@@ -4,9 +4,10 @@ import { existsSync } from 'fs'
 import { appendFile } from 'fs/promises'
 import { join } from 'path'
 import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
-import type { Options, SDKMessage, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
+import type { Options, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
+import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, AgentContext, AskUserQuestionOption } from '../shared/types'
 import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
@@ -43,7 +44,6 @@ export function resolveClaudeCodeExecutable(): string | undefined {
 interface SessionInfo {
   id: string
   createdAt: number
-  messageCount: number
 }
 
 const sessions = new Map<string, SessionInfo>()
@@ -315,6 +315,22 @@ interface ActiveQuery {
 const activeQueries = new Map<AgentContext, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
+function rejectAllPendingPermissions(): void {
+  for (const [id, p] of pendingPermissions) {
+    pendingPermissions.delete(id)
+    cancelPermissionNotification(id)
+    p.resolve({ behavior: 'deny', message: 'Query aborted' })
+  }
+}
+
+function rejectAllPendingAskUser(): void {
+  for (const [id, p] of pendingAskUser) {
+    pendingAskUser.delete(id)
+    clearTimeout(p.timeout)
+    p.resolve({ behavior: 'deny', message: 'Query aborted' })
+  }
+}
+
 export function abortActiveQuery(context?: AgentContext): void {
   if (context) {
     const entry = activeQueries.get(context)
@@ -328,6 +344,8 @@ export function abortActiveQuery(context?: AgentContext): void {
       try { (entry.query as any).abort() } catch {}
     }
     activeQueries.clear()
+    rejectAllPendingPermissions()
+    rejectAllPendingAskUser()
   }
 }
 
@@ -392,7 +410,6 @@ export async function sendMessage(
         sessions.set(currentSessionId, {
           id: currentSessionId,
           createdAt: Date.now(),
-          messageCount: 0
         })
         mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId })
         evictOldSessions()
@@ -426,133 +443,6 @@ export async function sendMessage(
     } as AgentIPCMessage & { context: AgentContext })
   } finally {
     activeQueries.delete(context)
-  }
-}
-
-/**
- * Convert an SDK message into a typed AgentIPCMessage for the renderer.
- * Unknown/irrelevant message types return null and are silently dropped.
- */
-function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
-  const msg = message as Record<string, unknown>
-  const type = (msg.type as string) || ''
-  const subtype = (msg.subtype as string) || ''
-
-  switch (type) {
-    case 'system': {
-      if (subtype === 'init') {
-        return {
-          type: 'system',
-          subtype: 'init',
-          session_id: (msg.session_id as string) || '',
-          model: (msg.model as string) || '',
-          tools: (msg.tools as string[]) || [],
-        }
-      }
-      if (subtype === 'status') {
-        const status = msg.status as string | null
-        return {
-          type: 'system',
-          subtype: 'status',
-          status: status === 'compacting' || status === 'requesting' ? status : null,
-        }
-      }
-      if (subtype === 'compact_boundary') {
-        return { type: 'system', subtype: 'compact_boundary' }
-      }
-      if (subtype === 'permission_denied') {
-        return {
-          type: 'system',
-          subtype: 'permission_denied',
-          tool_use_id: (msg.tool_use_id as string) || '',
-          message: (msg.message as string) || '',
-        }
-      }
-      // Drop other system subtypes (notification, task_notification, tool_use_summary)
-      return null
-    }
-
-    case 'assistant': {
-      const apiMessage = msg.message as Record<string, unknown> | undefined
-      const content = apiMessage?.content as Array<Record<string, unknown>> | undefined
-      if (!content) return null
-      return {
-        type: 'assistant',
-        uuid: (msg.uuid as string) || '',
-        message: { content: content as any },
-      }
-    }
-
-    case 'user': {
-      const apiMessage = msg.message as Record<string, unknown> | undefined
-      const content = apiMessage?.content as Array<Record<string, unknown>> | undefined
-      if (!content) return null
-      return {
-        type: 'user',
-        uuid: (msg.uuid as string) || '',
-        message: { content: content as any },
-      }
-    }
-
-    case 'result': {
-      const usage = msg.usage as Record<string, unknown> | undefined
-      if (subtype === 'success') {
-        return {
-          type: 'result',
-          subtype: 'success',
-          usage: {
-            input_tokens: (usage?.input_tokens as number) || 0,
-            output_tokens: (usage?.output_tokens as number) || 0,
-            cache_read_tokens: (usage?.cache_read_input_tokens as number) || 0,
-            cache_creation_tokens: (usage?.cache_creation_input_tokens as number) || 0,
-          },
-          total_cost_usd: (msg.total_cost_usd as number) || 0,
-          duration_ms: (msg.duration_ms as number) || 0,
-        }
-      }
-      // Error result variants
-      const errors = (msg.errors as string[]) || []
-      return {
-        type: 'result',
-        subtype: 'error',
-        errors,
-        usage: {
-          input_tokens: (usage?.input_tokens as number) || 0,
-          output_tokens: (usage?.output_tokens as number) || 0,
-          cache_read_tokens: (usage?.cache_read_input_tokens as number) || 0,
-          cache_creation_tokens: (usage?.cache_creation_input_tokens as number) || 0,
-        },
-        total_cost_usd: (msg.total_cost_usd as number) || 0,
-        duration_ms: (msg.duration_ms as number) || 0,
-      }
-    }
-
-    case 'stream_event': {
-      const event = msg.event as Record<string, unknown> | undefined
-      if (!event) return null
-      const eventType = (event.type as string) || ''
-
-      // Only forward content-related events to renderer
-      if (eventType === 'content_block_start' || eventType === 'content_block_delta' || eventType === 'content_block_stop') {
-        return {
-          type: 'stream_event',
-          uuid: (msg.uuid as string) || '',
-          event: event as any,
-        }
-      }
-      // message_start/delta/stop are structural — forward them too for completeness
-      if (eventType === 'message_start' || eventType === 'message_delta' || eventType === 'message_stop') {
-        return {
-          type: 'stream_event',
-          uuid: (msg.uuid as string) || '',
-          event: event as any,
-        }
-      }
-      return null
-    }
-
-    default:
-      return null
   }
 }
 
@@ -590,44 +480,3 @@ export async function loadSdkSessionMessages(sessionId: string): Promise<Array<R
   }
 }
 
-export async function listSkills(): Promise<Array<{ name: string; description: string; argumentHint: string; aliases?: string[] }>> {
-  const dirs = getAuthorizedDirectories()
-  const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
-  const apiKey = getApiKey()
-  const baseUrl = getBaseUrl()
-  const profile = getActiveProfile()
-  const cliPath = resolveClaudeCodeExecutable()
-
-  const env: Record<string, string> = {}
-  if (apiKey) env.ANTHROPIC_API_KEY = apiKey
-  if (baseUrl && profile?.apiProvider === 'custom') env.ANTHROPIC_BASE_URL = baseUrl
-
-  try {
-    const messageStream = query({
-      prompt: '__skill_discovery_probe__',
-      options: {
-        model: getModel(),
-        cwd,
-        skills: 'all',
-        env,
-        ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
-        settings: {
-          autoMemoryDirectory: join(cwd, '.vision', 'memory')
-        }
-      }
-    })
-
-    const skills = await (messageStream as Query).supportedCommands()
-    // Abort the probe query — we only needed the skill list
-    try { (messageStream as any).abort() } catch {}
-    return skills.map(s => ({
-      name: s.name,
-      description: s.description,
-      argumentHint: s.argumentHint,
-      aliases: s.aliases
-    }))
-  } catch (err) {
-    console.error('[AgentManager] listSkills error:', err)
-    return []
-  }
-}

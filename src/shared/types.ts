@@ -44,6 +44,13 @@ export type ThinkingBlock = {
 
 export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock | ThinkingBlock
 
+// ─── Type Guards ──────────────────────────────────────────────────────
+
+export function isTextBlock(b: ContentBlock): b is TextBlock { return b.type === 'text' }
+export function isToolUseBlock(b: ContentBlock): b is ToolUseBlock { return b.type === 'tool_use' }
+export function isToolResultBlock(b: ContentBlock): b is ToolResultBlock { return b.type === 'tool_result' }
+export function isThinkingBlock(b: ContentBlock): b is ThinkingBlock { return b.type === 'thinking' }
+
 // ─── Stream Event Payloads ───────────────────────────────────────────
 
 export type TextDelta = {

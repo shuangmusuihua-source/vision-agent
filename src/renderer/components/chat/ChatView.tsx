@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { ChatCircleDots, CaretUp, Spinner } from '@phosphor-icons/react'
 import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
+import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
 
 const RENDER_BATCH = 100
@@ -55,20 +56,20 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
   }, [messages.length > RENDER_BATCH ? 'long' : 'short'])
 
   return (
-    <div className="chat-view" aria-live="polite" aria-label="对话消息">
+    <div className={styles.chatView} aria-live="polite" aria-label="对话消息">
       {isResuming && (
-        <div className="chat-loading">
+        <div className={styles.chatLoading}>
           <Spinner size={24} className="spin" /> 加载会话历史…
         </div>
       )}
       {messages.length === 0 && !isResuming && (
-        <div className="chat-empty">
-          <ChatCircleDots size={48} weight="thin" className="chat-empty-icon" />
-          <span className="chat-empty-hint">开始对话</span>
+        <div className={styles.chatEmpty}>
+          <ChatCircleDots size={48} weight="thin" className={styles.chatEmptyIcon} />
+          <span className={styles.chatEmptyHint}>开始对话</span>
         </div>
       )}
       {hasMore && (
-        <button className="chat-load-more" onClick={() => setVisibleCount((c) => c + RENDER_BATCH)}>
+        <button className={styles.chatLoadMore} onClick={() => setVisibleCount((c) => c + RENDER_BATCH)}>
           <CaretUp size={14} weight="bold" /> 加载更早消息 ({messages.length - visibleCount} 条)
         </button>
       )}

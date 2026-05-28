@@ -12,18 +12,14 @@ import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
 import { useAgent, useIPCSubscriptions, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useDividerDrag } from '../../hooks/useDividerDrag'
+import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { AgentContext } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { ChatMessage as ConversationMessage } from '../../store/agent-store'
 import type { FileEntry, SkillDefinition } from '../../lib/ipc'
-
-const AGENT_DEFAULT_WIDTH = 360
-const AGENT_MIN_WIDTH = 240
-const AGENT_MAX_WIDTH = 500
-const AGENT_COLLAPSE_THRESHOLD = 180
-const EDITOR_MIN_RATIO = 0.30
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -42,16 +38,28 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [toggleVisible, setToggleVisible] = useState(true)
   const toggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [agentWidth, setAgentWidth] = useState(AGENT_DEFAULT_WIDTH)
+  const [agentWidth, setAgentWidth] = useState(360)
   const [agentCollapsed, setAgentCollapsed] = useState(false)
-  const lastWidthRef = useRef(AGENT_DEFAULT_WIDTH)
-  const [dividerHovered, setDividerHovered] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
-  const dragStartXRef = useRef(0)
-  const dragStartWidthRef = useRef(0)
-  const layoutWidthRef = useRef(0)
   const shellRef = useRef<HTMLDivElement>(null)
   const [isChatFirst, setIsChatFirst] = useState(false)
+
+  const {
+    dividerHovered,
+    setDividerHovered,
+    isDragging,
+    handleSwapLayout,
+    handleExpand,
+    handleToggleAgent,
+    handleDividerMouseDown,
+  } = useDividerDrag({
+    agentCollapsed,
+    agentWidth,
+    isChatFirst,
+    setAgentWidth,
+    setAgentCollapsed,
+    shellRef,
+    onSwapLayout: () => setIsChatFirst((v) => !v),
+  })
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
@@ -77,101 +85,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
+  // Keyboard shortcuts
+  useAppShortcuts({ setShowSearch, setIsChatFirst })
+
   // Auto-link file when activeTab changes
   useEffect(() => {
     if (activeTab) {
       setLinkedFile(activeTab)
     }
   }, [activeTab])
-
-  // Cmd+Shift+F to open search, Cmd+Shift+R to swap layout
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
-        e.preventDefault()
-        setShowSearch(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'r') {
-        e.preventDefault()
-        setIsChatFirst((v) => !v)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
-  // ── Divider: swap layout ──
-  const handleSwapLayout = useCallback(() => {
-    setIsChatFirst((v) => !v)
-  }, [])
-
-  // ── Divider: expand agent panel ──
-  const handleExpand = useCallback(() => {
-    setAgentWidth(lastWidthRef.current || AGENT_DEFAULT_WIDTH)
-    setAgentCollapsed(false)
-  }, [])
-
-  // ── Divider: toggle agent panel (Cmd+Shift+B) ──
-  const handleToggleAgent = useCallback(() => {
-    if (agentCollapsed) {
-      setAgentWidth(lastWidthRef.current || AGENT_DEFAULT_WIDTH)
-      setAgentCollapsed(false)
-    } else {
-      lastWidthRef.current = agentWidth
-      setAgentWidth(0)
-      setAgentCollapsed(true)
-    }
-  }, [agentCollapsed, agentWidth])
-
-  // ── Divider: drag to resize ──
-  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
-    if (agentCollapsed) return
-    const target = e.target as HTMLElement
-    if (target.closest('.divider-swap-btn') || target.closest('.divider-expand-btn')) return
-    e.preventDefault()
-    setIsDragging(true)
-    setDividerHovered(true)
-    dragStartXRef.current = e.clientX
-    dragStartWidthRef.current = agentWidth
-    layoutWidthRef.current = shellRef.current?.offsetWidth || window.innerWidth
-  }, [agentCollapsed, agentWidth])
-
-  useEffect(() => {
-    if (!isDragging) return
-    const onMouseMove = (e: MouseEvent) => {
-      const delta = isChatFirst ? e.clientX - dragStartXRef.current : dragStartXRef.current - e.clientX
-      const newWidth = Math.min(AGENT_MAX_WIDTH, Math.max(0, dragStartWidthRef.current + delta))
-      const editorMinWidth = layoutWidthRef.current * EDITOR_MIN_RATIO
-      const maxAgentWidth = layoutWidthRef.current - editorMinWidth
-      const clamped = Math.min(newWidth, maxAgentWidth)
-      if (clamped < AGENT_COLLAPSE_THRESHOLD) {
-        lastWidthRef.current = dragStartWidthRef.current
-        setAgentWidth(0)
-        setAgentCollapsed(true)
-        setIsDragging(false)
-        setDividerHovered(false)
-      } else {
-        setAgentWidth(clamped)
-        setAgentCollapsed(false)
-      }
-    }
-    const onMouseUp = () => {
-      setIsDragging(false)
-      setDividerHovered(false)
-    }
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [isDragging, isChatFirst])
-
-  useEffect(() => {
-    if (agentCollapsed && agentWidth > 0) {
-      lastWidthRef.current = agentWidth
-    }
-  }, [agentCollapsed, agentWidth])
 
   // Responsive: auto-collapse sidebar/agent panel at small widths
   useEffect(() => {

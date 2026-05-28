@@ -1,0 +1,57 @@
+.chatView {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chatEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  padding: 40px 0;
+}
+
+.chatEmptyIcon {
+  color: var(--color-text-tertiary);
+  opacity: 0.4;
+}
+
+.chatEmptyHint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.chatLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.chatLoadMore {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.chatLoadMore:hover {
+  color: var(--color-text-primary);
+}
