@@ -106,8 +106,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       } else if (w < 1200) {
         setSidebarCollapsed(true)
         if (agentCollapsed) {
-          setAgentWidth(lastWidthRef.current || AGENT_DEFAULT_WIDTH)
-          setAgentCollapsed(false)
+          handleExpand()
         }
       }
     }
@@ -491,6 +490,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             useAgentStore.setState({ context: 'ask' })
             setShowAskZuovis(true)
           }}
+        isAskZuovisActive={showAskZuovis}
+        activeFile={activeTab}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
