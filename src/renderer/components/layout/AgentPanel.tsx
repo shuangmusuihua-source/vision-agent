@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, CaretDown, Spinner, X } from '@phosphor-icons/react'
-import type { UsageInfo, PermissionRequestIPC as PermissionRequest, SdkSessionInfo } from '../../../shared/types'
-import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
+import { Plus, CaretDown, X } from '@phosphor-icons/react'
+import type { UsageInfo, PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
+import type { AgentContext } from '../../../shared/types'
 import type { SkillMeta } from '../../../shared/types'
 import type { AppSettings, ModelProfile } from '../../lib/ipc'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -16,6 +16,7 @@ const MODELS: Record<string, string> = {
 }
 
 interface AgentPanelProps {
+  context?: AgentContext
   width: number
   edgeClass: string
   usageInfo: UsageInfo | null
@@ -36,7 +37,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ width, edgeClass, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -54,19 +55,6 @@ function AgentPanel({ width, edgeClass, usageInfo, permissionRequest, onPermissi
     if (askUserRequest) setAskDrawerOpen(true)
   }, [askUserRequest])
 
-  const activeSkillMeta = useAgentStore((s) => {
-    if (!activeSkillId) return null
-    const msgs = s.slots.editor.messages
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].skillMeta?.id === activeSkillId) return msgs[i].skillMeta
-    }
-    return null
-  })
-
-  useEffect(() => {
-    if (activeSkillMeta?.status === 'running') setSkillDrawerHidden(false)
-  }, [activeSkillMeta])
-
   useEffect(() => {
     if (pendingAskAnswer && !askDrawerOpen) {
       onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answer)
@@ -83,6 +71,19 @@ function AgentPanel({ width, edgeClass, usageInfo, permissionRequest, onPermissi
   useEffect(() => {
     onAskUserDrawerRespond?.(handleAskUserRespond)
   }, [handleAskUserRespond, onAskUserDrawerRespond])
+
+  const activeSkillMeta = useAgentStore((s) => {
+    if (!activeSkillId) return null
+    const msgs = s.slots[context].messages
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].skillMeta?.id === activeSkillId) return msgs[i].skillMeta
+    }
+    return null
+  })
+
+  useEffect(() => {
+    if (activeSkillMeta?.status === 'running') setSkillDrawerHidden(false)
+  }, [activeSkillMeta])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

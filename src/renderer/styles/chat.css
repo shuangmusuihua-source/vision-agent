@@ -369,11 +369,11 @@
 .message-user-content {
   background: #111;
   color: #fff;
-  padding: 14px 18px;
+  padding: 8px 16px;
   border-radius: 24px;
   -electron-corner-smoothing: system-ui;
   font-size: var(--font-size-md);
-  line-height: 1.65;
+  line-height: 1.5;
   max-width: 88%;
   word-wrap: break-word;
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
@@ -387,7 +387,7 @@
 .message-assistant-content {
   max-width: 100%;
   font-size: var(--font-size-md);
-  line-height: 1.65;
+  line-height: 1.5;
   color: #3f3f3f;
 }
 
@@ -397,7 +397,7 @@
   -webkit-backdrop-filter: blur(22px);
   border-radius: 24px;
   -electron-corner-smoothing: system-ui;
-  padding: 14px 18px;
+  padding: 8px 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.075), inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
@@ -421,7 +421,15 @@
 }
 
 .message-markdown p {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.message-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.message-markdown p:first-child {
+  margin-top: 0;
 }
 
 .message-markdown code {
@@ -438,7 +446,11 @@
   padding: 12px;
   overflow-x: auto;
   font-size: var(--font-size-sm);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+}
+
+.message-markdown pre:last-child {
+  margin-bottom: 0;
 }
 
 .message-markdown pre code {
@@ -449,7 +461,12 @@
 .message-markdown ul,
 .message-markdown ol {
   padding-left: 20px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.message-markdown ul:last-child,
+.message-markdown ol:last-child {
+  margin-bottom: 0;
 }
 
 .message-markdown strong {

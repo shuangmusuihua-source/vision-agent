@@ -25,6 +25,7 @@ export type ContextSlot = {
   skillOutput: SkillOutputState | null
   activeSkillId: string | null
   lastEditedFile: string | null
+  prefillText: string | null
   _acc: StreamingAccumulator | null
   _firstContentSeen: boolean
 }
@@ -41,6 +42,7 @@ function emptySlot(): ContextSlot {
     skillOutput: null,
     activeSkillId: null,
     lastEditedFile: null,
+    prefillText: null,
     _acc: null,
     _firstContentSeen: false,
   }
@@ -70,6 +72,8 @@ export type AgentStore = {
   handleAskUserResponse: (requestId: string, answer: string) => void
   handleAskUserTimeout: (requestId: string) => void
   handleSkillOutput: (state: SkillOutputState) => void
+  setPrefill: (context: AgentContext, text: string) => void
+  consumePrefill: (context: AgentContext) => void
 }
 
 // ─── Backward-compatible type aliases ────────────────────────────────────
