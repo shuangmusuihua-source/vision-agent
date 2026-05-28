@@ -189,6 +189,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const isStreaming = useIsStreaming('editor')
   const editorPermission = usePermissionRequest('editor')
   const editorAskUser = useAskUserRequest('editor')
+  const editorAskUserRespondRef = useRef<((answer: string) => void) | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
   const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
@@ -488,6 +489,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
+            setActiveTab('')
             setShowAskZuovis(true)
           }}
         isAskZuovisActive={showAskZuovis}
@@ -594,6 +596,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onPermissionRespond={respondPermission}
         askUserRequest={editorAskUser}
         onAskUserRespond={editorRespondAskUser}
+        onAskUserDrawerRespond={(respond) => { editorAskUserRespondRef.current = respond }}
         sessionList={sessionList}
         currentSessionId={currentSessionId}
         onSelectSession={resumeSession}
@@ -601,8 +604,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onRefreshSessions={loadSessions}
         activeSkillId={activeSkillId}
         chatInput={<ChatInput context="editor" onSend={(msg) => {
-          editorSendMessage(msg, linkedFile || undefined)
-        }} onSkillSelect={handleSkillSelect} disabled={isStreaming && agentStatus !== 'waitingForUserInput'} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
+          if (editorAskUser && editorAskUserRespondRef.current) {
+            editorAskUserRespondRef.current(msg)
+          } else {
+            editorSendMessage(msg, linkedFile || undefined)
+          }
+        }} onSkillSelect={handleSkillSelect} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
