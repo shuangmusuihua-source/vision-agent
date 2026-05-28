@@ -119,6 +119,7 @@ interface AgentApi {
   listSdkSessions: () => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
   abort: (context?: AgentContext) => Promise<{ success: boolean }>
+  selectFolder: () => Promise<Electron.OpenDialogReturnValue>
 
   // Unified event channel
   onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void

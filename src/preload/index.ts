@@ -66,6 +66,7 @@ const api = {
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
     abort: (context?: 'editor' | 'ask') => ipcRenderer.invoke('agent:abort', context),
+    selectFolder: () => ipcRenderer.invoke('agent:selectFolder'),
 
     // ── Unified event channel ────────────────────────────────────────
     // All SDK messages (assistant, user, result, stream_event, system)

@@ -20,7 +20,7 @@ interface FeatureCard {
 
 const FEATURES: FeatureCard[] = [
   { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析桌面文件，给出整理方案', colorClass: 'ask-card-purple', prompt: '整理我的桌面', skillId: 'organize-desktop' },
-  { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '分类归档、批量重命名、去重', colorClass: 'ask-card-pink', prompt: '帮我整理文件' },
+  { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择文件夹，分析并整理', colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
   { id: 'write-doc', icon: FileText, title: '写文档', desc: '简历、报告、方案、会议纪要', colorClass: 'ask-card-blue', prompt: '帮我写文档' },
   { id: 'make-ppt', icon: PresentationChart, title: '做 PPT', desc: '演示文稿、产品展示、培训课件', colorClass: 'ask-card-green', prompt: '帮我做PPT' },
   { id: 'search-knowledge', icon: MagnifyingGlass, title: '搜索知识', desc: '知识库检索、信息整理、摘要', colorClass: 'ask-card-orange', prompt: '帮我搜索知识' },
@@ -74,8 +74,22 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
     askDrawerRespondRef.current = handleAskUserRespond
   }, [handleAskUserRespond])
 
-  const handleCardClick = (card: FeatureCard) => {
+  const handleCardClick = async (card: FeatureCard) => {
     if (isStreaming && agentStatus !== 'waitingForUserInput') return
+    if (card.id === 'organize-files') {
+      const result = await window.api.agent.selectFolder()
+      if (result.canceled || !result.filePaths.length) return
+      if (card.skillId) {
+        useAgentStore.setState((prev) => ({
+          slots: {
+            ...prev.slots,
+            ask: { ...prev.slots.ask, activeSkillId: card.skillId },
+          },
+        }))
+      }
+      sendMessage(`整理这个文件夹：${result.filePaths[0]}`)
+      return
+    }
     if (card.skillId) {
       useAgentStore.setState((prev) => ({
         slots: {

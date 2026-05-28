@@ -369,6 +369,14 @@ export function registerIpcHandlers(): void {
     return { success: true }
   })
 
+  ipcMain.handle('agent:selectFolder', async () => {
+    const window = getMainWindow()
+    if (!window) return { canceled: true, filePaths: [] }
+    return await dialog.showOpenDialog(window, {
+      properties: ['openDirectory'],
+    })
+  })
+
   // --- Memory ---
   ipcMain.handle('memory:list', async () => {
     const dirs = getAuthorizedDirectories()
