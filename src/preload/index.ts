@@ -28,7 +28,13 @@ const api = {
       ipcRenderer.invoke('workspace:moveFile', sourcePath, targetDir),
     deleteWorkspace: (dirPath: string) =>
       ipcRenderer.invoke('workspace:deleteWorkspace', dirPath),
-    knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir')
+    knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir'),
+    createDir: (parentPath: string, dirName: string) =>
+      ipcRenderer.invoke('workspace:createDir', parentPath, dirName),
+    renameEntry: (oldPath: string, newName: string) =>
+      ipcRenderer.invoke('workspace:renameEntry', oldPath, newName),
+    deleteDir: (dirPath: string) =>
+      ipcRenderer.invoke('workspace:deleteDir', dirPath)
   },
 
   settings: {

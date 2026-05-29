@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, DotsThreeCircle, ArrowLeft } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, DotsThreeCircle, ArrowLeft } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -133,6 +133,22 @@ function Sidebar({
     }
   }
 
+  const handleDeleteDir = async (dirPath: string, wsPath: string) => {
+    if (!window.confirm('确定删除此目录？目录内所有文件都将被删除，此操作不可撤销。')) return
+    const result = await window.api.workspace.deleteDir(dirPath)
+    if (result.success) {
+      onRefreshWorkspace(wsPath)
+    }
+  }
+
+  const handleRenameDir = async (dirPath: string, newName: string, wsPath: string) => {
+    if (!newName.trim() || newName === dirPath.split('/').pop()) return
+    const result = await window.api.workspace.renameEntry(dirPath, newName.trim())
+    if (result.success) {
+      onRefreshWorkspace(wsPath)
+    }
+  }
+
   const refreshMemory = useCallback(() => {
     window.api.memory.list().then(setMemoryFiles).catch(() => setMemoryFiles([]))
   }, [])
@@ -237,7 +253,41 @@ function Sidebar({
             >
               {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
               {isExpanded ? <FolderOpen size={14} weight="bold" /> : <Folder size={14} weight="bold" />}
-              <span>{entry.name}</span>
+              {renamingPath === entry.path ? (
+                <input
+                  className="sidebar-rename-input"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.isComposing) {
+                      handleRenameDir(entry.path, renameValue, wsPath)
+                      setRenamingPath(null)
+                    }
+                    if (e.key === 'Escape') setRenamingPath(null)
+                  }}
+                  onBlur={() => setRenamingPath(null)}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span>{entry.name}</span>
+              )}
+              <button
+                className="sidebar-file-action"
+                onClick={(e) => handleStartRename(entry.path, e)}
+                title="重命名"
+                aria-label="重命名"
+              >
+                <Pencil size={12} weight="bold" />
+              </button>
+              <button
+                className="sidebar-file-action"
+                onClick={(e) => { e.stopPropagation(); handleDeleteDir(entry.path, wsPath) }}
+                title="删除目录"
+                aria-label="删除目录"
+              >
+                <Trash size={12} weight="bold" />
+              </button>
             </div>
             {isExpanded && entry.children && renderTree(entry.children, depth + 1, wsPath)}
           </div>
@@ -356,61 +406,30 @@ function Sidebar({
           )}
         </button>
 
-        {/* 知识库 */}
-        {fixedWorkspacePaths.length > 0 && (
-          <>
-            <div className="sidebar-workspace-module-header">
-              <span className="sidebar-workspace-module-title">知识库</span>
-            </div>
-            {fixedWorkspacePaths.map((wsPath) => {
-              const isCollapsed = collapsedWorkspaces.has(wsPath)
-              return (
-                <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
-                  <div className="sidebar-workspace-header">
-                    <button
-                      className="sidebar-workspace-toggle"
-                      onClick={() => toggleWorkspace(wsPath)}
-                      aria-label={isCollapsed ? '展开知识库' : '折叠知识库'}
-                    >
-                      {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
-                    </button>
-                    <BookOpen size={14} weight="bold" className="sidebar-workspace-fixed-icon" />
-                    <span className="sidebar-workspace-name">知识库</span>
-                    <button
-                      className="sidebar-workspace-add-file"
-                      onClick={() => setCreatingFileIn(wsPath)}
-                      title="新建文件"
-                      aria-label="新建文件"
-                    >
-                      <Plus size={12} weight="bold" />
-                    </button>
-                  </div>
-                  {!isCollapsed && (
-                    <div className="sidebar-workspace-body">
-                      {creatingFileIn === wsPath && (
-                        <div className="sidebar-new-file-input">
-                          <input
-                            ref={newFileInputRef}
-                            className="sidebar-new-file-field"
-                            placeholder="文件名（自动添加 .md）"
-                            value={newFileName}
-                            onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.isComposing) handleCreateFile(wsPath)
-                              if (e.key === 'Escape') setCreatingFileIn(null)
-                            }}
-                          />
-                          {createError && <span className="sidebar-new-file-error">{createError}</span>}
-                        </div>
-                      )}
-                      {renderTree(files[wsPath] || [], 0, wsPath)}
-                    </div>
-                  )}
+        {/* 知识库 — fixed Knowledge directory */}
+        {fixedWorkspacePaths.map((wsPath) => {
+          const isCollapsed = collapsedWorkspaces.has(wsPath)
+          return (
+            <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
+              <div className="sidebar-workspace-header">
+                <button
+                  className="sidebar-workspace-toggle"
+                  onClick={() => toggleWorkspace(wsPath)}
+                  aria-label={isCollapsed ? '展开 Knowledge' : '折叠 Knowledge'}
+                >
+                  {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+                </button>
+                <Folder size={14} weight="bold" />
+                <span className="sidebar-workspace-name">Knowledge</span>
+              </div>
+              {!isCollapsed && (
+                <div className="sidebar-workspace-body">
+                  {renderTree(files[wsPath] || [], 0, wsPath)}
                 </div>
-              )
-            })}
-          </>
-        )}
+              )}
+            </div>
+          )
+        })}
 
         {/* 工作区 */}
         {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length > 0 && (
@@ -578,7 +597,7 @@ function Sidebar({
                 className="move-dropdown-item"
                 onClick={() => handleMoveToWorkspace(ws)}
               >
-                {wsIsFixed ? <BookOpen size={14} weight="bold" /> : <Folder size={14} weight="bold" />}
+                <Folder size={14} weight="bold" />
                 <span>{wsIsFixed ? '知识库' : workspaceName(ws)}</span>
               </button>
             )

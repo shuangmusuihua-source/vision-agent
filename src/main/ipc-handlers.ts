@@ -230,6 +230,45 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('workspace:createDir', async (_event, parentPath: string, dirName: string) => {
+    if (!isPathAuthorized(parentPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      const name = sanitizeFileName(dirName.trim())
+      if (!name) return { success: false, error: '名称不能为空' }
+      const dirPath = join(parentPath, name)
+      if (existsSync(dirPath)) return { success: false, error: '目录已存在' }
+      await mkdir(dirPath, { recursive: true })
+      return { success: true, path: dirPath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('workspace:renameEntry', async (_event, oldPath: string, newName: string) => {
+    if (!isPathAuthorized(oldPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      const name = sanitizeFileName(newName.trim())
+      if (!name) return { success: false, error: '名称不能为空' }
+      const parentDir = dirname(oldPath)
+      const newPath = join(parentDir, name)
+      if (existsSync(newPath)) return { success: false, error: '同名文件或目录已存在' }
+      await rename(oldPath, newPath)
+      return { success: true, path: newPath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('workspace:deleteDir', async (_event, dirPath: string) => {
+    if (!isPathAuthorized(dirPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      await rm(dirPath, { recursive: true, force: true })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {
     if (!isPathAuthorized(dirPath)) return []
     try {
