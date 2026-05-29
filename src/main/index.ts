@@ -91,6 +91,12 @@ export function getMainWindow(): BrowserWindow | null {
 app.whenReady().then(() => {
   setupMenu()
 
+  // Set Dock icon in dev mode (production uses the bundled .icns)
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const iconPath = join(__dirname, '../../build/icon.png')
+    app.dock.setIcon(iconPath)
+  }
+
   // Ensure knowledge base directory exists and is registered
   const knowledgeDir = ensureKnowledgeBase()
 
