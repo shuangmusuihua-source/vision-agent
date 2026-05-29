@@ -20,8 +20,18 @@ export type IPCChannelMap = {
       prompt: string
       sessionId?: string
       activeFilePath?: string
+      skillId?: string
+      context?: 'editor' | 'ask'
     }
     response: { started: boolean }
+  }
+  'agent:abort': {
+    request: 'editor' | 'ask' | undefined
+    response: void
+  }
+  'agent:selectFolder': {
+    request: void
+    response: { canceled: boolean; filePaths: string[] }
   }
   'agent:getSessionList': {
     request: void
@@ -47,7 +57,7 @@ export type IPCChannelMap = {
   }
   'agent:loadSessionMessages': {
     request: { sessionId: string }
-    response: AgentIPCMessage[]
+    response: Array<Record<string, unknown>>
   }
 
   // Workspace

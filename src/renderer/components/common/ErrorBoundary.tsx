@@ -44,11 +44,11 @@ export class ErrorBoundary extends Component<Props, State> {
           justifyContent: 'center',
           height: '100%',
           padding: '2rem',
-          color: 'var(--text-secondary)',
+          color: 'var(--color-text-secondary)',
           gap: '0.75rem',
           textAlign: 'center'
         }}>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>
             组件出错
           </p>
           {this.state.error && (
@@ -61,10 +61,10 @@ export class ErrorBoundary extends Component<Props, State> {
             style={{
               padding: '0.375rem 1rem',
               fontSize: '0.8125rem',
-              border: '1px solid var(--border)',
+              border: '1px solid var(--color-border)',
               borderRadius: '6px',
-              background: 'var(--bg-primary)',
-              color: 'var(--text-primary)',
+              background: 'var(--color-bg-primary)',
+              color: 'var(--color-text-primary)',
               cursor: 'pointer'
             }}
           >

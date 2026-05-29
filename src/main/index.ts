@@ -149,6 +149,11 @@ app.whenReady().then(() => {
         win.webContents.send('update:downloaded')
       }
     })
+
+    autoUpdater.on('error', (err) => {
+      console.error('[AutoUpdater] error:', err)
+      Sentry.captureException(err)
+    })
   }
 
   app.on('activate', () => {

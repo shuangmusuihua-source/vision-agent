@@ -2,6 +2,17 @@ appId: com.vision-agent.app
 productName: Vision Agent
 directories:
   buildResources: build
+extraResources:
+  - from: src/main/skills
+    to: skills
+    filter:
+      - '*/SKILL.md'
+      - '*/references/*'
+      - '*/.claude-plugin/*'
+      - '*/.claude/*'
+      - '*/plugins/**/*'
+      - '*/bold-template-pack/*'
+      - '!*/.DS_Store'
 files:
   - '!**/.vscode/*'
   - '!src/*'

@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app } from 'electron'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { appendFile } from 'fs/promises'
@@ -72,12 +72,26 @@ const pendingAskUser = new Map<string, {
 }>()
 
 // Audit log path
-const AUDIT_LOG_PATH = `${process.env.HOME || '/tmp'}/.vision-agent/audit.log`
+const AUDIT_LOG_PATH = join(app.getPath('userData'), 'audit.log')
+
+const AUDIT_REDACT_PATTERNS = [
+  /(?:api[_-]?key|apikey|secret|token|password|auth)\s*[:=]\s*['"]?[^\s'"]+['"]?/gi,
+  /sk-[a-zA-Z0-9]{20,}/g,
+  /(?:Bearer\s+)[a-zA-Z0-9._\-]+/g,
+]
+
+function redactCredentials(text: string): string {
+  let result = text
+  for (const pattern of AUDIT_REDACT_PATTERNS) {
+    result = result.replace(pattern, (m) => m.slice(0, 4) + '***[REDACTED]')
+  }
+  return result
+}
 
 async function writeAuditLog(entry: Record<string, unknown>): Promise<void> {
   try {
     const line = JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + '\n'
-    await appendFile(AUDIT_LOG_PATH, line, { encoding: 'utf-8' })
+    await appendFile(AUDIT_LOG_PATH, redactCredentials(line), { encoding: 'utf-8' })
   } catch {
     // Audit log write failure should not block agent
   }
@@ -162,7 +176,14 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
 
-  const env: Record<string, string | undefined> = { ...process.env }
+  // Only forward whitelisted env vars to SDK subprocess (not entire process.env)
+  const env: Record<string, string | undefined> = {
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    PATH: process.env.PATH,
+  }
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey
   }

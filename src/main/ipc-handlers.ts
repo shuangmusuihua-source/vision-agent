@@ -183,11 +183,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('workspace:createWorkspace', async (_event, name: string) => {
     try {
+      const safeName = sanitizeFileName(name.trim())
+      if (!safeName || safeName !== name.trim()) return null
       const docsDir = join(app.getPath('documents'), 'VisionAgent')
       if (!existsSync(docsDir)) {
         await mkdir(docsDir, { recursive: true })
       }
-      const dirPath = join(docsDir, name)
+      const dirPath = join(docsDir, safeName)
       if (existsSync(dirPath)) return null
       await mkdir(dirPath, { recursive: true })
       return dirPath
@@ -284,9 +286,13 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:previewArtifact', async (_event, options: { fileName: string; content: string }) => {
+    const safeName = sanitizeFileName(options.fileName)
+    if (!safeName) return { success: false, error: 'Invalid file name' }
     const tmpDir = join(app.getPath('temp'), 'vision-agent-preview')
     await mkdir(tmpDir, { recursive: true })
-    const filePath = join(tmpDir, options.fileName)
+    const filePath = join(tmpDir, safeName)
+    // Verify resolved path stays within tmpDir
+    if (!filePath.startsWith(tmpDir)) return { success: false, error: 'Path traversal detected' }
     await writeFile(filePath, options.content, 'utf-8')
     await shell.openPath(filePath)
     return { success: true, filePath }
