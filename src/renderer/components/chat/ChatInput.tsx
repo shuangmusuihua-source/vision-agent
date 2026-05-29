@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, FileText, PresentationChart, Article, Stop } from '@phosphor-icons/react'
+import { ArrowUp, FileText, PresentationChart, Article, Stop, Trash, FolderOpen, Monitor } from '@phosphor-icons/react'
 import type { IconWeight } from '@phosphor-icons/react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
@@ -19,7 +19,10 @@ interface ChatInputProps {
 const ICON_MAP: Record<string, React.ComponentType<{ size: number; weight: IconWeight }>> = {
   FileText,
   PresentationChart,
-  Article
+  Article,
+  Trash,
+  FolderOpen,
+  Monitor
 }
 
 function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
@@ -49,7 +52,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
 
   // Load skills on mount
   useEffect(() => {
-    window.api.skills.list().then(setSkills).catch(() => setSkills([]))
+    window.api.skills.list().then(
+      (all) => setSkills(all.filter((s) => !s.hideInSlashMenu))
+    ).catch(() => setSkills([]))
   }, [])
 
   // Detect "/" at start of input for skill popup

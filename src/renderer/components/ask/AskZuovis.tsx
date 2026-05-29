@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar, type IconWeight } from '@phosphor-icons/react'
+import { Monitor, FolderOpen, Trash, PresentationChart, MagnifyingGlass, ChartBar, type IconWeight } from '@phosphor-icons/react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, useAskUserRequest } from '../../hooks/useAgent'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
 import { useAgentStore } from '../../store/agent-store-impl'
+import bullLogo from '../../assets/zuovis-logo.svg'
 import './ask-zuovis.css'
 
 interface FeatureCard {
@@ -21,7 +22,7 @@ interface FeatureCard {
 const FEATURES: FeatureCard[] = [
   { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析桌面文件，给出整理方案', colorClass: 'ask-card-purple', prompt: '整理我的桌面', skillId: 'organize-desktop' },
   { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择文件夹，分析并整理', colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
-  { id: 'write-doc', icon: FileText, title: '写文档', desc: '简历、报告、方案、会议纪要', colorClass: 'ask-card-blue', prompt: '帮我写文档' },
+  { id: 'system-cleanup', icon: Trash, title: '系统清理', desc: '扫描垃圾文件，释放磁盘空间', colorClass: 'ask-card-blue', prompt: '扫描并清理我的系统垃圾', skillId: 'system-cleanup' },
   { id: 'make-ppt', icon: PresentationChart, title: '做 PPT', desc: '演示文稿、产品展示、培训课件', colorClass: 'ask-card-green', prompt: '帮我做PPT' },
   { id: 'search-knowledge', icon: MagnifyingGlass, title: '搜索知识', desc: '知识库检索、信息整理、摘要', colorClass: 'ask-card-orange', prompt: '帮我搜索知识' },
   { id: 'analyze-data', icon: ChartBar, title: '分析数据', desc: '数据解读、趋势分析、可视化', colorClass: 'ask-card-teal', prompt: '帮我分析数据' },
@@ -121,8 +122,11 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
         {!hasMessages ? (
           <div className="ask-zuovis-content">
             <div className="ask-zuovis-greeting">
-              <div className="ask-zuovis-greeting-title">你好，有什么可以帮你？</div>
-              <div className="ask-zuovis-greeting-sub">我是 Zuovis，你的智能助手</div>
+              <img className="ask-zuovis-greeting-logo" src={bullLogo} alt="Zuovis" />
+              <div className="ask-zuovis-greeting-text">
+                <div className="ask-zuovis-greeting-title">你好，有什么可以帮你？</div>
+                <div className="ask-zuovis-greeting-sub">我是 Zuovis，你的智能助手</div>
+              </div>
             </div>
 
             <div className="ask-zuovis-grid">

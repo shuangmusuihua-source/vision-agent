@@ -253,7 +253,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
         })
       }
 
-      // All other tools (Bash, Write, Edit) require user approval
+      // // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,

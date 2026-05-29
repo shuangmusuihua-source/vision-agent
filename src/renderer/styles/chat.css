@@ -436,8 +436,32 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   background: var(--color-bg-tertiary);
-  padding: 2px 4px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Blockquote — suggestion / callout blocks */
+.message-markdown blockquote {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-left: 3px solid #6657ff;
+  background: rgba(102, 87, 255, 0.06);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-text-secondary);
+}
+
+.message-markdown blockquote p {
+  margin-bottom: 4px;
+}
+
+.message-markdown blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+[data-theme="dark"] .message-markdown blockquote {
+  background: rgba(102, 87, 255, 0.1);
+  border-left-color: #8b7fff;
 }
 
 .message-markdown pre {
@@ -469,8 +493,72 @@
   margin-bottom: 0;
 }
 
+/* Nested list hierarchy */
+.message-markdown li > ul,
+.message-markdown li > ol {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding-left: 16px;
+  border-left: 2px solid var(--color-border);
+}
+
+.message-markdown li {
+  margin-bottom: 2px;
+}
+
 .message-markdown strong {
   font-weight: var(--font-weight-semibold);
+}
+
+.message-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.message-markdown thead {
+  background: var(--color-bg-tertiary);
+}
+
+.message-markdown th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.message-markdown td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.message-markdown tr:last-child td {
+  border-bottom: none;
+}
+
+.message-markdown tbody tr:hover {
+  background: var(--color-bg-tertiary);
+}
+
+/* Dark mode table tweaks */
+[data-theme="dark"] .message-markdown thead {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .message-markdown th {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .message-markdown td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .message-streaming-dots {
@@ -746,22 +834,33 @@
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  transform: translateY(8px);
-  transition: max-height 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: max-height 0.25s ease, opacity 0.25s ease;
 }
 
 .input-drawer--open {
-  max-height: 40vh;
+  max-height: 55vh;
   opacity: 1;
-  transform: translateY(0);
+  overflow-y: auto;
+  overflow-x: visible;
+  padding: 4px;
+  margin: -4px;
 }
 
 .input-drawer__content {
-  padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-  background: transparent;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  margin-bottom: 4px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  margin-bottom: 8px;
+}
+
+[data-theme="dark"] .input-drawer__content {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* ── Drawer Permission ── */
@@ -928,37 +1027,37 @@
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
-  margin-bottom: 10px;
+  margin-bottom: 16px;
   line-height: 1.5;
 }
 
 .drawer-question-options {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 4px;
+  margin-bottom: 14px;
+  max-height: 36vh;
   overflow-y: auto;
 }
 
 .drawer-question-option {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: background 0.15s, transform 0.15s;
   text-align: left;
   width: 100%;
-  position: relative;
 }
 
 .drawer-question-option:hover {
-  border-color: var(--color-action);
   background: var(--color-action-bg);
+  transform: translateX(2px);
 }
 
 .drawer-question-option-label {
@@ -966,28 +1065,36 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   line-height: 1.3;
-  padding-right: 20px;
+  flex: 1;
 }
 
 .drawer-question-option-desc {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
 .drawer-question-option-icon {
   color: var(--color-text-tertiary);
-  position: absolute;
-  top: 8px;
-  right: 12px;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.drawer-question-option:hover .drawer-question-option-icon {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .drawer-question-hint {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+  text-align: center;
 }
 
 [data-theme="dark"] .drawer-question-option:hover {
-  border-color: var(--color-action);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .message-system {
@@ -1571,10 +1678,6 @@
 [data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; opacity: 0.7; }
 [data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; opacity: 0.7; }
 [data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; opacity: 0.7; }
-
-[data-theme="dark"] .input-drawer__content {
-  border-bottom-color: rgba(255, 255, 255, 0.15);
-}
 
 [data-theme="dark"] .skill-status-bar {
   background: rgba(255, 255, 255, 0.06);

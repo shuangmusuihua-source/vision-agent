@@ -43,6 +43,7 @@ interface SkillDefinition {
   promptTemplate: string
   argumentHint?: string
   outputMode?: 'skill-output' | 'write'
+  hideInSlashMenu?: boolean
 }
 
 // ─── Search Result ──────────────────────────────────────────────────

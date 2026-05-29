@@ -29,8 +29,76 @@
 }
 
 .ask-zuovis-greeting {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 520px;
+  width: 100%;
 }
+
+.ask-zuovis-greeting-text {
+  text-align: left;
+}
+
+.ask-zuovis-greeting-logo {
+  width: 72px;
+  height: 72px;
+  opacity: 0.85;
+  flex-shrink: 0;
+  animation: bullGreet 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center bottom;
+}
+
+@keyframes bullGreet {
+  /* 准备 — 藏在下方 */
+  0% {
+    transform: translateY(60px) scale(0.3, 1.4);
+    opacity: 0;
+  }
+  /* 弹入 — squash and stretch */
+  10% {
+    transform: translateY(-8px) scale(1.15, 0.85);
+    opacity: 1;
+  }
+  /* 触地回弹 */
+  18% {
+    transform: translateY(0) scale(0.95, 1.08);
+  }
+  /* 稳定 */
+  24% {
+    transform: translateY(0) scale(1, 1);
+  }
+  /* 歪头看 — 向右倾 */
+  36% {
+    transform: rotate(8deg) translateY(-2px);
+  }
+  /* 歪头看 — 向左倾 */
+  48% {
+    transform: rotate(-6deg) translateY(-2px);
+  }
+  /* 回正 */
+  56% {
+    transform: rotate(0deg) translateY(0);
+  }
+  /* 小跳一下 */
+  66% {
+    transform: translateY(-10px) scale(1.06, 0.94);
+  }
+  /* 落地 */
+  72% {
+    transform: translateY(0) scale(0.96, 1.04);
+  }
+  /* 回稳 */
+  78% {
+    transform: translateY(0) scale(1, 1);
+  }
+  /* 待机 */
+  100% {
+    transform: translateY(0) scale(1, 1);
+    opacity: 0.9;
+  }
+}
+
 
 .ask-zuovis-greeting-title {
   font-size: 22px;
@@ -152,18 +220,21 @@
   margin: 0;
 }
 
-/* Permission/AskUser drawer — visible background in Ask Zuovis */
+/* Permission/AskUser drawer — glassmorphism matching capsule */
 .ask-zuovis-footer .input-drawer__content {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
 }
 
 [data-theme="dark"] .ask-zuovis-footer .input-drawer__content {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 .ask-zuovis-capsule-wrapper {

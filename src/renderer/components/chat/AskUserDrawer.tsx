@@ -26,7 +26,7 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
                 {opt.description && (
                   <span className="drawer-question-option-desc">{opt.description}</span>
                 )}
-                <ArrowElbowDownLeft size={14} weight="regular" className="drawer-question-option-icon" />
+                <ArrowElbowDownLeft size={14} weight="bold" className="drawer-question-option-icon" />
               </button>
             ))}
           </div>
