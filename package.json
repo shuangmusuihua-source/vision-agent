@@ -1,6 +1,6 @@
 {
   "name": "vision-agent",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Local Agent-driven Markdown client powered by Claude Agent SDK",
   "main": "./out/main/index.js",
   "scripts": {

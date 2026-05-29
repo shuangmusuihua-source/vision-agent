@@ -503,7 +503,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                 const msgs = [...s.messages]
                 const idx = msgs.findIndex((m) => m.id === acc!.messageId)
                 if (idx >= 0) {
-                  const existing = msgs[idx].toolCalls.some((tc) => tc.toolUseId === tu.id)
+                  const existing = msgs[idx].toolCalls.some((tc) => tc.toolUseId === block.id)
                   if (!existing) {
                     msgs[idx] = {
                       ...msgs[idx],

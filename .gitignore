@@ -5,3 +5,5 @@ dist/
 *.log
 .env
 .env.local
+design-token-preview.html
+mockups/

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar } from '@phosphor-icons/react'
+import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar, type IconWeight } from '@phosphor-icons/react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, useAskUserRequest } from '../../hooks/useAgent'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
@@ -10,7 +10,7 @@ import './ask-zuovis.css'
 
 interface FeatureCard {
   id: string
-  icon: React.ComponentType<{ size: number; weight: string; className?: string }>
+  icon: React.ComponentType<{ size: number; weight?: IconWeight; className?: string }>
   title: string
   desc: string
   colorClass: string
@@ -83,7 +83,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
         useAgentStore.setState((prev) => ({
           slots: {
             ...prev.slots,
-            ask: { ...prev.slots.ask, activeSkillId: card.skillId },
+            ask: { ...prev.slots.ask, activeSkillId: card.skillId ?? null },
           },
         }))
       }
@@ -94,7 +94,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
       useAgentStore.setState((prev) => ({
         slots: {
           ...prev.slots,
-          ask: { ...prev.slots.ask, activeSkillId: card.skillId },
+          ask: { ...prev.slots.ask, activeSkillId: card.skillId ?? null },
         },
       }))
     }

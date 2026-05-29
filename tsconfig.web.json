@@ -10,7 +10,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "outDir": "./out/renderer",
+    "noEmit": true,
     "types": []
   },
   "include": ["src/renderer/**/*", "src/shared/**/*"]

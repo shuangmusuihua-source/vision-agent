@@ -9,7 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "outDir": "./out/main",
+    "noEmit": true,
     "types": ["node"]
   },
   "include": ["src/main/**/*", "src/preload/**/*", "electron.vite.config.ts"]

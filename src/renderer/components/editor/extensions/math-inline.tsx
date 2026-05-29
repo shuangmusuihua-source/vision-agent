@@ -3,12 +3,13 @@ import { NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer } from '@tiptap
 import katex from 'katex'
 import React from 'react'
 
-const MathInlineComponent: React.FC<{ node: { attrs: { latex: string } }; updateAttributes: (attrs: Record<string, string>) => void }> = ({ node }) => {
+const MathInlineComponent: React.FC<{ node: { attrs: Record<string, unknown> } }> = ({ node }) => {
+  const latex = (node.attrs.latex as string) || ''
   let html = ''
   try {
-    html = katex.renderToString(node.attrs.latex || '', { displayMode: false, throwOnError: false })
+    html = katex.renderToString(latex, { displayMode: false, throwOnError: false })
   } catch {
-    html = `<span class="math-error">${node.attrs.latex}</span>`
+    html = `<span class="math-error">${latex}</span>`
   }
   return (
     <NodeViewWrapper as="span" className="math-inline" data-type="math-inline">
@@ -60,8 +61,8 @@ export const MathInline = Node.create({
     level: 'inline' as const,
     start(src: string) {
       const idx = src.indexOf('$')
-      if (idx === -1) return
-      if (src[idx + 1] === '$') return
+      if (idx === -1) return -1
+      if (src[idx + 1] === '$') return -1
       return idx
     },
     tokenize(src: string) {
@@ -69,7 +70,6 @@ export const MathInline = Node.create({
       if (match) {
         return { type: 'mathInline', raw: match[0], text: match[1] }
       }
-      return undefined
     },
   },
 })
