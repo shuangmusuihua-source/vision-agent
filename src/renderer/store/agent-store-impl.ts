@@ -239,7 +239,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates.activeSkillId = null
         slotUpdates.skillOutput = null
         const msgs = slot.messages.map((m) =>
-          m.phase !== 'complete' ? { ...m, phase: 'error' as const } : m
+          m.phase !== 'complete' && m.phase !== 'stopped' ? { ...m, phase: 'error' as const } : m
         )
         const skillId = slot.activeSkillId
         if (skillId) {
@@ -629,14 +629,37 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           get().dispatchAgentEvent({ type: 'RESULT_SUCCESS' }, ctx)
         } else {
           const errorMsg = msg as ResultErrorPayload
+          const errorText = errorMsg.errors.join('\n') || 'Agent error'
+          const isAborted = /aborted|cancelled|canceled/i.test(errorText)
+
           set((state) => {
             const s = state.slots[ctx]
+            const lastMsg = s.messages[s.messages.length - 1]
+            if (isAborted) {
+              // User-initiated stop: replace error with friendly message
+              const stopNote = {
+                id: `stop-${Date.now()}`,
+                role: 'assistant' as const,
+                phase: 'stopped' as const,
+                textContent: '我的思考被用户停止了',
+                content: [],
+                toolCalls: [],
+                createdAt: Date.now(),
+              }
+              const msgs = lastMsg?.phase === 'streaming'
+                ? [...s.messages.slice(0, -1), { ...lastMsg, phase: 'complete' as const }, stopNote]
+                : [...s.messages, stopNote]
+              return updateSlot(state, ctx, {
+                messages: msgs,
+                usageInfo: errorMsg.usage,
+              })
+            }
             return updateSlot(state, ctx, {
               messages: [...s.messages, {
                 id: `error-${Date.now()}`,
-                role: 'assistant',
-                phase: 'error',
-                textContent: errorMsg.errors.join('\n') || 'Agent error',
+                role: 'assistant' as const,
+                phase: 'error' as const,
+                textContent: errorText,
                 content: [],
                 toolCalls: [],
                 createdAt: Date.now(),

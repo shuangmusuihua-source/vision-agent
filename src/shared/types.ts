@@ -230,6 +230,7 @@ export type MessagePhase =
   | 'streaming'
   | 'tool_calling'
   | 'complete'
+  | 'stopped'
   | 'error'
 
 export type ToolCallState = {

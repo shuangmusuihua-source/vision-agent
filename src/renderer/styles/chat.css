@@ -511,6 +511,26 @@
 .status-dot:nth-child(2) { animation-delay: 0.2s; }
 .status-dot:nth-child(3) { animation-delay: 0.4s; }
 
+.message-stopped {
+  justify-content: center;
+}
+
+.message-stopped-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.message-stopped-icon {
+  font-size: 10px;
+  color: #ff4757;
+  line-height: 1;
+}
+
 .message-thinking-indicator {
   background: none !important;
   box-shadow: none !important;
@@ -689,6 +709,33 @@
 
 .chat-send-btn:disabled {
   cursor: not-allowed;
+}
+
+.chat-stop-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  -electron-corner-smoothing: system-ui;
+  background: linear-gradient(135deg, #ff4757, #ff6b81);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+  animation: chatStopPulse 1.5s ease-in-out infinite;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-stop-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+}
+
+@keyframes chatStopPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
 }
 
 /* --- Permission Dialog --- */

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, FileText, PresentationChart, Article } from '@phosphor-icons/react'
+import { ArrowUp, FileText, PresentationChart, Article, Stop } from '@phosphor-icons/react'
 import type { IconWeight } from '@phosphor-icons/react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
@@ -9,7 +9,9 @@ interface ChatInputProps {
   context: AgentContext
   onSend: (message: string) => void
   onSkillSelect?: (skill: SkillDefinition) => void
+  onStop?: () => void
   disabled: boolean
+  isStreaming?: boolean
   placeholder?: string
   variant?: 'default' | 'capsule'
 }
@@ -20,7 +22,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size: number; weight: IconW
   Article
 }
 
-function ChatInput({ context, onSend, onSkillSelect, disabled, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
+function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
   const [text, setText] = useState('')
   const [skills, setSkills] = useState<SkillDefinition[]>([])
   const [showSkillPopup, setShowSkillPopup] = useState(false)
@@ -154,14 +156,25 @@ function ChatInput({ context, onSend, onSkillSelect, disabled, placeholder, vari
             disabled={disabled}
             autoFocus
           />
-          <button
-            className={`ask-zuovis-send-btn ${text.trim() && !disabled ? 'ask-zuovis-send-btn-active' : ''}`}
-            onClick={doSend}
-            disabled={!text.trim() || disabled}
-            type="button"
-          >
-            <ArrowUp size={16} weight="bold" />
-          </button>
+          {isStreaming && onStop ? (
+            <button
+              className="ask-zuovis-stop-btn"
+              onClick={onStop}
+              type="button"
+              title="停止生成"
+            >
+              <Stop size={14} weight="fill" />
+            </button>
+          ) : (
+            <button
+              className={`ask-zuovis-send-btn ${text.trim() && !disabled ? 'ask-zuovis-send-btn-active' : ''}`}
+              onClick={doSend}
+              disabled={!text.trim() || disabled}
+              type="button"
+            >
+              <ArrowUp size={16} weight="bold" />
+            </button>
+          )}
         </div>
         {showSkillPopup && filteredSkills.length > 0 && (
           <div className="skill-popup" ref={popupRef}>
@@ -213,14 +226,25 @@ function ChatInput({ context, onSend, onSkillSelect, disabled, placeholder, vari
           rows={1}
           autoFocus
         />
-        <button
-          className={`chat-send-btn ${text.trim() && !disabled ? 'chat-send-btn-active' : ''}`}
-          onClick={doSend}
-          disabled={!text.trim() || disabled}
-          type="button"
-        >
-          <ArrowUp size={16} weight="bold" />
-        </button>
+        {isStreaming && onStop ? (
+          <button
+            className="chat-stop-btn"
+            onClick={onStop}
+            type="button"
+            title="停止生成"
+          >
+            <Stop size={14} weight="fill" />
+          </button>
+        ) : (
+          <button
+            className={`chat-send-btn ${text.trim() && !disabled ? 'chat-send-btn-active' : ''}`}
+            onClick={doSend}
+            disabled={!text.trim() || disabled}
+            type="button"
+          >
+            <ArrowUp size={16} weight="bold" />
+          </button>
+        )}
       </div>
 
       {showSkillPopup && filteredSkills.length > 0 && (

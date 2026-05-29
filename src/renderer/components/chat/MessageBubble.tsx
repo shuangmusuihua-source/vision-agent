@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
-import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple } from '@phosphor-icons/react'
+import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple, StopCircle } from '@phosphor-icons/react'
 import type { ConversationMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
@@ -86,6 +86,17 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [selectionBtn])
+
+  if (message.phase === 'stopped') {
+    return (
+      <div className="message-bubble message-assistant message-stopped">
+        <div className="message-stopped-content">
+          <StopCircle size={16} weight="fill" />
+          <span>{displayContent}</span>
+        </div>
+      </div>
+    )
+  }
 
   if (isStatusIndicator) {
     return (

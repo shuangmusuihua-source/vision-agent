@@ -609,7 +609,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           } else {
             editorSendMessage(msg, linkedFile || undefined)
           }
-        }} onSkillSelect={handleSkillSelect} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
+        }} onSkillSelect={handleSkillSelect} onStop={() => window.api.agent.abort('editor')} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >

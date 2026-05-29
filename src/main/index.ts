@@ -94,7 +94,7 @@ app.whenReady().then(() => {
   // Set Dock icon in dev mode (production uses the bundled .icns)
   if (process.platform === 'darwin' && !app.isPackaged) {
     const iconPath = join(__dirname, '../../build/icon.png')
-    app.dock.setIcon(iconPath)
+    app.dock?.setIcon(iconPath)
   }
 
   // Ensure knowledge base directory exists and is registered

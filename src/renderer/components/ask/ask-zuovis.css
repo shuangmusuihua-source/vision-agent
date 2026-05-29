@@ -47,7 +47,7 @@
 .ask-zuovis-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
   max-width: 520px;
   width: 100%;
 }
@@ -59,19 +59,28 @@
   border-radius: 14px;
   padding: 16px 14px;
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   display: flex;
   flex-direction: column;
   gap: 8px;
   text-align: left;
-  border: none;
+  border: 1px solid rgba(0, 0, 0, 0.04);
   -electron-corner-smoothing: system-ui;
+  transform: translateY(0);
 }
 
 .ask-zuovis-card:hover {
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.ask-zuovis-card:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: transform 0.05s ease, box-shadow 0.05s ease;
 }
 
 .ask-zuovis-card-icon {
@@ -221,6 +230,32 @@
   cursor: not-allowed;
 }
 
+.ask-zuovis-stop-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  -electron-corner-smoothing: system-ui;
+  background: linear-gradient(135deg, #ff4757, #ff6b81);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  animation: stopPulse 1.5s ease-in-out infinite;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ask-zuovis-stop-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+}
+
+@keyframes stopPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
+}
+
 /* ── Resuming indicator ── */
 
 .ask-zuovis-resuming {
@@ -236,21 +271,23 @@
 /* ── Dark theme overrides ── */
 
 [data-theme="dark"] .ask-zuovis-card {
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 1px 2px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] .ask-zuovis-card:hover {
-  background: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
-[data-theme="dark"] .ask-card-purple .ask-zuovis-card-icon { background: rgba(102, 87, 255, 0.15); }
-[data-theme="dark"] .ask-card-pink .ask-zuovis-card-icon { background: rgba(255, 88, 178, 0.15); }
-[data-theme="dark"] .ask-card-blue .ask-zuovis-card-icon { background: rgba(59, 130, 246, 0.15); }
-[data-theme="dark"] .ask-card-green .ask-zuovis-card-icon { background: rgba(34, 197, 94, 0.15); }
-[data-theme="dark"] .ask-card-orange .ask-zuovis-card-icon { background: rgba(249, 115, 22, 0.15); }
-[data-theme="dark"] .ask-card-teal .ask-zuovis-card-icon { background: rgba(20, 184, 166, 0.15); }
+[data-theme="dark"] .ask-card-purple .ask-zuovis-card-icon { background: rgba(130, 117, 255, 0.18); color: #9b8eff; }
+[data-theme="dark"] .ask-card-pink .ask-zuovis-card-icon { background: rgba(255, 110, 190, 0.18); color: #ff8cc6; }
+[data-theme="dark"] .ask-card-blue .ask-zuovis-card-icon { background: rgba(96, 165, 250, 0.18); color: #93c5fd; }
+[data-theme="dark"] .ask-card-green .ask-zuovis-card-icon { background: rgba(74, 222, 128, 0.18); color: #86efac; }
+[data-theme="dark"] .ask-card-orange .ask-zuovis-card-icon { background: rgba(251, 146, 60, 0.18); color: #fdba74; }
+[data-theme="dark"] .ask-card-teal .ask-zuovis-card-icon { background: rgba(45, 212, 191, 0.18); color: #5eead4; }
 
 [data-theme="dark"] .ask-zuovis-capsule {
   background: rgba(255, 255, 255, 0.08);

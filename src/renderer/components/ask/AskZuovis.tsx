@@ -169,7 +169,9 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           <ChatInput
           context="ask"
           onSend={handleChatSend}
+          onStop={() => window.api.agent.abort('ask')}
           disabled={isStreaming && agentStatus !== 'waitingForUserInput'}
+          isStreaming={isStreaming}
           placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}
           variant="capsule"
         />

@@ -309,6 +309,7 @@ function extractPathFromToolInput(
 interface ActiveQuery {
   query: Query
   skillId: string | null
+  abortController: AbortController
 }
 
 // Guard against concurrent sendMessage calls — per context slot
@@ -335,13 +336,13 @@ export function abortActiveQuery(context?: AgentContext): void {
   if (context) {
     const entry = activeQueries.get(context)
     if (entry) {
-      try { (entry.query as any).abort() } catch {}
+      entry.abortController.abort()
       activeQueries.delete(context)
     }
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
-      try { (entry.query as any).abort() } catch {}
+      entry.abortController.abort()
     }
     activeQueries.clear()
     rejectAllPendingPermissions()
@@ -370,7 +371,7 @@ export async function sendMessage(
   // Abort any active query in the same context slot
   const existing = activeQueries.get(context)
   if (existing) {
-    try { (existing.query as any).abort() } catch {}
+    existing.abortController.abort()
     activeQueries.delete(context)
   }
 
@@ -381,15 +382,17 @@ export async function sendMessage(
   let currentSessionId = sessionId
 
   try {
+    const abortController = new AbortController()
     const messageStream = query({
       prompt,
       options: {
         ...options,
+        abortController,
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
     const activeSkillId = activeQueries.get(context)?.skillId ?? null
-    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId })
+    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId, abortController })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
