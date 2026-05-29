@@ -7,3 +7,4 @@ dist/
 .env.local
 design-token-preview.html
 mockups/
+.claude/
