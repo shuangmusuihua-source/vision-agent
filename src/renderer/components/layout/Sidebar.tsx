@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, DotsThreeCircle } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, BookOpen, DotsThreeCircle, ArrowLeft } from '@phosphor-icons/react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import type { FileEntry } from '../../lib/ipc'
 
@@ -27,11 +27,48 @@ interface SidebarProps {
   onToggleGraph: () => void
   onDaydream: (mode: string) => void
   onAskZuovis: () => void
+  onAskZuovisBack: () => void
   isAskZuovisActive: boolean
+  isAskZuovisInChat: boolean
+  isAskZuovisRunning: boolean
   activeFile: string
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
+}
+
+function SidebarBackButton({ running, onBack }: { running: boolean; onBack: () => void }) {
+  const [clickedOnce, setClickedOnce] = useState(false)
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (running && !clickedOnce) {
+      setClickedOnce(true)
+      return
+    }
+    setClickedOnce(false)
+    onBack()
+  }
+
+  return (
+    <div
+      className={`sidebar-ask-zuovis-back-wrap${running ? ' sidebar-ask-zuovis-back-wrap--warn' : ''}${clickedOnce ? ' sidebar-ask-zuovis-back-wrap--clicked' : ''}`}
+    >
+      <button
+        className="sidebar-ask-zuovis-back"
+        onClick={handleClick}
+        title={running ? '返回将中止当前任务' : '返回首页'}
+        aria-label="返回首页"
+      >
+        <ArrowLeft size={12} weight="bold" />
+      </button>
+      {running && (
+        <div className="sidebar-ask-zuovis-back-tip">
+          {clickedOnce ? '再次点击确认返回' : '返回将中止当前任务'}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Sidebar({
@@ -52,7 +89,10 @@ function Sidebar({
   onToggleGraph,
   onDaydream,
   onAskZuovis,
+  onAskZuovisBack,
   isAskZuovisActive,
+  isAskZuovisInChat,
+  isAskZuovisRunning,
   activeFile,
   showGraph,
   changedFileCount,
@@ -311,6 +351,9 @@ function Sidebar({
         <button className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`} onClick={onAskZuovis}>
           <div className="sidebar-ask-zuovis-icon"><DotsThreeCircle size={12} weight="bold" /></div>
           <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
+          {isAskZuovisActive && isAskZuovisInChat && (
+            <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
+          )}
         </button>
 
         {/* 知识库 */}

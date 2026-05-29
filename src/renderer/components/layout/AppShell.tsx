@@ -11,10 +11,11 @@ import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
-import { useAgent, useIPCSubscriptions, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useDividerDrag } from '../../hooks/useDividerDrag'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { emptySlot } from '../../store/agent-store'
 import type { AgentContext } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
@@ -196,6 +197,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const agentStatus = useAgentStatus('editor')
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
+
+  const askIsStreaming = useIsStreaming('ask')
+  const askMessages = useMessages('ask')
+
+  const handleAskZuovisBack = useCallback(() => {
+    if (askIsStreaming) window.api.agent.abort('ask')
+    useAgentStore.setState((prev) => ({
+      slots: { ...prev.slots, ask: emptySlot() },
+    }))
+  }, [askIsStreaming])
 
   // Restore/refresh workspaces from cached settings
   const settings = useSettings()
@@ -493,6 +504,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             setShowAskZuovis(true)
           }}
         isAskZuovisActive={showAskZuovis}
+        onAskZuovisBack={handleAskZuovisBack}
+        isAskZuovisInChat={askMessages.length > 0}
+        isAskZuovisRunning={askIsStreaming}
         activeFile={activeTab}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
