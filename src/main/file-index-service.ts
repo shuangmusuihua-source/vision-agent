@@ -142,6 +142,9 @@ class FileIndexService {
     this.watcher.on('unlink', (filePath) => {
       if (filePath.endsWith('.md')) this.handleFileDelete(filePath)
     })
+    this.watcher.on('error', (err) => {
+      console.error('[FileIndexService] watcher error:', err)
+    })
   }
 
   /** Handle a single file change event */
@@ -208,6 +211,9 @@ class FileIndexService {
     })
     this.knowledgeWatcher.on('unlink', (filePath) => {
       if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+    })
+    this.knowledgeWatcher.on('error', (err) => {
+      console.error('[FileIndexService] knowledge watcher error:', err)
     })
   }
 

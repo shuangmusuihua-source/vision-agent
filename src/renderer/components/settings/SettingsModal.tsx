@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Sun, Moon, Desktop, Users, Info, Plus, X, Trash } from '@phosphor-icons/react'
+import { Sun, Moon, Monitor, Users, Info, Plus, X, Trash2 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import { useSettings, getSettingsCache } from '../../store/settings-cache'
 import type { ModelProfile } from '../../lib/ipc'
@@ -11,9 +11,9 @@ interface SettingsModalProps {
 type SettingsPage = 'appearance' | 'profiles' | 'about'
 
 const PAGES: Array<{ id: SettingsPage; label: string; icon: React.ReactElement }> = [
-  { id: 'appearance', label: '外观', icon: <Sun size={16} weight="bold" /> },
-  { id: 'profiles', label: '模型配置', icon: <Users size={16} weight="bold" /> },
-  { id: 'about', label: '关于', icon: <Info size={16} weight="bold" /> }
+  { id: 'appearance', label: '外观', icon: <Sun size={16} /> },
+  { id: 'profiles', label: '模型配置', icon: <Users size={16} /> },
+  { id: 'about', label: '关于', icon: <Info size={16} /> }
 ]
 
 const MODEL_PRESETS = [
@@ -235,8 +235,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   }, [])
 
   return (
-    <div className="settings-overlay app-modal-overlay app-modal-visible" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="settings-window app-modal app-modal-visible" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+    <div className="settings-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="settings-window" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
         <div className="settings-sidebar">
           {PAGES.map((page) => (
             <button
@@ -254,7 +254,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
         <div className="settings-content">
           <button className="settings-close-btn" onClick={onClose}>
-            <X size={16} weight="bold" />
+            <X size={16} />
           </button>
 
           {activePage === 'appearance' && (
@@ -267,21 +267,21 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                     className={`theme-option ${theme === 'light' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('light')}
                   >
-                    <Sun size={24} weight="bold" />
+                    <Sun size={24} />
                     <span className="theme-option-label">浅色</span>
                   </button>
                   <button
                     className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('dark')}
                   >
-                    <Moon size={24} weight="bold" />
+                    <Moon size={24} />
                     <span className="theme-option-label">深色</span>
                   </button>
                   <button
                     className={`theme-option ${theme === 'system' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('system')}
                   >
-                    <Desktop size={24} weight="bold" />
+                    <Monitor size={24} />
                     <span className="theme-option-label">跟随系统</span>
                   </button>
                 </div>
@@ -465,7 +465,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 )
               })}
               <button className="add-profile-btn" onClick={handleAddProfile}>
-                <Plus size={16} weight="bold" />
+                <Plus size={16} />
                 添加配置
               </button>
             </div>

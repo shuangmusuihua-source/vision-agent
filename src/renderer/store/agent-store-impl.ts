@@ -201,6 +201,10 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates._firstContentSeen = false
         slotUpdates.activeSkillId = null
         slotUpdates.skillOutput = null
+        slotUpdates.permissionRequest = null
+        slotUpdates.permissionQueue = []
+        slotUpdates.askUserRequest = null
+        slotUpdates.askUserQueue = []
         const msgs = (slotUpdates.messages || slot.messages).map((m) =>
           m.phase !== 'complete' && m.phase !== 'error' ? { ...m, phase: 'complete' as const } : m
         )
@@ -238,8 +242,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates._firstContentSeen = false
         slotUpdates.activeSkillId = null
         slotUpdates.skillOutput = null
+        slotUpdates.permissionRequest = null
+        slotUpdates.permissionQueue = []
+        slotUpdates.askUserRequest = null
+        slotUpdates.askUserQueue = []
         const msgs = slot.messages.map((m) =>
-          m.phase !== 'complete' ? { ...m, phase: 'error' as const } : m
+          m.phase !== 'complete' && m.phase !== 'stopped' ? { ...m, phase: 'error' as const } : m
         )
         const skillId = slot.activeSkillId
         if (skillId) {
@@ -503,7 +511,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                 const msgs = [...s.messages]
                 const idx = msgs.findIndex((m) => m.id === acc!.messageId)
                 if (idx >= 0) {
-                  const existing = msgs[idx].toolCalls.some((tc) => tc.toolUseId === tu.id)
+                  const existing = msgs[idx].toolCalls.some((tc) => tc.toolUseId === block.id)
                   if (!existing) {
                     msgs[idx] = {
                       ...msgs[idx],
@@ -629,14 +637,37 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           get().dispatchAgentEvent({ type: 'RESULT_SUCCESS' }, ctx)
         } else {
           const errorMsg = msg as ResultErrorPayload
+          const errorText = errorMsg.errors.join('\n') || 'Agent error'
+          const isAborted = /aborted|cancelled|canceled/i.test(errorText)
+
           set((state) => {
             const s = state.slots[ctx]
+            const lastMsg = s.messages[s.messages.length - 1]
+            if (isAborted) {
+              // User-initiated stop: replace error with friendly message
+              const stopNote = {
+                id: `stop-${Date.now()}`,
+                role: 'assistant' as const,
+                phase: 'stopped' as const,
+                textContent: '我的思考被用户停止了',
+                content: [],
+                toolCalls: [],
+                createdAt: Date.now(),
+              }
+              const msgs = lastMsg?.phase === 'streaming'
+                ? [...s.messages.slice(0, -1), { ...lastMsg, phase: 'complete' as const }, stopNote]
+                : [...s.messages, stopNote]
+              return updateSlot(state, ctx, {
+                messages: msgs,
+                usageInfo: errorMsg.usage,
+              })
+            }
             return updateSlot(state, ctx, {
               messages: [...s.messages, {
                 id: `error-${Date.now()}`,
-                role: 'assistant',
-                phase: 'error',
-                textContent: errorMsg.errors.join('\n') || 'Agent error',
+                role: 'assistant' as const,
+                phase: 'error' as const,
+                textContent: errorText,
                 content: [],
                 toolCalls: [],
                 createdAt: Date.now(),
@@ -658,19 +689,26 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
   handlePermissionRequest(req: PermissionRequestIPC) {
     const ctx = (req.context as AgentContext) || get().context
-    set((state) => updateSlot(state, ctx, { permissionRequest: req }))
+    set((state) => {
+      const slot = state.slots[ctx]
+      // If a permission dialog is already showing, queue this request
+      if (slot.permissionRequest) {
+        return updateSlot(state, ctx, { permissionQueue: [...slot.permissionQueue, req] })
+      }
+      return updateSlot(state, ctx, { permissionRequest: req })
+    })
   },
 
   handlePermissionResponse(requestId: string, behavior: 'allow' | 'deny') {
-    // Clear permission from whichever slot has it
+    // Clear permission from whichever slot has it, then show next in queue
     set((state) => {
-      const editorSlot = state.slots.editor
-      const askSlot = state.slots.ask
-      if (editorSlot.permissionRequest?.id === requestId) {
-        return updateSlot(state, 'editor', { permissionRequest: null })
-      }
-      if (askSlot.permissionRequest?.id === requestId) {
-        return updateSlot(state, 'ask', { permissionRequest: null })
+      for (const ctx of ['editor', 'ask'] as AgentContext[]) {
+        const slot = state.slots[ctx]
+        if (slot.permissionRequest?.id === requestId) {
+          const next = slot.permissionQueue[0] ?? null
+          const rest = slot.permissionQueue.slice(1)
+          return updateSlot(state, ctx, { permissionRequest: next, permissionQueue: rest })
+        }
       }
       return {}
     })
@@ -678,18 +716,25 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
   handleAskUserRequest(req: AskUserRequestIPC) {
     const ctx = (req.context as AgentContext) || get().context
-    set((state) => updateSlot(state, ctx, { askUserRequest: req }))
+    set((state) => {
+      const slot = state.slots[ctx]
+      if (slot.askUserRequest) {
+        return updateSlot(state, ctx, { askUserQueue: [...slot.askUserQueue, req] })
+      }
+      return updateSlot(state, ctx, { askUserRequest: req })
+    })
     get().dispatchAgentEvent({ type: 'ASK_USER_REQUEST' }, ctx)
   },
 
   handleAskUserResponse(requestId: string, answer: string) {
     set((state) => {
-      // Find which slot has this askUserRequest
       let ctx: AgentContext = state.context
       if (state.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
       else if (state.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
 
       const s = state.slots[ctx]
+      const next = s.askUserQueue[0] ?? null
+      const rest = s.askUserQueue.slice(1)
       return updateSlot(state, ctx, {
         messages: [...s.messages, {
           id: `user-answer-${Date.now()}`,
@@ -700,21 +745,22 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           toolCalls: [],
           createdAt: Date.now(),
         }],
-        askUserRequest: null,
+        askUserRequest: next,
+        askUserQueue: rest,
       })
     })
   },
 
   handleAskUserTimeout(requestId: string) {
-    // Resolve context BEFORE set() clears askUserRequest
-    const current = get()
-    let ctx: AgentContext = current.context
-    if (current.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
-    else if (current.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
-
     set((state) => {
+      let ctx: AgentContext = state.context
+      if (state.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
+      else if (state.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
+
       const s = state.slots[ctx]
-      return updateSlot(state, ctx, {
+      const next = s.askUserQueue[0] ?? null
+      const rest = s.askUserQueue.slice(1)
+      const updated = updateSlot(state, ctx, {
         messages: [...s.messages, {
           id: `timeout-${Date.now()}`,
           role: 'system',
@@ -724,11 +770,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           toolCalls: [],
           createdAt: Date.now(),
         }],
-        askUserRequest: null,
+        askUserRequest: next,
+        askUserQueue: rest,
       })
+      get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, ctx)
+      return updated
     })
-
-    get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, ctx)
   },
 
   handleSkillOutput(skillState: SkillOutputState) {

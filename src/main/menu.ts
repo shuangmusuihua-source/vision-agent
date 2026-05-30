@@ -7,11 +7,11 @@ export function setupMenu(): void {
     ...(isMac
       ? [
           {
-            label: app.name,
+            label: app.getName(),
             submenu: [
-              { label: `About ${app.name}`, role: 'about' as const },
+              { label: `About ${app.getName()}`, role: 'about' as const },
               { type: 'separator' as const },
-              { label: 'Preferences...', accelerator: 'CmdOrCtrl+,', click: sendMenuAction('open-settings') },
+              { label: 'Preferences...', accelerator: 'CmdOrCtrl+,', sublabel: '打开设置面板', click: sendMenuAction('open-settings') },
               { type: 'separator' as const },
               { role: 'services' as const },
               { type: 'separator' as const },
@@ -27,7 +27,7 @@ export function setupMenu(): void {
     {
       label: 'File',
       submenu: [
-        { label: 'Save', accelerator: 'CmdOrCtrl+S', click: sendMenuAction('save-file') }
+        { label: 'Save', accelerator: 'CmdOrCtrl+S', sublabel: '保存当前文件', click: sendMenuAction('save-file') }
       ]
     },
     {
@@ -45,13 +45,13 @@ export function setupMenu(): void {
     {
       label: 'View',
       submenu: [
-        { label: 'Toggle Sidebar', accelerator: 'CmdOrCtrl+B', click: sendMenuAction('toggle-sidebar') },
-        { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+B', click: sendMenuAction('toggle-agent-panel') },
+        { label: 'Toggle Sidebar', accelerator: 'CmdOrCtrl+B', sublabel: '显示/隐藏侧边栏', click: sendMenuAction('toggle-sidebar') },
+        { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+B', sublabel: '显示/隐藏 Agent 面板', click: sendMenuAction('toggle-agent-panel') },
         { type: 'separator' as const },
-        { label: 'Search', accelerator: 'CmdOrCtrl+Shift+F', click: sendMenuAction('open-search') },
+        { label: 'Search', accelerator: 'CmdOrCtrl+Shift+F', sublabel: '搜索文件内容', click: sendMenuAction('open-search') },
         { type: 'separator' as const },
-        { label: 'Source Mode', accelerator: 'CmdOrCtrl+/', click: sendMenuAction('toggle-source-mode') },
-        { label: 'Focus Mode', accelerator: 'CmdOrCtrl+\\', click: sendMenuAction('toggle-focus-mode') },
+        { label: 'Source Mode', accelerator: 'CmdOrCtrl+/', sublabel: '切换源码视图', click: sendMenuAction('toggle-source-mode') },
+        { label: 'Focus Mode', accelerator: 'CmdOrCtrl+\\', sublabel: '切换专注模式', click: sendMenuAction('toggle-focus-mode') },
         { type: 'separator' as const },
         { role: 'togglefullscreen' as const },
         { role: 'toggleDevTools' as const }

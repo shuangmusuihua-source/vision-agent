@@ -21,7 +21,9 @@ export type ContextSlot = {
   agentState: AgentState
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequestIPC | null
+  permissionQueue: PermissionRequestIPC[]
   askUserRequest: AskUserRequestIPC | null
+  askUserQueue: AskUserRequestIPC[]
   skillOutput: SkillOutputState | null
   activeSkillId: string | null
   lastEditedFile: string | null
@@ -38,7 +40,9 @@ function emptySlot(): ContextSlot {
     agentState: 'idle',
     usageInfo: null,
     permissionRequest: null,
+    permissionQueue: [],
     askUserRequest: null,
+    askUserQueue: [],
     skillOutput: null,
     activeSkillId: null,
     lastEditedFile: null,

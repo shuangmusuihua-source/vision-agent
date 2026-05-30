@@ -59,7 +59,14 @@ async function runAgentQuery(prompt: string, cwd: string, effort: 'low' | 'high'
   const profile = getActiveProfile()
   const cliPath = resolveClaudeCodeExecutable()
 
-  const env: Record<string, string | undefined> = { ...process.env }
+  // Only forward whitelisted env vars to SDK subprocess (not entire process.env)
+  const env: Record<string, string | undefined> = {
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    PATH: process.env.PATH,
+  }
   if (apiKey) env.ANTHROPIC_API_KEY = apiKey
   if (baseUrl && profile?.apiProvider === 'custom') env.ANTHROPIC_BASE_URL = baseUrl
 

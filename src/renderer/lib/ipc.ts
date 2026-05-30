@@ -43,6 +43,7 @@ interface SkillDefinition {
   promptTemplate: string
   argumentHint?: string
   outputMode?: 'skill-output' | 'write'
+  hideInSlashMenu?: boolean
 }
 
 // ─── Search Result ──────────────────────────────────────────────────
@@ -91,6 +92,10 @@ interface WorkspaceApi {
   moveFile: (sourcePath: string, targetDir: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
   deleteWorkspace: (dirPath: string) => Promise<{ success: boolean; error?: string }>
   knowledgeDir: () => Promise<string>
+  createDir: (parentPath: string, dirName: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  renameEntry: (oldPath: string, newName: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  deleteDir: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+  selectFiles: () => Promise<{ canceled: boolean; filePaths: string[] }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
@@ -186,6 +191,7 @@ interface WindowApi {
   menu: MenuApi
   notification: NotificationApi
   update: UpdateApi
+  onMainError: (callback: (error: { type: string; message: string }) => void) => () => void
 }
 
 interface MemoryApi {

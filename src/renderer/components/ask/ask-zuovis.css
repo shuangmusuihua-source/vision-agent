@@ -29,8 +29,76 @@
 }
 
 .ask-zuovis-greeting {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 520px;
+  width: 100%;
 }
+
+.ask-zuovis-greeting-text {
+  text-align: left;
+}
+
+.ask-zuovis-greeting-logo {
+  width: 72px;
+  height: 72px;
+  opacity: 0.85;
+  flex-shrink: 0;
+  animation: bullGreet 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center bottom;
+}
+
+@keyframes bullGreet {
+  /* 准备 — 藏在下方 */
+  0% {
+    transform: translateY(60px) scale(0.3, 1.4);
+    opacity: 0;
+  }
+  /* 弹入 — squash and stretch */
+  10% {
+    transform: translateY(-8px) scale(1.15, 0.85);
+    opacity: 1;
+  }
+  /* 触地回弹 */
+  18% {
+    transform: translateY(0) scale(0.95, 1.08);
+  }
+  /* 稳定 */
+  24% {
+    transform: translateY(0) scale(1, 1);
+  }
+  /* 歪头看 — 向右倾 */
+  36% {
+    transform: rotate(8deg) translateY(-2px);
+  }
+  /* 歪头看 — 向左倾 */
+  48% {
+    transform: rotate(-6deg) translateY(-2px);
+  }
+  /* 回正 */
+  56% {
+    transform: rotate(0deg) translateY(0);
+  }
+  /* 小跳一下 */
+  66% {
+    transform: translateY(-10px) scale(1.06, 0.94);
+  }
+  /* 落地 */
+  72% {
+    transform: translateY(0) scale(0.96, 1.04);
+  }
+  /* 回稳 */
+  78% {
+    transform: translateY(0) scale(1, 1);
+  }
+  /* 待机 */
+  100% {
+    transform: translateY(0) scale(1, 1);
+    opacity: 0.9;
+  }
+}
+
 
 .ask-zuovis-greeting-title {
   font-size: 22px;
@@ -47,60 +115,155 @@
 .ask-zuovis-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  max-width: 520px;
+  gap: 16px;
+  max-width: 540px;
   width: 100%;
 }
 
+@keyframes diffuse-a {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.7; }
+}
+@keyframes diffuse-b {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 0; }
+}
+
+/* Outer card: colorful gradient + thick white border */
 .ask-zuovis-card {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 14px;
-  padding: 16px 14px;
+  border-radius: 36px;
+  border: 5px solid #fff;
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.2),
+              box-shadow 0.35s ease;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  overflow: clip;
+  padding: 28px 14px 14px;
+  text-align: left;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  text-align: left;
-  border: none;
-  -electron-corner-smoothing: system-ui;
+  min-height: 180px;
 }
 
 .ask-zuovis-card:hover {
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-4px);
+  border-color: #fff;
+  box-shadow:
+    0 28px 52px rgba(16, 16, 16, 0.13),
+    0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
-.ask-zuovis-card-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+.ask-zuovis-card:active {
+  transform: translateY(-1px);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+/* Per-card base gradient (multi-color, inspired by iOS widget) */
+.ask-card-purple {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(190,140,255,0.9) 0% 20%, rgba(190,140,255,0) 48%),
+    radial-gradient(circle at 75% 50%, rgba(255,130,160,0.7) 0% 20%, rgba(255,130,160,0) 42%),
+    radial-gradient(circle at 40% 70%, rgba(120,100,240,0.7) 0% 20%, rgba(120,100,240,0) 50%);
+}
+.ask-card-pink {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255,150,120,0.9) 0% 20%, rgba(255,150,120,0) 48%),
+    radial-gradient(circle at 70% 45%, rgba(255,100,150,0.75) 0% 20%, rgba(255,100,150,0) 42%),
+    radial-gradient(circle at 35% 72%, rgba(200,90,220,0.65) 0% 20%, rgba(200,90,220,0) 50%);
+}
+.ask-card-blue {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(120,180,255,0.88) 0% 20%, rgba(120,180,255,0) 48%),
+    radial-gradient(circle at 75% 48%, rgba(80,200,220,0.7) 0% 20%, rgba(80,200,220,0) 42%),
+    radial-gradient(circle at 38% 70%, rgba(70,100,240,0.7) 0% 20%, rgba(70,100,240,0) 50%);
+}
+
+/* ::before / ::after — crossfading gradient layers */
+.ask-zuovis-card::before,
+.ask-zuovis-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.ask-zuovis-card::before { animation: diffuse-a 8s ease-in-out infinite; }
+.ask-zuovis-card::after  { animation: diffuse-b 8s ease-in-out infinite; }
+
+/* Per-color ::before gradients (phase A — warm tones) */
+.ask-card-purple::before {
+  background:
+    radial-gradient(circle at 80% 60%, rgba(255,180,100,0.8) 0% 18%, rgba(255,180,100,0) 45%);
+}
+.ask-card-pink::before {
+  background:
+    radial-gradient(circle at 82% 55%, rgba(255,200,120,0.75) 0% 18%, rgba(255,200,120,0) 45%);
+}
+.ask-card-blue::before {
+  background:
+    radial-gradient(circle at 80% 60%, rgba(180,220,255,0.75) 0% 18%, rgba(180,220,255,0) 45%);
+}
+
+/* Per-color ::after gradients (phase B — cool tones) */
+.ask-card-purple::after {
+  background:
+    radial-gradient(circle at 25% 75%, rgba(150,120,255,0.75) 0% 18%, rgba(150,120,255,0) 45%);
+}
+.ask-card-pink::after {
+  background:
+    radial-gradient(circle at 20% 78%, rgba(255,130,200,0.7) 0% 18%, rgba(255,130,200,0) 45%);
+}
+.ask-card-blue::after {
+  background:
+    radial-gradient(circle at 25% 75%, rgba(100,160,255,0.7) 0% 18%, rgba(100,160,255,0) 45%);
+}
+
+/* Title — on the gradient background (like "9:41 AM") */
+.ask-zuovis-card-title {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-bottom: 4px;
 }
 
-.ask-card-purple .ask-zuovis-card-icon { background: rgba(102, 87, 255, 0.1); color: #6657ff; }
-.ask-card-pink .ask-zuovis-card-icon { background: rgba(255, 88, 178, 0.1); color: #ff58b2; }
-.ask-card-blue .ask-zuovis-card-icon { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-.ask-card-green .ask-zuovis-card-icon { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
-.ask-card-orange .ask-zuovis-card-icon { background: rgba(249, 115, 22, 0.1); color: #f97316; }
-.ask-card-teal .ask-zuovis-card-icon { background: rgba(20, 184, 166, 0.1); color: #14b8a6; }
-
-.ask-zuovis-card-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary);
+/* Inner frosted glass block */
+.ask-zuovis-card-glass {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 -4px 14px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  margin: 10px 0 10px;
+  margin-top: auto;
+  padding: 12px 14px;
 }
 
 .ask-zuovis-card-desc {
   font-size: 11px;
-  color: var(--color-text-tertiary);
-  line-height: 1.4;
+  color: #9a9a9a;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+.ask-zuovis-card-desc strong {
+  color: #1a1a1a;
+  font-weight: 800;
 }
 
 /* ── Messages (when chat is active) ── */
@@ -143,37 +306,25 @@
   margin: 0;
 }
 
-/* Permission/AskUser drawer — visible background in Ask Zuovis */
+/* Permission/AskUser drawer — glassmorphism matching capsule */
 .ask-zuovis-footer .input-drawer__content {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
 }
 
 [data-theme="dark"] .ask-zuovis-footer .input-drawer__content {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 .ask-zuovis-capsule-wrapper {
   position: relative;
-  pointer-events: auto;
-}
-
-.ask-zuovis-capsule {
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 22px;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  -electron-corner-smoothing: system-ui;
   pointer-events: auto;
 }
 
@@ -183,9 +334,27 @@
   outline: none;
   background: transparent;
   font-size: 14px;
+  line-height: normal;
   color: var(--color-text-primary);
   font-family: inherit;
   box-shadow: none;
+  padding: 0;
+  height: auto;
+}
+
+.ask-zuovis-capsule {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 22px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  -electron-corner-smoothing: system-ui;
+  pointer-events: auto;
 }
 
 .ask-zuovis-input:focus {
@@ -221,6 +390,101 @@
   cursor: not-allowed;
 }
 
+.ask-zuovis-stop-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  -electron-corner-smoothing: system-ui;
+  background: linear-gradient(135deg, #ff4757, #ff6b81);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  animation: stopPulse 1.5s ease-in-out infinite;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ask-zuovis-stop-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+}
+
+@keyframes stopPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
+}
+
+/* ── File attachment ── */
+
+.ask-zuovis-attach-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  border: none;
+  flex-shrink: 0;
+}
+
+.ask-zuovis-attach-btn:hover {
+  color: var(--color-text-primary);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.ask-zuovis-attach-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.ask-zuovis-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ask-zuovis-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  max-width: 180px;
+}
+
+.ask-zuovis-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-zuovis-attachment-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ask-zuovis-attachment-remove:hover {
+  color: var(--color-danger);
+}
+
 /* ── Resuming indicator ── */
 
 .ask-zuovis-resuming {
@@ -236,21 +500,43 @@
 /* ── Dark theme overrides ── */
 
 [data-theme="dark"] .ask-zuovis-card {
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
-
 [data-theme="dark"] .ask-zuovis-card:hover {
-  background: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 28px 52px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
-
-[data-theme="dark"] .ask-card-purple .ask-zuovis-card-icon { background: rgba(102, 87, 255, 0.15); }
-[data-theme="dark"] .ask-card-pink .ask-zuovis-card-icon { background: rgba(255, 88, 178, 0.15); }
-[data-theme="dark"] .ask-card-blue .ask-zuovis-card-icon { background: rgba(59, 130, 246, 0.15); }
-[data-theme="dark"] .ask-card-green .ask-zuovis-card-icon { background: rgba(34, 197, 94, 0.15); }
-[data-theme="dark"] .ask-card-orange .ask-zuovis-card-icon { background: rgba(249, 115, 22, 0.15); }
-[data-theme="dark"] .ask-card-teal .ask-zuovis-card-icon { background: rgba(20, 184, 166, 0.15); }
+[data-theme="dark"] .ask-zuovis-card-glass {
+  background: rgba(30, 30, 30, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 -4px 14px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+[data-theme="dark"] .ask-zuovis-card-desc {
+  color: #888;
+}
+[data-theme="dark"] .ask-zuovis-card-desc strong {
+  color: #e8e8e6;
+}
+[data-theme="dark"] .ask-card-purple { background:
+    radial-gradient(circle at 20% 15%, rgba(160,110,240,0.55) 0% 20%, rgba(160,110,240,0) 48%),
+    radial-gradient(circle at 75% 50%, rgba(240,110,140,0.4) 0% 20%, rgba(240,110,140,0) 42%),
+    radial-gradient(circle at 40% 70%, rgba(100,80,220,0.4) 0% 20%, rgba(100,80,220,0) 50%);
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4)); }
+[data-theme="dark"] .ask-card-pink { background:
+    radial-gradient(circle at 18% 12%, rgba(240,130,100,0.55) 0% 20%, rgba(240,130,100,0) 48%),
+    radial-gradient(circle at 70% 45%, rgba(240,85,130,0.45) 0% 20%, rgba(240,85,130,0) 42%),
+    radial-gradient(circle at 35% 72%, rgba(180,75,200,0.4) 0% 20%, rgba(180,75,200,0) 50%);
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4)); }
+[data-theme="dark"] .ask-card-blue { background:
+    radial-gradient(circle at 20% 10%, rgba(100,160,240,0.5) 0% 20%, rgba(100,160,240,0) 48%),
+    radial-gradient(circle at 75% 48%, rgba(70,180,200,0.4) 0% 20%, rgba(70,180,200,0) 42%),
+    radial-gradient(circle at 38% 70%, rgba(60,80,220,0.4) 0% 20%, rgba(60,80,220,0) 50%);
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4)); }
 
 [data-theme="dark"] .ask-zuovis-capsule {
   background: rgba(255, 255, 255, 0.08);

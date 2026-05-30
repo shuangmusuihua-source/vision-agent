@@ -9,6 +9,7 @@ import { notifyCronTaskComplete } from './notification-manager'
 import { join } from 'path'
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
+const runningTasks = new Set<string>()
 
 function persistTasks(): void {
   saveCronTasks(Array.from(tasks.values()).map((e) => e.task))
@@ -68,6 +69,10 @@ export function getTask(taskId: string): CronTask | undefined {
 }
 
 export async function executeTask(task: CronTask): Promise<void> {
+  if (runningTasks.has(task.id)) return
+  runningTasks.add(task.id)
+
+  try {
   const dirs = getAuthorizedDirectories()
   const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
   const apiKey = getApiKey()
@@ -76,7 +81,13 @@ export async function executeTask(task: CronTask): Promise<void> {
   const profile = getActiveProfile()
   const cliPath = resolveClaudeCodeExecutable()
 
-  const env: Record<string, string> = {}
+  const authorizedRoots = getAuthorizedDirectories()
+  const env: Record<string, string | undefined> = {
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    LANG: process.env.LANG,
+    PATH: process.env.PATH,
+  }
   if (apiKey) env.ANTHROPIC_API_KEY = apiKey
   if (baseUrl && profile?.apiProvider === 'custom') env.ANTHROPIC_BASE_URL = baseUrl
 
@@ -86,6 +97,19 @@ export async function executeTask(task: CronTask): Promise<void> {
     permissionMode: 'acceptEdits',
     env,
     allowedTools: ['Read', 'Glob', 'Grep', 'Write', 'Edit'],
+    canUseTool: async (_toolName, input) => {
+      const filePath = typeof input === 'object' && input !== null
+        ? (input as Record<string, unknown>).file_path as string | undefined
+        : undefined
+      if (filePath) {
+        const resolved = require('path').resolve(filePath)
+        const isAuthorized = authorizedRoots.some((root: string) => resolved.startsWith(root))
+        if (!isAuthorized) {
+          return { behavior: 'deny' as const, message: 'Path not authorized for cron task' }
+        }
+      }
+      return { behavior: 'allow' as const }
+    },
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     settings: {
       autoMemoryDirectory: join(cwd, '.vision', 'memory')
@@ -134,6 +158,9 @@ export async function executeTask(task: CronTask): Promise<void> {
         message: (err as Error).message || '未知错误',
       })
     }
+  }
+  } finally {
+    runningTasks.delete(task.id)
   }
 }
 

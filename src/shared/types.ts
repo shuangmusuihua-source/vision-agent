@@ -33,7 +33,7 @@ export type ToolUseBlock = {
 export type ToolResultBlock = {
   type: 'tool_result'
   tool_use_id: string
-  content: string
+  content: string | unknown[]
   is_error: boolean
 }
 
@@ -230,6 +230,7 @@ export type MessagePhase =
   | 'streaming'
   | 'tool_calling'
   | 'complete'
+  | 'stopped'
   | 'error'
 
 export type ToolCallState = {

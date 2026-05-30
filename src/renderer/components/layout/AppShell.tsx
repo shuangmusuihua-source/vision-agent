@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
-import { SidebarSimple, FileText, Download, ArrowSquareOut, ArrowsLeftRight, CaretLeft } from '@phosphor-icons/react'
+import { PanelLeft, FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'lucide-react'
+import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
 import MarkdownEditor from '../editor/MarkdownEditor'
@@ -11,10 +12,11 @@ import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
-import { useAgent, useIPCSubscriptions, useIsStreaming, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useDividerDrag } from '../../hooks/useDividerDrag'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { emptySlot } from '../../store/agent-store'
 import type { AgentContext } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
@@ -26,6 +28,7 @@ interface AppShellProps {
 }
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
+  const modal = useModal()
   const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
   const [fixedWorkspacePaths, setFixedWorkspacePaths] = useState<string[]>([])
 
@@ -80,7 +83,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [modalVisible, setModalVisible] = useState(false)
   const [showDaydream, setShowDaydream] = useState(false)
   const [daydreamMode, setDaydreamMode] = useState('matrix')
-  const [showAskZuovis, setShowAskZuovis] = useState(false)
+  const [showAskZuovis, setShowAskZuovis] = useState(true)
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
@@ -137,6 +140,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const unsubAvailable = window.api.update.onAvailable((info) => setUpdateAvailable(info))
     const unsubDownloaded = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
     return () => { unsubAvailable(); unsubDownloaded() }
+  }, [])
+
+  // Main process error listener
+  const [mainError, setMainError] = useState<string | null>(null)
+  useEffect(() => {
+    const unsub = window.api.onMainError((error) => {
+      console.error(`[Main ${error.type}]`, error.message)
+      setMainError(error.message)
+    })
+    return unsub
   }, [])
 
   // Menu bar actions
@@ -196,6 +209,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const agentStatus = useAgentStatus('editor')
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
+
+  const askIsStreaming = useIsStreaming('ask')
+  const askMessages = useMessages('ask')
+
+  const handleAskZuovisBack = useCallback(() => {
+    if (askIsStreaming) window.api.agent.abort('ask')
+    useAgentStore.setState((prev) => ({
+      slots: { ...prev.slots, ask: emptySlot() },
+    }))
+  }, [askIsStreaming])
 
   // Restore/refresh workspaces from cached settings
   const settings = useSettings()
@@ -307,7 +330,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }))
       setFiles(entries)
     } else {
-      window.alert(result.error || '删除失败')
+      modal.alert({ title: '删除失败', message: result.error || '删除失败' })
     }
   }, [openTabs, handleTabClose])
 
@@ -329,7 +352,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }))
       setFiles(entries)
     } else {
-      window.alert(result.error || '重命名失败')
+      modal.alert({ title: '重命名失败', message: result.error || '重命名失败' })
     }
   }, [openTabs, handleTabClose, handleFileSelect])
 
@@ -349,7 +372,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }))
       setFiles(entries)
     } else {
-      window.alert(result.error || '移动失败')
+      modal.alert({ title: '移动失败', message: result.error || '移动失败' })
     }
   }, [openTabs, handleTabClose, handleFileSelect])
 
@@ -493,6 +516,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             setShowAskZuovis(true)
           }}
         isAskZuovisActive={showAskZuovis}
+        onAskZuovisBack={handleAskZuovisBack}
+        isAskZuovisInChat={askMessages.length > 0}
+        isAskZuovisRunning={askIsStreaming}
         activeFile={activeTab}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
@@ -548,7 +574,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </ErrorBoundary>
         ) : (
           <div className="editor-empty">
-            <FileText size={48} weight="thin" className="editor-empty-icon" />
+            <FileText size={48} className="editor-empty-icon" />
             <span className="editor-empty-hint">选择文件或打开工作区</span>
           </div>
         )}
@@ -577,12 +603,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <div className="divider-line" />
         {!agentCollapsed && (
           <button className="divider-swap-btn" onClick={handleSwapLayout} title="切换面板位置" aria-label="切换面板位置">
-            <ArrowsLeftRight size={12} weight="bold" />
+            <ArrowLeftRight size={12} />
           </button>
         )}
         {agentCollapsed && (
           <button className="divider-expand-btn" onClick={handleExpand} title="展开面板" aria-label="展开面板">
-            <CaretLeft size={12} weight="bold" />
+            <ChevronLeft size={12} />
           </button>
         )}
       </div>
@@ -609,7 +635,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           } else {
             editorSendMessage(msg, linkedFile || undefined)
           }
-        }} onSkillSelect={handleSkillSelect} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
+        }} onSkillSelect={handleSkillSelect} onStop={() => window.api.agent.abort('editor')} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
@@ -624,7 +650,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <div className="update-banner">
           <span>新版本 v{updateAvailable.version} 可用</span>
           <button className="update-banner-btn" onClick={() => window.api.update.download()}>
-            <Download size={14} weight="bold" /> 下载
+            <Download size={14} /> 下载
           </button>
           <button className="update-banner-dismiss" onClick={() => setUpdateAvailable(null)}>✕</button>
         </div>
@@ -633,8 +659,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <div className="update-banner update-banner-ready">
           <span>更新已就绪</span>
           <button className="update-banner-btn" onClick={() => window.api.update.install()}>
-            <ArrowSquareOut size={14} weight="bold" /> 重启安装
+            <ExternalLink size={14} /> 重启安装
           </button>
+        </div>
+      )}
+      {mainError && (
+        <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+          <span>应用错误: {mainError.slice(0, 80)}{mainError.length > 80 ? '...' : ''}</span>
+          <button className="update-banner-dismiss" onClick={() => setMainError(null)}>✕</button>
         </div>
       )}
       {showSearch && (
@@ -655,15 +687,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
           aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
         >
-          <SidebarSimple size={14} weight="light" />
+          <PanelLeft size={14} />
         </button>
       </div>
       {showNewWorkspaceModal && (
-        <div className={`app-modal-overlay${modalVisible ? ' app-modal-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
-          <div className={`app-modal${modalVisible ? ' app-modal-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}>
-            <div className="app-modal-title">新建工作区</div>
+        <div className={`modal-overlay${modalVisible ? ' modal-overlay-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
+          <div className={`modal-window${modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">新建工作区</div>
             <input
-              className="app-modal-input"
+              className="modal-input"
               placeholder="工作区名称"
               value={newWorkspaceName}
               onChange={(e) => { setNewWorkspaceName(e.target.value); setNewWorkspaceError('') }}
@@ -673,24 +705,24 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
               }}
               autoFocus
             />
-            {newWorkspaceError && <span className="app-modal-error">{newWorkspaceError}</span>}
-            <div className="app-modal-actions">
-              <button className="app-modal-cancel" onClick={handleCloseNewWorkspaceModal}>取消</button>
-              <button className="app-modal-confirm" onClick={handleCreateWorkspace}>创建</button>
+            {newWorkspaceError && <span className="modal-error">{newWorkspaceError}</span>}
+            <div className="modal-actions">
+              <button className="btn-modal btn-modal-cancel" onClick={handleCloseNewWorkspaceModal}>取消</button>
+              <button className="btn-modal btn-modal-primary" onClick={handleCreateWorkspace}>创建</button>
             </div>
           </div>
         </div>
       )}
       {deleteWsPath && (
-        <div className="app-modal-overlay app-modal-visible" onClick={() => setDeleteWsPath(null)}>
-          <div className="app-modal app-modal-visible" role="dialog" aria-modal="true" aria-label="删除工作区" onClick={(e) => e.stopPropagation()}>
-            <div className="app-modal-title">删除工作区</div>
-            <div className="app-modal-warning">
+        <div className="modal-overlay modal-overlay-visible" onClick={() => setDeleteWsPath(null)}>
+          <div className="modal-window modal-window-visible" role="dialog" aria-modal="true" aria-label="删除工作区" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">删除工作区</div>
+            <div className="modal-body">
               此操作将永久删除工作区 <strong>{deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
             </div>
-            <div className="app-modal-hint">请输入工作区名称以确认删除：</div>
+            <div className="modal-hint">请输入工作区名称以确认删除：</div>
             <input
-              className="app-modal-input"
+              className="modal-input"
               placeholder={deleteWsPath.split('/').pop()}
               value={deleteWsConfirm}
               onChange={(e) => setDeleteWsConfirm(e.target.value)}
@@ -711,17 +743,17 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                       setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
                       setDeleteWsPath(null)
                     } else {
-                      window.alert(result.error || '删除失败')
+                      modal.alert({ title: '删除失败', message: result.error || '删除失败' })
                     }
                   })()
                 }
               }}
               autoFocus
             />
-            <div className="app-modal-actions">
-              <button className="app-modal-cancel" onClick={() => setDeleteWsPath(null)}>取消</button>
+            <div className="modal-actions">
+              <button className="btn-modal btn-modal-cancel" onClick={() => setDeleteWsPath(null)}>取消</button>
               <button
-                className="app-modal-confirm app-modal-danger"
+                className="btn-modal btn-modal-primary btn-modal-danger"
                 disabled={deleteWsConfirm !== deleteWsPath.split('/')?.pop()}
                 onClick={async () => {
                   const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
@@ -736,7 +768,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                     setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
                     setDeleteWsPath(null)
                   } else {
-                    window.alert(result.error || '删除失败')
+                    modal.alert({ title: '删除失败', message: result.error || '删除失败' })
                   }
                 }}
               >删除</button>

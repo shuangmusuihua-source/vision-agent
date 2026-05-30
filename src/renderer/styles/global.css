@@ -285,6 +285,11 @@ button {
   font-size: inherit;
   padding: 0;
   color: inherit;
+  text-box: trim-both cap alphabetic;
+}
+
+.btn-modal, .btn {
+  text-box: trim-both cap alphabetic;
 }
 
 button:hover {

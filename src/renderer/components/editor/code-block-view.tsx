@@ -1,7 +1,7 @@
 import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react'
 import { createPortal } from 'react-dom'
 import { useCallback, useState, useRef, useEffect } from 'react'
-import { Copy, ChartBar, ArrowsOutSimple, X, MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react'
+import { Copy, ChartBar, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 // Lazy-loaded mermaid — only imported when a mermaid code block is encountered
@@ -44,15 +44,15 @@ function MermaidOverlay({ svg, onClose }: { svg: string; onClose: () => void }):
           <>
             <div className="mermaid-overlay-toolbar">
               <button className="mermaid-overlay-btn" onClick={() => zoomIn()} title="放大">
-                <MagnifyingGlassPlus size={16} weight="bold" />
+                <ZoomIn size={16} />
               </button>
               <span className="mermaid-overlay-scale">{Math.round(state.scale * 100)}%</span>
               <button className="mermaid-overlay-btn" onClick={() => zoomOut()} title="缩小">
-                <MagnifyingGlassMinus size={16} weight="bold" />
+                <ZoomOut size={16} />
               </button>
               <button className="mermaid-overlay-btn" onClick={() => resetTransform()} title="重置">1:1</button>
               <button className="mermaid-overlay-btn" onClick={stableOnClose} title="关闭 (Esc)">
-                <X size={16} weight="bold" />
+                <X size={16} />
               </button>
             </div>
             <TransformComponent
@@ -166,12 +166,12 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
               onClick={() => setShowSource(!showSource)}
               title={showSource ? 'Show diagram' : 'Show source'}
             >
-              <ChartBar size={13} weight="bold" />
+              <ChartBar size={14} />
               {showSource ? 'Diagram' : 'Source'}
             </button>
           )}
           <button className="code-block-copy-btn" onClick={handleCopy}>
-            {copied ? 'Copied' : <Copy size={13} weight="bold" />}
+            {copied ? 'Copied' : <Copy size={14} />}
           </button>
         </div>
       </div>
@@ -190,7 +190,7 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
             <button className="mermaid-expand-btn" onClick={() => {
               if (mermaidRef.current?.innerHTML) setOverlaySvg(mermaidRef.current.innerHTML)
             }} title="放大预览">
-              <ArrowsOutSimple size={14} weight="bold" />
+              <Maximize2 size={14} />
             </button>
           )}
         </div>

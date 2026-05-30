@@ -1,22 +1,21 @@
-/* --- Settings Overlay --- */
+/* --- Settings Modal — unified frosted overlay + layout window --- */
 
 .settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
-  transition: background 0.2s ease;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
 }
 
-.settings-overlay.app-modal-visible {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .settings-overlay.app-modal-visible {
-  background: rgba(0, 0, 0, 0.5);
+[data-theme="dark"] .settings-overlay {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
 }
 
 /* --- Settings Window --- */
@@ -28,24 +27,19 @@
   max-height: calc(100vh - 40px);
   background: var(--color-bg-primary);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0);
   overflow: hidden;
   display: flex;
   padding: 0;
   border: none;
-  opacity: 0;
-  transform: scale(0.95) translateY(8px);
-  transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 8px 40px rgba(0, 0, 0, 0.15);
 }
 
-.settings-window.app-modal-visible {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
-}
-
-[data-theme="dark"] .settings-window.app-modal-visible {
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.05);
+[data-theme="dark"] .settings-window {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.04),
+    0 8px 40px rgba(0, 0, 0, 0.4);
 }
 
 /* --- Settings Sidebar --- */

@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app } from 'electron'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { appendFile } from 'fs/promises'
@@ -62,6 +62,7 @@ function evictOldSessions() {
 const pendingPermissions = new Map<string, {
   resolve: (result: PermissionResult) => void
   input: Record<string, unknown>
+  timeout: ReturnType<typeof setTimeout>
 }>()
 
 // Pending AskUserQuestion requests waiting for user input
@@ -72,12 +73,26 @@ const pendingAskUser = new Map<string, {
 }>()
 
 // Audit log path
-const AUDIT_LOG_PATH = `${process.env.HOME || '/tmp'}/.vision-agent/audit.log`
+const AUDIT_LOG_PATH = join(app.getPath('userData'), 'audit.log')
+
+const AUDIT_REDACT_PATTERNS = [
+  /(?:api[_-]?key|apikey|secret|token|password|auth)\s*[:=]\s*['"]?[^\s'"]+['"]?/gi,
+  /sk-[a-zA-Z0-9]{20,}/g,
+  /(?:Bearer\s+)[a-zA-Z0-9._\-]+/g,
+]
+
+function redactCredentials(text: string): string {
+  let result = text
+  for (const pattern of AUDIT_REDACT_PATTERNS) {
+    result = result.replace(pattern, (m) => m.slice(0, 4) + '***[REDACTED]')
+  }
+  return result
+}
 
 async function writeAuditLog(entry: Record<string, unknown>): Promise<void> {
   try {
     const line = JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + '\n'
-    await appendFile(AUDIT_LOG_PATH, line, { encoding: 'utf-8' })
+    await appendFile(AUDIT_LOG_PATH, redactCredentials(line), { encoding: 'utf-8' })
   } catch {
     // Audit log write failure should not block agent
   }
@@ -124,6 +139,7 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
   const pending = pendingPermissions.get(requestId)
   if (!pending) return
   pendingPermissions.delete(requestId)
+  clearTimeout(pending.timeout)
   cancelPermissionNotification(requestId)
   if (behavior === 'allow') {
     pending.resolve({ behavior: 'allow', updatedInput: pending.input })
@@ -162,7 +178,23 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
 
-  const env: Record<string, string | undefined> = { ...process.env }
+  // Prepend common user-level bin paths so tools like pip/brew/npm are findable
+  const userBinPaths = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+    `${process.env.HOME}/.local/bin`,
+  ].join(':')
+
+  // Only forward whitelisted env vars to SDK subprocess (not entire process.env)
+  const env: Record<string, string | undefined> = {
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    PATH: `${userBinPaths}:${process.env.PATH}`,
+  }
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey
   }
@@ -253,7 +285,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
         })
       }
 
-      // All other tools (Bash, Write, Edit) require user approval
+      // // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,
@@ -264,16 +296,15 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
-        pendingPermissions.set(requestId, { resolve, input })
-
-        // Timeout after 5 minutes — auto-deny
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
           if (pendingPermissions.has(requestId)) {
             pendingPermissions.delete(requestId)
             cancelPermissionNotification(requestId)
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
+
+        pendingPermissions.set(requestId, { resolve, input, timeout })
       })
     }
   }
@@ -309,6 +340,7 @@ function extractPathFromToolInput(
 interface ActiveQuery {
   query: Query
   skillId: string | null
+  abortController: AbortController
 }
 
 // Guard against concurrent sendMessage calls — per context slot
@@ -318,6 +350,7 @@ const _skillOutputBridge = new SkillOutputBridge()
 function rejectAllPendingPermissions(): void {
   for (const [id, p] of pendingPermissions) {
     pendingPermissions.delete(id)
+    clearTimeout(p.timeout)
     cancelPermissionNotification(id)
     p.resolve({ behavior: 'deny', message: 'Query aborted' })
   }
@@ -335,13 +368,13 @@ export function abortActiveQuery(context?: AgentContext): void {
   if (context) {
     const entry = activeQueries.get(context)
     if (entry) {
-      try { (entry.query as any).abort() } catch {}
+      entry.abortController.abort()
       activeQueries.delete(context)
     }
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
-      try { (entry.query as any).abort() } catch {}
+      entry.abortController.abort()
     }
     activeQueries.clear()
     rejectAllPendingPermissions()
@@ -370,7 +403,7 @@ export async function sendMessage(
   // Abort any active query in the same context slot
   const existing = activeQueries.get(context)
   if (existing) {
-    try { (existing.query as any).abort() } catch {}
+    existing.abortController.abort()
     activeQueries.delete(context)
   }
 
@@ -381,15 +414,17 @@ export async function sendMessage(
   let currentSessionId = sessionId
 
   try {
+    const abortController = new AbortController()
     const messageStream = query({
       prompt,
       options: {
         ...options,
+        abortController,
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
     const activeSkillId = activeQueries.get(context)?.skillId ?? null
-    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId })
+    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId, abortController })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break

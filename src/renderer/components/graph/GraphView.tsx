@@ -1,6 +1,6 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { Lightning, Spinner, Info, CaretDown } from '@phosphor-icons/react'
+import { Zap, Loader2, Info, ChevronDown } from 'lucide-react'
 import type { GraphNode, GraphEdge } from '../../../shared/types'
 import { useGraphStore } from '../../store/graph-store'
 
@@ -224,7 +224,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
           disabled={isExtracting}
           title="Extract semantic graph from documents"
         >
-          {isExtracting ? <Spinner size={16} weight="regular" /> : <Lightning size={16} weight="regular" />}
+          {isExtracting ? <Loader2 size={16} /> : <Zap size={16} />}
           {isExtracting ? ` ${extractionProgress?.phase || 'extracting'}...` : extractionState === 'complete' && !extractionProgress ? ' Done' : ' Extract'}
         </button>
         {changedFileCount > 0 && (
@@ -261,7 +261,7 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
         )}
         <div className={`graph-legend-card${legendCollapsed ? ' collapsed' : ''}`}>
           <button className="graph-legend-toggle" onClick={() => setLegendCollapsed(!legendCollapsed)}>
-            {legendCollapsed ? <Info size={14} /> : <CaretDown size={14} />}
+            {legendCollapsed ? <Info size={14} /> : <ChevronDown size={14} />}
           </button>
           {!legendCollapsed && (
             <div className="graph-legend-items">

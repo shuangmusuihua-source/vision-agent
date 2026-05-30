@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { CaretDown, Play, Trash, Plus, X, ClockCounterClockwise, File } from '@phosphor-icons/react'
+import { ChevronDown, Play, Trash2, Plus, X, RotateCcw, File } from 'lucide-react'
 import type { CronTask } from '../../lib/ipc'
 
 // --- Schedule builder types (migrated from CronPanel) ---
@@ -172,24 +172,24 @@ function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactE
           <div className="drawer-lip drawer-file-lip">
             <div className="drawer-lip-left">
               <div className="drawer-lip-icon">
-                <File size={12} weight="fill" />
+                <File size={12} />
               </div>
               <span className="drawer-file-tag-name" title={linkedFile}>{fileName}</span>
             </div>
             <button className="drawer-file-tag-close" onClick={onUnlinkFile}>
-              <X size={10} weight="bold" />
+              <X size={10} />
             </button>
           </div>
         ) : (
           <div className="drawer-lip" onClick={() => setExpanded(!expanded)}>
             <div className="drawer-lip-left">
               <div className={`drawer-lip-icon ${expanded ? 'drawer-lip-icon-active' : ''}`}>
-                <ClockCounterClockwise size={12} weight="bold" />
+                <RotateCcw size={12} />
               </div>
               <span className="drawer-lip-label">定时任务</span>
             </div>
             <div className="drawer-lip-right">
-              {expanded ? <CaretDown size={12} weight="bold" /> : <CaretDown size={12} weight="bold" className="drawer-chevron" />}
+              {expanded ? <ChevronDown size={12} /> : <ChevronDown size={12} className="drawer-chevron" />}
             </div>
           </div>
         )}
@@ -318,7 +318,7 @@ function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactE
 
             {!showForm && tasks.length > 0 && (
               <button className="drawer-add-btn" onClick={() => setShowForm(true)}>
-                <Plus size={12} weight="bold" />
+                <Plus size={12} />
                 新建定时任务
               </button>
             )}
@@ -326,7 +326,7 @@ function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactE
             {tasks.length === 0 && !showForm ? (
               <div className="drawer-empty">
                 <button className="drawer-add-btn" onClick={() => setShowForm(true)}>
-                  <Plus size={12} weight="bold" />
+                  <Plus size={12} />
                   新建定时任务
                 </button>
               </div>
@@ -345,14 +345,14 @@ function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactE
                         disabled={running === task.id}
                         title="立即执行"
                       >
-                        <Play size={12} weight="bold" />
+                        <Play size={12} />
                       </button>
                       <button
                         className="drawer-task-action drawer-task-action-danger"
                         onClick={() => handleRemove(task.id)}
                         title="删除"
                       >
-                        <Trash size={12} weight="bold" />
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   </div>
@@ -362,7 +362,7 @@ function DrawerZone({ linkedFile, onUnlinkFile }: DrawerZoneProps): React.ReactE
 
             {showForm && (
               <button className="drawer-form-close" onClick={() => setShowForm(false)}>
-                <X size={12} weight="bold" />
+                <X size={12} />
                 关闭
               </button>
             )}

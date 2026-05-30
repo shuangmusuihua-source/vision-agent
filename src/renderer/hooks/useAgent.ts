@@ -202,15 +202,7 @@ export function useAgent(context: AgentContext = 'editor') {
   }, [store])
 
   const resumeSession = useCallback(async (sessionId: string) => {
-    store.setState((s) => ({
-      slots: {
-        ...s.slots,
-        [context]: {
-          ...s.slots[context],
-          isResumingSession: true,
-        },
-      },
-    }))
+    store.setState({ isResumingSession: true })
 
     try {
       const messages = await window.api.agent.loadSessionMessages(sessionId)
@@ -230,15 +222,7 @@ export function useAgent(context: AgentContext = 'editor') {
     } catch (err) {
       console.error('[useAgent] Failed to resume session:', err)
     } finally {
-      store.setState((s) => ({
-        slots: {
-          ...s.slots,
-          [context]: {
-            ...s.slots[context],
-            isResumingSession: false,
-          },
-        },
-      }))
+      store.setState({ isResumingSession: false })
     }
   }, [context, store])
 

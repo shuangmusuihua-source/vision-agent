@@ -55,7 +55,7 @@ function createWindow(): void {
     minWidth: 680,
     minHeight: 400,
     show: false,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'hidden',
     trafficLightPosition: { x: 8, y: 8 },
     transparent: true,
     backgroundColor: '#00000000',
@@ -64,7 +64,10 @@ function createWindow(): void {
     title: 'Vision Agent',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
     }
   })
 
@@ -90,6 +93,12 @@ export function getMainWindow(): BrowserWindow | null {
 
 app.whenReady().then(() => {
   setupMenu()
+
+  // Set Dock icon in dev mode (production uses the bundled .icns)
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const iconPath = join(__dirname, '../../build/icon.png')
+    app.dock?.setIcon(iconPath)
+  }
 
   // Ensure knowledge base directory exists and is registered
   const knowledgeDir = ensureKnowledgeBase()
@@ -142,6 +151,11 @@ app.whenReady().then(() => {
       if (win && !win.isDestroyed()) {
         win.webContents.send('update:downloaded')
       }
+    })
+
+    autoUpdater.on('error', (err) => {
+      console.error('[AutoUpdater] error:', err)
+      Sentry.captureException(err)
     })
   }
 

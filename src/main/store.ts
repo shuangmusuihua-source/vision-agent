@@ -220,7 +220,7 @@ export function ensureKnowledgeBase(): string {
 
   const fixed = store.get('fixedDirectories')
   if (!fixed.includes(kbDir)) {
-    store.set('fixedDirectories', [...fixed, kbDir])
+    store.set('fixedDirectories', [kbDir, ...fixed])
   }
 
   const dirs = store.get('authorizedDirectories')

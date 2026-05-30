@@ -1,30 +1,29 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Monitor, FolderOpen, FileText, PresentationChart, MagnifyingGlass, ChartBar } from '@phosphor-icons/react'
+import { Monitor, FolderOpen, Trash2 } from 'lucide-react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, useAskUserRequest } from '../../hooks/useAgent'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
 import { useAgentStore } from '../../store/agent-store-impl'
+import bullLogo from '../../assets/zuovis-logo.svg'
 import './ask-zuovis.css'
 
 interface FeatureCard {
   id: string
-  icon: React.ComponentType<{ size: number; weight: string; className?: string }>
+  icon: React.ComponentType<{ size: number; className?: string }>
   title: string
   desc: string
+  descBold: string[]
   colorClass: string
   prompt: string
   skillId?: string
 }
 
 const FEATURES: FeatureCard[] = [
-  { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析桌面文件，给出整理方案', colorClass: 'ask-card-purple', prompt: '整理我的桌面', skillId: 'organize-desktop' },
-  { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择文件夹，分析并整理', colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
-  { id: 'write-doc', icon: FileText, title: '写文档', desc: '简历、报告、方案、会议纪要', colorClass: 'ask-card-blue', prompt: '帮我写文档' },
-  { id: 'make-ppt', icon: PresentationChart, title: '做 PPT', desc: '演示文稿、产品展示、培训课件', colorClass: 'ask-card-green', prompt: '帮我做PPT' },
-  { id: 'search-knowledge', icon: MagnifyingGlass, title: '搜索知识', desc: '知识库检索、信息整理、摘要', colorClass: 'ask-card-orange', prompt: '帮我搜索知识' },
-  { id: 'analyze-data', icon: ChartBar, title: '分析数据', desc: '数据解读、趋势分析、可视化', colorClass: 'ask-card-teal', prompt: '帮我分析数据' },
+  { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析你的桌面文件，给出智能整理方案', descBold: ['桌面文件', '整理方案'], colorClass: 'ask-card-purple', prompt: '整理我的桌面', skillId: 'organize-desktop' },
+  { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择一个文件夹，我来帮你归类整理', descBold: ['归类整理'], colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
+  { id: 'system-cleanup', icon: Trash2, title: '系统清理', desc: '扫描垃圾文件，释放宝贵的磁盘空间', descBold: ['垃圾文件', '磁盘空间'], colorClass: 'ask-card-blue', prompt: '扫描并清理我的系统垃圾', skillId: 'system-cleanup' },
 ]
 
 interface AskZuovisProps {
@@ -83,7 +82,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
         useAgentStore.setState((prev) => ({
           slots: {
             ...prev.slots,
-            ask: { ...prev.slots.ask, activeSkillId: card.skillId },
+            ask: { ...prev.slots.ask, activeSkillId: card.skillId ?? null },
           },
         }))
       }
@@ -94,7 +93,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
       useAgentStore.setState((prev) => ({
         slots: {
           ...prev.slots,
-          ask: { ...prev.slots.ask, activeSkillId: card.skillId },
+          ask: { ...prev.slots.ask, activeSkillId: card.skillId ?? null },
         },
       }))
     }
@@ -121,8 +120,11 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
         {!hasMessages ? (
           <div className="ask-zuovis-content">
             <div className="ask-zuovis-greeting">
-              <div className="ask-zuovis-greeting-title">你好，有什么可以帮你？</div>
-              <div className="ask-zuovis-greeting-sub">我是 Zuovis，你的智能助手</div>
+              <img className="ask-zuovis-greeting-logo" src={bullLogo} alt="Zuovis" />
+              <div className="ask-zuovis-greeting-text">
+                <div className="ask-zuovis-greeting-title">你好，有什么可以帮你？</div>
+                <div className="ask-zuovis-greeting-sub">我是 Zuovis，你的智能助手</div>
+              </div>
             </div>
 
             <div className="ask-zuovis-grid">
@@ -134,11 +136,22 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
                     className={`ask-zuovis-card ${feature.colorClass}`}
                     onClick={() => handleCardClick(feature)}
                   >
-                    <div className="ask-zuovis-card-icon">
-                      <Icon size={16} weight="regular" />
+                    <span className="ask-zuovis-card-title">
+                      <Icon size={16} />
+                      {feature.title}
+                    </span>
+                    <div className="ask-zuovis-card-glass">
+                      <span className="ask-zuovis-card-desc">
+                        {feature.descBold
+                          ? feature.desc.split(new RegExp(`(${feature.descBold.join('|')})`, 'g')).map((part, i) =>
+                              feature.descBold.includes(part)
+                                ? <strong key={i}>{part}</strong>
+                                : part
+                            )
+                          : feature.desc
+                        }
+                      </span>
                     </div>
-                    <div className="ask-zuovis-card-title">{feature.title}</div>
-                    <div className="ask-zuovis-card-desc">{feature.desc}</div>
                   </button>
                 )
               })}
@@ -169,7 +182,9 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           <ChatInput
           context="ask"
           onSend={handleChatSend}
+          onStop={() => window.api.agent.abort('ask')}
           disabled={isStreaming && agentStatus !== 'waitingForUserInput'}
+          isStreaming={isStreaming}
           placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}
           variant="capsule"
         />

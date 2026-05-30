@@ -1,6 +1,6 @@
 {
   "name": "vision-agent",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Local Agent-driven Markdown client powered by Claude Agent SDK",
   "main": "./out/main/index.js",
   "scripts": {
@@ -14,7 +14,6 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.141",
     "@anthropic-ai/claude-agent-sdk-darwin-arm64": "^0.2.141",
-    "@phosphor-icons/react": "^2.1.10",
     "@sentry/electron": "^7.13.0",
     "@tiptap/extension-code-block-lowlight": "^3.23.4",
     "@tiptap/extension-highlight": "^3.23.4",
@@ -37,6 +36,7 @@
     "electron-updater": "^6.8.3",
     "js-yaml": "^4.1.1",
     "lowlight": "^3.3.0",
+    "lucide-react": "^1.17.0",
     "mermaid": "^11.15.0",
     "node-cron": "^4.2.1",
     "react": "^19.0.0",

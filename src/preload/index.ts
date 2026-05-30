@@ -28,7 +28,14 @@ const api = {
       ipcRenderer.invoke('workspace:moveFile', sourcePath, targetDir),
     deleteWorkspace: (dirPath: string) =>
       ipcRenderer.invoke('workspace:deleteWorkspace', dirPath),
-    knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir')
+    knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir'),
+    createDir: (parentPath: string, dirName: string) =>
+      ipcRenderer.invoke('workspace:createDir', parentPath, dirName),
+    renameEntry: (oldPath: string, newName: string) =>
+      ipcRenderer.invoke('workspace:renameEntry', oldPath, newName),
+    deleteDir: (dirPath: string) =>
+      ipcRenderer.invoke('workspace:deleteDir', dirPath),
+    selectFiles: () => ipcRenderer.invoke('workspace:selectFiles'),
   },
 
   settings: {
@@ -183,6 +190,12 @@ const api = {
       ipcRenderer.on('update:downloaded', handler)
       return () => { ipcRenderer.removeListener('update:downloaded', handler) }
     }
+  },
+
+  onMainError: (callback: (error: { type: string; message: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: { type: string; message: string }) => callback(error)
+    ipcRenderer.on('main:error', handler)
+    return () => { ipcRenderer.removeListener('main:error', handler) }
   }
 }
 

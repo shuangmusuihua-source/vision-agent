@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { ShieldWarning, Check, X } from '@phosphor-icons/react'
+import { ShieldAlert, Check, X } from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
 import type { PermissionRequest } from '../../store/agent-store'
 
@@ -23,7 +23,7 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
     <InputDrawer open onClose={() => {}}>
       <div className="drawer-permission">
         <div className="drawer-permission-header">
-          <ShieldWarning size={16} weight="bold" className="drawer-permission-icon" />
+          <ShieldAlert size={16} className="drawer-permission-icon" />
           <span className="drawer-permission-title">权限请求</span>
           <span className="drawer-permission-tool">{request.toolName}</span>
         </div>
@@ -34,10 +34,10 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
         )}
         <div className="drawer-permission-actions">
           <button className="drawer-permission-btn drawer-permission-btn--deny" onClick={() => onRespond(request.id, 'deny')}>
-            <X size={14} weight="bold" /> Deny
+            <X size={14} /> Deny
           </button>
           <button className="drawer-permission-btn drawer-permission-btn--allow" onClick={() => onRespond(request.id, 'allow')}>
-            <Check size={14} weight="bold" /> Allow
+            <Check size={14} /> Allow
           </button>
         </div>
       </div>

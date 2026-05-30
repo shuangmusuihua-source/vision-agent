@@ -1,4 +1,4 @@
-import { ArrowElbowDownLeft } from '@phosphor-icons/react'
+import { CornerDownLeft } from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
 import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
 
@@ -26,7 +26,7 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
                 {opt.description && (
                   <span className="drawer-question-option-desc">{opt.description}</span>
                 )}
-                <ArrowElbowDownLeft size={14} weight="regular" className="drawer-question-option-icon" />
+                <CornerDownLeft size={14} className="drawer-question-option-icon" />
               </button>
             ))}
           </div>

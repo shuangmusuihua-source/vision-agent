@@ -11,6 +11,7 @@ import './styles/search.css'
 import AppShell from './components/layout/AppShell'
 import SettingsModal from './components/settings/SettingsModal'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
+import { ModalProvider } from './components/common/ModalSystem'
 
 function applyTheme(theme: 'light' | 'dark' | 'system'): void {
   let effective: 'light' | 'dark'
@@ -61,8 +62,10 @@ function App(): React.ReactElement {
         <button onClick={() => location.reload()} style={{ padding: '0.5rem 1.5rem', fontSize: '0.875rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>重新加载</button>
       </div>
     }>
-      <AppShell onOpenSettings={() => setShowSettings(true)} />
-      {showSettings && <SettingsModal onClose={handleSettingsClose} />}
+      <ModalProvider>
+        <AppShell onOpenSettings={() => setShowSettings(true)} />
+        {showSettings && <SettingsModal onClose={handleSettingsClose} />}
+      </ModalProvider>
     </ErrorBoundary>
   )
 }

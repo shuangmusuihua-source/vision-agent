@@ -38,7 +38,7 @@ function pushSettingsToRenderer(): void {
 
 // --- Workspace ---
 
-async function scanDirectory(dirPath: string, maxDepth = 3, depth = 0): Promise<FileEntry[]> {
+async function scanDirectory(dirPath: string, maxDepth = 1, depth = 0): Promise<FileEntry[]> {
   if (depth >= maxDepth) return []
   const entries = await readdir(dirPath, { withFileTypes: true })
   const result: FileEntry[] = []
@@ -47,7 +47,9 @@ async function scanDirectory(dirPath: string, maxDepth = 3, depth = 0): Promise<
     const fullPath = join(dirPath, entry.name)
     if (entry.isDirectory()) {
       const children = await scanDirectory(fullPath, maxDepth, depth + 1)
-      result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
+      if (children.length > 0) {
+        result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
+      }
     } else if (extname(entry.name) === '.md') {
       result.push({ name: entry.name, path: fullPath, isDirectory: false })
     }
@@ -183,11 +185,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('workspace:createWorkspace', async (_event, name: string) => {
     try {
+      const safeName = sanitizeFileName(name.trim())
+      if (!safeName || safeName !== name.trim()) return null
       const docsDir = join(app.getPath('documents'), 'VisionAgent')
       if (!existsSync(docsDir)) {
         await mkdir(docsDir, { recursive: true })
       }
-      const dirPath = join(docsDir, name)
+      const dirPath = join(docsDir, safeName)
       if (existsSync(dirPath)) return null
       await mkdir(dirPath, { recursive: true })
       return dirPath
@@ -230,6 +234,45 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('workspace:createDir', async (_event, parentPath: string, dirName: string) => {
+    if (!isPathAuthorized(parentPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      const name = sanitizeFileName(dirName.trim())
+      if (!name) return { success: false, error: '名称不能为空' }
+      const dirPath = join(parentPath, name)
+      if (existsSync(dirPath)) return { success: false, error: '目录已存在' }
+      await mkdir(dirPath, { recursive: true })
+      return { success: true, path: dirPath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('workspace:renameEntry', async (_event, oldPath: string, newName: string) => {
+    if (!isPathAuthorized(oldPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      const name = sanitizeFileName(newName.trim())
+      if (!name) return { success: false, error: '名称不能为空' }
+      const parentDir = dirname(oldPath)
+      const newPath = join(parentDir, name)
+      if (existsSync(newPath)) return { success: false, error: '同名文件或目录已存在' }
+      await rename(oldPath, newPath)
+      return { success: true, path: newPath }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('workspace:deleteDir', async (_event, dirPath: string) => {
+    if (!isPathAuthorized(dirPath)) return { success: false, error: 'Path not authorized' }
+    try {
+      await rm(dirPath, { recursive: true, force: true })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {
     if (!isPathAuthorized(dirPath)) return []
     try {
@@ -245,9 +288,13 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:previewArtifact', async (_event, options: { fileName: string; content: string }) => {
+    const safeName = sanitizeFileName(options.fileName)
+    if (!safeName) return { success: false, error: 'Invalid file name' }
     const tmpDir = join(app.getPath('temp'), 'vision-agent-preview')
     await mkdir(tmpDir, { recursive: true })
-    const filePath = join(tmpDir, options.fileName)
+    const filePath = join(tmpDir, safeName)
+    // Verify resolved path stays within tmpDir
+    if (!filePath.startsWith(tmpDir)) return { success: false, error: 'Path traversal detected' }
     await writeFile(filePath, options.content, 'utf-8')
     await shell.openPath(filePath)
     return { success: true, filePath }
@@ -376,6 +423,21 @@ export function registerIpcHandlers(): void {
     if (!window) return { canceled: true, filePaths: [] }
     return await dialog.showOpenDialog(window, {
       properties: ['openDirectory'],
+    })
+  })
+
+  ipcMain.handle('workspace:selectFiles', async () => {
+    const window = getMainWindow()
+    if (!window) return { canceled: true, filePaths: [] }
+    return await dialog.showOpenDialog(window, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'All Supported', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'pdf'] },
+        { name: 'Text', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg'] },
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
     })
   })
 

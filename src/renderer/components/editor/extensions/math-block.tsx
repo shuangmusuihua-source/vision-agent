@@ -3,12 +3,13 @@ import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import katex from 'katex'
 import React from 'react'
 
-const MathBlockComponent: React.FC<{ node: { attrs: { latex: string } } }> = ({ node }) => {
+const MathBlockComponent: React.FC<{ node: { attrs: Record<string, unknown> } }> = ({ node }) => {
+  const latex = (node.attrs.latex as string) || ''
   let html = ''
   try {
-    html = katex.renderToString(node.attrs.latex || '', { displayMode: true, throwOnError: false })
+    html = katex.renderToString(latex, { displayMode: true, throwOnError: false })
   } catch {
-    html = `<span class="math-error">${node.attrs.latex}</span>`
+    html = `<span class="math-error">${latex}</span>`
   }
   return (
     <NodeViewWrapper as="div" className="math-block" data-type="math-block">
@@ -60,7 +61,7 @@ export const MathBlock = Node.create({
     level: 'block' as const,
     start(src: string) {
       const idx = src.indexOf('$$')
-      if (idx === -1) return
+      if (idx === -1) return -1
       return idx
     },
     tokenize(src: string) {
@@ -68,7 +69,6 @@ export const MathBlock = Node.create({
       if (match) {
         return { type: 'mathBlock', raw: match[0], text: match[1].trim() }
       }
-      return undefined
     },
   },
 })
