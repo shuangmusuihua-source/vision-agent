@@ -22,23 +22,29 @@ export function resolveClaudeCodeExecutable(): string | undefined {
   // 优先使用平台原生二进制
   try {
     const nativeBinary = require.resolve('@anthropic-ai/claude-agent-sdk-darwin-arm64/claude')
-    if (existsSync(nativeBinary)) {
-      _cachedCliPath = nativeBinary
-      return nativeBinary
+    const resolved = resolveAsarPath(nativeBinary)
+    if (existsSync(resolved)) {
+      _cachedCliPath = resolved
+      return resolved
     }
   } catch {}
 
   // 回退到 cli.js
   try {
     const cliJs = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js')
-    if (existsSync(cliJs)) {
-      _cachedCliPath = cliJs
-      return cliJs
+    const resolved = resolveAsarPath(cliJs)
+    if (existsSync(resolved)) {
+      _cachedCliPath = resolved
+      return resolved
     }
   } catch {}
 
   _cachedCliPath = undefined
   return undefined
+}
+
+function resolveAsarPath(filePath: string): string {
+  return filePath.replace('.asar/', '.asar.unpacked/').replace('.asar\\', '.asar.unpacked\\')
 }
 
 interface SessionInfo {

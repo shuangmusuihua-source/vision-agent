@@ -23,10 +23,18 @@ publish:
   provider: github
   owner: shuangmusuihua-source
   repo: vision-agent
+asarUnpack:
+  - '**/@anthropic-ai/claude-agent-sdk-darwin-arm64/**'
+  - '**/@anthropic-ai/claude-agent-sdk/cli.js'
+  - '**/@anthropic-ai/claude-agent-sdk/**/*.js'
+  - '**/@anthropic-ai/claude-agent-sdk/**/*.json'
 mac:
   icon: build/icon.icns
   target:
-    - dmg
+    - target: dmg
+      arch:
+        - arm64
+        - x64
   category: public.app-category.productivity
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
