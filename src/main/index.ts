@@ -55,7 +55,7 @@ function createWindow(): void {
     minWidth: 680,
     minHeight: 400,
     show: false,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'hidden',
     trafficLightPosition: { x: 8, y: 8 },
     transparent: true,
     backgroundColor: '#00000000',
@@ -64,7 +64,10 @@ function createWindow(): void {
     title: 'Vision Agent',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
     }
   })
 

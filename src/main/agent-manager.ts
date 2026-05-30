@@ -62,6 +62,7 @@ function evictOldSessions() {
 const pendingPermissions = new Map<string, {
   resolve: (result: PermissionResult) => void
   input: Record<string, unknown>
+  timeout: ReturnType<typeof setTimeout>
 }>()
 
 // Pending AskUserQuestion requests waiting for user input
@@ -138,6 +139,7 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
   const pending = pendingPermissions.get(requestId)
   if (!pending) return
   pendingPermissions.delete(requestId)
+  clearTimeout(pending.timeout)
   cancelPermissionNotification(requestId)
   if (behavior === 'allow') {
     pending.resolve({ behavior: 'allow', updatedInput: pending.input })
@@ -176,13 +178,22 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
 
+  // Prepend common user-level bin paths so tools like pip/brew/npm are findable
+  const userBinPaths = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+    `${process.env.HOME}/.local/bin`,
+  ].join(':')
+
   // Only forward whitelisted env vars to SDK subprocess (not entire process.env)
   const env: Record<string, string | undefined> = {
     HOME: process.env.HOME,
     USER: process.env.USER,
     LANG: process.env.LANG,
     LC_ALL: process.env.LC_ALL,
-    PATH: process.env.PATH,
+    PATH: `${userBinPaths}:${process.env.PATH}`,
   }
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey
@@ -285,16 +296,15 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
-        pendingPermissions.set(requestId, { resolve, input })
-
-        // Timeout after 5 minutes — auto-deny
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
           if (pendingPermissions.has(requestId)) {
             pendingPermissions.delete(requestId)
             cancelPermissionNotification(requestId)
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
+
+        pendingPermissions.set(requestId, { resolve, input, timeout })
       })
     }
   }
@@ -340,6 +350,7 @@ const _skillOutputBridge = new SkillOutputBridge()
 function rejectAllPendingPermissions(): void {
   for (const [id, p] of pendingPermissions) {
     pendingPermissions.delete(id)
+    clearTimeout(p.timeout)
     cancelPermissionNotification(id)
     p.resolve({ behavior: 'deny', message: 'Query aborted' })
   }

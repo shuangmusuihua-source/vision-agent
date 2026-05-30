@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, CaretRight, CaretDown, CaretDoubleUp, Trash, X, MagnifyingGlass, Gear, Graph, Plus, PushPin, Eye, ArrowsOutCardinal, Pencil, DotsThreeCircle, ArrowLeft } from '@phosphor-icons/react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, ChevronsUp, Trash2, X, Search, Settings, GitGraph, Plus, Pin, Eye, Move, Pencil, Ellipsis, ArrowLeft } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
+import { useModal } from '../common/ModalSystem'
 import type { FileEntry } from '../../lib/ipc'
 
 interface MemoryEntry {
@@ -60,7 +61,7 @@ function SidebarBackButton({ running, onBack }: { running: boolean; onBack: () =
         title={running ? '返回将中止当前任务' : '返回首页'}
         aria-label="返回首页"
       >
-        <ArrowLeft size={12} weight="bold" />
+        <ArrowLeft size={12} />
       </button>
       {running && (
         <div className="sidebar-ask-zuovis-back-tip">
@@ -98,6 +99,7 @@ function Sidebar({
   changedFileCount,
   collapsed
 }: SidebarProps): React.ReactElement {
+  const modal = useModal()
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set())
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
   const [memoryExpanded, setMemoryExpanded] = useState(true)
@@ -134,7 +136,8 @@ function Sidebar({
   }
 
   const handleDeleteDir = async (dirPath: string, wsPath: string) => {
-    if (!window.confirm('确定删除此目录？目录内所有文件都将被删除，此操作不可撤销。')) return
+    const ok = await modal.confirm({ title: '删除目录', message: '确定删除此目录？目录内所有文件都将被删除，此操作不可撤销。', variant: 'danger' })
+    if (!ok) return
     const result = await window.api.workspace.deleteDir(dirPath)
     if (result.success) {
       onRefreshWorkspace(wsPath)
@@ -158,13 +161,15 @@ function Sidebar({
   }, [memoryRefreshKey, refreshMemory])
 
   const handleDeleteMemory = useCallback(async (filePath: string) => {
-    if (!window.confirm('确定删除此记忆文件？此操作不可撤销。')) return
+    const ok = await modal.confirm({ title: '删除记忆', message: '确定删除此记忆文件？此操作不可撤销。', variant: 'danger' })
+    if (!ok) return
     await window.api.memory.delete(filePath)
     refreshMemory()
   }, [refreshMemory])
 
-  const handleDeleteFile = useCallback((filePath: string) => {
-    if (!window.confirm('确定删除此文件？此操作不可撤销。')) return
+  const handleDeleteFile = useCallback(async (filePath: string) => {
+    const ok = await modal.confirm({ title: '删除文件', message: '确定删除此文件？此操作不可撤销。', variant: 'danger' })
+    if (!ok) return
     onFileDelete(filePath)
   }, [onFileDelete])
 
@@ -251,8 +256,8 @@ function Sidebar({
               style={{ paddingLeft }}
               onClick={() => toggleDir(entry.path)}
             >
-              {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
-              {isExpanded ? <FolderOpen size={14} weight="bold" /> : <Folder size={14} weight="bold" />}
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
               {renamingPath === entry.path ? (
                 <input
                   className="sidebar-rename-input"
@@ -278,7 +283,7 @@ function Sidebar({
                 title="重命名"
                 aria-label="重命名"
               >
-                <Pencil size={12} weight="bold" />
+                <Pencil size={12} />
               </button>
               <button
                 className="sidebar-file-action"
@@ -286,7 +291,7 @@ function Sidebar({
                 title="删除目录"
                 aria-label="删除目录"
               >
-                <Trash size={12} weight="bold" />
+                <Trash2 size={12} />
               </button>
             </div>
             {isExpanded && entry.children && renderTree(entry.children, depth + 1, wsPath)}
@@ -303,7 +308,7 @@ function Sidebar({
             if (renamingPath !== entry.path) onFileSelect(entry.path)
           }}
         >
-          <File size={14} weight="bold" />
+          <File size={14} />
           {renamingPath === entry.path ? (
             <input
               className="sidebar-rename-input"
@@ -326,7 +331,7 @@ function Sidebar({
               title="移动到其他工作区"
               aria-label="移动到其他工作区"
             >
-              <ArrowsOutCardinal size={12} weight="bold" />
+              <Move size={12} />
             </button>
           )}
           {renamingPath !== entry.path && (
@@ -336,7 +341,7 @@ function Sidebar({
               title="重命名"
               aria-label="重命名"
             >
-              <Pencil size={12} weight="bold" />
+              <Pencil size={12} />
             </button>
           )}
           <button
@@ -345,7 +350,7 @@ function Sidebar({
             title="删除文件"
             aria-label="删除文件"
           >
-            <Trash size={12} weight="bold" />
+            <Trash2 size={12} />
           </button>
         </div>
       )
@@ -382,24 +387,24 @@ function Sidebar({
       <div className="sidebar-header">
         <div className="sidebar-header-actions">
           <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)" aria-label="搜索">
-            <MagnifyingGlass size={14} weight="bold" />
+            <Search size={16} />
           </button>
           <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图" aria-label="图谱视图">
-            <Graph size={14} weight="bold" />
+            <GitGraph size={16} />
             {changedFileCount >= 2 && <span className="sidebar-badge-dot" />}
           </button>
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置" aria-label="设置">
-            <Gear size={14} weight="bold" />
+            <Settings size={16} />
           </button>
           <button ref={daydreamBtnRef} className="sidebar-icon-btn" onClick={togglePicker} title="心休模式" aria-label="心休模式">
-            <Eye size={14} weight="bold" />
+            <Eye size={16} />
           </button>
         </div>
       </div>
 
       <div className="sidebar-content">
         <button className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`} onClick={onAskZuovis}>
-          <div className="sidebar-ask-zuovis-icon"><DotsThreeCircle size={12} weight="bold" /></div>
+          <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
           <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
           {isAskZuovisActive && isAskZuovisInChat && (
             <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
@@ -417,9 +422,9 @@ function Sidebar({
                   onClick={() => toggleWorkspace(wsPath)}
                   aria-label={isCollapsed ? '展开 Knowledge' : '折叠 Knowledge'}
                 >
-                  {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+                  {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                 </button>
-                <Folder size={14} weight="bold" />
+                <Folder size={14} />
                 <span className="sidebar-workspace-name">Knowledge</span>
               </div>
               {!isCollapsed && (
@@ -437,10 +442,10 @@ function Sidebar({
             <span className="sidebar-workspace-module-title">工作区</span>
             <div className="sidebar-workspace-module-actions">
               <button className="sidebar-workspace-module-btn" onClick={handleCollapseAll} title="全部收起" aria-label="全部收起">
-                <CaretDoubleUp size={12} weight="bold" />
+                <ChevronsUp size={12} />
               </button>
               <button className="sidebar-workspace-module-btn" onClick={onNewWorkspace} title="新建工作区" aria-label="新建工作区">
-                <Plus size={12} weight="bold" />
+                <Plus size={12} />
               </button>
             </div>
           </div>
@@ -468,7 +473,7 @@ function Sidebar({
                         onClick={() => toggleWorkspace(wsPath)}
                         aria-label={isCollapsed ? '展开工作区' : '折叠工作区'}
                       >
-                        {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                       </button>
                       <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
                       {idx > 0 && (
@@ -478,7 +483,7 @@ function Sidebar({
                           title="置顶"
                           aria-label="置顶"
                         >
-                          <PushPin size={12} weight="bold" />
+                          <Pin size={12} />
                         </button>
                       )}
                       <button
@@ -487,7 +492,7 @@ function Sidebar({
                         title="移除工作区"
                         aria-label="移除工作区"
                       >
-                        <X size={12} weight="bold" />
+                        <X size={12} />
                       </button>
                       <button
                         className="sidebar-workspace-add-file"
@@ -495,7 +500,7 @@ function Sidebar({
                         title="新建文件"
                         aria-label="新建文件"
                       >
-                        <Plus size={12} weight="bold" />
+                        <Plus size={12} />
                       </button>
                     </div>
                     {!isCollapsed && (
@@ -512,6 +517,7 @@ function Sidebar({
                                 if (e.key === 'Enter' && !e.isComposing) handleCreateFile(wsPath)
                                 if (e.key === 'Escape') setCreatingFileIn(null)
                               }}
+                              onBlur={() => setCreatingFileIn(null)}
                             />
                             {createError && <span className="sidebar-new-file-error">{createError}</span>}
                           </div>
@@ -531,7 +537,7 @@ function Sidebar({
             <div className="sidebar-workspace-module-header" onClick={() => setMemoryExpanded((v) => !v)} style={{ cursor: 'pointer' }}>
               <span className="sidebar-workspace-module-title">Memory</span>
               <div className="sidebar-workspace-module-actions">
-                {memoryExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+                {memoryExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </div>
             </div>
             {memoryExpanded && memoryFiles.map((file) => (
@@ -541,7 +547,7 @@ function Sidebar({
                 style={{ paddingLeft: 20 }}
                 onClick={() => onFileSelect(file.path)}
               >
-                <File size={14} weight="bold" />
+                <File size={14} />
                 <span className="sidebar-memory-name">{file.name}</span>
                 <button
                   className="sidebar-memory-delete"
@@ -550,7 +556,7 @@ function Sidebar({
                     handleDeleteMemory(file.path)
                   }}
                 >
-                  <Trash size={12} weight="bold" />
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))}
@@ -597,7 +603,7 @@ function Sidebar({
                 className="move-dropdown-item"
                 onClick={() => handleMoveToWorkspace(ws)}
               >
-                <Folder size={14} weight="bold" />
+                <Folder size={14} />
                 <span>{wsIsFixed ? '知识库' : workspaceName(ws)}</span>
               </button>
             )

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ClockCounterClockwise, Plus } from '@phosphor-icons/react'
+import { RotateCcw, Plus } from 'lucide-react'
 import type { SdkSessionInfo } from '../../store/agent-store'
 import type { AppSettings } from '../../lib/ipc'
 
@@ -62,10 +62,10 @@ function SessionBar({ sessions, currentSessionId, onSelectSession, onNewSession,
           }}
           title="历史会话"
         >
-          <ClockCounterClockwise size={14} weight="bold" />
+          <RotateCcw size={14} />
         </button>
         <button className="session-bar-btn" onClick={onNewSession} title="新建会话">
-          <Plus size={14} weight="bold" />
+          <Plus size={14} />
         </button>
       </div>
 

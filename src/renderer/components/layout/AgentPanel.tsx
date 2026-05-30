@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, CaretDown, X } from '@phosphor-icons/react'
+import { Plus, ChevronDown, X } from 'lucide-react'
 import type { UsageInfo, PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AgentContext } from '../../../shared/types'
 import type { SkillMeta } from '../../../shared/types'
@@ -122,7 +122,7 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
           <div className="agent-header-model" ref={modelDropdownRef}>
             <button className="agent-header-model-btn" onClick={() => setShowModelDropdown(!showModelDropdown)} aria-label="选择模型">
               {modelLabel}
-              <CaretDown size={10} weight="bold" />
+              <ChevronDown size={12} />
             </button>
             {showModelDropdown && (
               <div className="agent-header-dropdown agent-header-model-dropdown">
@@ -141,10 +141,10 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
 
           <div className="agent-header-session" ref={historyDropdownRef}>
             <button className="agent-header-session-btn" onClick={onNewSession} title="新建会话" aria-label="新建会话">
-              <Plus size={14} weight="bold" />
+              <Plus size={14} />
             </button>
             <button className="agent-header-session-arrow" onClick={handleToggleHistory} title="历史会话" aria-label="历史会话">
-              <CaretDown size={10} weight="bold" />
+              <ChevronDown size={12} />
             </button>
             {showHistory && (
               <div className="agent-header-dropdown agent-header-history-dropdown">

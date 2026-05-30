@@ -1,4 +1,4 @@
-import { CaretDown, CaretRight, Wrench, Check, X, Spinner } from '@phosphor-icons/react'
+import { ChevronDown, ChevronRight, Wrench, Check, X, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import type { ToolCall } from '../../store/agent-store'
 
@@ -10,10 +10,10 @@ function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement
   const [expanded, setExpanded] = useState(false)
 
   const statusIcon = {
-    running: <Spinner size={12} weight="bold" className="tool-call-spinner" />,
-    completed: <Check size={12} weight="bold" className="tool-call-success" />,
-    error: <X size={12} weight="bold" className="tool-call-error" />,
-    pending: <Spinner size={12} weight="bold" className="tool-call-spinner" />
+    running: <Loader2 size={12} className="tool-call-spinner" />,
+    completed: <Check size={12} className="tool-call-success" />,
+    error: <X size={12} className="tool-call-error" />,
+    pending: <Loader2 size={12} className="tool-call-spinner" />
   }[toolCall.status]
 
   const inputSummary = summarizeInput(toolCall.toolName, toolCall.input)
@@ -27,9 +27,9 @@ function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement
     <div className="tool-call-display">
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
         <span className="tool-call-chevron">
-          {expanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
-        <Wrench size={12} weight="bold" className="tool-call-icon" />
+        <Wrench size={12} className="tool-call-icon" />
         <span className="tool-call-name">{toolCall.toolName}</span>
         <span className="tool-call-summary">{inputSummary}</span>
         <span className="tool-call-status">{statusIcon}</span>

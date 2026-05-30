@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { ChatCircleDots, CaretUp, Spinner } from '@phosphor-icons/react'
+import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
 import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
 import styles from './ChatView.module.css'
@@ -59,18 +59,18 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
     <div className={styles.chatView} aria-live="polite" aria-label="对话消息">
       {isResuming && (
         <div className={styles.chatLoading}>
-          <Spinner size={24} className="spin" /> 加载会话历史…
+          <Loader2 size={24} className="spin" /> 加载会话历史…
         </div>
       )}
       {messages.length === 0 && !isResuming && (
         <div className={styles.chatEmpty}>
-          <ChatCircleDots size={48} weight="thin" className={styles.chatEmptyIcon} />
+          <MessageCircleMore size={48} className={styles.chatEmptyIcon} />
           <span className={styles.chatEmptyHint}>开始对话</span>
         </div>
       )}
       {hasMore && (
         <button className={styles.chatLoadMore} onClick={() => setVisibleCount((c) => c + RENDER_BATCH)}>
-          <CaretUp size={14} weight="bold" /> 加载更早消息 ({messages.length - visibleCount} 条)
+          <ChevronUp size={14} /> 加载更早消息 ({messages.length - visibleCount} 条)
         </button>
       )}
       {visibleMessages.items.map((msg) => (

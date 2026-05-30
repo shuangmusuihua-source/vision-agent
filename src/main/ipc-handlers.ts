@@ -38,7 +38,7 @@ function pushSettingsToRenderer(): void {
 
 // --- Workspace ---
 
-async function scanDirectory(dirPath: string, maxDepth = 3, depth = 0): Promise<FileEntry[]> {
+async function scanDirectory(dirPath: string, maxDepth = 1, depth = 0): Promise<FileEntry[]> {
   if (depth >= maxDepth) return []
   const entries = await readdir(dirPath, { withFileTypes: true })
   const result: FileEntry[] = []
@@ -47,7 +47,9 @@ async function scanDirectory(dirPath: string, maxDepth = 3, depth = 0): Promise<
     const fullPath = join(dirPath, entry.name)
     if (entry.isDirectory()) {
       const children = await scanDirectory(fullPath, maxDepth, depth + 1)
-      result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
+      if (children.length > 0) {
+        result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
+      }
     } else if (extname(entry.name) === '.md') {
       result.push({ name: entry.name, path: fullPath, isDirectory: false })
     }
@@ -421,6 +423,21 @@ export function registerIpcHandlers(): void {
     if (!window) return { canceled: true, filePaths: [] }
     return await dialog.showOpenDialog(window, {
       properties: ['openDirectory'],
+    })
+  })
+
+  ipcMain.handle('workspace:selectFiles', async () => {
+    const window = getMainWindow()
+    if (!window) return { canceled: true, filePaths: [] }
+    return await dialog.showOpenDialog(window, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'All Supported', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'pdf'] },
+        { name: 'Text', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg'] },
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
     })
   })
 

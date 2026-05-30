@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CaretDown, CaretRight, Spinner, Check, X, FileText, FileHtml } from '@phosphor-icons/react'
+import { ChevronDown, ChevronRight, Loader2, Check, X, FileText, FileCode } from 'lucide-react'
 import type { SkillInfo, ToolCall } from '../../store/agent-store'
 
 interface SkillCardProps {
@@ -29,17 +29,17 @@ function SkillCard({ skillInfo, toolCalls, onOpenFile }: SkillCardProps): React.
   }
 
   const outputExt = skillInfo.outputFile?.split('.').pop()?.toLowerCase()
-  const OutputIcon = outputExt === 'html' || outputExt === 'htm' ? FileHtml : FileText
+  const OutputIcon = outputExt === 'html' || outputExt === 'htm' ? FileCode : FileText
 
   return (
     <div className={`skill-card skill-card-${skillInfo.status}`}>
       <div className="skill-card-header" onClick={() => setExpanded(!expanded)}>
         <span className="skill-card-chevron">
-          {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
         <span className="skill-card-name">{skillInfo.name}</span>
         <span className="skill-card-status">
-          {isRunning && <Spinner size={14} className="skill-card-spinner" />}
+          {isRunning && <Loader2 size={14} className="skill-card-spinner" />}
           {isCompleted && <Check size={14} className="skill-card-check" />}
           {isError && <X size={14} className="skill-card-error-icon" />}
         </span>
@@ -51,7 +51,7 @@ function SkillCard({ skillInfo, toolCalls, onOpenFile }: SkillCardProps): React.
         <div className="skill-card-steps">
           {toolCalls.map((tc) => (
             <div key={tc.toolUseId} className={`skill-card-step skill-card-step-${tc.status}`}>
-              {tc.status === 'running' && <Spinner size={12} className="skill-card-spinner" />}
+              {tc.status === 'running' && <Loader2 size={12} className="skill-card-spinner" />}
               {tc.status === 'completed' && <Check size={12} className="skill-card-step-completed" />}
               {tc.status === 'error' && <X size={12} className="skill-card-step-error" />}
               <span className="skill-card-step-name">{tc.toolName}</span>
@@ -66,7 +66,7 @@ function SkillCard({ skillInfo, toolCalls, onOpenFile }: SkillCardProps): React.
       )}
       {isCompleted && skillInfo.outputFile && (
         <div className="skill-card-output" onClick={handleOutputClick}>
-          <OutputIcon size={14} weight="regular" />
+          <OutputIcon size={14} />
           <span className="skill-card-output-name">
             {skillInfo.outputFile.split('/').pop()}
           </span>

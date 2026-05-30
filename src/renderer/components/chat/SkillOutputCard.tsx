@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState } from 'react'
+import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react'
 import { createLowlight, common } from 'lowlight'
 
 const lowlight = createLowlight(common)
@@ -55,9 +55,22 @@ function OdometerDigit({ digit }: { digit: string }) {
 }
 
 function OdometerNumber({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const maxWidthRef = useRef(0)
   const digits = String(value).split('')
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const w = el.getBoundingClientRect().width
+    if (w > maxWidthRef.current) {
+      maxWidthRef.current = w
+      el.style.minWidth = `${w}px`
+    }
+  })
+
   return (
-    <span className="odometer-number">
+    <span className="odometer-number" ref={ref}>
       {digits.map((d, i) => <OdometerDigit key={i} digit={d} />)}
     </span>
   )

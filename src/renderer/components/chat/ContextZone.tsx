@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText } from '@phosphor-icons/react'
+import { FileText } from 'lucide-react'
 
 interface ContextZoneProps {
   activeFilePath?: string
@@ -12,7 +12,7 @@ function ContextZone({ activeFilePath }: ContextZoneProps): React.ReactElement |
 
   return (
     <div className="context-zone-tag context-zone-tag--file" title={activeFilePath}>
-      <FileText size={12} weight="bold" />
+      <FileText size={12} />
       <span>{fileName}</span>
     </div>
   )

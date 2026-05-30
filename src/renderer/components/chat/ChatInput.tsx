@@ -1,9 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, FileText, PresentationChart, Article, Stop, Trash, FolderOpen, Monitor } from '@phosphor-icons/react'
-import type { IconWeight } from '@phosphor-icons/react'
+import { ArrowUp, FileText, Presentation, Newspaper, CircleStop, Trash2, FolderOpen, Monitor, Paperclip, X } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
+
+interface AttachedFile {
+  name: string
+  path: string
+  type: 'text' | 'image' | 'pdf'
+}
 
 interface ChatInputProps {
   context: AgentContext
@@ -16,11 +21,11 @@ interface ChatInputProps {
   variant?: 'default' | 'capsule'
 }
 
-const ICON_MAP: Record<string, React.ComponentType<{ size: number; weight: IconWeight }>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ size: number }>> = {
   FileText,
-  PresentationChart,
-  Article,
-  Trash,
+  Presentation,
+  Newspaper,
+  Trash2,
   FolderOpen,
   Monitor
 }
@@ -31,6 +36,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const [showSkillPopup, setShowSkillPopup] = useState(false)
   const [skillFilter, setSkillFilter] = useState('')
   const [selectedSkillIdx, setSelectedSkillIdx] = useState(0)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
@@ -84,13 +90,43 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     }
   }, [onSkillSelect])
 
+  const handleAttachFiles = useCallback(async () => {
+    const result = await window.api.workspace.selectFiles()
+    if (result.canceled || result.filePaths.length === 0) return
+
+    const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
+    const files: AttachedFile[] = []
+    for (const filePath of result.filePaths) {
+      const name = filePath.split('/').pop() || filePath
+      const ext = name.split('.').pop()?.toLowerCase() || ''
+      const type = ext === 'pdf' ? 'pdf' :
+        imageExts.includes(ext) ? 'image' : 'text'
+      files.push({ name, path: filePath, type, base64: '', mimeType: '', size: 0 })
+    }
+    setAttachedFiles((prev) => [...prev, ...files])
+  }, [])
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
   const doSend = useCallback(() => {
-    if (text.trim() && !disabled) {
-      onSend(text.trim())
+    const hasContent = text.trim() || attachedFiles.length > 0
+    if (hasContent && !disabled) {
+      let prompt = text.trim()
+      if (attachedFiles.length > 0) {
+        const fileParts = attachedFiles.map((f) => {
+          const label = f.type === 'image' ? 'image' : f.type === 'pdf' ? 'PDF' : 'file'
+          return `[Attached ${label}: ${f.path}]`
+        })
+        prompt = fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
+      }
+      onSend(prompt)
       setText('')
+      setAttachedFiles([])
       setShowSkillPopup(false)
     }
-  }, [text, disabled, onSend])
+  }, [text, disabled, onSend, attachedFiles])
 
   // Skill popup keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
@@ -149,7 +185,32 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   if (variant === 'capsule') {
     return (
       <div className="ask-zuovis-capsule-wrapper">
+        {attachedFiles.length > 0 && (
+          <div className="ask-zuovis-attachments">
+            {attachedFiles.map((file, idx) => (
+              <span key={idx} className="ask-zuovis-attachment-chip" title={file.path}>
+                <span className="ask-zuovis-attachment-name">{file.name}</span>
+                <button
+                  className="ask-zuovis-attachment-remove"
+                  onClick={() => handleRemoveFile(idx)}
+                  type="button"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="ask-zuovis-capsule">
+          <button
+            className="ask-zuovis-attach-btn"
+            onClick={handleAttachFiles}
+            disabled={disabled}
+            type="button"
+            title="上传文件"
+          >
+            <Paperclip size={14} />
+          </button>
           <input
             ref={inputRef}
             type="text"
@@ -168,16 +229,16 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
               type="button"
               title="停止生成"
             >
-              <Stop size={14} weight="fill" />
+              <CircleStop size={14} />
             </button>
           ) : (
             <button
-              className={`ask-zuovis-send-btn ${text.trim() && !disabled ? 'ask-zuovis-send-btn-active' : ''}`}
+              className={`ask-zuovis-send-btn ${(text.trim() || attachedFiles.length > 0) && !disabled ? 'ask-zuovis-send-btn-active' : ''}`}
               onClick={doSend}
-              disabled={!text.trim() || disabled}
+              disabled={(!text.trim() && attachedFiles.length === 0) || disabled}
               type="button"
             >
-              <ArrowUp size={16} weight="bold" />
+              <ArrowUp size={16} />
             </button>
           )}
         </div>
@@ -195,7 +256,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
                   onMouseEnter={() => setSelectedSkillIdx(idx)}
                 >
                   <div className="skill-popup-item-name">
-                    {IconComp && <IconComp size={14} weight="regular" />}
+                    {IconComp && <IconComp size={14} />}
                     {skill.name}
                     {skill.argumentHint && (
                       <span className="skill-popup-item-hint">{skill.argumentHint}</span>
@@ -238,7 +299,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             type="button"
             title="停止生成"
           >
-            <Stop size={14} weight="fill" />
+            <CircleStop size={14} />
           </button>
         ) : (
           <button
@@ -247,7 +308,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             disabled={!text.trim() || disabled}
             type="button"
           >
-            <ArrowUp size={16} weight="bold" />
+            <ArrowUp size={16} />
           </button>
         )}
       </div>
@@ -266,7 +327,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
               onMouseEnter={() => setSelectedSkillIdx(idx)}
             >
               <div className="skill-popup-item-name">
-                {IconComp && <IconComp size={14} weight="regular" />}
+                {IconComp && <IconComp size={14} />}
                 {skill.name}
                 {skill.argumentHint && (
                   <span className="skill-popup-item-hint">{skill.argumentHint}</span>

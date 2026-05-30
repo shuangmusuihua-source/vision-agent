@@ -385,6 +385,7 @@
 }
 
 .message-assistant-content {
+  width: 100%;
   max-width: 100%;
   font-size: var(--font-size-md);
   line-height: 1.5;
@@ -1042,10 +1043,10 @@
 
 .drawer-question-option {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 30px 10px 14px;
   border-radius: 10px;
   border: none;
   background: transparent;
@@ -1053,6 +1054,7 @@
   transition: background 0.15s, transform 0.15s;
   text-align: left;
   width: 100%;
+  position: relative;
 }
 
 .drawer-question-option:hover {
@@ -1065,26 +1067,26 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   line-height: 1.3;
-  flex: 1;
 }
 
 .drawer-question-option-desc {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
-  flex-shrink: 0;
 }
 
 .drawer-question-option-icon {
   color: var(--color-text-tertiary);
-  flex-shrink: 0;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
   opacity: 0;
-  transform: translateX(-4px);
   transition: opacity 0.15s, transform 0.15s;
 }
 
 .drawer-question-option:hover .drawer-question-option-icon {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(-50%) translateX(0);
 }
 
 .drawer-question-hint {
@@ -1475,7 +1477,7 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   margin: 8px 0;
-  background: white;
+  background: var(--color-bg-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   min-width: 0;
 }
@@ -1501,7 +1503,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: white;
+  background: var(--color-bg-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
@@ -1574,8 +1576,13 @@
 }
 
 .skill-output-card-status {
+  margin-left: auto;
   font-size: var(--font-size-xs);
   color: var(--color-action);
+}
+
+.skill-output-card-status.done {
+  color: var(--color-success);
 }
 
 .skill-output-card-body {
@@ -1583,9 +1590,10 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   line-height: 1.5;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   padding: 6px 12px 8px;
   overflow: hidden;
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .skill-output-card-streaming .skill-output-card-body {
@@ -1603,13 +1611,13 @@
 }
 
 /* Lowlight syntax highlighting */
-.skill-output-card-body .hljs-tag { color: var(--color-action); opacity: 0.7; }
-.skill-output-card-body .hljs-attr { color: var(--color-success); opacity: 0.7; }
-.skill-output-card-body .hljs-string { color: #e8a838; opacity: 0.7; }
-.skill-output-card-body .hljs-comment { color: var(--color-text-tertiary); opacity: 0.4; }
-.skill-output-card-body .hljs-name { color: var(--color-action); opacity: 0.7; }
-.skill-output-card-body .hljs-keyword { color: #c678dd; opacity: 0.7; }
-.skill-output-card-body .hljs-number { color: #d19a66; opacity: 0.7; }
+.skill-output-card-body .hljs-tag { color: var(--color-action); }
+.skill-output-card-body .hljs-attr { color: var(--color-success); }
+.skill-output-card-body .hljs-string { color: #c4882d; }
+.skill-output-card-body .hljs-comment { color: var(--color-text-tertiary); }
+.skill-output-card-body .hljs-name { color: var(--color-action); }
+.skill-output-card-body .hljs-keyword { color: #b05fd4; }
+.skill-output-card-body .hljs-number { color: #c07a4e; }
 
 /* --- Artifact Action Buttons --- */
 
@@ -1672,12 +1680,16 @@
 }
 
 [data-theme="dark"] .skill-output-card-body {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.45);
 }
 
-[data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; opacity: 0.7; }
-[data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; opacity: 0.7; }
-[data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; opacity: 0.7; }
+[data-theme="dark"] .skill-output-card-body .hljs-tag { color: #56b6c2; }
+[data-theme="dark"] .skill-output-card-body .hljs-attr { color: #98c379; }
+[data-theme="dark"] .skill-output-card-body .hljs-name { color: #61afef; }
+[data-theme="dark"] .skill-output-card-body .hljs-comment { color: #5c6370; }
+[data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; }
+[data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; }
+[data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; }
 
 [data-theme="dark"] .skill-status-bar {
   background: rgba(255, 255, 255, 0.06);

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { MagnifyingGlass, X, FileText } from '@phosphor-icons/react'
+import { Search, X, FileText } from 'lucide-react'
 import type { SearchResult } from '../../lib/ipc'
 
 interface SearchPanelProps {
@@ -120,7 +120,7 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
     <div className="search-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="search-panel" role="dialog" aria-modal="true" aria-label="Search" onClick={(e) => e.stopPropagation()}>
         <div className="search-input-row">
-          <MagnifyingGlass size={16} weight="bold" className="search-icon" />
+          <Search size={16} className="search-icon" />
           <input
             ref={inputRef}
             className="search-input"
@@ -132,7 +132,7 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
           />
           {keyword && (
             <button className="search-clear-btn" onClick={() => setKeyword('')}>
-              <X size={14} weight="bold" />
+              <X size={14} />
             </button>
           )}
         </div>
@@ -154,7 +154,7 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
                 onClose()
               }}
             >
-              <FileText size={14} weight="bold" className="search-result-icon" />
+              <FileText size={14} className="search-result-icon" />
               <div className="search-result-info">
                 <span className="search-result-file">{result.fileName}</span>
                 <span className="search-result-line">:{result.line}</span>

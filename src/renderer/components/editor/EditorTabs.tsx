@@ -1,5 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react'
-import { X, CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface EditorTabsProps {
   tabs: string[]
@@ -78,7 +78,7 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
     <div className="editor-tabs-container">
       {canScrollLeft && (
         <button className="editor-tabs-nav editor-tabs-nav-left" onClick={() => scroll('left')}>
-          <CaretLeft size={14} weight="bold" />
+          <ChevronLeft size={14} />
         </button>
       )}
       <div className="editor-tabs" ref={scrollRef}>
@@ -94,14 +94,14 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
               className="editor-tab-close"
               onClick={(e) => handleClose(e, path)}
             >
-              <X size={12} weight="bold" />
+              <X size={12} />
             </button>
           </div>
         ))}
       </div>
       {canScrollRight && (
         <button className="editor-tabs-nav editor-tabs-nav-right" onClick={() => scroll('right')}>
-          <CaretRight size={14} weight="bold" />
+          <ChevronRight size={14} />
         </button>
       )}
     </div>

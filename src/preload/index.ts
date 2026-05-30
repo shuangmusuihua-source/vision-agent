@@ -34,7 +34,8 @@ const api = {
     renameEntry: (oldPath: string, newName: string) =>
       ipcRenderer.invoke('workspace:renameEntry', oldPath, newName),
     deleteDir: (dirPath: string) =>
-      ipcRenderer.invoke('workspace:deleteDir', dirPath)
+      ipcRenderer.invoke('workspace:deleteDir', dirPath),
+    selectFiles: () => ipcRenderer.invoke('workspace:selectFiles'),
   },
 
   settings: {
@@ -189,6 +190,12 @@ const api = {
       ipcRenderer.on('update:downloaded', handler)
       return () => { ipcRenderer.removeListener('update:downloaded', handler) }
     }
+  },
+
+  onMainError: (callback: (error: { type: string; message: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: { type: string; message: string }) => callback(error)
+    ipcRenderer.on('main:error', handler)
+    return () => { ipcRenderer.removeListener('main:error', handler) }
   }
 }
 

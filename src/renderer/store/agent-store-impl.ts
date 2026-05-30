@@ -752,16 +752,15 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   },
 
   handleAskUserTimeout(requestId: string) {
-    const current = get()
-    let ctx: AgentContext = current.context
-    if (current.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
-    else if (current.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
-
     set((state) => {
+      let ctx: AgentContext = state.context
+      if (state.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
+      else if (state.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
+
       const s = state.slots[ctx]
       const next = s.askUserQueue[0] ?? null
       const rest = s.askUserQueue.slice(1)
-      return updateSlot(state, ctx, {
+      const updated = updateSlot(state, ctx, {
         messages: [...s.messages, {
           id: `timeout-${Date.now()}`,
           role: 'system',
@@ -774,9 +773,9 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         askUserRequest: next,
         askUserQueue: rest,
       })
+      get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, ctx)
+      return updated
     })
-
-    get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, ctx)
   },
 
   handleSkillOutput(skillState: SkillOutputState) {

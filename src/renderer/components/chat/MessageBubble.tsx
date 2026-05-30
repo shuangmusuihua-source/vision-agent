@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
-import { FileText, FileHtml, ArrowSquareOut, ChatCircleText, DownloadSimple, StopCircle } from '@phosphor-icons/react'
+import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop } from 'lucide-react'
 import type { ConversationMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
@@ -91,7 +91,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
     return (
       <div className="message-bubble message-assistant message-stopped">
         <div className="message-stopped-content">
-          <StopCircle size={16} weight="fill" />
+          <CircleStop size={16} />
           <span>{displayContent}</span>
         </div>
       </div>
@@ -113,7 +113,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
 
   if (message.artifact) {
     const art = message.artifact
-    const Icon = art.fileType === 'html' ? FileHtml : FileText
+    const Icon = art.fileType === 'html' ? FileCode : FileText
 
     const handleOpen = () => {
       if (art.filePath) {
@@ -163,7 +163,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
     return (
       <div className="message-bubble message-assistant">
         <div className="artifact-bubble" onClick={hasFile ? handleOpen : undefined}>
-          <Icon size={20} weight="regular" />
+          <Icon size={20} />
           <div className="artifact-info">
             <span className="artifact-name">{art.fileName}</span>
             <span className="artifact-action">
@@ -172,15 +172,15 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
           </div>
           {hasContent && art.fileType === 'html' && (
             <button className="artifact-action-btn" onClick={handlePreview} title="在浏览器中预览">
-              <ArrowSquareOut size={14} weight="regular" />
+              <ExternalLink size={14} />
             </button>
           )}
           {hasContent && (
             <button className="artifact-download-btn" onClick={handleDownload} title="下载到本地">
-              <DownloadSimple size={14} weight="bold" />
+              <Download size={14} />
             </button>
           )}
-          {hasFile && <ArrowSquareOut size={14} weight="regular" />}
+          {hasFile && <ExternalLink size={14} />}
         </div>
       </div>
     )
@@ -225,7 +225,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
           style={{ left: selectionBtn.x, top: selectionBtn.y }}
           onClick={handleClickAddToChat}
         >
-          <ChatCircleText size={12} weight="bold" />
+          <MessageSquareText size={12} />
           添加到对话
         </div>
       )}

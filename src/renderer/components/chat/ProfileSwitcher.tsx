@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { CaretDown, Plus } from '@phosphor-icons/react'
+import { ChevronDown, Plus } from 'lucide-react'
 import type { ModelProfile, AppSettings } from '../../lib/ipc'
 import { useSettings } from '../../store/settings-cache'
 
@@ -46,7 +46,7 @@ function ProfileSwitcher({ onOpenSettings }: ProfileSwitcherProps): React.ReactE
             {MODELS[activeProfile.model] || activeProfile.model}
           </span>
         )}
-        <CaretDown size={14} weight="bold" />
+        <ChevronDown size={14} />
       </button>
 
       {open && (
@@ -73,7 +73,7 @@ function ProfileSwitcher({ onOpenSettings }: ProfileSwitcherProps): React.ReactE
               onOpenSettings()
             }}
           >
-            <Plus size={14} weight="bold" />
+            <Plus size={14} />
             <span>Add Profile</span>
           </button>
         </div>
