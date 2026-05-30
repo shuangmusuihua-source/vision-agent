@@ -273,10 +273,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
   }
 
-  const handleRefreshWorkspace = async (path: string) => {
+  const handleRefreshWorkspace = useCallback(async (path: string) => {
     const entries = await window.api.workspace.listFiles(path)
     setFiles((prev) => ({ ...prev, [path]: entries }))
-  }
+  }, [])
+
+  const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
+    setWorkspacePaths(paths)
+    await window.api.settings.reorderDirectories(paths)
+  }, [])
 
   const handleFileSelect = useCallback(async (path: string) => {
     // Switch back to editor context when leaving Ask Zuovis
@@ -504,10 +509,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onRemoveWorkspace={(path) => { setDeleteWsPath(path); setDeleteWsConfirm('') }}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
-        onReorderWorkspaces={async (paths) => {
-          setWorkspacePaths(paths)
-          await window.api.settings.reorderDirectories(paths)
-        }}
+        onReorderWorkspaces={handleReorderWorkspaces}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
         onAskZuovis={() => {
