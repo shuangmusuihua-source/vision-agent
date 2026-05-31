@@ -185,7 +185,7 @@
 
   --editor-font-size: 15px;
   --editor-line-height: 1.75;
-  --editor-paragraph-spacing: 0.6em;
+  --editor-paragraph-spacing: 0.85em;
 
   --heading-font: var(--font-sans);
   --heading-line-height: 1.3;
