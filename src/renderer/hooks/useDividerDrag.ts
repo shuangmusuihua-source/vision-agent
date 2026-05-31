@@ -30,6 +30,8 @@ export function useDividerDrag({
   const dragStartXRef = useRef(0)
   const dragStartWidthRef = useRef(0)
   const layoutWidthRef = useRef(0)
+  const rafRef = useRef<number>(0)
+  const pendingWidthRef = useRef(0)
 
   const handleSwapLayout = useCallback(() => {
     onSwapLayout()
@@ -71,24 +73,34 @@ export function useDividerDrag({
       const editorMinWidth = layoutWidthRef.current * EDITOR_MIN_RATIO
       const maxAgentWidth = layoutWidthRef.current - editorMinWidth
       const clamped = Math.min(newWidth, maxAgentWidth)
+      pendingWidthRef.current = clamped
       if (clamped < AGENT_COLLAPSE_THRESHOLD) {
+        cancelAnimationFrame(rafRef.current)
         lastWidthRef.current = dragStartWidthRef.current
         setAgentWidth(0)
         setAgentCollapsed(true)
         setIsDragging(false)
         setDividerHovered(false)
-      } else {
-        setAgentWidth(clamped)
-        setAgentCollapsed(false)
+      } else if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = 0
+          setAgentWidth(pendingWidthRef.current)
+          setAgentCollapsed(false)
+        })
       }
     }
     const onMouseUp = () => {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+      setAgentWidth(pendingWidthRef.current || dragStartWidthRef.current)
       setIsDragging(false)
       setDividerHovered(false)
     }
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
     return () => {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
     }
