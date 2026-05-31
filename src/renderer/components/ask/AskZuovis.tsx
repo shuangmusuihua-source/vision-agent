@@ -186,7 +186,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           context="ask"
           onSend={handleChatSend}
           onStop={() => window.api.agent.abort('ask')}
-          disabled={isStreaming && agentStatus !== 'waitingForUserInput'}
+          disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !askUserRequest}
           isStreaming={isStreaming}
           placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}
           variant="capsule"
