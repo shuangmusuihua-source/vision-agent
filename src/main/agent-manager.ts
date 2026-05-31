@@ -417,19 +417,13 @@ export function setSkillOutputWindow(win: BrowserWindow): void {
   _skillOutputBridge.setWindow(win)
 }
 
-export function setActiveSkillId(skillId: string | null, context: AgentContext = 'editor'): void {
-  const entry = activeQueries.get(context)
-  if (entry) {
-    entry.skillId = skillId
-  }
-}
-
 export async function sendMessage(
   mainWindow: BrowserWindow,
   prompt: string,
   sessionId?: string,
   activeFilePath?: string,
-  context: AgentContext = 'editor'
+  context: AgentContext = 'editor',
+  skillId?: string | null
 ): Promise<void> {
   // Abort any active query in the same context slot
   const existing = activeQueries.get(context)
@@ -453,8 +447,7 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
-    const activeSkillId = activeQueries.get(context)?.skillId ?? null
-    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId, abortController })
+    activeQueries.set(context, { query: messageStream as Query, skillId: skillId ?? null, abortController })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break

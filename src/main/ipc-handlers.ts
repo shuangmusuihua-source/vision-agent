@@ -3,7 +3,7 @@ import { readFile, writeFile, readdir, mkdir, unlink, rename, rm } from 'fs/prom
 import { join, extname, relative, basename, dirname } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
-import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, abortActiveQuery, setActiveSkillId } from './agent-manager'
+import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, abortActiveQuery } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { getBuiltinSkills } from './skills/builtin'
 import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './semantic-extractor'
@@ -388,8 +388,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    setActiveSkillId(skillId || null, context || 'editor')
-    sendMessage(window, prompt, sessionId, activeFilePath, context || 'editor')
+    sendMessage(window, prompt, sessionId, activeFilePath, context || 'editor', skillId || null)
     return { started: true }
   })
 

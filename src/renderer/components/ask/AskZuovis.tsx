@@ -21,7 +21,7 @@ interface FeatureCard {
 }
 
 const FEATURES: FeatureCard[] = [
-  { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析你的桌面文件，给出智能整理方案', descBold: ['桌面文件', '整理方案'], colorClass: 'ask-card-purple', prompt: '整理我的桌面', skillId: 'organize-desktop' },
+  { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析你的桌面文件，给出智能整理方案', descBold: ['桌面文件', '整理方案'], colorClass: 'ask-card-purple', prompt: '使用整理桌面 skill 整理我的桌面', skillId: 'organize-desktop' },
   { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择一个文件夹，我来帮你归类整理', descBold: ['归类整理'], colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
   { id: 'system-cleanup', icon: Trash2, title: '系统清理', desc: '扫描垃圾文件，释放宝贵的磁盘空间', descBold: ['垃圾文件', '磁盘空间'], colorClass: 'ask-card-blue', prompt: '扫描并清理我的系统垃圾', skillId: 'system-cleanup' },
 ]
@@ -87,7 +87,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           },
         }))
       }
-      sendMessage(`整理这个文件夹：${result.filePaths[0]}`)
+      sendMessage(`使用整理文件夹 skill 整理这个文件夹：${result.filePaths[0]}`)
       return
     }
     if (card.skillId) {
