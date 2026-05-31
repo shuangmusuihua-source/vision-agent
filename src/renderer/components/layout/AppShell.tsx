@@ -12,7 +12,7 @@ import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
-import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useDividerDrag } from '../../hooks/useDividerDrag'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -201,6 +201,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   } = useAgent('editor')
   const isStreaming = useIsStreaming('editor')
   const editorPermission = usePermissionRequest('editor')
+  const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
   const editorAskUserRespondRef = useRef<((answer: string) => void) | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
@@ -621,6 +622,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
         usageInfo={usageInfo}
         permissionRequest={editorPermission}
+        permissionQueueLength={editorPermissionQueueLen}
         onPermissionRespond={respondPermission}
         askUserRequest={editorAskUser}
         onAskUserRespond={editorRespondAskUser}

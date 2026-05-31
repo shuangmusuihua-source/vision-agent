@@ -238,6 +238,11 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       input: Record<string, unknown>,
       options: { signal: AbortSignal; suggestions?: unknown[] }
     ): Promise<PermissionResult> => {
+      // Respect SDK abort signal — clean up if already aborted
+      if (options.signal?.aborted) {
+        return { behavior: 'deny', message: 'Tool use cancelled by SDK' }
+      }
+
       // Auto-allow safe read-only tools
       if (toolName === 'WebSearch' || toolName === 'WebFetch' || toolName === 'Glob' || toolName === 'Grep') {
         return { behavior: 'allow', updatedInput: input }
@@ -302,10 +307,28 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
+        const cleanup = () => {
+          if (pendingPermissions.has(requestId)) {
+            pendingPermissions.delete(requestId)
+            cancelPermissionNotification(requestId)
+            clearTimeout(timeout)
+          }
+        }
+
+        // AbortSignal: SDK cancelled this tool use
+        if (options.signal) {
+          options.signal.addEventListener('abort', () => {
+            cleanup()
+            mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
+            resolve({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
+          }, { once: true })
+        }
+
         const timeout = setTimeout(() => {
           if (pendingPermissions.has(requestId)) {
             pendingPermissions.delete(requestId)
             cancelPermissionNotification(requestId)
+            mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
@@ -377,6 +400,8 @@ export function abortActiveQuery(context?: AgentContext): void {
       entry.abortController.abort()
       activeQueries.delete(context)
     }
+    rejectAllPendingPermissions()
+    rejectAllPendingAskUser()
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
@@ -409,8 +434,7 @@ export async function sendMessage(
   // Abort any active query in the same context slot
   const existing = activeQueries.get(context)
   if (existing) {
-    existing.abortController.abort()
-    activeQueries.delete(context)
+    abortActiveQuery(context)
   }
 
   _skillOutputBridge.reset()
@@ -484,6 +508,8 @@ export async function sendMessage(
     } as AgentIPCMessage & { context: AgentContext })
   } finally {
     activeQueries.delete(context)
+    rejectAllPendingPermissions()
+    rejectAllPendingAskUser()
   }
 }
 

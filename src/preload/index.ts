@@ -109,6 +109,12 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
     },
 
+    onPermissionTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string; context: AgentContext }) => callback(data)
+      ipcRenderer.on('agent:permissionTimeout', handler)
+      return () => { ipcRenderer.removeListener('agent:permissionTimeout', handler) }
+    },
+
     onSkillOutput: (callback: (state: SkillOutputState) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, state: SkillOutputState) => callback(state)
       ipcRenderer.on('skill:output', handler)

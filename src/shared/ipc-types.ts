@@ -230,7 +230,8 @@ export type IPCEventMap = {
   'agent:sessionCreated': string
   'agent:permissionRequest': PermissionRequestIPC
   'agent:askUser': AskUserRequestIPC
-  'agent:askUserTimeout': { requestId: string }
+  'agent:askUserTimeout': { requestId: string; context: string }
+  'agent:permissionTimeout': { requestId: string; context: string }
   'agent:notification': { type: string; message: string; title: string }
   'settings:changed': Record<string, unknown>
   'graph:semanticProgress': GraphExtractionProgress

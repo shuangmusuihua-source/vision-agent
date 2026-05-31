@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Monitor, FolderOpen, Trash2 } from 'lucide-react'
-import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, useAskUserRequest } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import PermissionDialog from '../chat/PermissionDialog'
@@ -39,6 +39,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
   const agentStatus = useAgentStatus('ask')
   const isResuming = useIsResumingSession()
   const permissionRequest = usePermissionRequest('ask')
+  const permissionQueueLen = usePermissionQueueLength('ask')
   const askUserRequest = useAskUserRequest('ask')
   const hasMessages = messages.length > 0
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -169,6 +170,8 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           <PermissionDialog
             request={permissionRequest}
             onRespond={handlePermissionRespond}
+            queuePosition={1}
+            queueTotal={1 + permissionQueueLen}
           />
         )}
         {askUserRequest && (
