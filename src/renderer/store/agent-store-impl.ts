@@ -218,9 +218,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           }
         }
         const finalMsgs = [...msgs]
+        const processedIds = slot._processedArtifactIds
         for (let i = msgs.length - 1; i >= 0; i--) {
+          if (processedIds.has(msgs[i].id)) continue
           const artifact = extractArtifactFromMessage(msgs[i])
           if (artifact) {
+            processedIds.add(msgs[i].id)
             finalMsgs.push({
               id: `artifact-${Date.now()}-${i}`,
               role: 'assistant',
@@ -233,6 +236,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             })
           }
         }
+        slotUpdates._processedArtifactIds = processedIds
         slotUpdates.messages = finalMsgs
       }
 
@@ -259,6 +263,18 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           }
         }
         slotUpdates.messages = msgs
+      }
+
+      if (event.type === 'ABORT') {
+        slotUpdates.isStreaming = false
+        slotUpdates._acc = null
+        slotUpdates._firstContentSeen = false
+        slotUpdates.activeSkillId = null
+        slotUpdates.skillOutput = null
+        slotUpdates.permissionRequest = null
+        slotUpdates.permissionQueue = []
+        slotUpdates.askUserRequest = null
+        slotUpdates.askUserQueue = []
       }
 
       return updateSlot(state, ctx, slotUpdates)
@@ -563,6 +579,11 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             })
             return
           }
+
+          case 'message_start':
+          case 'message_delta':
+          case 'message_stop':
+            return
 
           default:
             return

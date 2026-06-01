@@ -134,6 +134,7 @@ interface AgentApi {
   onPermissionRequest: (callback: (data: { id: string; toolName: string; input: unknown; context: AgentContext }) => void) => () => void
   onAskUser: (callback: (data: { id: string; question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean; context: AgentContext }) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
+  onPermissionTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
   onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => () => void
   onSkillOutput: (callback: (state: SkillOutputState) => void) => () => void
 }

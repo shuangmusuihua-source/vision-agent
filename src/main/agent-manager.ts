@@ -2,7 +2,7 @@ import { BrowserWindow, app } from 'electron'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { appendFile } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
@@ -69,6 +69,7 @@ const pendingPermissions = new Map<string, {
   resolve: (result: PermissionResult) => void
   input: Record<string, unknown>
   timeout: ReturnType<typeof setTimeout>
+  context: AgentContext
 }>()
 
 // Pending AskUserQuestion requests waiting for user input
@@ -76,6 +77,7 @@ const pendingAskUser = new Map<string, {
   resolve: (result: PermissionResult) => void
   originalInput: Record<string, unknown>
   timeout: ReturnType<typeof setTimeout>
+  context: AgentContext
 }>()
 
 // Audit log path
@@ -225,8 +227,8 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       preset: 'claude_code' as const,
       append: [
         '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
-        activeFilePath ? `用户当前正在查看的文件: ${activeFilePath}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
-        workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd}\n读写用户文件时，请使用完整路径。` : ''
+        activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
+        workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : ''
       ].filter(Boolean).join('\n')
     },
     settings: {
@@ -250,10 +252,11 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
 
       // Auto-allow Read within authorized directories and app skills directory
       if (toolName === 'Read') {
-        const pathToCheck = extractPathFromToolInput(toolName, input)
-        if (pathToCheck) {
-          const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(dir))
-          const isAppSkill = pathToCheck.startsWith(getAppSkillsCwd())
+        const rawPath = extractPathFromToolInput(toolName, input)
+        if (rawPath) {
+          const pathToCheck = resolve(rawPath)
+          const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(resolve(dir)))
+          const isAppSkill = pathToCheck.startsWith(resolve(getAppSkillsCwd()))
           if (isAuthorized || isAppSkill) {
             return { behavior: 'allow', updatedInput: input }
           }
@@ -292,7 +295,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
             }
           }, 300000)
 
-          pendingAskUser.set(requestId, { resolve, timeout, originalInput: input })
+          pendingAskUser.set(requestId, { resolve, timeout, originalInput: input, context })
         })
       }
 
@@ -333,7 +336,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
           }
         }, 300000)
 
-        pendingPermissions.set(requestId, { resolve, input, timeout })
+        pendingPermissions.set(requestId, { resolve, input, timeout, context })
       })
     }
   }
@@ -376,8 +379,9 @@ interface ActiveQuery {
 const activeQueries = new Map<AgentContext, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
-function rejectAllPendingPermissions(): void {
+function rejectAllPendingPermissions(context?: AgentContext): void {
   for (const [id, p] of pendingPermissions) {
+    if (context && p.context !== context) continue
     pendingPermissions.delete(id)
     clearTimeout(p.timeout)
     cancelPermissionNotification(id)
@@ -385,8 +389,9 @@ function rejectAllPendingPermissions(): void {
   }
 }
 
-function rejectAllPendingAskUser(): void {
+function rejectAllPendingAskUser(context?: AgentContext): void {
   for (const [id, p] of pendingAskUser) {
+    if (context && p.context !== context) continue
     pendingAskUser.delete(id)
     clearTimeout(p.timeout)
     p.resolve({ behavior: 'deny', message: 'Query aborted' })
@@ -400,8 +405,8 @@ export function abortActiveQuery(context?: AgentContext): void {
       entry.abortController.abort()
       activeQueries.delete(context)
     }
-    rejectAllPendingPermissions()
-    rejectAllPendingAskUser()
+    rejectAllPendingPermissions(context)
+    rejectAllPendingAskUser(context)
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
@@ -501,8 +506,8 @@ export async function sendMessage(
     } as AgentIPCMessage & { context: AgentContext })
   } finally {
     activeQueries.delete(context)
-    rejectAllPendingPermissions()
-    rejectAllPendingAskUser()
+    rejectAllPendingPermissions(context)
+    rejectAllPendingAskUser(context)
   }
 }
 

@@ -101,7 +101,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       const ext = name.split('.').pop()?.toLowerCase() || ''
       const type = ext === 'pdf' ? 'pdf' :
         imageExts.includes(ext) ? 'image' : 'text'
-      files.push({ name, path: filePath, type, base64: '', mimeType: '', size: 0 })
+      files.push({ name, path: filePath, type })
     }
     setAttachedFiles((prev) => [...prev, ...files])
   }, [])
