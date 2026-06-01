@@ -106,9 +106,11 @@
 
 .markdown-editor h5,
 .markdown-editor h6 {
-  font-size: 1em;
-  font-weight: var(--font-weight-semibold);
+  font-size: 0.85em;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* --- Paragraphs --- */
@@ -266,6 +268,80 @@
   background: var(--color-bg-secondary);
 }
 
+/* --- Syntax highlighting --- */
+
+.markdown-editor .hljs-comment,
+.markdown-editor .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.markdown-editor .hljs-keyword,
+.markdown-editor .hljs-selector-tag,
+.markdown-editor .hljs-type {
+  color: #d73a49;
+}
+
+.markdown-editor .hljs-string,
+.markdown-editor .hljs-regexp,
+.markdown-editor .hljs-addition {
+  color: #22863a;
+}
+
+.markdown-editor .hljs-number,
+.markdown-editor .hljs-literal,
+.markdown-editor .hljs-symbol {
+  color: #005cc5;
+}
+
+.markdown-editor .hljs-title,
+.markdown-editor .hljs-section,
+.markdown-editor .hljs-selector-id {
+  color: #6f42c1;
+}
+
+.markdown-editor .hljs-attr,
+.markdown-editor .hljs-attribute,
+.markdown-editor .hljs-variable,
+.markdown-editor .hljs-template-variable {
+  color: #e36209;
+}
+
+.markdown-editor .hljs-name,
+.markdown-editor .hljs-tag {
+  color: #22863a;
+}
+
+.markdown-editor .hljs-built_in,
+.markdown-editor .hljs-builtin-name {
+  color: #005cc5;
+}
+
+.markdown-editor .hljs-meta,
+.markdown-editor .hljs-doctag {
+  color: #6a737d;
+}
+
+.markdown-editor .hljs-deletion {
+  color: #d73a49;
+}
+
+.markdown-editor .hljs-emphasis {
+  font-style: italic;
+}
+
+.markdown-editor .hljs-strong {
+  font-weight: var(--font-weight-bold);
+}
+
+.markdown-editor .hljs-link {
+  text-decoration: underline;
+}
+
+.markdown-editor .hljs-params {
+  color: var(--color-text-primary);
+}
+
 /* --- Horizontal rule --- */
 
 .markdown-editor hr {
@@ -282,6 +358,11 @@
   margin: 0 0 var(--editor-paragraph-spacing) 0;
   overflow: hidden;
   border-radius: var(--radius-sm);
+  font-size: 0.95em;
+}
+
+.markdown-editor thead th {
+  border-bottom: 2px solid var(--color-border);
 }
 
 .markdown-editor th,
@@ -289,7 +370,6 @@
   border: 1px solid var(--color-border);
   padding: 8px 12px;
   text-align: left;
-  min-width: 80px;
 }
 
 .markdown-editor th {
@@ -298,8 +378,12 @@
   font-size: 0.9em;
 }
 
-.markdown-editor tr:hover td {
+.markdown-editor tbody tr:nth-child(even) td {
   background: var(--color-bg-secondary);
+}
+
+.markdown-editor tr:hover td {
+  background: var(--color-bg-hover);
 }
 
 /* --- Images --- */
@@ -332,7 +416,12 @@
 /* --- Strong / Em --- */
 
 .markdown-editor strong {
-  font-weight: 650;
+  font-weight: var(--font-weight-bold);
+}
+
+.markdown-editor s {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
 }
 
 /* --- Editor Tabs --- */
@@ -669,12 +758,24 @@
   border-left-color: rgba(255, 255, 255, 0.15);
 }
 
+[data-theme="dark"] .markdown-editor thead th {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
 [data-theme="dark"] .markdown-editor th {
   background: rgba(255, 255, 255, 0.04);
 }
 
+[data-theme="dark"] .markdown-editor tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
 [data-theme="dark"] .markdown-editor tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .markdown-editor s {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 [data-theme="dark"] .markdown-editor .heading-with-anchor::after {
@@ -701,6 +802,61 @@
 
 [data-theme="dark"] .wikilink {
   background: rgba(74, 158, 255, 0.12);
+}
+
+[data-theme="dark"] .markdown-editor .hljs-comment,
+[data-theme="dark"] .markdown-editor .hljs-quote {
+  color: #5c6370;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-keyword,
+[data-theme="dark"] .markdown-editor .hljs-selector-tag,
+[data-theme="dark"] .markdown-editor .hljs-type {
+  color: #c678dd;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-string,
+[data-theme="dark"] .markdown-editor .hljs-regexp,
+[data-theme="dark"] .markdown-editor .hljs-addition {
+  color: #98c379;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-number,
+[data-theme="dark"] .markdown-editor .hljs-literal,
+[data-theme="dark"] .markdown-editor .hljs-symbol {
+  color: #d19a66;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-title,
+[data-theme="dark"] .markdown-editor .hljs-section,
+[data-theme="dark"] .markdown-editor .hljs-selector-id {
+  color: #61afef;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-attr,
+[data-theme="dark"] .markdown-editor .hljs-attribute,
+[data-theme="dark"] .markdown-editor .hljs-variable,
+[data-theme="dark"] .markdown-editor .hljs-template-variable {
+  color: #e5c07b;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-name,
+[data-theme="dark"] .markdown-editor .hljs-tag {
+  color: #56b6c2;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-built_in,
+[data-theme="dark"] .markdown-editor .hljs-builtin-name {
+  color: #61afef;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-meta,
+[data-theme="dark"] .markdown-editor .hljs-doctag {
+  color: #5c6370;
+}
+
+[data-theme="dark"] .markdown-editor .hljs-deletion {
+  color: #e06c75;
 }
 
 /* --- Frontmatter --- */

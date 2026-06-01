@@ -109,6 +109,12 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
     },
 
+    onPermissionTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string; context: AgentContext }) => callback(data)
+      ipcRenderer.on('agent:permissionTimeout', handler)
+      return () => { ipcRenderer.removeListener('agent:permissionTimeout', handler) }
+    },
+
     onSkillOutput: (callback: (state: SkillOutputState) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, state: SkillOutputState) => callback(state)
       ipcRenderer.on('skill:output', handler)
@@ -131,12 +137,6 @@ const api = {
 
   graph: {
     getData: () => ipcRenderer.invoke('graph:getData'),
-    extractSemantic: () => ipcRenderer.invoke('graph:extractSemantic'),
-    onSemanticProgress: (callback: (data: { phase: string; progress: number }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { phase: string; progress: number }) => callback(data)
-      ipcRenderer.on('graph:semanticProgress', handler)
-      return () => { ipcRenderer.removeListener('graph:semanticProgress', handler) }
-    },
     onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: { count: number; files: string[] }) => callback(data)
       ipcRenderer.on('graph:filesChanged', handler)

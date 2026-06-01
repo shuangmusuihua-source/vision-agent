@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Sun, Moon, Monitor, Users, Info, Plus, X, Trash2 } from 'lucide-react'
-import ReactDOM from 'react-dom'
+import { Sun, Moon, Monitor, Users, Info, Plus, X } from 'lucide-react'
 import { useSettings, getSettingsCache } from '../../store/settings-cache'
 import type { ModelProfile } from '../../lib/ipc'
 
@@ -15,21 +14,6 @@ const PAGES: Array<{ id: SettingsPage; label: string; icon: React.ReactElement }
   { id: 'profiles', label: '模型配置', icon: <Users size={16} /> },
   { id: 'about', label: '关于', icon: <Info size={16} /> }
 ]
-
-const MODEL_PRESETS = [
-  'claude-sonnet-4-20250514',
-  'claude-opus-4-20250514',
-  'claude-haiku-4-20250514',
-  'deepseek-chat',
-  'deepseek-reasoner',
-  'mistral-large-latest',
-  'gpt-4o',
-  'gpt-4.1',
-  'o3',
-  'o4-mini'
-]
-
-const PROVIDER_PRESETS = ['anthropic', 'bedrock', 'vertex', 'azure', 'openai', 'deepseek', 'mistral', 'ollama', 'custom']
 
 const NEW_PROFILE: Omit<ModelProfile, 'id'> = {
   name: '',
@@ -124,7 +108,6 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
     if (!editForm.model?.trim()) errors.model = true
 
     if (Object.keys(errors).length > 0) {
-      // Clear first then set, so shake animation re-triggers each time
       setValidationErrors({})
       requestAnimationFrame(() => {
         setValidationErrors(errors)
@@ -154,7 +137,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   }, [editForm, isNewProfile, activeProfileId])
 
   const handleAddProfile = useCallback(() => {
-    const id = `profile-${Date.now()}`
+    const id = `profile-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const tempProfile: ModelProfile = { id, ...NEW_PROFILE }
     setProfiles((prev) => [...prev, tempProfile])
     setEditingProfileId(id)
@@ -236,13 +219,14 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
   return (
     <div className="settings-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="settings-window" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+      <div className="settings-window" role="dialog" aria-modal="true" aria-label="设置" onClick={(e) => e.stopPropagation()}>
         <div className="settings-sidebar">
           {PAGES.map((page) => (
             <button
               key={page.id}
               className={`settings-sidebar-item ${activePage === page.id ? 'active' : ''}`}
               onClick={() => setActivePage(page.id)}
+              aria-current={activePage === page.id ? 'page' : undefined}
             >
               {page.icon}
               <span>{page.label}</span>
@@ -253,7 +237,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
         </div>
 
         <div className="settings-content">
-          <button className="settings-close-btn" onClick={onClose}>
+          <button className="settings-close-btn" onClick={onClose} aria-label="关闭设置">
             <X size={16} />
           </button>
 
@@ -262,26 +246,32 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
               <div className="settings-page-title">外观</div>
               <div className="settings-section">
                 <div className="settings-section-title">主题</div>
-                <div className="theme-options">
+                <div className="theme-options" role="radiogroup" aria-label="选择主题">
                   <button
                     className={`theme-option ${theme === 'light' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('light')}
+                    role="radio"
+                    aria-checked={theme === 'light'}
                   >
-                    <Sun size={24} />
+                    <Sun size={22} />
                     <span className="theme-option-label">浅色</span>
                   </button>
                   <button
                     className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('dark')}
+                    role="radio"
+                    aria-checked={theme === 'dark'}
                   >
-                    <Moon size={24} />
+                    <Moon size={22} />
                     <span className="theme-option-label">深色</span>
                   </button>
                   <button
                     className={`theme-option ${theme === 'system' ? 'active' : ''}`}
                     onClick={() => handleThemeChange('system')}
+                    role="radio"
+                    aria-checked={theme === 'system'}
                   >
-                    <Monitor size={24} />
+                    <Monitor size={22} />
                     <span className="theme-option-label">跟随系统</span>
                   </button>
                 </div>
@@ -294,18 +284,21 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
               <div className="settings-page-title">模型配置</div>
               {profiles.map((profile) => {
                 const isEditing = editingProfileId === profile.id
+                const fieldId = (field: string) => `profile-${profile.id}-${field}`
+                const isActive = activeProfileId === profile.id
                 return (
                   <div className="settings-section" key={profile.id}>
                     <div className="settings-section-title">
-                      {isEditing && isNewProfile ? '新配置' : profile.name}
+                      {isEditing && isNewProfile ? '新配置' : profile.name || '未命名'}
                     </div>
                     <div className="profile-card">
                       <div className="profile-card-header">
-                        <span className={`profile-card-name ${activeProfileId === profile.id ? 'profile-status-active' : 'profile-status-inactive'}`}>
-                          {activeProfileId === profile.id ? '● 当前激活' : '○ 未激活'}
+                        <span className={`profile-status-badge ${isActive ? 'profile-status-active' : 'profile-status-inactive'}`}>
+                          <span className="profile-status-dot" />
+                          {isActive ? '当前激活' : '未激活'}
                         </span>
                         <div className="profile-card-actions">
-                          {activeProfileId !== profile.id && !isNewProfile && (
+                          {!isActive && !isNewProfile && (
                             <button className="profile-card-btn" onClick={() => handleSetActive(profile.id)}>激活</button>
                           )}
                           {!isEditing && (
@@ -328,11 +321,12 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                       {isEditing ? (
                         <>
                           <div className={`profile-field ${validationErrors.name ? 'field-error' : ''}`}>
-                            <div className="profile-field-label">
-                              配置名称 <span className="required-mark">*</span>
-                            </div>
+                            <label className="profile-field-label" htmlFor={fieldId('name')}>
+                              配置名称 <span className="required-mark" aria-hidden="true">*</span>
+                            </label>
                             <input
                               ref={nameInputRef}
+                              id={fieldId('name')}
                               className="profile-field-input"
                               type="text"
                               placeholder="例如：My Opus"
@@ -341,14 +335,17 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                                 setEditForm((f) => ({ ...f, name: e.target.value }))
                                 clearFieldError('name')
                               }}
+                              aria-required="true"
+                              aria-invalid={!!validationErrors.name}
                             />
                             {validationErrors.name && (
-                              <div className="field-error-msg">请填写配置名称</div>
+                              <div className="field-error-msg" role="alert">请填写配置名称</div>
                             )}
                           </div>
                           <div className="profile-field">
-                            <div className="profile-field-label">API Provider</div>
+                            <label className="profile-field-label" htmlFor={fieldId('apiProvider')}>API Provider</label>
                             <input
+                              id={fieldId('apiProvider')}
                               className="profile-field-input"
                               type="text"
                               placeholder="anthropic"
@@ -357,10 +354,12 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                             />
                           </div>
                           <div className={`profile-field ${validationErrors.baseUrl ? 'field-error' : ''}`}>
-                            <div className="profile-field-label">
-                              Base URL <span className="required-mark">*</span>
-                            </div>
+                            <label className="profile-field-label" htmlFor={fieldId('baseUrl')}>
+                              Base URL <span className="required-mark" aria-hidden="true">*</span>
+                            </label>
                             <input
+                              ref={baseUrlInputRef}
+                              id={fieldId('baseUrl')}
                               className="profile-field-input"
                               type="text"
                               placeholder="https://api.anthropic.com"
@@ -369,18 +368,21 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                                 setEditForm((f) => ({ ...f, baseUrl: e.target.value }))
                                 clearFieldError('baseUrl')
                               }}
+                              aria-required="true"
+                              aria-invalid={!!validationErrors.baseUrl}
                             />
                             {validationErrors.baseUrl && (
-                              <div className="field-error-msg">请填写 Base URL</div>
+                              <div className="field-error-msg" role="alert">请填写 Base URL</div>
                             )}
                           </div>
                           <div className={`profile-field ${validationErrors.apiKey ? 'field-error' : ''}`}>
-                            <div className="profile-field-label">
-                              API Key <span className="required-mark">*</span>
-                            </div>
+                            <label className="profile-field-label" htmlFor={fieldId('apiKey')}>
+                              API Key <span className="required-mark" aria-hidden="true">*</span>
+                            </label>
                             <div className="api-key-row">
                               <input
                                 ref={apiKeyInputRef}
+                                id={fieldId('apiKey')}
                                 className="profile-field-input api-key-input"
                                 type={showApiKey[profile.id] ? 'text' : 'password'}
                                 placeholder="sk-ant-..."
@@ -389,20 +391,28 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                                   setEditForm((f) => ({ ...f, apiKey: e.target.value }))
                                   clearFieldError('apiKey')
                                 }}
+                                aria-required="true"
+                                aria-invalid={!!validationErrors.apiKey}
                               />
-                              <button className="api-key-toggle" onClick={() => toggleApiKey(profile.id)}>
+                              <button
+                                className="api-key-toggle"
+                                onClick={() => toggleApiKey(profile.id)}
+                                aria-label={showApiKey[profile.id] ? '隐藏 API Key' : '显示 API Key'}
+                              >
                                 {showApiKey[profile.id] ? '隐藏' : '显示'}
                               </button>
                             </div>
                             {validationErrors.apiKey && (
-                              <div className="field-error-msg">请填写 API Key</div>
+                              <div className="field-error-msg" role="alert">请填写 API Key</div>
                             )}
                           </div>
                           <div className={`profile-field ${validationErrors.model ? 'field-error' : ''}`}>
-                            <div className="profile-field-label">
-                              模型 <span className="required-mark">*</span>
-                            </div>
+                            <label className="profile-field-label" htmlFor={fieldId('model')}>
+                              模型 <span className="required-mark" aria-hidden="true">*</span>
+                            </label>
                             <input
+                              ref={modelInputRef}
+                              id={fieldId('model')}
                               className="profile-field-input"
                               type="text"
                               placeholder="claude-sonnet-4-20250514"
@@ -411,9 +421,11 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                                 setEditForm((f) => ({ ...f, model: e.target.value }))
                                 clearFieldError('model')
                               }}
+                              aria-required="true"
+                              aria-invalid={!!validationErrors.model}
                             />
                             {validationErrors.model && (
-                              <div className="field-error-msg">请填写模型</div>
+                              <div className="field-error-msg" role="alert">请填写模型</div>
                             )}
                           </div>
                           <div className="profile-edit-actions">
@@ -425,7 +437,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               {connectionTest.status === 'testing' ? '测试中...' : '测试连接'}
                             </button>
                             {connectionTest.status !== 'idle' && connectionTest.message && (
-                              <span className={`profile-test-result ${connectionTest.status === 'success' ? 'profile-test-success' : 'profile-test-error'}`}>
+                              <span className={`profile-test-result ${connectionTest.status === 'success' ? 'profile-test-success' : 'profile-test-error'}`} role="status">
                                 {connectionTest.message}
                               </span>
                             )}
@@ -449,7 +461,11 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               <span className="profile-field-value api-key-value">
                                 {showApiKey[profile.id] ? profile.apiKey : 'sk-ant-••••••••••••••••'}
                               </span>
-                              <button className="api-key-toggle" onClick={() => toggleApiKey(profile.id)}>
+                              <button
+                                className="api-key-toggle"
+                                onClick={() => toggleApiKey(profile.id)}
+                                aria-label={showApiKey[profile.id] ? '隐藏 API Key' : '显示 API Key'}
+                              >
                                 {showApiKey[profile.id] ? '隐藏' : '显示'}
                               </button>
                             </div>
@@ -474,11 +490,13 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
           {activePage === 'about' && (
             <div className="settings-page">
               <div className="settings-page-title">关于</div>
-              <div className="about-logo">Vision Agent</div>
-              <div className="about-version">Version 1.0.0</div>
-              <div className="about-desc">
-                基于 Claude Agent SDK 的智能编程助手。<br />
-                集成文件编辑、代码审查、定时任务等功能。
+              <div className="about-section">
+                <div className="about-logo">Vision Agent</div>
+                <div className="about-version">Version 1.0.0</div>
+                <div className="about-desc">
+                  基于 Claude Agent SDK 的智能编程助手。<br />
+                  集成文件编辑、代码审查、定时任务等功能。
+                </div>
               </div>
             </div>
           )}

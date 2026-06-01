@@ -25,9 +25,10 @@ interface MessageBubbleProps {
   onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
   context: 'editor' | 'ask'
+  isLastMessage: boolean
 }
 
-const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context }: MessageBubbleProps): React.ReactElement {
+const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context, isLastMessage }: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 
@@ -36,9 +37,6 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
 
   // Unified skill output from main process bridge (via store)
   const skillOutput = useAgentStore((s) => s.slots[context].skillOutput)
-
-  // Only show SkillOutputCard for the last assistant message during streaming
-  const isLastMessage = useAgentStore((s) => s.slots[context].messages[s.slots[context].messages.length - 1]?.id === message.id)
   const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutput.content.length > 0
 
   // Status indicator: system messages with 'thinking' text during streaming

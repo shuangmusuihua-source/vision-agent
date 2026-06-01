@@ -7,6 +7,7 @@ extraResources:
     to: skills
     filter:
       - '*/SKILL.md'
+      - '*/scan.sh'
       - '*/references/*'
       - '*/.claude-plugin/*'
       - '*/.claude/*'
@@ -23,21 +24,28 @@ publish:
   provider: github
   owner: shuangmusuihua-source
   repo: vision-agent
+asarUnpack:
+  - '**/@anthropic-ai/claude-agent-sdk-darwin-arm64/**'
+  - '**/@anthropic-ai/claude-agent-sdk/cli.js'
+  - '**/@anthropic-ai/claude-agent-sdk/**/*.js'
+  - '**/@anthropic-ai/claude-agent-sdk/**/*.json'
 mac:
   icon: build/icon.icns
   target:
-    - dmg
+    - target: dmg
+      arch:
+        - arm64
   category: public.app-category.productivity
-  hardenedRuntime: true
+  hardenedRuntime: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   gatekeeperAssess: false
   extendInfo:
     NSDocumentsFolderUsageDescription: "Vision Agent needs access to your Documents folder to create workspaces."
     NSDesktopFolderUsageDescription: "Vision Agent needs access to your Desktop folder to open workspace directories."
-afterSign: scripts/notarize.js
+# afterSign: scripts/notarize.js  # disabled for unsigned internal testing
 dmg:
-  sign: true
+  sign: false
   contents:
     - x: 130
       y: 220

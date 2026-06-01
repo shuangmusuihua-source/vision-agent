@@ -6,10 +6,13 @@ import type { PermissionRequest } from '../../store/agent-store'
 interface PermissionDialogProps {
   request: PermissionRequest
   onRespond: (requestId: string, behavior: 'allow' | 'deny') => void
+  queuePosition?: number
+  queueTotal?: number
 }
 
-function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.ReactElement {
+function PermissionDialog({ request, onRespond, queuePosition, queueTotal }: PermissionDialogProps): React.ReactElement {
   const inputSummary = summarizePermissionInput(request.toolName, request.input)
+  const showBadge = queueTotal !== undefined && queueTotal > 1
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -20,11 +23,14 @@ function PermissionDialog({ request, onRespond }: PermissionDialogProps): React.
   }, [request.id, onRespond])
 
   return (
-    <InputDrawer open onClose={() => {}}>
+    <InputDrawer key={request.id} open onClose={() => {}}>
       <div className="drawer-permission">
         <div className="drawer-permission-header">
           <ShieldAlert size={16} className="drawer-permission-icon" />
           <span className="drawer-permission-title">权限请求</span>
+          {showBadge && (
+            <span className="drawer-permission-badge">{queuePosition}/{queueTotal}</span>
+          )}
           <span className="drawer-permission-tool">{request.toolName}</span>
         </div>
         {inputSummary && (

@@ -140,8 +140,6 @@ interface AgentApi {
 
 interface GraphApi {
   getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>
-  extractSemantic: () => Promise<{ success: boolean; error?: string; skipped?: boolean; message?: string; data?: { nodes: GraphNode[]; edges: GraphEdge[] } }>
-  onSemanticProgress: (callback: (data: { phase: string; progress: number }) => void) => () => void
   onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => () => void
 }
 

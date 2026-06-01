@@ -73,7 +73,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
           <ChevronUp size={14} /> 加载更早消息 ({messages.length - visibleCount} 条)
         </button>
       )}
-      {visibleMessages.items.map((msg) => (
+      {visibleMessages.items.map((msg, idx) => (
         <MessageBubble
           key={msg.id}
           message={msg}
@@ -81,6 +81,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
           workspacePath={workspacePath}
+          isLastMessage={idx === visibleMessages.items.length - 1}
         />
       ))}
       {isStreaming && agentState === 'thinking' && (

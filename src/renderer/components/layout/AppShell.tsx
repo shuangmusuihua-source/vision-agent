@@ -12,7 +12,7 @@ import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
-import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useDividerDrag } from '../../hooks/useDividerDrag'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -80,6 +80,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [deleteWsConfirm, setDeleteWsConfirm] = useState('')
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
   const [newWorkspaceError, setNewWorkspaceError] = useState('')
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [showDaydream, setShowDaydream] = useState(false)
   const [daydreamMode, setDaydreamMode] = useState('matrix')
@@ -201,6 +202,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   } = useAgent('editor')
   const isStreaming = useIsStreaming('editor')
   const editorPermission = usePermissionRequest('editor')
+  const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
   const editorAskUserRespondRef = useRef<((answer: string) => void) | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
@@ -251,32 +253,51 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       setShowNewWorkspaceModal(false)
       setNewWorkspaceName('')
       setNewWorkspaceError('')
+      setIsCreatingWorkspace(false)
     }, 200)
   }
 
   const handleCreateWorkspace = async () => {
-    if (!newWorkspaceName.trim()) {
+    const name = newWorkspaceName.trim()
+    if (!name) {
       setNewWorkspaceError('请输入工作区名称')
       return
     }
-    const dirPath = await window.api.workspace.createWorkspace(newWorkspaceName.trim())
-    if (dirPath) {
-      if (!workspacePaths.includes(dirPath)) {
-        setWorkspacePaths((prev) => [...prev, dirPath])
-        const entries = await window.api.workspace.listFiles(dirPath)
-        setFiles((prev) => ({ ...prev, [dirPath]: entries }))
-        await window.api.settings.addDirectory(dirPath)
+    if (/[/\\]/.test(name) || name.includes('..')) {
+      setNewWorkspaceError('工作区名称不能包含 / \\ 或 ..')
+      return
+    }
+    setIsCreatingWorkspace(true)
+    setNewWorkspaceError('')
+    try {
+      const dirPath = await window.api.workspace.createWorkspace(name)
+      if (dirPath) {
+        if (!workspacePaths.includes(dirPath)) {
+          setWorkspacePaths((prev) => [...prev, dirPath])
+          const entries = await window.api.workspace.listFiles(dirPath)
+          setFiles((prev) => ({ ...prev, [dirPath]: entries }))
+          await window.api.settings.addDirectory(dirPath)
+        }
+        handleCloseNewWorkspaceModal()
+      } else {
+        setNewWorkspaceError('工作区已存在，请使用其他名称')
       }
-      handleCloseNewWorkspaceModal()
-    } else {
-      setNewWorkspaceError('工作区已存在或创建失败')
+    } catch {
+      setNewWorkspaceError('创建工作区失败，请重试')
+    } finally {
+      setIsCreatingWorkspace(false)
     }
   }
 
-  const handleRefreshWorkspace = async (path: string) => {
+  const handleRefreshWorkspace = useCallback(async (path: string) => {
     const entries = await window.api.workspace.listFiles(path)
     setFiles((prev) => ({ ...prev, [path]: entries }))
-  }
+  }, [])
+
+  const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
+    setWorkspacePaths(paths)
+    await window.api.settings.reorderDirectories(paths)
+  }, [])
 
   const handleFileSelect = useCallback(async (path: string) => {
     // Switch back to editor context when leaving Ask Zuovis
@@ -504,10 +525,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onRemoveWorkspace={(path) => { setDeleteWsPath(path); setDeleteWsConfirm('') }}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
-        onReorderWorkspaces={async (paths) => {
-          setWorkspacePaths(paths)
-          await window.api.settings.reorderDirectories(paths)
-        }}
+        onReorderWorkspaces={handleReorderWorkspaces}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
         onAskZuovis={() => {
@@ -619,6 +637,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
         usageInfo={usageInfo}
         permissionRequest={editorPermission}
+        permissionQueueLength={editorPermissionQueueLen}
         onPermissionRespond={respondPermission}
         askUserRequest={editorAskUser}
         onAskUserRespond={editorRespondAskUser}
@@ -692,23 +711,44 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       </div>
       {showNewWorkspaceModal && (
         <div className={`modal-overlay${modalVisible ? ' modal-overlay-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
-          <div className={`modal-window${modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal-window${modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Tab') {
+                const focusable = e.currentTarget.querySelectorAll<HTMLElement>('input, button:not([disabled])')
+                if (!focusable.length) return
+                const first = focusable[0]
+                const last = focusable[focusable.length - 1]
+                if (e.shiftKey && document.activeElement === first) {
+                  e.preventDefault()
+                  last.focus()
+                } else if (!e.shiftKey && document.activeElement === last) {
+                  e.preventDefault()
+                  first.focus()
+                }
+              }
+              if (e.key === 'Escape') handleCloseNewWorkspaceModal()
+            }}
+          >
             <div className="modal-title">新建工作区</div>
+            <div className="modal-subtitle">将创建在 ~/Documents/VisionAgent/ 下</div>
             <input
               className="modal-input"
               placeholder="工作区名称"
               value={newWorkspaceName}
               onChange={(e) => { setNewWorkspaceName(e.target.value); setNewWorkspaceError('') }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.isComposing) handleCreateWorkspace()
-                if (e.key === 'Escape') handleCloseNewWorkspaceModal()
+                if (e.key === 'Enter' && !e.isComposing && !isCreatingWorkspace) handleCreateWorkspace()
               }}
+              disabled={isCreatingWorkspace}
               autoFocus
+              aria-describedby={newWorkspaceError ? 'workspace-error' : undefined}
             />
-            {newWorkspaceError && <span className="modal-error">{newWorkspaceError}</span>}
+            {newWorkspaceError && <div className="modal-error" id="workspace-error" role="alert">{newWorkspaceError}</div>}
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={handleCloseNewWorkspaceModal}>取消</button>
-              <button className="btn-modal btn-modal-primary" onClick={handleCreateWorkspace}>创建</button>
+              <button className="btn-modal btn-modal-cancel" onClick={handleCloseNewWorkspaceModal} disabled={isCreatingWorkspace}>取消</button>
+              <button className="btn-modal btn-modal-primary" onClick={handleCreateWorkspace} disabled={isCreatingWorkspace}>
+                {isCreatingWorkspace ? '创建中...' : '创建'}
+              </button>
             </div>
           </div>
         </div>

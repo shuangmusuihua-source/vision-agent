@@ -778,6 +778,28 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     })
   },
 
+  handlePermissionTimeout(requestId: string) {
+    set((state) => {
+      for (const ctx of ['editor', 'ask'] as AgentContext[]) {
+        const slot = state.slots[ctx]
+        // Check if it's the currently active permission
+        if (slot.permissionRequest?.id === requestId) {
+          const next = slot.permissionQueue[0] ?? null
+          const rest = slot.permissionQueue.slice(1)
+          return updateSlot(state, ctx, { permissionRequest: next, permissionQueue: rest })
+        }
+        // Check if it's in the queue
+        const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
+        if (qIdx !== -1) {
+          const filtered = [...slot.permissionQueue]
+          filtered.splice(qIdx, 1)
+          return updateSlot(state, ctx, { permissionQueue: filtered })
+        }
+      }
+      return {}
+    })
+  },
+
   handleSkillOutput(skillState: SkillOutputState) {
     const ctx = skillState.context || get().context
     set((s) => updateSlot(s, ctx, { skillOutput: skillState }))

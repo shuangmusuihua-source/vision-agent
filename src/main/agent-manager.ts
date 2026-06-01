@@ -22,23 +22,29 @@ export function resolveClaudeCodeExecutable(): string | undefined {
   // 优先使用平台原生二进制
   try {
     const nativeBinary = require.resolve('@anthropic-ai/claude-agent-sdk-darwin-arm64/claude')
-    if (existsSync(nativeBinary)) {
-      _cachedCliPath = nativeBinary
-      return nativeBinary
+    const resolved = resolveAsarPath(nativeBinary)
+    if (existsSync(resolved)) {
+      _cachedCliPath = resolved
+      return resolved
     }
   } catch {}
 
   // 回退到 cli.js
   try {
     const cliJs = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js')
-    if (existsSync(cliJs)) {
-      _cachedCliPath = cliJs
-      return cliJs
+    const resolved = resolveAsarPath(cliJs)
+    if (existsSync(resolved)) {
+      _cachedCliPath = resolved
+      return resolved
     }
   } catch {}
 
   _cachedCliPath = undefined
   return undefined
+}
+
+function resolveAsarPath(filePath: string): string {
+  return filePath.replace('.asar/', '.asar.unpacked/').replace('.asar\\', '.asar.unpacked\\')
 }
 
 interface SessionInfo {
@@ -232,6 +238,11 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       input: Record<string, unknown>,
       options: { signal: AbortSignal; suggestions?: unknown[] }
     ): Promise<PermissionResult> => {
+      // Respect SDK abort signal — clean up if already aborted
+      if (options.signal?.aborted) {
+        return { behavior: 'deny', message: 'Tool use cancelled by SDK' }
+      }
+
       // Auto-allow safe read-only tools
       if (toolName === 'WebSearch' || toolName === 'WebFetch' || toolName === 'Glob' || toolName === 'Grep') {
         return { behavior: 'allow', updatedInput: input }
@@ -296,10 +307,28 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
+        const cleanup = () => {
+          if (pendingPermissions.has(requestId)) {
+            pendingPermissions.delete(requestId)
+            cancelPermissionNotification(requestId)
+            clearTimeout(timeout)
+          }
+        }
+
+        // AbortSignal: SDK cancelled this tool use
+        if (options.signal) {
+          options.signal.addEventListener('abort', () => {
+            cleanup()
+            mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
+            resolve({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
+          }, { once: true })
+        }
+
         const timeout = setTimeout(() => {
           if (pendingPermissions.has(requestId)) {
             pendingPermissions.delete(requestId)
             cancelPermissionNotification(requestId)
+            mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
@@ -371,6 +400,8 @@ export function abortActiveQuery(context?: AgentContext): void {
       entry.abortController.abort()
       activeQueries.delete(context)
     }
+    rejectAllPendingPermissions()
+    rejectAllPendingAskUser()
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
@@ -386,25 +417,18 @@ export function setSkillOutputWindow(win: BrowserWindow): void {
   _skillOutputBridge.setWindow(win)
 }
 
-export function setActiveSkillId(skillId: string | null, context: AgentContext = 'editor'): void {
-  const entry = activeQueries.get(context)
-  if (entry) {
-    entry.skillId = skillId
-  }
-}
-
 export async function sendMessage(
   mainWindow: BrowserWindow,
   prompt: string,
   sessionId?: string,
   activeFilePath?: string,
-  context: AgentContext = 'editor'
+  context: AgentContext = 'editor',
+  skillId?: string | null
 ): Promise<void> {
   // Abort any active query in the same context slot
   const existing = activeQueries.get(context)
   if (existing) {
-    existing.abortController.abort()
-    activeQueries.delete(context)
+    abortActiveQuery(context)
   }
 
   _skillOutputBridge.reset()
@@ -423,8 +447,7 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
-    const activeSkillId = activeQueries.get(context)?.skillId ?? null
-    activeQueries.set(context, { query: messageStream as Query, skillId: activeSkillId, abortController })
+    activeQueries.set(context, { query: messageStream as Query, skillId: skillId ?? null, abortController })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
@@ -478,6 +501,8 @@ export async function sendMessage(
     } as AgentIPCMessage & { context: AgentContext })
   } finally {
     activeQueries.delete(context)
+    rejectAllPendingPermissions()
+    rejectAllPendingAskUser()
   }
 }
 

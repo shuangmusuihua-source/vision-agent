@@ -50,6 +50,10 @@ export function useIPCSubscriptions() {
       store.getState().handleAskUserTimeout(data.requestId)
     })
 
+    const unsubPermTimeout = window.api.agent.onPermissionTimeout((data: { requestId: string; context: AgentContext }) => {
+      store.getState().handlePermissionTimeout(data.requestId)
+    })
+
     const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string }) => {
       store.setState((state) => ({
         slots: {
@@ -74,6 +78,7 @@ export function useIPCSubscriptions() {
       unsubPerm()
       unsubAsk()
       unsubAskTimeout()
+      unsubPermTimeout()
       unsubSession()
       unsubSkillOutput()
     }
@@ -245,6 +250,7 @@ export const useCurrentSessionId = (context: AgentContext) => useAgentStore((s) 
 export const useAgentStatus = (context: AgentContext) => useAgentStore((s) => s.slots[context].agentState)
 export const useUsageInfo = (context: AgentContext) => useAgentStore((s) => s.slots[context].usageInfo)
 export const usePermissionRequest = (context: AgentContext) => useAgentStore((s) => s.slots[context].permissionRequest)
+export const usePermissionQueueLength = (context: AgentContext) => useAgentStore((s) => s.slots[context].permissionQueue.length)
 export const useAskUserRequest = (context: AgentContext) => useAgentStore((s) => s.slots[context].askUserRequest)
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) => s.slots[context].lastEditedFile)

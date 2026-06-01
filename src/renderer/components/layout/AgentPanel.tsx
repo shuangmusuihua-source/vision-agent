@@ -21,6 +21,7 @@ interface AgentPanelProps {
   edgeClass: string
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
+  permissionQueueLength: number
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
   askUserRequest: AskUserRequest | null
   onAskUserRespond: (requestId: string, answer: string) => void
@@ -37,7 +38,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissionRequest, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -192,6 +193,8 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
               <PermissionDialog
                 request={permissionRequest}
                 onRespond={onPermissionRespond}
+                queuePosition={1}
+                queueTotal={1 + permissionQueueLength}
               />
             )}
             {askUserRequest && (

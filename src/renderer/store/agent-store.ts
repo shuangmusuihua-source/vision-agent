@@ -75,6 +75,7 @@ export type AgentStore = {
   handleAskUserRequest: (req: AskUserRequestIPC) => void
   handleAskUserResponse: (requestId: string, answer: string) => void
   handleAskUserTimeout: (requestId: string) => void
+  handlePermissionTimeout: (requestId: string) => void
   handleSkillOutput: (state: SkillOutputState) => void
   setPrefill: (context: AgentContext, text: string) => void
   consumePrefill: (context: AgentContext) => void
