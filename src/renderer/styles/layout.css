@@ -1210,110 +1210,6 @@
   margin-left: calc(-1 * var(--sidebar-width)) !important;
 }
 
-.ask-zuovis {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.ask-zuovis-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  gap: 32px;
-  overflow-y: auto;
-}
-
-.ask-zuovis-greeting {
-  text-align: center;
-}
-
-.ask-zuovis-greeting-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  margin-bottom: 6px;
-}
-
-.ask-zuovis-greeting-sub {
-  font-size: 14px;
-  color: var(--color-text-tertiary);
-}
-
-.ask-zuovis-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  max-width: 520px;
-  width: 100%;
-}
-
-/* --- Ask Zuovis Footer / Input Capsule --- */
-
-.ask-zuovis-footer {
-  flex-shrink: 0;
-  padding: 6px 20% 12px;
-  pointer-events: none;
-}
-
-.ask-zuovis-footer > * {
-  pointer-events: auto;
-}
-
-.ask-zuovis-send-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  -electron-corner-smoothing: system-ui;
-  background: rgba(0, 0, 0, 0.3);
-  color: #fff !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: default;
-  transition: background 0.2s, box-shadow 0.2s;
-}
-
-.ask-zuovis-send-btn-active {
-  background: linear-gradient(135deg, #ff58b2, #6657ff);
-  box-shadow: 0 8px 20px rgba(102, 87, 255, 0.25);
-  cursor: pointer;
-}
-
-.ask-zuovis-send-btn:disabled {
-  cursor: not-allowed;
-}
-
-/* --- Ask Zuovis Scroll / Messages --- */
-
-.ask-zuovis-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: visible;
-  padding: 24px 0;
-}
-
-.ask-zuovis-resuming {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 40px 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-}
-
-.ask-zuovis-messages-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 15% 24px;
-}
-
 /* --- Dark mode layout polish --- */
 
 [data-theme="dark"] .sidebar-entry:hover {
@@ -1333,16 +1229,6 @@
 
 [data-theme="dark"] .sidebar-ask-zuovis-active:hover {
   background: rgba(255, 255, 255, 0.12);
-}
-
-[data-theme="dark"] .ask-zuovis-capsule {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-}
-
-[data-theme="dark"] .ask-zuovis-send-btn {
-  background: rgba(255, 255, 255, 0.15);
 }
 
 [data-theme="dark"] .main-content {
