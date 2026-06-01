@@ -11,15 +11,24 @@ interface IndexedFile {
   mtimeMs: number
 }
 
+interface KnowledgeEntry {
+  filePath: string
+  wikilinks: string[]
+  mtimeMs: number
+}
+
 class FileIndexService {
   private index = new Map<string, IndexedFile>()
+  private knowledgeIndex = new Map<string, KnowledgeEntry>()
   private watcher: FSWatcher | null = null
   private workspaceDir: string | null = null
+  private knowledgeBaseDir: string | null = null
   private ready = false
   private readyCallbacks: Array<() => void> = []
+  private knowledgeReady = false
+  private knowledgeReadyCallbacks: Array<() => void> = []
   private changedFiles = new Set<string>()
   private knowledgeWatcher: FSWatcher | null = null
-  private knowledgeChangedFiles = new Set<string>()
 
   /** Initialize index for a workspace directory */
   async init(workspaceDir: string): Promise<void> {
@@ -45,6 +54,14 @@ class FileIndexService {
     if (this.ready || !this.workspaceDir) return Promise.resolve()
     return new Promise((resolve) => {
       this.readyCallbacks.push(resolve)
+    })
+  }
+
+  /** Wait until knowledge index is ready */
+  onKnowledgeReady(): Promise<void> {
+    if (this.knowledgeReady || !this.knowledgeBaseDir) return Promise.resolve()
+    return new Promise((resolve) => {
+      this.knowledgeReadyCallbacks.push(resolve)
     })
   }
 
@@ -106,8 +123,12 @@ class FileIndexService {
         wikilinks,
         mtimeMs: stat.mtimeMs
       })
-    } catch {
-      this.index.delete(filePath)
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') {
+        this.index.delete(filePath)
+      }
+      console.error(`[FileIndexService] failed to index file ${filePath}:`, err)
     }
   }
 
@@ -156,8 +177,12 @@ class FileIndexService {
       } else {
         this.index.delete(filePath)
       }
-    } catch {
-      this.index.delete(filePath)
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') {
+        this.index.delete(filePath)
+      }
+      console.error(`[FileIndexService] handleFileChange failed for ${filePath}:`, err)
     }
     this.changedFiles.add(filePath)
     this.notifyFileChange()
@@ -181,20 +206,20 @@ class FileIndexService {
     }
   }
 
-  /** Get changed files and clear the set */
-  getAndClearChangedFiles(): string[] {
-    const files = Array.from(this.changedFiles)
-    this.changedFiles.clear()
-    return files
-  }
-
-  /** Initialize knowledge base watcher (separate from main workspace) */
+  /** Initialize knowledge base watcher and index (separate from main workspace) */
   async initKnowledgeIndex(knowledgeDir: string): Promise<void> {
     if (this.knowledgeWatcher) {
       await this.knowledgeWatcher.close()
       this.knowledgeWatcher = null
     }
-    this.knowledgeChangedFiles.clear()
+    this.knowledgeBaseDir = knowledgeDir
+
+    // Build initial knowledge base index
+    await this.buildKnowledgeIndex()
+
+    this.knowledgeReady = true
+    this.knowledgeReadyCallbacks.forEach((cb) => cb())
+    this.knowledgeReadyCallbacks = []
 
     this.knowledgeWatcher = chokidar.watch(knowledgeDir, {
       ignored: /(^|[\/\\])\.(git|vision|claude)|node_modules|out|dist/,
@@ -203,38 +228,78 @@ class FileIndexService {
       awaitWriteFinish: { stabilityThreshold: 100 },
     })
 
-    this.knowledgeWatcher.on('add', (filePath) => {
-      if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+    this.knowledgeWatcher.on('add', async (filePath) => {
+      if (filePath.endsWith('.md')) {
+        await this.indexKnowledgeFile(filePath)
+        this.changedFiles.add(filePath)
+        this.notifyFileChange()
+      }
     })
-    this.knowledgeWatcher.on('change', (filePath) => {
-      if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+    this.knowledgeWatcher.on('change', async (filePath) => {
+      if (filePath.endsWith('.md')) {
+        await this.indexKnowledgeFile(filePath)
+        this.changedFiles.add(filePath)
+        this.notifyFileChange()
+      }
     })
     this.knowledgeWatcher.on('unlink', (filePath) => {
-      if (filePath.endsWith('.md')) this.knowledgeChangedFiles.add(filePath)
+      if (filePath.endsWith('.md')) {
+        this.knowledgeIndex.delete(filePath)
+        this.changedFiles.add(filePath)
+        this.notifyFileChange()
+      }
     })
     this.knowledgeWatcher.on('error', (err) => {
       console.error('[FileIndexService] knowledge watcher error:', err)
     })
   }
 
-  /** Get knowledge base changed files and clear the set */
-  getAndClearKnowledgeChangedFiles(): string[] {
-    const files = Array.from(this.knowledgeChangedFiles)
-    this.knowledgeChangedFiles.clear()
-    return files
+  /** Build index of all .md files in the knowledge base */
+  private async buildKnowledgeIndex(): Promise<void> {
+    if (!this.knowledgeBaseDir) return
+    this.knowledgeIndex.clear()
+
+    const mdFiles = await this.discoverMarkdownFiles(this.knowledgeBaseDir)
+    const batchSize = 20
+    for (let i = 0; i < mdFiles.length; i += batchSize) {
+      const batch = mdFiles.slice(i, i + batchSize)
+      await Promise.all(batch.map((fp) => this.indexKnowledgeFile(fp)))
+    }
   }
 
-  /** Get graph data: nodes and edges from wikilinks */
-  getGraphData(): GraphData {
+  /** Index a single knowledge base file */
+  private async indexKnowledgeFile(filePath: string): Promise<void> {
+    try {
+      const stat = await fs.promises.stat(filePath)
+      const existing = this.knowledgeIndex.get(filePath)
+      if (existing && existing.mtimeMs === stat.mtimeMs) return
+
+      const content = await fs.promises.readFile(filePath, 'utf-8')
+      const wikilinks = this.extractWikilinks(content)
+
+      this.knowledgeIndex.set(filePath, {
+        filePath,
+        wikilinks,
+        mtimeMs: stat.mtimeMs
+      })
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT') {
+        this.knowledgeIndex.delete(filePath)
+      }
+      console.error(`[FileIndexService] failed to index knowledge file ${filePath}:`, err)
+    }
+  }
+
+  /** Get graph data from knowledge base files only */
+  getKnowledgeGraphData(): GraphData {
     const nodes: GraphNode[] = []
     const edges: GraphEdge[] = []
-    const nodeIds = new Set<string>()
 
-    for (const [filePath, data] of this.index) {
+    for (const [filePath, data] of this.knowledgeIndex) {
       const label = path.basename(filePath, '.md')
       const isMemory = filePath.includes(`${path.sep}.vision${path.sep}memory${path.sep}`)
       const id = isMemory ? `memory:${label}` : filePath
-      nodeIds.add(id)
       nodes.push({ id, label, type: isMemory ? 'memory' : 'file' })
     }
 
@@ -243,7 +308,7 @@ class FileIndexService {
       labelToId.set(node.label, node.id)
     }
 
-    for (const [, data] of this.index) {
+    for (const [, data] of this.knowledgeIndex) {
       for (const link of data.wikilinks) {
         const targetId = labelToId.get(link)
         if (targetId) {
@@ -308,11 +373,16 @@ class FileIndexService {
       this.knowledgeWatcher = null
     }
     this.index.clear()
+    this.knowledgeIndex.clear()
     this.workspaceDir = null
+    this.knowledgeBaseDir = null
+    this.readyCallbacks.forEach((cb) => cb())
+    this.knowledgeReadyCallbacks.forEach((cb) => cb())
     this.ready = false
     this.readyCallbacks = []
+    this.knowledgeReady = false
+    this.knowledgeReadyCallbacks = []
     this.changedFiles.clear()
-    this.knowledgeChangedFiles.clear()
   }
 }
 

@@ -29,59 +29,6 @@
   border-color: var(--color-action);
 }
 
-.graph-filter-group {
-  display: flex;
-  gap: 2px;
-}
-
-.graph-filter-btn {
-  padding: 4px 10px;
-  font-size: var(--font-size-xs);
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.graph-filter-btn:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-}
-
-.graph-filter-btn:last-child {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.graph-filter-btn.active {
-  background: var(--color-action);
-  color: white;
-  border-color: var(--color-action);
-}
-
-.graph-extract-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: var(--font-size-xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.graph-extract-btn:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-}
-
-.graph-extract-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .graph-change-badge {
   display: inline-flex;
   align-items: center;
@@ -168,28 +115,9 @@
   flex-shrink: 0;
 }
 
-.graph-legend-diamond {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  transform: rotate(45deg);
-  flex-shrink: 0;
-}
-
 .graph-legend-line {
   display: inline-block;
   width: 16px;
   height: 2px;
   flex-shrink: 0;
-}
-
-.graph-legend-line.dashed {
-  background: repeating-linear-gradient(
-    90deg,
-    currentColor 0,
-    currentColor 3px,
-    transparent 3px,
-    transparent 5px
-  ) !important;
-  background-color: transparent;
 }

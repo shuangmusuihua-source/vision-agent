@@ -8,7 +8,6 @@ import type {
   SdkSessionInfo,
   UsageInfo,
   GraphData,
-  GraphExtractionProgress,
 } from './types'
 
 // ─── Request/Response Channels ───────────────────────────────────────
@@ -175,10 +174,6 @@ export type IPCChannelMap = {
     request: void
     response: GraphData
   }
-  'graph:extractSemantic': {
-    request: void
-    response: { success: boolean; error?: string; skipped?: boolean; message?: string; data?: GraphData }
-  }
 
   // Cron
   'cron:register': {
@@ -234,7 +229,6 @@ export type IPCEventMap = {
   'agent:permissionTimeout': { requestId: string; context: string }
   'agent:notification': { type: string; message: string; title: string }
   'settings:changed': Record<string, unknown>
-  'graph:semanticProgress': GraphExtractionProgress
   'graph:filesChanged': { count: number; files: string[] }
   'cron:taskCompleted': unknown
   'menu-action': string

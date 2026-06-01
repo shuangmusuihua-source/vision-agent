@@ -1,13 +1,12 @@
 import { ipcMain, dialog, shell, nativeTheme, app } from 'electron'
 import { readFile, writeFile, readdir, mkdir, unlink, rename, rm } from 'fs/promises'
-import { join, extname, relative, basename, dirname } from 'path'
+import { join, extname, basename, dirname } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from './index'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, abortActiveQuery } from './agent-manager'
 import { registerTask, removeTask, listTasks, executeTaskById } from './cron-manager'
 import { getBuiltinSkills } from './skills/builtin'
-import { extractSemanticGraph, loadSemanticGraph, mergeGraphData, semanticDataToGraph } from './semantic-extractor'
-import type { AgentContext, GraphNode, GraphEdge, GraphData, FileEntry } from '../shared/types'
+import type { AgentContext, GraphNode, GraphData, FileEntry } from '../shared/types'
 import {
   getSettings,
   addProfile,
@@ -522,35 +521,11 @@ export function registerIpcHandlers(): void {
 
   // --- Graph ---
   ipcMain.handle('graph:getData', async () => {
-    await fileIndexService.onReady()
-    const rawWikilinkData = fileIndexService.getGraphData()
-    const wikilinkData: { nodes: GraphNode[]; edges: GraphEdge[] } = {
-      nodes: rawWikilinkData.nodes as GraphNode[],
-      edges: rawWikilinkData.edges.map(e => ({ ...e, type: 'reference' as const }))
-    }
-    const knowledgeDir = getKnowledgeBaseDir()
-    const semanticRaw = await loadSemanticGraph(knowledgeDir)
-    const semanticData = semanticDataToGraph(semanticRaw)
-    return mergeGraphData(wikilinkData, semanticData)
-  })
-
-  ipcMain.handle('graph:extractSemantic', async () => {
-    const knowledgeDir = getKnowledgeBaseDir()
-    const changedFiles = fileIndexService.getAndClearKnowledgeChangedFiles()
-    const window = getMainWindow()
-    try {
-      const result = await extractSemanticGraph(knowledgeDir, changedFiles, (phase, progress) => {
-        if (window) {
-          window.webContents.send('graph:semanticProgress', { phase, progress })
-        }
-      })
-      if (result.skipped) {
-        return { success: true, skipped: true, message: 'No new or changed files to extract', nodes: result.nodes.length, edges: result.edges.length }
-      }
-      return { success: true, nodes: result.nodes.length, edges: result.edges.length }
-    } catch (err) {
-      console.error('[GraphExtractor] extractSemantic failed:', err)
-      return { success: false, error: (err as Error).message }
+    await Promise.all([fileIndexService.onReady(), fileIndexService.onKnowledgeReady()])
+    const rawData = fileIndexService.getKnowledgeGraphData()
+    return {
+      nodes: rawData.nodes as GraphNode[],
+      edges: rawData.edges.map(e => ({ ...e, type: 'reference' as const }))
     }
   })
 
