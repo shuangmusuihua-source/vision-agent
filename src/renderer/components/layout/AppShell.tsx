@@ -491,12 +491,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           ...s.slots.editor,
           activeSkillId: skill.id,
           messages: [...s.slots.editor.messages, {
+            kind: 'user' as const,
             id: `skill-${Date.now()}`,
             role: 'user',
-            phase: 'complete',
             textContent: `执行 Skill: ${skill.name}`,
-            content: [{ type: 'text', text: `执行 Skill: ${skill.name}` }],
-            toolCalls: [],
             skillMeta: { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' },
             createdAt: Date.now(),
           }],

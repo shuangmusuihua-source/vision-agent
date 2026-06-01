@@ -7,6 +7,8 @@ import type {
   AgentState,
   AgentEvent,
   ConversationMessage,
+  TextMessage,
+  StoppedMessage,
   ContentBlock,
   ToolCallState,
   ArtifactData,
@@ -58,9 +60,11 @@ function ensureAccumulator(messageId: string, slot: ContextSlot): StreamingAccum
   }
 }
 
-function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content: ContentBlock[], phase: ConversationMessage['phase']): Partial<ContextSlot> {
+function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content: ContentBlock[], phase: TextMessage['phase']): Partial<ContextSlot> {
   const msgIdx = slot.messages.findIndex((m) => m.id === acc.messageId)
   if (msgIdx < 0) return { _acc: null }
+  const existing = slot.messages[msgIdx]
+  if (existing.kind !== 'text') return { _acc: null }
 
   const textContent = acc.text
   const toolCalls: ToolCallState[] = []
@@ -81,10 +85,10 @@ function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content
 
   const updatedMessages = [...slot.messages]
   updatedMessages[msgIdx] = {
-    ...updatedMessages[msgIdx],
+    ...existing,
     phase,
     textContent: hasText ? (content.find(isTextBlock))?.text || textContent : textContent,
-    content: content.length > 0 ? content : updatedMessages[msgIdx].content,
+    content: content.length > 0 ? content : existing.content,
     toolCalls: hasToolUse
       ? content
           .filter(isToolUseBlock)
@@ -99,7 +103,7 @@ function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content
             }
           })
       : toolCalls,
-  }
+  } as TextMessage
 
   return { messages: updatedMessages, _acc: null }
 }
@@ -131,6 +135,7 @@ function fileTypeFromContent(content: string): ArtifactFileType {
 }
 
 function extractArtifactFromMessage(msg: ConversationMessage): ArtifactData | null {
+  if (msg.kind !== 'text') return null
   const skillContent = extractSkillOutputContent(msg.textContent)
   if (skillContent) {
     const writeTool = msg.toolCalls.find(
@@ -190,7 +195,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       // On leaving 'thinking', remove status indicator messages
       if (slot.agentState === 'thinking' && next !== 'thinking') {
         slotUpdates.messages = slot.messages.filter(
-          (m) => !(m.phase === 'streaming' && m.role === 'system')
+          (m) => m.kind !== 'status'
         )
       }
 
@@ -206,13 +211,16 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates.askUserRequest = null
         slotUpdates.askUserQueue = []
         const msgs = (slotUpdates.messages || slot.messages).map((m) =>
-          m.phase !== 'complete' && m.phase !== 'error' ? { ...m, phase: 'complete' as const } : m
+          m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'error'
+            ? { ...m, phase: 'complete' as const }
+            : m
         )
         const skillId = slot.activeSkillId
         if (skillId) {
           for (let i = 0; i < msgs.length; i++) {
-            if (msgs[i].skillMeta?.id === skillId) {
-              msgs[i] = { ...msgs[i], skillMeta: { ...msgs[i].skillMeta!, status: 'completed' } }
+            const msg = msgs[i]
+            if ((msg.kind === 'text' || msg.kind === 'user') && msg.skillMeta?.id === skillId) {
+              msgs[i] = { ...msg, skillMeta: { ...msg.skillMeta!, status: 'completed' } } as typeof msg
               break
             }
           }
@@ -225,12 +233,9 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           if (artifact) {
             processedIds.add(msgs[i].id)
             finalMsgs.push({
+              kind: 'artifact' as const,
               id: `artifact-${Date.now()}-${i}`,
               role: 'assistant',
-              phase: 'complete',
-              textContent: '',
-              content: [],
-              toolCalls: [],
               artifact,
               createdAt: Date.now(),
             })
@@ -251,13 +256,16 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates.askUserRequest = null
         slotUpdates.askUserQueue = []
         const msgs = slot.messages.map((m) =>
-          m.phase !== 'complete' && m.phase !== 'stopped' ? { ...m, phase: 'error' as const } : m
+          m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'stopped'
+            ? { ...m, phase: 'error' as const }
+            : m
         )
         const skillId = slot.activeSkillId
         if (skillId) {
           for (let i = 0; i < msgs.length; i++) {
-            if (msgs[i].skillMeta?.id === skillId) {
-              msgs[i] = { ...msgs[i], skillMeta: { ...msgs[i].skillMeta!, status: 'error' } }
+            const msg = msgs[i]
+            if ((msg.kind === 'text' || msg.kind === 'user') && msg.skillMeta?.id === skillId) {
+              msgs[i] = { ...msg, skillMeta: { ...msg.skillMeta!, status: 'error' } } as typeof msg
               break
             }
           }
@@ -315,15 +323,15 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           const pdMsg = msg as SystemPermissionDeniedPayload
           set((state) => {
             const slot = state.slots[ctx]
-            const targetMsg = slot.messages.find((m) =>
-              m.toolCalls.some((tc) => tc.toolUseId === pdMsg.tool_use_id)
+            const targetMsg = slot.messages.find((m): m is TextMessage =>
+              m.kind === 'text' && m.toolCalls.some((tc) => tc.toolUseId === pdMsg.tool_use_id)
             )
             if (targetMsg) {
               const msgs = [...slot.messages]
               const idx = msgs.indexOf(targetMsg)
               msgs[idx] = {
-                ...msgs[idx],
-                toolCalls: msgs[idx].toolCalls.map((tc) =>
+                ...targetMsg,
+                toolCalls: targetMsg.toolCalls.map((tc) =>
                   tc.toolUseId === pdMsg.tool_use_id
                     ? { ...tc, status: 'error' as const, result: `Permission denied: ${pdMsg.message}` }
                     : tc
@@ -358,7 +366,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           }
 
           const msgId = assistantMsg.uuid || `assistant-${Date.now()}`
-          const phase: ConversationMessage['phase'] = 'complete'
+          const phase: TextMessage['phase'] = 'complete'
 
           const textContent = content
             .filter(isTextBlock)
@@ -380,7 +388,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
           const visibleToolCalls = toolCalls.filter((tc) => tc.toolName !== 'AskUserQuestion')
 
-          const newMsg: ConversationMessage = {
+          const newMsg: TextMessage = {
+            kind: 'text',
             id: msgId,
             role: 'assistant',
             phase,
@@ -415,12 +424,13 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                 if (!acc) {
                   let msgId = `assistant-${Date.now()}`
                   const lastMsg = s.messages[s.messages.length - 1]
-                  if (lastMsg?.role === 'assistant' && lastMsg.phase !== 'complete') {
+                  if (lastMsg?.kind === 'text' && lastMsg.phase !== 'complete') {
                     msgId = lastMsg.id
                   } else {
                     const newAcc = ensureAccumulator(msgId, s)
                     newAcc.text = textDelta.text
-                    const newMsg: ConversationMessage = {
+                    const newMsg: TextMessage = {
+                      kind: 'text',
                       id: msgId,
                       role: 'assistant',
                       phase: 'streaming',
@@ -429,7 +439,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                       toolCalls: [],
                       createdAt: Date.now(),
                     }
-                    const msgs = [...s.messages.filter((m) => !(m.phase === 'streaming' && m.role === 'system')), newMsg]
+                    const msgs = [...s.messages.filter((m) => m.kind !== 'status'), newMsg]
                     return updateSlot(state, ctx, { messages: msgs, _acc: newAcc, isStreaming: true })
                   }
                   acc = ensureAccumulator(msgId, s)
@@ -439,7 +449,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
                 const msgs = [...s.messages]
                 const idx = msgs.findIndex((m) => m.id === acc!.messageId)
-                if (idx >= 0) {
+                if (idx >= 0 && msgs[idx].kind === 'text') {
                   msgs[idx] = { ...msgs[idx], textContent: acc.text, phase: 'streaming' }
                 }
 
@@ -468,7 +478,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
                   const msgs = [...s.messages]
                   const idx = msgs.findIndex((m) => m.id === acc.messageId)
-                  if (idx >= 0) {
+                  if (idx >= 0 && msgs[idx].kind === 'text') {
                     const updatedToolCalls = msgs[idx].toolCalls.map((tc) =>
                       tc.toolUseId === lastId
                         ? { ...tc, inputJsonPartial: acc.toolUseBlocks.get(lastId)!.inputJson }
@@ -494,10 +504,11 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
               if (!acc) {
                 let msgId = `assistant-${Date.now()}`
                 const lastMsg = s.messages[s.messages.length - 1]
-                if (lastMsg?.role === 'assistant' && lastMsg.phase !== 'complete') {
+                if (lastMsg?.kind === 'text' && lastMsg.phase !== 'complete') {
                   msgId = lastMsg.id
                 } else {
-                  const newMsg: ConversationMessage = {
+                  const newMsg: TextMessage = {
+                    kind: 'text',
                     id: msgId,
                     role: 'assistant',
                     phase: 'tool_calling',
@@ -506,7 +517,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                     toolCalls: [],
                     createdAt: Date.now(),
                   }
-                  const msgs = [...s.messages.filter((m) => !(m.phase === 'streaming' && m.role === 'system')), newMsg]
+                  const msgs = [...s.messages.filter((m) => m.kind !== 'status'), newMsg]
                   const newAcc = ensureAccumulator(msgId, s)
                   return updateSlot(state, ctx, { messages: msgs, _acc: newAcc, isStreaming: true })
                 }
@@ -527,7 +538,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
                 const msgs = [...s.messages]
                 const idx = msgs.findIndex((m) => m.id === acc!.messageId)
-                if (idx >= 0) {
+                if (idx >= 0 && msgs[idx].kind === 'text') {
                   const existing = msgs[idx].toolCalls.some((tc) => tc.toolUseId === block.id)
                   if (!existing) {
                     msgs[idx] = {
@@ -551,7 +562,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
               if (!acc) return {}
               const msgs = [...s.messages]
               const idx = msgs.findIndex((m) => m.id === acc.messageId)
-              if (idx < 0) return {}
+              if (idx < 0 || msgs[idx].kind !== 'text') return {}
 
               const updatedToolCalls = msgs[idx].toolCalls.map((tc) => {
                 const block = acc.toolUseBlocks.get(tc.toolUseId)
@@ -565,7 +576,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                   status: 'running' as const,
                 }
               })
-              msgs[idx] = { ...msgs[idx], toolCalls: updatedToolCalls }
+              msgs[idx] = { ...msgs[idx], toolCalls: updatedToolCalls } as TextMessage
 
               const writeOrEdit = updatedToolCalls.find(
                 (tc) => (tc.toolName === 'Write' || tc.toolName === 'Edit') && tc.status === 'running'
@@ -614,15 +625,17 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
               const isError = tr.is_error === true
 
               for (let i = 0; i < msgs.length; i++) {
-                const tcIdx = msgs[i].toolCalls.findIndex((tc) => tc.toolUseId === toolUseId)
+                if (msgs[i].kind !== 'text') continue
+                const msg = msgs[i] as TextMessage
+                const tcIdx = msg.toolCalls.findIndex((tc) => tc.toolUseId === toolUseId)
                 if (tcIdx >= 0) {
-                  const updatedToolCalls = [...msgs[i].toolCalls]
+                  const updatedToolCalls = [...msg.toolCalls]
                   updatedToolCalls[tcIdx] = {
                     ...updatedToolCalls[tcIdx],
                     result: resultContent,
                     status: isError ? 'error' : 'completed',
                   }
-                  msgs[i] = { ...msgs[i], toolCalls: updatedToolCalls }
+                  msgs[i] = { ...msg, toolCalls: updatedToolCalls }
                   changed = true
                   break
                 }
@@ -632,14 +645,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
 
           if (isReplay && textBlocks.length > 0) {
             const text = textBlocks.map((b) => b.text).join('')
-            if (text && !msgs.some((m) => m.role === 'user' && m.textContent === text)) {
+            if (text && !msgs.some((m) => m.kind === 'user' && m.textContent === text)) {
               msgs.push({
+                kind: 'user',
                 id: userMsg.uuid || `user-${Date.now()}`,
                 role: 'user',
-                phase: 'complete',
                 textContent: text,
-                content,
-                toolCalls: [],
                 createdAt: Date.now(),
               })
               changed = true
@@ -667,16 +678,15 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             const lastMsg = s.messages[s.messages.length - 1]
             if (isAborted) {
               // User-initiated stop: replace error with friendly message
-              const stopNote = {
+              const stopNote: StoppedMessage = {
+                kind: 'stopped',
                 id: `stop-${Date.now()}`,
-                role: 'assistant' as const,
-                phase: 'stopped' as const,
+                role: 'assistant',
+                phase: 'stopped',
                 textContent: '我的思考被用户停止了',
-                content: [],
-                toolCalls: [],
                 createdAt: Date.now(),
               }
-              const msgs = lastMsg?.phase === 'streaming'
+              const msgs = lastMsg?.kind === 'text' && lastMsg.phase === 'streaming'
                 ? [...s.messages.slice(0, -1), { ...lastMsg, phase: 'complete' as const }, stopNote]
                 : [...s.messages, stopNote]
               return updateSlot(state, ctx, {
@@ -686,9 +696,10 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             }
             return updateSlot(state, ctx, {
               messages: [...s.messages, {
+                kind: 'text' as const,
                 id: `error-${Date.now()}`,
-                role: 'assistant' as const,
-                phase: 'error' as const,
+                role: 'assistant',
+                phase: 'error',
                 textContent: errorText,
                 content: [],
                 toolCalls: [],
@@ -759,12 +770,10 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       const rest = s.askUserQueue.slice(1)
       return updateSlot(state, ctx, {
         messages: [...s.messages, {
+          kind: 'user' as const,
           id: `user-answer-${Date.now()}`,
           role: 'user',
-          phase: 'complete',
           textContent: answer,
-          content: [{ type: 'text', text: answer }],
-          toolCalls: [],
           createdAt: Date.now(),
         }],
         askUserRequest: next,
@@ -784,12 +793,11 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       const rest = s.askUserQueue.slice(1)
       const updated = updateSlot(state, ctx, {
         messages: [...s.messages, {
+          kind: 'status' as const,
           id: `timeout-${Date.now()}`,
           role: 'system',
           phase: 'complete',
           textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-          content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
-          toolCalls: [],
           createdAt: Date.now(),
         }],
         askUserRequest: next,

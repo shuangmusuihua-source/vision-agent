@@ -160,12 +160,10 @@ export function useAgent(context: AgentContext = 'editor') {
         [context]: {
           ...s.slots[context],
           messages: [...s.slots[context].messages, {
+            kind: 'user' as const,
             id: `user-${Date.now()}`,
             role: 'user',
-            phase: 'complete',
             textContent: prompt,
-            content: [{ type: 'text', text: prompt }],
-            toolCalls: [],
             createdAt: Date.now(),
           }],
           isStreaming: true,

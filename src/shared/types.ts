@@ -260,17 +260,56 @@ export type SkillMeta = {
   outputContent?: string
 }
 
-export type ConversationMessage = {
+// ─── Discriminated Message Union ─────────────────────────────────────
+
+interface MessageBase {
   id: string
-  role: 'user' | 'assistant' | 'system'
+  createdAt: number
+}
+
+export interface UserMessage extends MessageBase {
+  kind: 'user'
+  role: 'user'
+  textContent: string
+  skillMeta?: SkillMeta
+}
+
+export interface TextMessage extends MessageBase {
+  kind: 'text'
+  role: 'assistant'
   phase: MessagePhase
   textContent: string
   content: ContentBlock[]
   toolCalls: ToolCallState[]
-  artifact?: ArtifactData
   skillMeta?: SkillMeta
-  createdAt: number
 }
+
+export interface ArtifactMessage extends MessageBase {
+  kind: 'artifact'
+  role: 'assistant'
+  artifact: ArtifactData
+}
+
+export interface StatusMessage extends MessageBase {
+  kind: 'status'
+  role: 'system'
+  phase: MessagePhase
+  textContent: string
+}
+
+export interface StoppedMessage extends MessageBase {
+  kind: 'stopped'
+  role: 'assistant'
+  phase: 'stopped'
+  textContent: string
+}
+
+export type ConversationMessage =
+  | UserMessage
+  | TextMessage
+  | ArtifactMessage
+  | StatusMessage
+  | StoppedMessage
 
 // ─── Streaming Accumulator (store-internal) ─────────────────────────
 

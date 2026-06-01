@@ -77,7 +77,10 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
     if (!activeSkillId) return null
     const msgs = s.slots[context].messages
     for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].skillMeta?.id === activeSkillId) return msgs[i].skillMeta
+      const msg = msgs[i]
+      if (msg.kind === 'user' || msg.kind === 'text') {
+        if (msg.skillMeta?.id === activeSkillId) return msg.skillMeta
+      }
     }
     return null
   })
