@@ -619,12 +619,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <div className="divider-line" />
         {!agentCollapsed && (
           <button className="divider-swap-btn" onClick={handleSwapLayout} title="切换面板位置" aria-label="切换面板位置">
-            <ArrowLeftRight size={12} />
+            <ArrowLeftRight size={14} />
           </button>
         )}
         {agentCollapsed && (
           <button className="divider-expand-btn" onClick={handleExpand} title="展开面板" aria-label="展开面板">
-            <ChevronLeft size={12} />
+            <ChevronLeft size={14} />
           </button>
         )}
       </div>

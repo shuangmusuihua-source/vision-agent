@@ -909,20 +909,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   color: var(--color-text-secondary);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--duration-fast) var(--ease-default),
-              background var(--duration-fast) var(--ease-default),
-              color var(--duration-fast) var(--ease-default),
-              transform var(--duration-fast) var(--ease-default);
+  transition: opacity 0.2s ease,
+              background 0.2s ease,
+              color 0.2s ease,
+              transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s ease;
   cursor: pointer;
+}
+
+[data-theme="dark"] .divider-swap-btn,
+[data-theme="dark"] .divider-expand-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .divider-zone-hover .divider-swap-btn {
@@ -937,15 +947,23 @@
 
 .divider-swap-btn:hover,
 .divider-expand-btn:hover {
+  transform: translate(-50%, -50%) scale(1.08);
   background: var(--color-action);
-  color: var(--color-action-text);
+  color: #fff;
   border-color: var(--color-action);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .divider-swap-btn:hover,
+[data-theme="dark"] .divider-expand-btn:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .divider-swap-btn:active,
 .divider-expand-btn:active {
-  transform: translate(-50%, -50%) scale(0.88);
+  transform: translate(-50%, -50%) scale(0.92);
 }
+
 
 .divider-zone-dragging .divider-swap-btn {
   opacity: 0;
