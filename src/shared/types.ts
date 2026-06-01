@@ -217,7 +217,7 @@ export type AgentEvent =
 
 export const AGENT_TRANSITIONS: Record<AgentState, Partial<Record<AgentEvent['type'], AgentState>>> = {
   idle:            { SEND_MESSAGE: 'thinking' },
-  thinking:        { FIRST_CONTENT: 'running', STATUS_REQUESTING: 'thinking', COMPACT_BOUNDARY: 'compacting', RESULT_ERROR: 'error', ABORT: 'idle' },
+  thinking:        { FIRST_CONTENT: 'running', STATUS_REQUESTING: 'thinking', COMPACT_BOUNDARY: 'compacting', RESULT_SUCCESS: 'idle', RESULT_ERROR: 'error', ABORT: 'idle' },
   running:         { STATUS_REQUESTING: 'thinking', COMPACT_BOUNDARY: 'compacting', ASK_USER_REQUEST: 'waitingForUserInput', RESULT_SUCCESS: 'idle', RESULT_ERROR: 'error', ABORT: 'idle' },
   compacting:      { FIRST_CONTENT: 'running', STATUS_REQUESTING: 'thinking', RESULT_SUCCESS: 'idle', RESULT_ERROR: 'error', ABORT: 'idle' },
   waitingForUserInput: { ASK_USER_RESPONDED: 'running', ASK_USER_TIMEOUT: 'error', ABORT: 'idle' },

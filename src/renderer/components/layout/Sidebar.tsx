@@ -403,13 +403,19 @@ function Sidebar({
       </div>
 
       <div className="sidebar-content">
-        <button className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`} onClick={onAskZuovis}>
+        <div
+          className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`}
+          onClick={onAskZuovis}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onAskZuovis() }}
+        >
           <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
           <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
           {isAskZuovisActive && isAskZuovisInChat && (
             <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
           )}
-        </button>
+        </div>
 
         {/* 知识库 — fixed Knowledge directory */}
         {fixedWorkspacePaths.map((wsPath) => {

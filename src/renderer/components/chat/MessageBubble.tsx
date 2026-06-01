@@ -1,17 +1,33 @@
-import { useState, useCallback, useEffect, useRef, memo } from 'react'
+import { useState, useCallback, useEffect, useRef, memo, useSyncExternalStore } from 'react'
+import { Streamdown } from 'streamdown'
+import 'streamdown/styles.css'
 import 'katex/dist/katex.min.css'
-import ReactMarkdown from 'react-markdown'
+import { code } from '@streamdown/code'
+import { math } from '@streamdown/math'
 import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import rehypeKatex from 'rehype-katex'
 import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop } from 'lucide-react'
 import type { ConversationMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillOutputCard from './SkillOutputCard'
+import type { BundledTheme } from 'shiki'
 
-const REMARK_PLUGINS = [remarkGfm, remarkMath]
-const REHYPE_PLUGINS = [rehypeKatex]
+const REMARK_PLUGINS = [remarkGfm]
+const STREAMDOWN_PLUGINS = { code, math }
+
+function useCodeTheme(): [BundledTheme, BundledTheme] {
+  const theme = useSyncExternalStore(
+    (cb) => {
+      const obs = new MutationObserver(cb)
+      obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+      return () => obs.disconnect()
+    },
+    () => document.documentElement.getAttribute('data-theme') as string | null
+  )
+  return theme === 'light'
+    ? ['github-light', 'github-dark']
+    : ['github-dark', 'github-light']
+}
 
 function stripSkillOutputBlock(content: string): string {
   let result = content.replace(/```skill-output\n[\s\S]*?```/g, '')
@@ -34,6 +50,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
 
   const displayContent = message.textContent
   const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
+  const codeTheme = useCodeTheme()
 
   // Unified skill output from main process bridge (via store)
   const skillOutput = useAgentStore((s) => s.slots[context].skillOutput)
@@ -209,9 +226,19 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
           {displayContent && (
             <div className="message-assistant-text">
               <div className="message-markdown">
-                <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
+                <Streamdown
+                  animated={{ animation: 'slideUp', sep: 'word', stagger: 30, duration: 200 }}
+                  plugins={STREAMDOWN_PLUGINS}
+                  remarkPlugins={REMARK_PLUGINS}
+                  shikiTheme={codeTheme}
+                  mode={isStreaming ? 'streaming' : 'static'}
+                  isAnimating={isStreaming}
+                  parseIncompleteMarkdown={isStreaming}
+                  lineNumbers={false}
+                  controls={false}
+                >
                   {stripSkillOutputBlock(displayContent)}
-                </ReactMarkdown>
+                </Streamdown>
               </div>
             </div>
           )}

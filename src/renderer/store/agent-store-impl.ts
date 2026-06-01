@@ -418,17 +418,18 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                   if (lastMsg?.role === 'assistant' && lastMsg.phase !== 'complete') {
                     msgId = lastMsg.id
                   } else {
+                    const newAcc = ensureAccumulator(msgId, s)
+                    newAcc.text = textDelta.text
                     const newMsg: ConversationMessage = {
                       id: msgId,
                       role: 'assistant',
                       phase: 'streaming',
-                      textContent: '',
+                      textContent: textDelta.text,
                       content: [],
                       toolCalls: [],
                       createdAt: Date.now(),
                     }
                     const msgs = [...s.messages.filter((m) => !(m.phase === 'streaming' && m.role === 'system')), newMsg]
-                    const newAcc = ensureAccumulator(msgId, s)
                     return updateSlot(state, ctx, { messages: msgs, _acc: newAcc, isStreaming: true })
                   }
                   acc = ensureAccumulator(msgId, s)
