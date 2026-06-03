@@ -31,6 +31,8 @@ export type ContextSlot = {
   _acc: StreamingAccumulator | null
   _firstContentSeen: boolean
   _processedArtifactIds: Set<string>
+  _queryGeneration: number
+  _resultGuardGen: number
 }
 
 function emptySlot(): ContextSlot {
@@ -51,6 +53,8 @@ function emptySlot(): ContextSlot {
     _acc: null,
     _firstContentSeen: false,
     _processedArtifactIds: new Set(),
+    _queryGeneration: 0,
+    _resultGuardGen: 0,
   }
 }
 

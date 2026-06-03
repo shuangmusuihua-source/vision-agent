@@ -254,7 +254,8 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
       if (toolName === 'Read') {
         const rawPath = extractPathFromToolInput(toolName, input)
         if (rawPath) {
-          const pathToCheck = resolve(rawPath)
+          const agentCwd = getAppSkillsCwd()
+          const pathToCheck = resolve(agentCwd, rawPath)
           const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(resolve(dir)))
           const isAppSkill = pathToCheck.startsWith(resolve(getAppSkillsCwd()))
           if (isAuthorized || isAppSkill) {
@@ -268,6 +269,9 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
         const requestId = `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         // SDK format: { questions: [{ question, header, options: [{ label, description }], multiSelect }] }
         const questions = input.questions as Array<Record<string, unknown>> | undefined
+        if (questions && questions.length > 1) {
+          console.warn(`[AskUserQuestion] received ${questions.length} questions; only the first is supported.`)
+        }
         const firstQ = questions?.[0]
         const question = (firstQ?.question as string) || ''
         const rawOptions = firstQ?.options as Array<Record<string, string>> | undefined

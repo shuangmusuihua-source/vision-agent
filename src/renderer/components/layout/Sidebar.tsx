@@ -408,7 +408,7 @@ function Sidebar({
           onClick={onAskZuovis}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onAskZuovis() }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
         >
           <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
           <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>

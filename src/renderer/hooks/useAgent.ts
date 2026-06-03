@@ -100,12 +100,11 @@ function triggerWatchdog(ctx: AgentContext) {
       [ctx]: {
         ...state.slots[ctx],
         messages: [...s.messages, {
+          kind: 'status' as const,
           id: `watchdog-${Date.now()}`,
           role: 'system',
           phase: 'complete',
           textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-          content: [{ type: 'text', text: '☕ 等了很久没有回应，我先休息一下，有事随时沟通' }],
-          toolCalls: [],
           createdAt: Date.now(),
         }],
       },

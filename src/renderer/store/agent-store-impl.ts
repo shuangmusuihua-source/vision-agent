@@ -192,10 +192,20 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       const next = transition(slot.agentState, event)
       const slotUpdates: Partial<ContextSlot> = { agentState: next }
 
-      // On leaving 'thinking', remove status indicator messages
+      // On new query, increment generation to guard against stale IPC events
+      if (event.type === 'SEND_MESSAGE') {
+        slotUpdates._queryGeneration = (slot._queryGeneration || 0) + 1
+      }
+
+      // On abort, record the generation so stale result:error events can be detected
+      if (event.type === 'ABORT') {
+        slotUpdates._resultGuardGen = slot._queryGeneration || 0
+      }
+
+      // On leaving 'thinking', remove streaming status indicator messages
       if (slot.agentState === 'thinking' && next !== 'thinking') {
         slotUpdates.messages = slot.messages.filter(
-          (m) => m.kind !== 'status'
+          (m) => !(m.kind === 'status' && m.phase === 'streaming')
         )
       }
 
@@ -255,7 +265,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates.permissionQueue = []
         slotUpdates.askUserRequest = null
         slotUpdates.askUserQueue = []
-        const msgs = slot.messages.map((m) =>
+        const msgs = (slotUpdates.messages || slot.messages).map((m) =>
           m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'stopped'
             ? { ...m, phase: 'error' as const }
             : m
@@ -283,6 +293,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         slotUpdates.permissionQueue = []
         slotUpdates.askUserRequest = null
         slotUpdates.askUserQueue = []
+        const msgs = (slotUpdates.messages || slot.messages).map((m) =>
+          m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'error'
+            ? { ...m, phase: 'complete' as const }
+            : m
+        )
+        slotUpdates.messages = msgs
       }
 
       return updateSlot(state, ctx, slotUpdates)
@@ -439,7 +455,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                       toolCalls: [],
                       createdAt: Date.now(),
                     }
-                    const msgs = [...s.messages.filter((m) => m.kind !== 'status'), newMsg]
+                    const msgs = [...s.messages.filter((m) => !(m.kind === 'status' && m.phase === 'streaming')), newMsg]
                     return updateSlot(state, ctx, { messages: msgs, _acc: newAcc, isStreaming: true })
                   }
                   acc = ensureAccumulator(msgId, s)
@@ -517,11 +533,20 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                     toolCalls: [],
                     createdAt: Date.now(),
                   }
-                  const msgs = [...s.messages.filter((m) => m.kind !== 'status'), newMsg]
+                  const msgs = [...s.messages.filter((m) => !(m.kind === 'status' && m.phase === 'streaming')), newMsg]
                   const newAcc = ensureAccumulator(msgId, s)
-                  return updateSlot(state, ctx, { messages: msgs, _acc: newAcc, isStreaming: true })
+                  const firstSeen = s._firstContentSeen
+                  if (!firstSeen) {
+                    setTimeout(() => get().dispatchAgentEvent({ type: 'FIRST_CONTENT' }, ctx), 0)
+                  }
+                  return updateSlot(state, ctx, { messages: msgs, _acc: newAcc, isStreaming: true, _firstContentSeen: true })
                 }
                 acc = ensureAccumulator(msgId, s)
+              }
+
+              const firstSeen = s._firstContentSeen
+              if (!firstSeen) {
+                setTimeout(() => get().dispatchAgentEvent({ type: 'FIRST_CONTENT' }, ctx), 0)
               }
 
               if (block.type === 'tool_use') {
@@ -548,7 +573,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                     }
                   }
                 }
-                return updateSlot(state, ctx, { messages: msgs, _acc: acc })
+                return updateSlot(state, ctx, { messages: msgs, _acc: acc, _firstContentSeen: true })
               }
               return {}
             })
@@ -673,8 +698,14 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
           const errorText = errorMsg.errors.join('\n') || 'Agent error'
           const isAborted = /aborted|cancelled|canceled/i.test(errorText)
 
+          // Guard: if a new query has started since the abort that triggered this error,
+          // this result is stale and must be discarded to avoid corrupting the new query.
+          // Only applies to user-aborted queries; legitimate errors always process.
+          const abortGuardGen = isAborted ? get().slots[ctx]._resultGuardGen : undefined
+
           set((state) => {
             const s = state.slots[ctx]
+            if (abortGuardGen !== undefined && s._queryGeneration !== abortGuardGen) return {}
             const lastMsg = s.messages[s.messages.length - 1]
             if (isAborted) {
               // User-initiated stop: replace error with friendly message
@@ -708,7 +739,10 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
               usageInfo: errorMsg.usage,
             })
           })
-          get().dispatchAgentEvent({ type: 'RESULT_ERROR' }, ctx)
+          // Only dispatch RESULT_ERROR if the guard generation still matches (or no guard needed)
+          if (abortGuardGen === undefined || get().slots[ctx]._queryGeneration === abortGuardGen) {
+            get().dispatchAgentEvent({ type: 'RESULT_ERROR' }, ctx)
+          }
         }
         return
       }
