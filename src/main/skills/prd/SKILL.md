@@ -13,16 +13,20 @@ Generate structured Product Requirement Documents. Follow the five-part template
 
 ## Workflow
 
-### Stage 0 — Clarify (always ask if unclear)
+### Stage 0 — Clarify (ask one question at a time)
 
-Before generating, confirm with the user:
+Before generating, gather context. **Ask ONE question at a time.** Wait for the user's answer before asking the next. Never bombard with multiple questions at once.
 
-1. **Who is the user?** (角色)
-2. **What is the core problem?** (核心痛点)
-3. **Why this solution?** (为什么用户会选择它)
-4. **What is the MVP scope?** (最小可行范围)
+Ask in this order:
 
-If the user hasn't answered all four, ask. Don't guess.
+1. First, ask: **这个产品是做什么的？一句话描述即可。**
+2. Then: **目标用户是谁？他们的典型画像是什么？**
+3. Then: **核心痛点是什么？为什么现有方案不够好？**
+4. Finally: **MVP 第一期必须做哪些功能？哪些可以后续迭代？**
+
+After collecting all four answers, proceed to Stage 1. If any answer is too vague, ask one follow-up before moving on.
+
+Key rule: **每次只问一个问题。用户回答后再问下一个。**
 
 ### Stage 1 — 初稿 (Why)
 
