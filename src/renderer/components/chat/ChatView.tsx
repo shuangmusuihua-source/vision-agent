@@ -84,16 +84,25 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
           isLastMessage={idx === visibleMessages.items.length - 1}
         />
       ))}
-      {isStreaming && agentState === 'thinking' && (
-        <div className="message-bubble message-assistant message-thinking-indicator">
-          <div className="message-status-indicator">
-            思考中
-            <span className="status-dot" />
-            <span className="status-dot" />
-            <span className="status-dot" />
-          </div>
-        </div>
-      )}
+      {isStreaming && (() => {
+        // Keep indicator visible until actual text content arrives,
+        // bridging the gap between thinking→running and the first visible tokens.
+        const lastMsg = messages[messages.length - 1]
+        const hasContent = lastMsg && lastMsg.kind === 'text' && lastMsg.textContent.length > 0
+        if (agentState === 'thinking' || (agentState === 'running' && !hasContent)) {
+          return (
+            <div className="message-bubble message-assistant message-thinking-indicator">
+              <div className="message-status-indicator">
+                {agentState === 'thinking' ? '思考中' : '生成中'}
+                <span className="status-dot" />
+                <span className="status-dot" />
+                <span className="status-dot" />
+              </div>
+            </div>
+          )
+        }
+        return null
+      })()}
       <div ref={bottomRef} />
     </div>
   )
