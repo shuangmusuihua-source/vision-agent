@@ -518,16 +518,11 @@ function Sidebar({
           const isCollapsed = collapsedWorkspaces.has(wsPath)
           return (
             <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
-              <div className="sidebar-workspace-header">
-                <button
-                  className="sidebar-workspace-toggle"
-                  onClick={() => toggleWorkspace(wsPath)}
-                  aria-label={isCollapsed ? '展开 Knowledge' : '折叠 Knowledge'}
-                >
+              <div className="sidebar-workspace-module-header" onClick={() => toggleWorkspace(wsPath)} style={{ cursor: 'pointer' }}>
+                <span className="sidebar-workspace-module-title">Knowledge</span>
+                <div className="sidebar-workspace-module-actions">
                   {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                </button>
-                <Folder size={14} />
-                <span className="sidebar-workspace-name">Knowledge</span>
+                </div>
               </div>
               {!isCollapsed && (
                 <div className="sidebar-workspace-body">
