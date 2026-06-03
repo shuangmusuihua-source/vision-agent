@@ -50,7 +50,7 @@ function updateSlot(
 
 // ─── Accumulator helpers ──────────────────────────────────────────────
 
-function ensureAccumulator(messageId: string, slot: ContextSlot): StreamingAccumulator {
+export function ensureAccumulator(messageId: string, slot: ContextSlot): StreamingAccumulator {
   if (slot._acc && slot._acc.messageId === messageId) return slot._acc
   return {
     messageId,
@@ -60,7 +60,7 @@ function ensureAccumulator(messageId: string, slot: ContextSlot): StreamingAccum
   }
 }
 
-function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content: ContentBlock[], phase: TextMessage['phase']): Partial<ContextSlot> {
+export function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content: ContentBlock[], phase: TextMessage['phase']): Partial<ContextSlot> {
   const msgIdx = slot.messages.findIndex((m) => m.id === acc.messageId)
   if (msgIdx < 0) return { _acc: null }
   const existing = slot.messages[msgIdx]

@@ -13,8 +13,8 @@ import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
 import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
-import { useDividerDrag } from '../../hooks/useDividerDrag'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
 import type { AgentContext } from '../../../shared/types'
@@ -38,31 +38,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     })
   }, [])
   const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [toggleVisible, setToggleVisible] = useState(true)
-  const toggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [agentWidth, setAgentWidth] = useState(360)
-  const [agentCollapsed, setAgentCollapsed] = useState(false)
-  const shellRef = useRef<HTMLDivElement>(null)
-  const [isChatFirst, setIsChatFirst] = useState(false)
-
   const {
-    dividerHovered,
-    setDividerHovered,
-    isDragging,
-    handleSwapLayout,
-    handleExpand,
-    handleToggleAgent,
-    handleDividerMouseDown,
-  } = useDividerDrag({
-    agentCollapsed,
-    agentWidth,
-    isChatFirst,
-    setAgentWidth,
-    setAgentCollapsed,
+    sidebarCollapsed, setSidebarCollapsed,
+    agentWidth, agentCollapsed,
+    isChatFirst, setIsChatFirst,
     shellRef,
-    onSwapLayout: () => setIsChatFirst((v) => !v),
-  })
+    dividerHovered, setDividerHovered, isDragging,
+    handleSwapLayout, handleExpand, handleToggleAgent, handleDividerMouseDown,
+    toggleVisible, handleToggleMouseEnter, handleToggleMouseLeave,
+  } = useResponsiveLayout()
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
   const [tabContents, setTabContents] = useState<Record<string, string>>({})
@@ -98,43 +82,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       setLinkedFile(activeTab)
     }
   }, [activeTab])
-
-  // Responsive: auto-collapse sidebar/agent panel at small widths
-  useEffect(() => {
-    const handleResize = () => {
-      const w = window.innerWidth
-      if (w < 900) {
-        setSidebarCollapsed(true)
-        setAgentWidth(0)
-        setAgentCollapsed(true)
-      } else if (w < 1200) {
-        setSidebarCollapsed(true)
-        if (agentCollapsed) {
-          handleExpand()
-        }
-      }
-    }
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [agentCollapsed])
-
-  // Auto-hide sidebar toggle button after 3s
-  useEffect(() => {
-    toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
-    return () => {
-      if (toggleTimerRef.current) clearTimeout(toggleTimerRef.current)
-    }
-  }, [])
-
-  const handleToggleMouseEnter = useCallback(() => {
-    if (toggleTimerRef.current) clearTimeout(toggleTimerRef.current)
-    setToggleVisible(true)
-  }, [])
-
-  const handleToggleMouseLeave = useCallback(() => {
-    toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
-  }, [])
 
   // Auto-update notifications
   useEffect(() => {
