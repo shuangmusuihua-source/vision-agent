@@ -93,7 +93,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
           return (
             <div className="message-bubble message-assistant message-thinking-indicator">
               <div className="message-status-indicator">
-                {agentState === 'thinking' ? '思考中' : '生成中'}
+                {agentState === 'thinking' ? '思考中' : '整理思路中'}
                 <span className="status-dot" />
                 <span className="status-dot" />
                 <span className="status-dot" />
