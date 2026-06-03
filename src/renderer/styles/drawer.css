@@ -6,6 +6,7 @@
 
 .drawer {
   background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
