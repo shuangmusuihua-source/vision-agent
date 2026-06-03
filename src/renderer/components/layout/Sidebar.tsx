@@ -513,6 +513,8 @@ function Sidebar({
           </Flipper>
         )}
 
+        <div style={{ height: 24 }} />
+
         {/* 知识库 — fixed Knowledge directory */}
         {fixedWorkspacePaths.map((wsPath) => {
           const isCollapsed = collapsedWorkspaces.has(wsPath)
