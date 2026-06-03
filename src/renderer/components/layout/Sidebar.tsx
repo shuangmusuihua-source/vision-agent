@@ -513,7 +513,7 @@ function Sidebar({
           </Flipper>
         )}
 
-        <div style={{ height: 24 }} />
+        <div className="sidebar-section-divider" />
 
         {/* 知识库 — fixed Knowledge directory */}
         {fixedWorkspacePaths.map((wsPath) => {

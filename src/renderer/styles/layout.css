@@ -1064,6 +1064,12 @@
   opacity: 0.7;
 }
 
+.sidebar-section-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 12px 8px 16px;
+}
+
 .sidebar-workspace-fixed {
   padding-bottom: 8px;
   margin-bottom: 4px;
