@@ -1067,7 +1067,6 @@
 .sidebar-workspace-fixed {
   padding-bottom: 8px;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .sidebar-workspace-fixed-icon {
