@@ -417,31 +417,6 @@ function Sidebar({
           )}
         </div>
 
-        {/* 知识库 — fixed Knowledge directory */}
-        {fixedWorkspacePaths.map((wsPath) => {
-          const isCollapsed = collapsedWorkspaces.has(wsPath)
-          return (
-            <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
-              <div className="sidebar-workspace-header">
-                <button
-                  className="sidebar-workspace-toggle"
-                  onClick={() => toggleWorkspace(wsPath)}
-                  aria-label={isCollapsed ? '展开 Knowledge' : '折叠 Knowledge'}
-                >
-                  {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                </button>
-                <Folder size={14} />
-                <span className="sidebar-workspace-name">Knowledge</span>
-              </div>
-              {!isCollapsed && (
-                <div className="sidebar-workspace-body">
-                  {renderTree(files[wsPath] || [], 0, wsPath)}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
         {/* 工作区 */}
         {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length > 0 && (
           <div className="sidebar-workspace-module-header">
@@ -537,6 +512,31 @@ function Sidebar({
             })}
           </Flipper>
         )}
+
+        {/* 知识库 — fixed Knowledge directory */}
+        {fixedWorkspacePaths.map((wsPath) => {
+          const isCollapsed = collapsedWorkspaces.has(wsPath)
+          return (
+            <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
+              <div className="sidebar-workspace-header">
+                <button
+                  className="sidebar-workspace-toggle"
+                  onClick={() => toggleWorkspace(wsPath)}
+                  aria-label={isCollapsed ? '展开 Knowledge' : '折叠 Knowledge'}
+                >
+                  {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                </button>
+                <Folder size={14} />
+                <span className="sidebar-workspace-name">Knowledge</span>
+              </div>
+              {!isCollapsed && (
+                <div className="sidebar-workspace-body">
+                  {renderTree(files[wsPath] || [], 0, wsPath)}
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {memoryFiles.length > 0 && (
           <div className="sidebar-memory-section">
