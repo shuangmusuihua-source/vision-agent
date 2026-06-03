@@ -60,10 +60,10 @@ const builtinSkills: SkillDefinition[] = [
   },
   {
     id: 'prd',
-    name: '生成 PRD',
+    name: 'PRD · 策',
     description: '生成结构化产品需求文档：背景目标、方案概述、详细方案、上线计划',
     icon: 'ClipboardList',
-    promptTemplate: `使用 prd skill 生成 PRD：{activeFile}`,
+    promptTemplate: `帮我写一份产品需求文档（PRD）。`,
     outputMode: 'write',
   },
 ]
