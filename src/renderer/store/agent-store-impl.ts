@@ -110,7 +110,7 @@ function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content
 
 // ─── Artifact Extraction ────────────────────────────────────────────────
 
-function extractSkillOutputContent(text: string): string | null {
+export function extractSkillOutputContent(text: string): string | null {
   const match = text.match(/```skill-output\n([\s\S]*?)```/)
   if (match) return match[1]
   const partial = text.match(/```skill-output\n([\s\S]*)$/)
@@ -166,7 +166,7 @@ function extractArtifactFromMessage(msg: ConversationMessage): ArtifactData | nu
 
 // ─── State Machine ─────────────────────────────────────────────────────
 
-function transition(current: AgentState, event: AgentEvent): AgentState {
+export function transition(current: AgentState, event: AgentEvent): AgentState {
   const allowed = TRANSITIONS[current]?.[event.type]
   if (!allowed) {
     console.warn(`[AgentFSM] Invalid transition: ${current} + ${event.type}`)
