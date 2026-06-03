@@ -10,4 +10,5 @@ export const BUILTIN_SKILLS: BuiltinSkillManifest[] = [
   { id: 'system-cleanup', hasResources: true },
   { id: 'organize-desktop', hasResources: true },
   { id: 'organize-folder', hasResources: true },
+  { id: 'prd', hasResources: true },
 ]

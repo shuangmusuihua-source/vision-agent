@@ -58,6 +58,14 @@ const builtinSkills: SkillDefinition[] = [
     promptTemplate: `使用 organize-folder skill 整理文件夹... {activeFile}`,
     hideInSlashMenu: true,
   },
+  {
+    id: 'prd',
+    name: '生成 PRD',
+    description: '生成结构化产品需求文档：背景目标、方案概述、详细方案、上线计划',
+    icon: 'ClipboardList',
+    promptTemplate: `使用 prd skill 生成 PRD：{activeFile}`,
+    outputMode: 'write',
+  },
 ]
 
 export function getBuiltinSkills(): SkillDefinition[] {
