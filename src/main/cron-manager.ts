@@ -170,3 +170,9 @@ export async function executeTaskById(taskId: string): Promise<string> {
   await executeTask(entry.task)
   return entry.task.lastResult || ''
 }
+
+export function stopAllCronJobs(): void {
+  for (const [, entry] of tasks) {
+    entry.job.stop()
+  }
+}

@@ -9,7 +9,7 @@ import { getSettings, getAuthorizedDirectories, ensureKnowledgeBase, getKnowledg
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
-import { setSkillOutputWindow } from './agent-manager'
+import { setSkillOutputWindow, handleWindowDestroy } from './agent-manager'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -73,6 +73,10 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     if (mainWindow) mainWindow.show()
+  })
+
+  mainWindow.on('closed', () => {
+    handleWindowDestroy()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -172,4 +176,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  // Abort all active SDK agent queries + reject pending permissions
+  const { abortActiveQuery } = require('./agent-manager') as typeof import('./agent-manager')
+  abortActiveQuery()
+  handleWindowDestroy()
+  // Stop all cron jobs
+  const { stopAllCronJobs } = require('./cron-manager') as typeof import('./cron-manager')
+  stopAllCronJobs()
 })

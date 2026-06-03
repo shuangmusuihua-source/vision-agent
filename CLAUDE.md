@@ -64,7 +64,7 @@ Electron three-process app: Main, Preload, Renderer.
 
 ## Conventions
 
-- Icons: `@phosphor-icons/react` with `weight="regular"`. Some legacy `lucide-react` icons remain.
+- Icons: `lucide-react`
 - CSS variables for all colors and typography. Never hardcode color values in component CSS.
 - Theme switching via `data-theme` attribute on `<html>`. Light/dark/system.
 - File paths use `workspace:listMarkdownFiles` for `.md` discovery, `workspace:readFile`/`workspace:writeFile` for I/O.

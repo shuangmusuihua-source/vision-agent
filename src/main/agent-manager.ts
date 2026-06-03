@@ -402,6 +402,12 @@ function rejectAllPendingAskUser(context?: AgentContext): void {
   }
 }
 
+/** Clean up all pending promises when the renderer window is destroyed */
+export function handleWindowDestroy(): void {
+  rejectAllPendingPermissions()
+  rejectAllPendingAskUser()
+}
+
 export function abortActiveQuery(context?: AgentContext): void {
   if (context) {
     const entry = activeQueries.get(context)

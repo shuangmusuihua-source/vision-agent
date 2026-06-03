@@ -88,7 +88,8 @@ export function registerIpcHandlers(): void {
     if (!isPathAuthorized(dirPath)) return []
     try {
       return await scanDirectory(dirPath)
-    } catch {
+    } catch (e) {
+      console.error('[workspace:listFiles] failed:', dirPath, e)
       return []
     }
   })
@@ -276,7 +277,8 @@ export function registerIpcHandlers(): void {
     if (!isPathAuthorized(dirPath)) return []
     try {
       return await listMarkdownFiles(dirPath)
-    } catch {
+    } catch (e) {
+      console.error('[workspace:listMarkdownFiles] failed:', dirPath, e)
       return []
     }
   })
@@ -453,7 +455,8 @@ export function registerIpcHandlers(): void {
           name: e.name.replace(/\.md$/, ''),
           path: join(memoryDir, e.name)
         }))
-    } catch {
+    } catch (e) {
+      console.error('[memory:list] failed:', memoryDir, e)
       return []
     }
   })
