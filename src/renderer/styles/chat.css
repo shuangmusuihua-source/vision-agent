@@ -815,15 +815,15 @@
 .chat-input-wrapper {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   padding: 0;
   background: transparent;
   border-radius: var(--radius-xl);
 }
 
 .chat-input-attach-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-tertiary);
@@ -833,8 +833,6 @@
   cursor: pointer;
   border: none;
   flex-shrink: 0;
-  align-self: center;
-  margin-right: 2px;
 }
 
 .chat-input-attach-btn:hover {
@@ -894,7 +892,7 @@
   resize: none;
   border: none;
   border-radius: var(--radius-xl);
-  padding: 10px 40px 10px 14px;
+  padding: 10px 40px 10px 4px;
   font-size: var(--font-size-md);
   font-family: inherit;
   line-height: 1.5;
@@ -902,6 +900,7 @@
   background: transparent;
   outline: none;
   max-height: 120px;
+  min-width: 0;
 }
 
 .chat-input:focus {
