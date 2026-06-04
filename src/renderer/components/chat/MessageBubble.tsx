@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect, useRef, memo, useSyncExternalStore } from 'react'
 import { Streamdown } from 'streamdown'
+import type { DiagramPlugin } from 'streamdown'
 import 'streamdown/styles.css'
 import 'katex/dist/katex.min.css'
 import { code } from '@streamdown/code'
 import { math } from '@streamdown/math'
+import mermaid from 'mermaid'
 import remarkGfm from 'remark-gfm'
 import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop } from 'lucide-react'
 import type { ConversationMessage, TextMessage, ArtifactData } from '../../../shared/types'
@@ -13,7 +15,24 @@ import ToolCallDisplay from './ToolCallDisplay'
 import SkillOutputCard from './SkillOutputCard'
 
 const REMARK_PLUGINS = [remarkGfm]
-const STREAMDOWN_PLUGINS = { code, math }
+
+const mermaidPlugin: DiagramPlugin = {
+  name: 'mermaid',
+  type: 'diagram',
+  language: 'mermaid',
+  getMermaid(config) {
+    if (config) mermaid.initialize(config)
+    return {
+      initialize(cfg) { mermaid.initialize({ ...cfg, startOnLoad: false }) },
+      async render(id, source) {
+        const { svg } = await mermaid.render(id, source)
+        return { svg }
+      },
+    }
+  },
+}
+
+const STREAMDOWN_PLUGINS = { code, math, mermaid: mermaidPlugin }
 
 function useCodeTheme(): [BundledTheme, BundledTheme] {
   const theme = useSyncExternalStore(
@@ -226,13 +245,15 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
           <div className="message-assistant-text">
             <div className="message-markdown">
               <Streamdown
-                animated={{ animation: 'slideUp', sep: 'word', stagger: 30, duration: 200 }}
                 plugins={STREAMDOWN_PLUGINS}
                 remarkPlugins={REMARK_PLUGINS}
                 shikiTheme={codeTheme}
                 mode={isStreaming ? 'streaming' : 'static'}
                 isAnimating={isStreaming}
+                animated={isStreaming ? { animation: 'slideUp', sep: 'word', stagger: 30, duration: 200 } : undefined}
                 parseIncompleteMarkdown={isStreaming}
+                caret="block"
+                mermaid={{ config: { startOnLoad: false } }}
                 lineNumbers={false}
                 controls={false}
               >
@@ -299,6 +320,21 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
         <AssistantBubble message={message} isLastMessage={isLastMessage} skillOutput={skillOutput} codeTheme={codeTheme} onSelectText={onSelectText} context={context} />
       )
   }
+}, (prev, next) => {
+  // Skip re-render if nothing visible changed (reduces jank during streaming)
+  const a = prev.message, b = next.message
+  if (a.id !== b.id) return false
+  if (a.kind !== b.kind) return false
+  if (prev.isLastMessage !== next.isLastMessage) return false
+  // For text messages during streaming, compare the fields that affect rendering
+  if (a.kind === 'text' && b.kind === 'text') {
+    return a.textContent === b.textContent
+      && a.phase === b.phase
+      && a.toolCalls === b.toolCalls
+      && a.skillMeta === b.skillMeta
+  }
+  // For other types, use shallow reference comparison of key fields
+  return a === b
 })
 
 export default MessageBubble

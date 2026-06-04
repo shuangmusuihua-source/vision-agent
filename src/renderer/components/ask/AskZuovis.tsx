@@ -160,7 +160,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           </div>
         ) : (
           <div className="ask-zuovis-messages-inner">
-            <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} />
+            <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} scrollContainerRef={scrollRef} />
           </div>
         )}
       </div>
@@ -185,7 +185,10 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           <ChatInput
           context="ask"
           onSend={handleChatSend}
-          onStop={() => window.api.agent.abort('ask')}
+          onStop={() => {
+            useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'ask')
+            window.api.agent.abort('ask')
+          }}
           disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !askUserRequest}
           isStreaming={isStreaming}
           placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}

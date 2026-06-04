@@ -44,6 +44,7 @@ interface SkillDefinition {
   argumentHint?: string
   outputMode?: 'skill-output' | 'write'
   hideInSlashMenu?: boolean
+  enabled?: boolean
 }
 
 // ─── Search Result ──────────────────────────────────────────────────
@@ -154,6 +155,8 @@ interface CronApi {
 
 interface SkillsApi {
   list: () => Promise<SkillDefinition[]>
+  toggle: (skillId: string, enabled: boolean) => Promise<string[]>
+  getEnabled: () => Promise<string[]>
 }
 
 interface SearchApi {

@@ -10,6 +10,7 @@ export function getKnowledgeBaseDir(): string {
 }
 import { safeStorage } from 'electron'
 import type { ModelProfile } from '../shared/types'
+import { getBuiltinSkills } from './skills/builtin'
 
 const ENCRYPTION_PREFIX = 'enc:'
 
@@ -53,6 +54,7 @@ interface AppSettings {
   fixedDirectories: string[]
   theme: 'light' | 'dark' | 'system'
   cronTasks: CronTask[]
+  enabledSkills: string[]
 }
 
 const store = new Store<AppSettings>({
@@ -62,7 +64,8 @@ const store = new Store<AppSettings>({
     authorizedDirectories: [],
     fixedDirectories: [],
     theme: 'system',
-    cronTasks: []
+    cronTasks: [],
+    enabledSkills: []
   }
 })
 
@@ -232,6 +235,36 @@ export function ensureKnowledgeBase(): string {
   }
 
   return kbDir
+}
+
+export function getEnabledSkills(): string[] {
+  const stored = store.get('enabledSkills')
+  // On first launch, default to all built-in skills
+  if (!stored || stored.length === 0) {
+    const defaults = getBuiltinSkills().map((s: { id: string }) => s.id)
+    return defaults
+  }
+  return stored
+}
+
+export function setEnabledSkills(skillIds: string[]): void {
+  store.set('enabledSkills', skillIds)
+}
+
+export function toggleSkill(skillId: string, enabled: boolean): string[] {
+  let current = store.get('enabledSkills')
+  // On first toggle, seed with all built-in skill IDs as defaults
+  if (!current || current.length === 0) {
+    current = getBuiltinSkills().map((s: { id: string }) => s.id)
+  }
+  let next: string[]
+  if (enabled) {
+    next = current.includes(skillId) ? current : [...current, skillId]
+  } else {
+    next = current.filter((id) => id !== skillId)
+  }
+  store.set('enabledSkills', next)
+  return next
 }
 
 export type { ModelProfile, AppSettings }

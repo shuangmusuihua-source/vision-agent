@@ -158,7 +158,9 @@ const api = {
   },
 
   skills: {
-    list: () => ipcRenderer.invoke('skills:list')
+    list: () => ipcRenderer.invoke('skills:list'),
+    toggle: (skillId: string, enabled: boolean) => ipcRenderer.invoke('skills:toggle', skillId, enabled),
+    getEnabled: () => ipcRenderer.invoke('skills:getEnabled'),
   },
 
   search: {

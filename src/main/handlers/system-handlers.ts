@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { basename, join, extname } from 'path'
 import { readFile, writeFile, mkdir, unlink, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
-import { getAuthorizedDirectories, getApiKey, getBaseUrl } from '../store'
+import { getAuthorizedDirectories, getApiKey, getBaseUrl, getEnabledSkills, toggleSkill } from '../store'
 import { fileIndexService } from '../file-index-service'
 import { isPathAuthorized } from '../path-validator'
 import { getBuiltinSkills } from '../skills/builtin'
@@ -70,7 +70,19 @@ export function registerSystemHandlers(): void {
   })
 
   // --- Skills ---
-  ipcMain.handle('skills:list', async () => getBuiltinSkills())
+  ipcMain.handle('skills:list', async () => {
+    const skills = getBuiltinSkills()
+    const enabled = getEnabledSkills()
+    return skills.map((s) => ({ ...s, enabled: enabled.includes(s.id) }))
+  })
+
+  ipcMain.handle('skills:toggle', async (_event, skillId: string, enabled: boolean) => {
+    return toggleSkill(skillId, enabled)
+  })
+
+  ipcMain.handle('skills:getEnabled', async () => {
+    return getEnabledSkills()
+  })
 
   // --- Search ---
   ipcMain.handle('search:query', async (_event, keyword: string) => {

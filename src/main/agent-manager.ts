@@ -9,7 +9,7 @@ import { getAppSkillsCwd } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, AgentContext, AskUserQuestionOption } from '../shared/types'
-import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile } from './store'
+import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile, getEnabledSkills } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 
 let _cachedCliPath: string | undefined | null = null
@@ -97,18 +97,43 @@ function redactCredentials(text: string): string {
   return result
 }
 
-async function writeAuditLog(entry: Record<string, unknown>): Promise<void> {
+// ─── Buffered audit log writer ────────────────────────────────────────
+// Replaces per-call `await appendFile` with buffered batching (flush every 5s).
+// Each tool invocation triggers 2 log entries (PreToolUse + PostToolUse) —
+// with the old approach, both were inline `await`s blocking the hook chain.
+// Now writes are fire-and-forget, with a lazy timer that flushes the buffer.
+
+const auditBuffer: string[] = []
+let auditFlushTimer: ReturnType<typeof setTimeout> | null = null
+const AUDIT_FLUSH_MS = 5_000
+
+function scheduleAuditFlush(): void {
+  if (auditFlushTimer) return
+  auditFlushTimer = setTimeout(async () => {
+    auditFlushTimer = null
+    if (auditBuffer.length === 0) return
+    const batch = auditBuffer.splice(0)
+    try {
+      await appendFile(AUDIT_LOG_PATH, batch.join(''), { encoding: 'utf-8' })
+    } catch {
+      // Audit log write failure should not block agent
+    }
+  }, AUDIT_FLUSH_MS)
+}
+
+function writeAuditLog(entry: Record<string, unknown>): void {
   try {
     const line = JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + '\n'
-    await appendFile(AUDIT_LOG_PATH, redactCredentials(line), { encoding: 'utf-8' })
+    auditBuffer.push(redactCredentials(line))
+    scheduleAuditFlush()
   } catch {
-    // Audit log write failure should not block agent
+    // silently drop — audit failures must never break agent flow
   }
 }
 
 function buildHooks(mainWindow: BrowserWindow): Partial<Record<string, HookCallbackMatcher[]>> {
   const auditPreToolUse: HookCallback = async (input, _toolUseID, _options) => {
-    await writeAuditLog({
+    writeAuditLog({
       event: 'PreToolUse',
       tool: (input as Record<string, unknown>).tool_name,
       input: JSON.stringify((input as Record<string, unknown>).tool_input).substring(0, 500)
@@ -117,7 +142,7 @@ function buildHooks(mainWindow: BrowserWindow): Partial<Record<string, HookCallb
   }
 
   const auditPostToolUse: HookCallback = async (input, _toolUseID, _options) => {
-    await writeAuditLog({
+    writeAuditLog({
       event: 'PostToolUse',
       tool: (input as Record<string, unknown>).tool_name,
       result: JSON.stringify((input as Record<string, unknown>).tool_result).substring(0, 500)
@@ -218,7 +243,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
     permissionMode: 'default',
     settingSources: ['project'],
-    skills: 'all',
+    skills: getEnabledSkills(),
     includePartialMessages: true,
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
@@ -383,6 +408,80 @@ interface ActiveQuery {
 const activeQueries = new Map<AgentContext, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
+// ─── Text delta batching ──────────────────────────────────────────────
+// Batch text_delta stream events to reduce IPC/re-render frequency.
+// At typical streaming rates (40-80 tokens/sec), each token triggers:
+//   1 IPC send → 1 Zustand set() → 1 ChatView + MessageBubble re-render
+// By merging deltas within a 50ms window, we cut IPC events by ~3-4x
+// while keeping perceived latency well below the ~100ms human threshold.
+
+type TextBatchEntry = { context: AgentContext; text: string; uuid: string }
+const textBatches = new Map<AgentContext, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null }>()
+
+function ensureBatchSlot(ctx: AgentContext) {
+  if (!textBatches.has(ctx)) {
+    textBatches.set(ctx, { entries: [], timer: null })
+  }
+  return textBatches.get(ctx)!
+}
+
+function flushTextBatch(ctx: AgentContext, win: BrowserWindow): void {
+  const slot = textBatches.get(ctx)
+  if (!slot || slot.entries.length === 0) return
+
+  if (slot.timer) {
+    clearTimeout(slot.timer)
+    slot.timer = null
+  }
+
+  const entryCount = slot.entries.length
+  const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
+  const lastUuid = slot.entries[slot.entries.length - 1].uuid
+  slot.entries = []
+
+  if (!combinedText || win.isDestroyed()) return
+
+  // Emit a single combined stream_event carrying all accumulated text
+  win.webContents.send('agent:event', {
+    context: ctx,
+    type: 'stream_event',
+    uuid: lastUuid,
+    event: {
+      type: 'content_block_delta',
+      index: 0,
+      delta: { type: 'text_delta', text: combinedText },
+    },
+  })
+}
+
+function isTextDeltaEvent(rawMessage: Record<string, unknown>): string | null {
+  if (rawMessage.type !== 'stream_event') return null
+  const event = rawMessage.event as Record<string, unknown> | undefined
+  if (event?.type !== 'content_block_delta') return null
+  const delta = event.delta as Record<string, unknown> | undefined
+  if (delta?.type !== 'text_delta') return null
+  return (delta.text as string) || ''
+}
+
+function scheduleTextBatch(ctx: AgentContext, text: string, uuid: string, win: BrowserWindow): void {
+  const slot = ensureBatchSlot(ctx)
+  slot.entries.push({ context: ctx, text, uuid })
+
+  if (!slot.timer) {
+    slot.timer = setTimeout(() => flushTextBatch(ctx, win), 30)
+  }
+}
+
+/** Flush any pending text batch for the given context (called during cleanup/abort) */
+function discardTextBatch(ctx: AgentContext): void {
+  const slot = textBatches.get(ctx)
+  if (slot) {
+    if (slot.timer) clearTimeout(slot.timer)
+    slot.timer = null
+    slot.entries = []
+  }
+}
+
 function rejectAllPendingPermissions(context?: AgentContext): void {
   for (const [id, p] of pendingPermissions) {
     if (context && p.context !== context) continue
@@ -406,6 +505,8 @@ function rejectAllPendingAskUser(context?: AgentContext): void {
 export function handleWindowDestroy(): void {
   rejectAllPendingPermissions()
   rejectAllPendingAskUser()
+  // Discard pending text batches — no window to send to
+  for (const ctx of textBatches.keys()) discardTextBatch(ctx)
 }
 
 export function abortActiveQuery(context?: AgentContext): void {
@@ -417,6 +518,7 @@ export function abortActiveQuery(context?: AgentContext): void {
     }
     rejectAllPendingPermissions(context)
     rejectAllPendingAskUser(context)
+    discardTextBatch(context)
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
@@ -425,6 +527,7 @@ export function abortActiveQuery(context?: AgentContext): void {
     activeQueries.clear()
     rejectAllPendingPermissions()
     rejectAllPendingAskUser()
+    for (const ctx of textBatches.keys()) discardTextBatch(ctx)
   }
 }
 
@@ -471,10 +574,22 @@ export async function sendMessage(
       const skillId = activeQueries.get(context)?.skillId ?? null
       _skillOutputBridge.processRawEvent(message as Record<string, unknown>, skillId)
 
-      // Convert and emit via unified agent:event channel — tagged with context
+      const rawMsg = message as Record<string, unknown>
+      const textDeltaText = isTextDeltaEvent(rawMsg)
       const ipcMsg = toAgentIPCMessage(message)
-      if (ipcMsg) {
-        mainWindow.webContents.send('agent:event', { context, ...ipcMsg })
+
+      if (textDeltaText !== null) {
+        // Batch text_delta events: accumulate and flush every ~50ms
+        const uuid = (rawMsg.uuid as string) || ''
+        scheduleTextBatch(context, textDeltaText, uuid, mainWindow)
+      } else {
+        // Non-text event (tool_use, content_block_start/stop, result, etc.)
+        // Flush any pending text batch FIRST to preserve event ordering
+        flushTextBatch(context, mainWindow)
+
+        if (ipcMsg) {
+          mainWindow.webContents.send('agent:event', { context, ...ipcMsg })
+        }
       }
 
       // Session creation still gets its own lifecycle channel — tagged with context
@@ -488,6 +603,9 @@ export async function sendMessage(
         evictOldSessions()
       }
     }
+
+    // Flush any remaining batched text deltas after the stream ends
+    flushTextBatch(context, mainWindow)
 
     // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
@@ -515,6 +633,9 @@ export async function sendMessage(
       duration_ms: 0,
     } as AgentIPCMessage & { context: AgentContext })
   } finally {
+    // Flush any remaining batched text (if stream errored before for-await finished)
+    flushTextBatch(context, mainWindow)
+    discardTextBatch(context)
     activeQueries.delete(context)
     rejectAllPendingPermissions(context)
     rejectAllPendingAskUser(context)
