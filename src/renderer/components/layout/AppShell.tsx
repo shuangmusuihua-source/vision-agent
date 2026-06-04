@@ -10,6 +10,7 @@ import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 import AskZuovis from '../ask/AskZuovis'
 import SessionHistoryPanel from './SessionHistoryPanel'
+import ArtifactsPanel from './ArtifactsPanel'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
@@ -69,8 +70,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [modalVisible, setModalVisible] = useState(false)
   const [showDaydream, setShowDaydream] = useState(false)
   const [daydreamMode, setDaydreamMode] = useState('matrix')
-  const [showAskZuovis, setShowAskZuovis] = useState(true)
-  const [showSessionHistory, setShowSessionHistory] = useState(false)
+  type PrimaryView = 'ask' | 'editor' | 'history' | 'artifacts'
+  const [view, setView] = useState<PrimaryView>('ask')
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
@@ -169,18 +170,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     useAgentStore.setState((prev) => ({
       slots: { ...prev.slots, ask: emptySlot() },
     }))
+    setView('editor')
   }, [askIsStreaming])
 
   const handleSessionHistory = useCallback(() => {
     useAgentStore.setState({ context: 'editor' })
-    setShowAskZuovis(false)
-    setShowSessionHistory(true)
+    setView('history')
     setActiveTab('')
   }, [])
 
-  const handleSessionHistoryBack = useCallback(() => {
-    setShowSessionHistory(false)
-    setShowAskZuovis(true)
+  const handleArtifacts = useCallback(() => {
+    useAgentStore.setState({ context: 'editor' })
+    setView('artifacts')
+    setActiveTab('')
   }, [])
 
   // Restore/refresh workspaces from cached settings
@@ -262,12 +264,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const handleFileSelect = useCallback(async (path: string) => {
     // Switch back to editor context when leaving Ask Zuovis or SessionHistory
-    if (showAskZuovis) {
+    if (view !== 'editor') {
       useAgentStore.setState({ context: 'editor' })
-      setShowAskZuovis(false)
-    }
-    if (showSessionHistory) {
-      setShowSessionHistory(false)
+      setView('editor')
     }
     // If file is already open, just switch to it
     if (openTabs.includes(path)) {
@@ -282,7 +281,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       setActiveTab(path)
       setTabContents((prev) => ({ ...prev, [path]: result.content! }))
     }
-  }, [openTabs, showAskZuovis])
+  }, [openTabs, view])
 
   const handleTabClose = useCallback((path: string) => {
     setOpenTabs((prev) => {
@@ -428,7 +427,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }
 
       if (action === 'ask') {
-        const target: AgentContext = showAskZuovis ? 'ask' : 'editor'
+        const target: AgentContext = view === 'ask' ? 'ask' : 'editor'
         useAgentStore.setState((prev) => ({
           slots: {
             ...prev.slots,
@@ -495,13 +494,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
             setActiveTab('')
-            setShowAskZuovis(true)
-            setShowSessionHistory(false)
+            setView('ask')
           }}
-        isAskZuovisActive={showAskZuovis}
+        isAskZuovisActive={view === 'ask'}
         onAskZuovisBack={handleAskZuovisBack}
         onSessionHistory={handleSessionHistory}
-        isSessionHistoryActive={showSessionHistory}
+        isSessionHistoryActive={view === 'history'}
+        onArtifacts={handleArtifacts}
+        isArtifactsActive={view === 'artifacts'}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
         activeFile={activeTab}
@@ -510,12 +510,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         collapsed={sidebarCollapsed}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${showAskZuovis ? ' main-content-ask-zuovis' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
-        {showSessionHistory ? (
+        {view === 'artifacts' ? (
+          <ArtifactsPanel />
+        ) : view === 'history' ? (
           <SessionHistoryPanel />
-        ) : showAskZuovis ? (
+        ) : view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
@@ -578,7 +580,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         )}
       </main>
       {/* ── Divider Zone + Agent Panel (only in editor mode) ── */}
-      {!showAskZuovis && !showSessionHistory && (
+      {view === 'editor' && (
       <>
       <div
         className={`divider-zone${dividerHovered ? ' divider-zone-hover' : ''}${isDragging ? ' divider-zone-dragging' : ''}${agentCollapsed ? ' divider-zone-collapsed' : ''}`}

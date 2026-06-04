@@ -1138,6 +1138,11 @@
   box-shadow: 0 4px 12px rgba(72, 176, 216, 0.25);
 }
 
+.sidebar-artifacts-icon {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
 .sidebar-ask-zuovis-label {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);

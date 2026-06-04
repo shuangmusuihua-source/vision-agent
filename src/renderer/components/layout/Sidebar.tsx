@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, ChevronsUp, Trash2, X, Search, Settings, GitGraph, Plus, Pin, Eye, Move, Pencil, Ellipsis, ArrowLeft, Clock } from 'lucide-react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, ChevronsUp, Trash2, X, Search, Settings, GitGraph, Plus, Pin, Eye, Move, Pencil, Ellipsis, ArrowLeft, Clock, Box } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import type { FileEntry } from '../../lib/ipc'
@@ -34,6 +34,8 @@ interface SidebarProps {
   isAskZuovisRunning: boolean
   onSessionHistory: () => void
   isSessionHistoryActive: boolean
+  onArtifacts: () => void
+  isArtifactsActive: boolean
   activeFile: string
   showGraph: boolean
   changedFileCount: number
@@ -98,6 +100,8 @@ function Sidebar({
   isAskZuovisRunning,
   onSessionHistory,
   isSessionHistoryActive,
+  onArtifacts,
+  isArtifactsActive,
   activeFile,
   showGraph,
   changedFileCount,
@@ -430,6 +434,17 @@ function Sidebar({
         >
           <div className="sidebar-history-icon"><Clock size={12} /></div>
           <span className="sidebar-ask-zuovis-label">历史会话</span>
+        </div>
+
+        <div
+          className={`sidebar-ask-zuovis${isArtifactsActive ? ' sidebar-ask-zuovis-active' : ''}`}
+          onClick={onArtifacts}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onArtifacts() } }}
+        >
+          <div className="sidebar-history-icon sidebar-artifacts-icon"><Box size={12} /></div>
+          <span className="sidebar-ask-zuovis-label">产物</span>
         </div>
 
         {/* 工作区 */}
