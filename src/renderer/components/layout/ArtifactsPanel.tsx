@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Box, FileCode, FileText, Image, FileJson, File, CodeXml, Loader2, Trash2 } from 'lucide-react'
+import { FileCode, FileText, Image, FileJson, File, CodeXml, Loader2, Trash2 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import './ArtifactsPanel.css'
 
