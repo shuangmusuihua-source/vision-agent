@@ -170,7 +170,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     useAgentStore.setState((prev) => ({
       slots: { ...prev.slots, ask: emptySlot() },
     }))
-    setView('editor')
   }, [askIsStreaming])
 
   const handleSessionHistory = useCallback(() => {
