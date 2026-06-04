@@ -9,6 +9,7 @@ import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 import AskZuovis from '../ask/AskZuovis'
+import SessionHistoryPanel from './SessionHistoryPanel'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphView = lazy(() => import('../graph/GraphView'))
 import DaydreamOverlay from './DaydreamOverlay'
@@ -69,6 +70,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [showDaydream, setShowDaydream] = useState(false)
   const [daydreamMode, setDaydreamMode] = useState('matrix')
   const [showAskZuovis, setShowAskZuovis] = useState(true)
+  const [showSessionHistory, setShowSessionHistory] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
@@ -169,6 +171,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }))
   }, [askIsStreaming])
 
+  const handleSessionHistory = useCallback(() => {
+    useAgentStore.setState({ context: 'editor' })
+    setShowAskZuovis(false)
+    setShowSessionHistory(true)
+    setActiveTab('')
+  }, [])
+
+  const handleSessionHistoryBack = useCallback(() => {
+    setShowSessionHistory(false)
+    setShowAskZuovis(true)
+  }, [])
+
   // Restore/refresh workspaces from cached settings
   const settings = useSettings()
   const prevAuthDirsRef = useRef<string>('')
@@ -247,10 +261,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   const handleFileSelect = useCallback(async (path: string) => {
-    // Switch back to editor context when leaving Ask Zuovis
+    // Switch back to editor context when leaving Ask Zuovis or SessionHistory
     if (showAskZuovis) {
       useAgentStore.setState({ context: 'editor' })
       setShowAskZuovis(false)
+    }
+    if (showSessionHistory) {
+      setShowSessionHistory(false)
     }
     // If file is already open, just switch to it
     if (openTabs.includes(path)) {
@@ -430,7 +447,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   const handleSkillSelect = useCallback((skill: SkillDefinition) => {
-    const prompt = skill.promptTemplate.replace('{activeFile}', linkedFile || '')
+    const fileName = linkedFile ? linkedFile.split('/').pop() || linkedFile : ''
+    const fileRef = fileName ? ` · ${fileName}` : ''
+    const prompt = skill.promptTemplate.replace('{activeFile}', fileRef)
     useAgentStore.setState((s) => ({
       slots: {
         ...s.slots,
@@ -477,9 +496,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             useAgentStore.setState({ context: 'ask' })
             setActiveTab('')
             setShowAskZuovis(true)
+            setShowSessionHistory(false)
           }}
         isAskZuovisActive={showAskZuovis}
         onAskZuovisBack={handleAskZuovisBack}
+        onSessionHistory={handleSessionHistory}
+        isSessionHistoryActive={showSessionHistory}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
         activeFile={activeTab}
@@ -491,7 +513,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${showAskZuovis ? ' main-content-ask-zuovis' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
-        {showAskZuovis ? (
+        {showSessionHistory ? (
+          <SessionHistoryPanel />
+        ) : showAskZuovis ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
@@ -554,7 +578,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         )}
       </main>
       {/* ── Divider Zone + Agent Panel (only in editor mode) ── */}
-      {!showAskZuovis && (
+      {!showAskZuovis && !showSessionHistory && (
       <>
       <div
         className={`divider-zone${dividerHovered ? ' divider-zone-hover' : ''}${isDragging ? ' divider-zone-dragging' : ''}${agentCollapsed ? ' divider-zone-collapsed' : ''}`}

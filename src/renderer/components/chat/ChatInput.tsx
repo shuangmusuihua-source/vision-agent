@@ -116,8 +116,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       let prompt = text.trim()
       if (attachedFiles.length > 0) {
         const fileParts = attachedFiles.map((f) => {
-          const label = f.type === 'image' ? 'image' : f.type === 'pdf' ? 'PDF' : 'file'
-          return `[Attached ${label}: ${f.path}]`
+          const icon = f.type === 'image' ? '🖼️' : f.type === 'pdf' ? '📕' : '📄'
+          const label = f.type === 'image' ? '图片' : f.type === 'pdf' ? 'PDF文档' : '文件'
+          return `${icon} ${label}：${f.name}`
         })
         prompt = fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
       }
@@ -280,7 +281,32 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   // --- Default variant: textarea (editor agent panel style) ---
   return (
     <div className="chat-input-container">
+      {attachedFiles.length > 0 && (
+        <div className="chat-input-attachments">
+          {attachedFiles.map((file, idx) => (
+            <span key={idx} className="chat-input-attachment-chip" title={file.path}>
+              <span className="chat-input-attachment-name">{file.name}</span>
+              <button
+                className="chat-input-attachment-remove"
+                onClick={() => handleRemoveFile(idx)}
+                type="button"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="chat-input-wrapper">
+        <button
+          className="chat-input-attach-btn"
+          onClick={handleAttachFiles}
+          disabled={disabled}
+          type="button"
+          title="上传文件"
+        >
+          <Paperclip size={14} />
+        </button>
         <textarea
           ref={textareaRef}
           className="chat-input"

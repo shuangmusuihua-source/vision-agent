@@ -41,12 +41,10 @@ interface AgentPanelProps {
 function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
   const modelDropdownRef = useRef<HTMLDivElement>(null)
-  const historyDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     window.api.settings.get().then(setSettings)
@@ -94,13 +92,10 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
       if (showModelDropdown && modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
         setShowModelDropdown(false)
       }
-      if (showHistory && historyDropdownRef.current && !historyDropdownRef.current.contains(e.target as Node)) {
-        setShowHistory(false)
-      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [showModelDropdown, showHistory])
+  }, [showModelDropdown])
 
   const activeProfile = settings?.profiles.find(p => p.id === settings.activeProfileId)
   const modelLabel = activeProfile ? (MODELS[activeProfile.model] || activeProfile.model) : 'Sonnet 4'
@@ -111,13 +106,6 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
     setSettings(s)
     setShowModelDropdown(false)
   }, [])
-
-  const handleToggleHistory = useCallback(() => {
-    setShowHistory((v) => {
-      if (!v) onRefreshSessions()
-      return !v
-    })
-  }, [onRefreshSessions])
 
   return (
     <div className={`agent-panel ${edgeClass}`} style={{ width, minWidth: width, maxWidth: width }}>
@@ -139,35 +127,6 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
                     {MODELS[p.model] || p.model}
                   </button>
                 ))}
-              </div>
-            )}
-          </div>
-
-          <div className="agent-header-session" ref={historyDropdownRef}>
-            <button className="agent-header-session-btn" onClick={onNewSession} title="新建会话" aria-label="新建会话">
-              <Plus size={14} />
-            </button>
-            <button className="agent-header-session-arrow" onClick={handleToggleHistory} title="历史会话" aria-label="历史会话">
-              <ChevronDown size={12} />
-            </button>
-            {showHistory && (
-              <div className="agent-header-dropdown agent-header-history-dropdown">
-                {sessionList.length === 0 ? (
-                  <div className="agent-header-dropdown-empty">暂无历史会话</div>
-                ) : (
-                  sessionList.map(s => (
-                    <button
-                      key={s.id}
-                      className={`agent-header-dropdown-item${s.id === currentSessionId ? ' active' : ''}`}
-                      onClick={() => { onSelectSession(s.id); setShowHistory(false) }}
-                    >
-                      <span className="agent-header-history-title">{s.title || '未命名会话'}</span>
-                      <span className="agent-header-history-time">
-                        {s.lastModified ? new Date(s.lastModified).toLocaleDateString() : ''}
-                      </span>
-                    </button>
-                  ))
-                )}
               </div>
             )}
           </div>

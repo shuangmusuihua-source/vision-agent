@@ -821,6 +821,74 @@
   border-radius: var(--radius-xl);
 }
 
+.chat-input-attach-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 2px;
+}
+
+.chat-input-attach-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+}
+
+.chat-input-attach-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.chat-input-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 12px 0;
+}
+
+.chat-input-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  max-width: 200px;
+}
+
+.chat-input-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-input-attachment-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.chat-input-attachment-remove:hover {
+  color: var(--color-danger);
+}
+
 .chat-input {
   flex: 1;
   resize: none;
@@ -1810,4 +1878,50 @@
 [data-theme="dark"] .agent-panel .message-assistant-text {
   background: var(--color-bg-secondary);
   box-shadow: none;
+}
+
+/* ── Attachment chips in user messages ── */
+
+.message-attach-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.message-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.message-attach-chip-icon {
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+.message-attach-chip-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+.message-attach-chip-name {
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-user-text {
+  white-space: pre-wrap;
+  word-break: break-word;
 }

@@ -1125,6 +1125,19 @@
   box-shadow: 0 4px 12px rgba(102, 87, 255, 0.2);
 }
 
+.sidebar-history-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #48b0d8, #5b6cf0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(72, 176, 216, 0.25);
+}
+
 .sidebar-ask-zuovis-label {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);

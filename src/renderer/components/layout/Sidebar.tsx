@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, ChevronsUp, Trash2, X, Search, Settings, GitGraph, Plus, Pin, Eye, Move, Pencil, Ellipsis, ArrowLeft } from 'lucide-react'
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, ChevronsUp, Trash2, X, Search, Settings, GitGraph, Plus, Pin, Eye, Move, Pencil, Ellipsis, ArrowLeft, Clock } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import type { FileEntry } from '../../lib/ipc'
@@ -32,6 +32,8 @@ interface SidebarProps {
   isAskZuovisActive: boolean
   isAskZuovisInChat: boolean
   isAskZuovisRunning: boolean
+  onSessionHistory: () => void
+  isSessionHistoryActive: boolean
   activeFile: string
   showGraph: boolean
   changedFileCount: number
@@ -94,6 +96,8 @@ function Sidebar({
   isAskZuovisActive,
   isAskZuovisInChat,
   isAskZuovisRunning,
+  onSessionHistory,
+  isSessionHistoryActive,
   activeFile,
   showGraph,
   changedFileCount,
@@ -415,6 +419,17 @@ function Sidebar({
           {isAskZuovisActive && isAskZuovisInChat && (
             <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
           )}
+        </div>
+
+        <div
+          className={`sidebar-ask-zuovis${isSessionHistoryActive ? ' sidebar-ask-zuovis-active' : ''}`}
+          onClick={onSessionHistory}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSessionHistory() } }}
+        >
+          <div className="sidebar-history-icon"><Clock size={12} /></div>
+          <span className="sidebar-ask-zuovis-label">历史会话</span>
         </div>
 
         {/* 工作区 */}

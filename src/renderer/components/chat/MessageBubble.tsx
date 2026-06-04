@@ -141,6 +141,23 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
   )
 }
 
+const ATTACH_REGEX = /^(📄|🖼️|📕)\s+(.+?)[：:]\s*(.+)$/
+
+function parseAttachments(text: string): { attachments: string[]; body: string } {
+  const lines = text.split('\n')
+  const attachments: string[] = []
+  let bodyStart = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (ATTACH_REGEX.test(lines[i])) {
+      attachments.push(lines[i])
+      bodyStart = i + 1
+    } else {
+      break
+    }
+  }
+  return { attachments, body: lines.slice(bodyStart).join('\n').trimStart() }
+}
+
 function UserBubble({ text, onSelectText, context }: {
   text: string
   onSelectText?: (text: string, context?: string) => void
@@ -148,6 +165,8 @@ function UserBubble({ text, onSelectText, context }: {
 }) {
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+
+  const { attachments, body } = parseAttachments(text)
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()
@@ -177,7 +196,28 @@ function UserBubble({ text, onSelectText, context }: {
   return (
     <div className="message-bubble message-user">
       <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
-        {text}
+        {attachments.length > 0 ? (
+          <>
+            <div className="message-attach-chips">
+              {attachments.map((att, i) => {
+                const match = att.match(ATTACH_REGEX)
+                const icon = match?.[1] || '📄'
+                const label = match?.[2] || ''
+                const name = match?.[3] || att
+                return (
+                  <span key={i} className="message-attach-chip">
+                    <span className="message-attach-chip-icon">{icon}</span>
+                    <span className="message-attach-chip-label">{label}</span>
+                    <span className="message-attach-chip-name">{name}</span>
+                  </span>
+                )
+              })}
+            </div>
+            {body && <div className="message-user-text">{body}</div>}
+          </>
+        ) : (
+          text
+        )}
       </div>
       {selectionBtn && onSelectText && (
         <div className="selection-action-btn" style={{ left: selectionBtn.x, top: selectionBtn.y }} onClick={handleClickAddToChat}>
