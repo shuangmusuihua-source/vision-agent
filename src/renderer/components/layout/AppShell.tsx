@@ -514,7 +514,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
         {view === 'artifacts' ? (
-          <ArtifactsPanel />
+          <ArtifactsPanel onOpenFile={handleFileSelect} />
         ) : view === 'history' ? (
           <SessionHistoryPanel />
         ) : view === 'ask' ? (

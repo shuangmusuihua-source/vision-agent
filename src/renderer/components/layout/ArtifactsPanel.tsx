@@ -76,7 +76,11 @@ async function discoverArtifacts(): Promise<ArtifactEntry[]> {
   return results.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
-function ArtifactsPanel(): React.ReactElement {
+interface ArtifactsPanelProps {
+  onOpenFile?: (path: string) => void
+}
+
+function ArtifactsPanel({ onOpenFile }: ArtifactsPanelProps): React.ReactElement {
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -95,7 +99,12 @@ function ArtifactsPanel(): React.ReactElement {
   useEffect(() => { load() }, [load])
 
   const handleOpen = (a: ArtifactEntry) => {
-    if (a.filePath) window.api.workspace.openInBrowser(a.filePath)
+    if (!a.filePath) return
+    if (a.fileType === 'md' && onOpenFile) {
+      onOpenFile(a.filePath)
+    } else {
+      window.api.workspace.openInBrowser(a.filePath)
+    }
   }
 
   const handleDelete = useCallback(async (a: ArtifactEntry, e: React.MouseEvent) => {

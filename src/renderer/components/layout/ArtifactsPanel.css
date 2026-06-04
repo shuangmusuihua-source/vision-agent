@@ -42,27 +42,27 @@
 
 .artifacts-panel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
 }
 
 .artifacts-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 12px 10px;
+  gap: 8px;
+  padding: 18px 16px 14px;
   background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: box-shadow 0.2s, transform 0.15s;
 }
 
 .artifacts-card:hover {
-  border-color: var(--color-border);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
 }
 
 .artifacts-card-icon {
@@ -89,15 +89,15 @@
 
 .artifacts-card-delete {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--color-text-tertiary);
   cursor: pointer;
