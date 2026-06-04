@@ -115,12 +115,17 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     if (hasContent && !disabled) {
       let prompt = text.trim()
       if (attachedFiles.length > 0) {
+        // Hidden marker for main process to convert non-text files (pptx/xlsx/docx/pdf)
+        const convPaths = attachedFiles
+          .filter(f => /\.(pptx|xlsx|docx|pdf)$/i.test(f.name))
+          .map(f => f.path)
         const fileParts = attachedFiles.map((f) => {
           const icon = f.type === 'image' ? '🖼️' : f.type === 'pdf' ? '📕' : '📄'
           const label = f.type === 'image' ? '图片' : f.type === 'pdf' ? 'PDF文档' : '文件'
           return `${icon} ${label}：${f.name}`
         })
-        prompt = fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
+        const prefix = convPaths.length > 0 ? '<!--FILE_CONVERT:' + convPaths.join('|') + '-->\n' : ''
+        prompt = prefix + fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
       }
       onSend(prompt)
       setText('')

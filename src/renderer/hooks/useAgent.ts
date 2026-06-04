@@ -162,7 +162,7 @@ export function useAgent(context: AgentContext = 'editor') {
             kind: 'user' as const,
             id: `user-${Date.now()}`,
             role: 'user',
-            textContent: prompt,
+            textContent: prompt.replace(/<!--FILE_CONVERT:.+?-->\n?/, ''),
             createdAt: Date.now(),
           }],
           isStreaming: true,

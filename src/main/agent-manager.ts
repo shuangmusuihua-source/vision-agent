@@ -1,8 +1,9 @@
 import { BrowserWindow, app } from 'electron'
 import { createRequire } from 'module'
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { appendFile } from 'fs/promises'
-import { join, resolve } from 'path'
+import { join, resolve, basename } from 'path'
+import { execFileSync } from 'child_process'
 import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
@@ -549,6 +550,38 @@ export async function sendMessage(
     abortActiveQuery(context)
   }
 
+  // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
+  let processedPrompt = prompt
+  const convMatch = prompt.match(/<!--FILE_CONVERT:(.+?)-->/)
+  if (convMatch) {
+    const paths = convMatch[1].split('|').filter(Boolean)
+    const dirs = getAuthorizedDirectories()
+    const workspaceDir = dirs.length > 0 ? dirs[0] : process.cwd()
+    const tmpDir = join(workspaceDir, '.vision', 'tmp')
+    mkdirSync(tmpDir, { recursive: true })
+    const refs: string[] = []
+
+    for (const filePath of paths) {
+      try {
+        const outName = basename(filePath).replace(/\.[^.]+$/, '.md')
+        const outPath = join(tmpDir, outName)
+        const result = execFileSync('python3', ['-m', 'markitdown', filePath], {
+          encoding: 'utf-8',
+          timeout: 30000,
+        })
+        writeFileSync(outPath, result, 'utf-8')
+        refs.push(`${outName} (已从 ${basename(filePath)} 转换)`)
+      } catch (err) {
+        console.error(`[FileConvert] ${filePath}:`, (err as Error).message)
+      }
+    }
+
+    processedPrompt = prompt.replace(/<!--FILE_CONVERT:.+?-->\n?/, '').trim()
+    if (refs.length > 0) {
+      processedPrompt += '\n\n---\n已转换文件：\n' + refs.map(r => `- ${r}`).join('\n')
+    }
+  }
+
   _skillOutputBridge.reset()
 
   _skillOutputBridge.setContext(context)
@@ -558,7 +591,7 @@ export async function sendMessage(
   try {
     const abortController = new AbortController()
     const messageStream = query({
-      prompt,
+      prompt: processedPrompt,
       options: {
         ...options,
         abortController,
