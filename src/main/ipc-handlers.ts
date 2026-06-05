@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { readdir } from 'fs/promises'
 import { join, extname } from 'path'
-import { getMainWindow } from './index'
+import { getMainWindow } from './ipc-sender'
 import { getSettings } from './store'
 import type { FileEntry } from '../shared/types'
 import { registerWorkspaceHandlers } from './handlers/workspace-handlers'

@@ -9,7 +9,9 @@ import { getSettings, getAuthorizedDirectories, ensureKnowledgeBase, getKnowledg
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
-import { setSkillOutputWindow, handleWindowDestroy } from './agent-manager'
+import { setSkillOutputWindow, handleWindowDestroy, abortActiveQuery } from './agent-manager'
+import { stopAllCronJobs } from './cron-manager'
+import { setMainWindow, getMainWindow } from './ipc-sender'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -71,6 +73,9 @@ function createWindow(): void {
     }
   })
 
+  // Register the window in ipc-sender so other modules can reach it
+  setMainWindow(mainWindow)
+
   mainWindow.on('ready-to-show', () => {
     if (mainWindow) mainWindow.show()
   })
@@ -91,9 +96,8 @@ function createWindow(): void {
   }
 }
 
-export function getMainWindow(): BrowserWindow | null {
-  return mainWindow
-}
+// getMainWindow is now provided by ipc-sender module (re-exported below)
+export { getMainWindow }
 
 app.whenReady().then(() => {
   setupMenu()
@@ -179,11 +183,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  // Abort all active SDK agent queries + reject pending permissions
-  const { abortActiveQuery } = require('./agent-manager') as typeof import('./agent-manager')
   abortActiveQuery()
   handleWindowDestroy()
-  // Stop all cron jobs
-  const { stopAllCronJobs } = require('./cron-manager') as typeof import('./cron-manager')
   stopAllCronJobs()
 })

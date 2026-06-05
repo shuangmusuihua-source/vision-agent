@@ -2,7 +2,7 @@ import { ipcMain, dialog, shell, app } from 'electron'
 import { readFile, writeFile, mkdir, unlink, rename, rm } from 'fs/promises'
 import { join, extname, basename, dirname } from 'path'
 import { existsSync } from 'fs'
-import { getMainWindow } from '../index'
+import { getMainWindow } from '../ipc-sender'
 import {
   removeAuthorizedDirectory,
   getAuthorizedDirectories,

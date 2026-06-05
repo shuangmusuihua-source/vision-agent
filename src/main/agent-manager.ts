@@ -1,136 +1,39 @@
-import { BrowserWindow, app } from 'electron'
-import { createRequire } from 'module'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
-import { appendFile } from 'fs/promises'
+import { BrowserWindow } from 'electron'
+import { mkdirSync, writeFileSync } from 'fs'
 import { join, resolve, basename } from 'path'
 import { execFileSync } from 'child_process'
 import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
-import type { Options, PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, AgentContext, AskUserQuestionOption } from '../shared/types'
-import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile, getEnabledSkills } from './store'
+import { getApiKey, getAuthorizedDirectories, getEnabledSkills } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
+import { buildAgentOptions } from './agent-options'
+import { registerSession, getSessionList, getSessionInfo, type SessionInfo } from './agent-sessions'
+import { writeAuditLog } from './agent-audit'
+import {
+  registerPendingPermission,
+  registerPendingAskUser,
+  hasPendingPermission,
+  deletePendingPermission,
+  hasPendingAskUser,
+  deletePendingAskUser,
+  resolvePermission,
+  resolveAskUser,
+  rejectAllPendingPermissions,
+  rejectAllPendingAskUser,
+} from './agent-permissions'
+import { flushTextBatch, scheduleTextBatch, discardTextBatch, discardAllTextBatches, isTextDeltaEvent } from './agent-text-batch'
 
-let _cachedCliPath: string | undefined | null = null
+// ─── Re-exports (consumed by agent-handlers and index.ts) ──────────────
 
-export function resolveClaudeCodeExecutable(): string | undefined {
-  if (_cachedCliPath !== null) return _cachedCliPath
+export { getSessionList, getSessionInfo, type SessionInfo }
+export { registerSession }
+export { resolvePermission, resolveAskUser }
 
-  const require = createRequire(import.meta.url)
-
-  // 优先使用平台原生二进制
-  try {
-    const nativeBinary = require.resolve('@anthropic-ai/claude-agent-sdk-darwin-arm64/claude')
-    const resolved = resolveAsarPath(nativeBinary)
-    if (existsSync(resolved)) {
-      _cachedCliPath = resolved
-      return resolved
-    }
-  } catch {}
-
-  // 回退到 cli.js
-  try {
-    const cliJs = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js')
-    const resolved = resolveAsarPath(cliJs)
-    if (existsSync(resolved)) {
-      _cachedCliPath = resolved
-      return resolved
-    }
-  } catch {}
-
-  _cachedCliPath = undefined
-  return undefined
-}
-
-function resolveAsarPath(filePath: string): string {
-  return filePath.replace('.asar/', '.asar.unpacked/').replace('.asar\\', '.asar.unpacked\\')
-}
-
-interface SessionInfo {
-  id: string
-  createdAt: number
-}
-
-const sessions = new Map<string, SessionInfo>()
-
-const MAX_SESSIONS = 50
-function evictOldSessions() {
-  if (sessions.size <= MAX_SESSIONS) return
-  const keys = [...sessions.keys()]
-  const toDelete = keys.slice(0, sessions.size - MAX_SESSIONS)
-  for (const key of toDelete) {
-    sessions.delete(key)
-  }
-}
-
-// Pending permission requests waiting for user response
-const pendingPermissions = new Map<string, {
-  resolve: (result: PermissionResult) => void
-  input: Record<string, unknown>
-  timeout: ReturnType<typeof setTimeout>
-  context: AgentContext
-}>()
-
-// Pending AskUserQuestion requests waiting for user input
-const pendingAskUser = new Map<string, {
-  resolve: (result: PermissionResult) => void
-  originalInput: Record<string, unknown>
-  timeout: ReturnType<typeof setTimeout>
-  context: AgentContext
-}>()
-
-// Audit log path
-const AUDIT_LOG_PATH = join(app.getPath('userData'), 'audit.log')
-
-const AUDIT_REDACT_PATTERNS = [
-  /(?:api[_-]?key|apikey|secret|token|password|auth)\s*[:=]\s*['"]?[^\s'"]+['"]?/gi,
-  /sk-[a-zA-Z0-9]{20,}/g,
-  /(?:Bearer\s+)[a-zA-Z0-9._\-]+/g,
-]
-
-function redactCredentials(text: string): string {
-  let result = text
-  for (const pattern of AUDIT_REDACT_PATTERNS) {
-    result = result.replace(pattern, (m) => m.slice(0, 4) + '***[REDACTED]')
-  }
-  return result
-}
-
-// ─── Buffered audit log writer ────────────────────────────────────────
-// Replaces per-call `await appendFile` with buffered batching (flush every 5s).
-// Each tool invocation triggers 2 log entries (PreToolUse + PostToolUse) —
-// with the old approach, both were inline `await`s blocking the hook chain.
-// Now writes are fire-and-forget, with a lazy timer that flushes the buffer.
-
-const auditBuffer: string[] = []
-let auditFlushTimer: ReturnType<typeof setTimeout> | null = null
-const AUDIT_FLUSH_MS = 5_000
-
-function scheduleAuditFlush(): void {
-  if (auditFlushTimer) return
-  auditFlushTimer = setTimeout(async () => {
-    auditFlushTimer = null
-    if (auditBuffer.length === 0) return
-    const batch = auditBuffer.splice(0)
-    try {
-      await appendFile(AUDIT_LOG_PATH, batch.join(''), { encoding: 'utf-8' })
-    } catch {
-      // Audit log write failure should not block agent
-    }
-  }, AUDIT_FLUSH_MS)
-}
-
-function writeAuditLog(entry: Record<string, unknown>): void {
-  try {
-    const line = JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + '\n'
-    auditBuffer.push(redactCredentials(line))
-    scheduleAuditFlush()
-  } catch {
-    // silently drop — audit failures must never break agent flow
-  }
-}
+// ─── Hooks ─────────────────────────────────────────────────────────────
 
 function buildHooks(mainWindow: BrowserWindow): Partial<Record<string, HookCallbackMatcher[]>> {
   const auditPreToolUse: HookCallback = async (input, _toolUseID, _options) => {
@@ -169,98 +72,53 @@ function buildHooks(mainWindow: BrowserWindow): Partial<Record<string, HookCallb
   }
 }
 
-export function resolvePermission(requestId: string, behavior: 'allow' | 'deny'): void {
-  const pending = pendingPermissions.get(requestId)
-  if (!pending) return
-  pendingPermissions.delete(requestId)
-  clearTimeout(pending.timeout)
-  cancelPermissionNotification(requestId)
-  if (behavior === 'allow') {
-    pending.resolve({ behavior: 'allow', updatedInput: pending.input })
-  } else {
-    pending.resolve({ behavior: 'deny', message: 'User denied permission' })
+// ─── Options builder ───────────────────────────────────────────────────
+
+function extractPathFromToolInput(
+  toolName: string,
+  input: Record<string, unknown>
+): string | null {
+  const pathFields: Record<string, string[]> = {
+    Read: ['file_path'],
+    Edit: ['file_path'],
+    Write: ['file_path'],
+    Glob: ['path'],
+    Grep: ['path'],
+    Bash: ['command']
   }
+
+  const fields = pathFields[toolName]
+  if (!fields) return null
+
+  const value = String(input[fields[0]] ?? '')
+  if (!value) return null
+
+  if (toolName === 'Bash') {
+    const pathMatch = value.match(/(?:\/[\w.-]+)+/)
+    return pathMatch ? pathMatch[0] : null
+  }
+
+  return value
 }
 
-export function resolveAskUser(requestId: string, answer: string): void {
-  const pending = pendingAskUser.get(requestId)
-  if (!pending) {
-    console.warn(`[AgentManager] resolveAskUser: ${requestId} not found in pending map`)
-    return
-  }
-  pendingAskUser.delete(requestId)
-  clearTimeout(pending.timeout)
-
-  // Build answers map keyed by question text
-  const questions = pending.originalInput.questions as Array<Record<string, unknown>> | undefined
-  const firstQ = questions?.[0]
-  const questionText = (firstQ?.question as string) || 'answer'
-  const answers = { [questionText]: answer }
-
-  try {
-    pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers } })
-  } catch {
-    // Subprocess may have already exited
-  }
-}
-
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor'): Options {
-  const apiKey = getApiKey()
-  const model = getModel()
-  const baseUrl = getBaseUrl()
-  const profile = getActiveProfile()
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor') {
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
 
-  // Prepend common user-level bin paths so tools like pip/brew/npm are findable
-  const userBinPaths = [
-    '/opt/homebrew/bin',
-    '/opt/homebrew/sbin',
-    '/usr/local/bin',
-    '/usr/local/sbin',
-    `${process.env.HOME}/.local/bin`,
-  ].join(':')
+  const systemPromptAppend = [
+    '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
+    `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
+    activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
+    workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : ''
+  ].filter(Boolean).join('\n')
 
-  // Only forward whitelisted env vars to SDK subprocess (not entire process.env)
-  const env: Record<string, string | undefined> = {
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    LANG: process.env.LANG,
-    LC_ALL: process.env.LC_ALL,
-    PATH: `${userBinPaths}:${process.env.PATH}`,
-  }
-  if (apiKey) {
-    env.ANTHROPIC_API_KEY = apiKey
-  }
-  if (baseUrl) {
-    env.ANTHROPIC_BASE_URL = baseUrl
-  }
-
-  const cliPath = resolveClaudeCodeExecutable()
-
-  return {
-    model,
-    cwd: getAppSkillsCwd(),
-    allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
+  return buildAgentOptions({
     permissionMode: 'default',
+    allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
+    includePartialMessages: true,
     settingSources: ['project'],
     skills: getEnabledSkills(),
-    includePartialMessages: true,
-    env,
-    ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
-    systemPrompt: {
-      type: 'preset' as const,
-      preset: 'claude_code' as const,
-      append: [
-        '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
-        `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
-        activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
-        workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : ''
-      ].filter(Boolean).join('\n')
-    },
-    settings: {
-      autoMemoryDirectory: join(workspaceCwd, '.vision', 'memory')
-    },
+    systemPromptAppend,
     hooks: buildHooks(mainWindow),
     canUseTool: async (
       toolName: string,
@@ -319,18 +177,18 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
 
         return new Promise<PermissionResult>((resolve) => {
           const timeout = setTimeout(() => {
-            if (pendingAskUser.has(requestId)) {
-              pendingAskUser.delete(requestId)
+            if (hasPendingAskUser(requestId)) {
+              deletePendingAskUser(requestId)
               mainWindow.webContents.send('agent:askUserTimeout', { requestId, context })
               resolve({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
             }
           }, 300000)
 
-          pendingAskUser.set(requestId, { resolve, timeout, originalInput: input, context })
+          registerPendingAskUser(requestId, resolve, input, timeout, context)
         })
       }
 
-      // // All other tools (Bash, Write, Edit) require user approval
+      // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       mainWindow.webContents.send('agent:permissionRequest', {
         id: requestId,
@@ -342,8 +200,8 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
 
       return new Promise<PermissionResult>((resolve) => {
         const cleanup = () => {
-          if (pendingPermissions.has(requestId)) {
-            pendingPermissions.delete(requestId)
+          if (hasPendingPermission(requestId)) {
+            deletePendingPermission(requestId)
             cancelPermissionNotification(requestId)
             clearTimeout(timeout)
           }
@@ -359,46 +217,21 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
         }
 
         const timeout = setTimeout(() => {
-          if (pendingPermissions.has(requestId)) {
-            pendingPermissions.delete(requestId)
+          if (hasPendingPermission(requestId)) {
+            deletePendingPermission(requestId)
             cancelPermissionNotification(requestId)
             mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
 
-        pendingPermissions.set(requestId, { resolve, input, timeout, context })
+        registerPendingPermission(requestId, resolve, input, timeout, context)
       })
-    }
-  }
+    },
+  })
 }
 
-function extractPathFromToolInput(
-  toolName: string,
-  input: Record<string, unknown>
-): string | null {
-  const pathFields: Record<string, string[]> = {
-    Read: ['file_path'],
-    Edit: ['file_path'],
-    Write: ['file_path'],
-    Glob: ['path'],
-    Grep: ['path'],
-    Bash: ['command']
-  }
-
-  const fields = pathFields[toolName]
-  if (!fields) return null
-
-  const value = String(input[fields[0]] ?? '')
-  if (!value) return null
-
-  if (toolName === 'Bash') {
-    const pathMatch = value.match(/(?:\/[\w.-]+)+/)
-    return pathMatch ? pathMatch[0] : null
-  }
-
-  return value
-}
+// ─── Query management ──────────────────────────────────────────────────
 
 interface ActiveQuery {
   query: Query
@@ -409,107 +242,6 @@ interface ActiveQuery {
 // Guard against concurrent sendMessage calls — per context slot
 const activeQueries = new Map<AgentContext, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
-
-// ─── Text delta batching ──────────────────────────────────────────────
-// Batch text_delta stream events to reduce IPC/re-render frequency.
-// At typical streaming rates (40-80 tokens/sec), each token triggers:
-//   1 IPC send → 1 Zustand set() → 1 ChatView + MessageBubble re-render
-// By merging deltas within a 50ms window, we cut IPC events by ~3-4x
-// while keeping perceived latency well below the ~100ms human threshold.
-
-type TextBatchEntry = { context: AgentContext; text: string; uuid: string }
-const textBatches = new Map<AgentContext, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null }>()
-
-function ensureBatchSlot(ctx: AgentContext) {
-  if (!textBatches.has(ctx)) {
-    textBatches.set(ctx, { entries: [], timer: null })
-  }
-  return textBatches.get(ctx)!
-}
-
-function flushTextBatch(ctx: AgentContext, win: BrowserWindow): void {
-  const slot = textBatches.get(ctx)
-  if (!slot || slot.entries.length === 0) return
-
-  if (slot.timer) {
-    clearTimeout(slot.timer)
-    slot.timer = null
-  }
-
-  const entryCount = slot.entries.length
-  const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
-  const lastUuid = slot.entries[slot.entries.length - 1].uuid
-  slot.entries = []
-
-  if (!combinedText || win.isDestroyed()) return
-
-  // Emit a single combined stream_event carrying all accumulated text
-  win.webContents.send('agent:event', {
-    context: ctx,
-    type: 'stream_event',
-    uuid: lastUuid,
-    event: {
-      type: 'content_block_delta',
-      index: 0,
-      delta: { type: 'text_delta', text: combinedText },
-    },
-  })
-}
-
-function isTextDeltaEvent(rawMessage: Record<string, unknown>): string | null {
-  if (rawMessage.type !== 'stream_event') return null
-  const event = rawMessage.event as Record<string, unknown> | undefined
-  if (event?.type !== 'content_block_delta') return null
-  const delta = event.delta as Record<string, unknown> | undefined
-  if (delta?.type !== 'text_delta') return null
-  return (delta.text as string) || ''
-}
-
-function scheduleTextBatch(ctx: AgentContext, text: string, uuid: string, win: BrowserWindow): void {
-  const slot = ensureBatchSlot(ctx)
-  slot.entries.push({ context: ctx, text, uuid })
-
-  if (!slot.timer) {
-    slot.timer = setTimeout(() => flushTextBatch(ctx, win), 30)
-  }
-}
-
-/** Flush any pending text batch for the given context (called during cleanup/abort) */
-function discardTextBatch(ctx: AgentContext): void {
-  const slot = textBatches.get(ctx)
-  if (slot) {
-    if (slot.timer) clearTimeout(slot.timer)
-    slot.timer = null
-    slot.entries = []
-  }
-}
-
-function rejectAllPendingPermissions(context?: AgentContext): void {
-  for (const [id, p] of pendingPermissions) {
-    if (context && p.context !== context) continue
-    pendingPermissions.delete(id)
-    clearTimeout(p.timeout)
-    cancelPermissionNotification(id)
-    p.resolve({ behavior: 'deny', message: 'Query aborted' })
-  }
-}
-
-function rejectAllPendingAskUser(context?: AgentContext): void {
-  for (const [id, p] of pendingAskUser) {
-    if (context && p.context !== context) continue
-    pendingAskUser.delete(id)
-    clearTimeout(p.timeout)
-    p.resolve({ behavior: 'deny', message: 'Query aborted' })
-  }
-}
-
-/** Clean up all pending promises when the renderer window is destroyed */
-export function handleWindowDestroy(): void {
-  rejectAllPendingPermissions()
-  rejectAllPendingAskUser()
-  // Discard pending text batches — no window to send to
-  for (const ctx of textBatches.keys()) discardTextBatch(ctx)
-}
 
 export function abortActiveQuery(context?: AgentContext): void {
   if (context) {
@@ -529,13 +261,22 @@ export function abortActiveQuery(context?: AgentContext): void {
     activeQueries.clear()
     rejectAllPendingPermissions()
     rejectAllPendingAskUser()
-    for (const ctx of textBatches.keys()) discardTextBatch(ctx)
+    for (const ctx of ['editor', 'ask'] as AgentContext[]) discardTextBatch(ctx)
   }
+}
+
+/** Clean up all pending promises when the renderer window is destroyed */
+export function handleWindowDestroy(): void {
+  rejectAllPendingPermissions()
+  rejectAllPendingAskUser()
+  discardAllTextBatches()
 }
 
 export function setSkillOutputWindow(win: BrowserWindow): void {
   _skillOutputBridge.setWindow(win)
 }
+
+// ─── Main query loop ───────────────────────────────────────────────────
 
 export async function sendMessage(
   mainWindow: BrowserWindow,
@@ -584,7 +325,6 @@ export async function sendMessage(
   }
 
   _skillOutputBridge.reset()
-
   _skillOutputBridge.setContext(context)
   const options = buildOptions(mainWindow, activeFilePath, context)
   let currentSessionId = sessionId
@@ -605,15 +345,15 @@ export async function sendMessage(
       if (mainWindow.isDestroyed()) break
 
       // Feed raw SDK event to skill output bridge (before conversion)
-      const skillId = activeQueries.get(context)?.skillId ?? null
-      _skillOutputBridge.processRawEvent(message as Record<string, unknown>, skillId)
+      const activeSkillId = activeQueries.get(context)?.skillId ?? null
+      _skillOutputBridge.processRawEvent(message as Record<string, unknown>, activeSkillId)
 
       const rawMsg = message as Record<string, unknown>
       const textDeltaText = isTextDeltaEvent(rawMsg)
       const ipcMsg = toAgentIPCMessage(message)
 
       if (textDeltaText !== null) {
-        // Batch text_delta events: accumulate and flush every ~50ms
+        // Batch text_delta events: accumulate and flush every ~30ms
         const uuid = (rawMsg.uuid as string) || ''
         scheduleTextBatch(context, textDeltaText, uuid, mainWindow)
       } else {
@@ -629,12 +369,8 @@ export async function sendMessage(
       // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
-        sessions.set(currentSessionId, {
-          id: currentSessionId,
-          createdAt: Date.now(),
-        })
+        registerSession(currentSessionId)
         mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId })
-        evictOldSessions()
       }
     }
 
@@ -676,13 +412,7 @@ export async function sendMessage(
   }
 }
 
-export function getSessionList(): SessionInfo[] {
-  return Array.from(sessions.values())
-}
-
-export function getSessionInfo(id: string): SessionInfo | undefined {
-  return sessions.get(id)
-}
+// ─── SDK session listing ───────────────────────────────────────────────
 
 export async function listSdkSessions(): Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number }>> {
   const cwd = getAppSkillsCwd()
@@ -709,4 +439,3 @@ export async function loadSdkSessionMessages(sessionId: string): Promise<Array<R
     return []
   }
 }
-

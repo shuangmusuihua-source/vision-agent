@@ -1,5 +1,5 @@
 import { ipcMain, dialog } from 'electron'
-import { getMainWindow } from '../index'
+import { getMainWindow } from '../ipc-sender'
 import { sendMessage, getSessionList, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, abortActiveQuery } from '../agent-manager'
 import type { AgentContext } from '../../shared/types'
 

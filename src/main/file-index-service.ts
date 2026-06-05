@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import chokidar, { type FSWatcher } from 'chokidar'
-import { getMainWindow } from './index'
+import { getMainWindow } from './ipc-sender'
 import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
 
 interface IndexedFile {

@@ -17,13 +17,14 @@ import DaydreamOverlay from './DaydreamOverlay'
 import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
+import { useWorkspace } from '../../hooks/useWorkspace'
+import { useTabs } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
 import type { AgentContext } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
-import type { ChatMessage as ConversationMessage } from '../../store/agent-store'
-import type { FileEntry, SkillDefinition } from '../../lib/ipc'
+import type { SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -31,15 +32,19 @@ interface AppShellProps {
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const modal = useModal()
-  const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
-  const [fixedWorkspacePaths, setFixedWorkspacePaths] = useState<string[]>([])
 
-  useEffect(() => {
-    window.api.workspace.knowledgeDir().then(dir => {
-      setFixedWorkspacePaths([dir])
-    })
-  }, [])
-  const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
+  // ── Hooks: workspace, tabs ──────────────────────────────────────────
+
+  const workspace = useWorkspace()
+  const {
+    openTabs, activeTab, activeContent,
+    openFile, closeTab, switchTab, clearTab, closeTabsByPrefix,
+    saveFile, refreshActiveContent,
+  } = useTabs()
+  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+
+  // ── Layout hooks ────────────────────────────────────────────────────
+
   const {
     sidebarCollapsed, setSidebarCollapsed,
     agentWidth, agentCollapsed,
@@ -49,10 +54,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     handleSwapLayout, handleExpand, handleToggleAgent, handleDividerMouseDown,
     toggleVisible, handleToggleMouseEnter, handleToggleMouseLeave,
   } = useResponsiveLayout()
-  const [openTabs, setOpenTabs] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<string>('')
-  const [tabContents, setTabContents] = useState<Record<string, string>>({})
-  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+
+  // ── Editor / UI state ───────────────────────────────────────────────
+
   const showGraph = useShowGraph()
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -61,86 +65,68 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [focusMode, setFocusMode] = useState(false)
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
   const [linkedFile, setLinkedFile] = useState<string | null>(null)
-  const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false)
-  const [deleteWsPath, setDeleteWsPath] = useState<string | null>(null)
-  const [deleteWsConfirm, setDeleteWsConfirm] = useState('')
-  const [newWorkspaceName, setNewWorkspaceName] = useState('')
-  const [newWorkspaceError, setNewWorkspaceError] = useState('')
-  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [showDaydream, setShowDaydream] = useState(false)
-  const [daydreamMode, setDaydreamMode] = useState('matrix')
+
   type PrimaryView = 'ask' | 'editor' | 'history' | 'artifacts'
   const [view, setView] = useState<PrimaryView>('ask')
+
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
   const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
-  // Keyboard shortcuts
+  const [showDaydream, setShowDaydream] = useState(false)
+  const [daydreamMode, setDaydreamMode] = useState('matrix')
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────
+
   useAppShortcuts({ setShowSearch, setIsChatFirst })
 
-  // Auto-link file when activeTab changes
+  // ── Auto-link active tab → linked file ──────────────────────────────
+
   useEffect(() => {
-    if (activeTab) {
-      setLinkedFile(activeTab)
-    }
+    if (activeTab) setLinkedFile(activeTab)
   }, [activeTab])
 
-  // Auto-update notifications
+  // ── IPC subscriptions (update, menu, graph, main error) ─────────────
+
   useEffect(() => {
-    const unsubAvailable = window.api.update.onAvailable((info) => setUpdateAvailable(info))
-    const unsubDownloaded = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
-    return () => { unsubAvailable(); unsubDownloaded() }
+    const a = window.api.update.onAvailable((info) => setUpdateAvailable(info))
+    const b = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
+    return () => { a(); b() }
   }, [])
 
-  // Main process error listener
   const [mainError, setMainError] = useState<string | null>(null)
   useEffect(() => {
-    const unsub = window.api.onMainError((error) => {
+    return window.api.onMainError((error) => {
       console.error(`[Main ${error.type}]`, error.message)
       setMainError(error.message)
     })
-    return unsub
   }, [])
 
-  // Menu bar actions
   useEffect(() => {
-    const unsub = window.api.graph.onFilesChanged((data) => {
+    return window.api.graph.onFilesChanged((data) => {
       useGraphStore.getState().handleFilesChanged(data)
     })
-    return unsub
   }, [])
 
   useEffect(() => {
-    const unsub = window.api.menu.onAction((action) => {
+    return window.api.menu.onAction((action) => {
       switch (action) {
-        case 'open-settings':
-          onOpenSettings()
-          break
-        case 'toggle-sidebar':
-          setSidebarCollapsed((v) => !v)
-          break
-        case 'toggle-agent-panel':
-          handleToggleAgent()
-          break
-        case 'open-search':
-          setShowSearch(true)
-          break
-        case 'toggle-source-mode':
-          setSourceMode((v) => !v)
-          break
-        case 'toggle-focus-mode':
-          setFocusMode((v) => !v)
-          break
-        case 'save-file':
-          break
+        case 'open-settings': onOpenSettings(); break
+        case 'toggle-sidebar': setSidebarCollapsed((v) => !v); break
+        case 'toggle-agent-panel': handleToggleAgent(); break
+        case 'open-search': setShowSearch(true); break
+        case 'toggle-source-mode': setSourceMode((v) => !v); break
+        case 'toggle-focus-mode': setFocusMode((v) => !v); break
+        case 'save-file': break
       }
     })
-    return unsub
   }, [onOpenSettings])
 
-  // Singleton IPC subscription — routes all events to correct store slot
+  // ── Singleton IPC → agent store ─────────────────────────────────────
+
   useIPCSubscriptions()
+
+  // ── Agent hooks (editor context) ────────────────────────────────────
 
   const {
     sendMessage: editorSendMessage,
@@ -162,8 +148,20 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
 
+  // ── Agent hooks (ask context) ───────────────────────────────────────
+
   const askIsStreaming = useIsStreaming('ask')
   const askMessages = useMessages('ask')
+
+  // ── Settings → workspace sync ───────────────────────────────────────
+
+  const settings = useSettings()
+  useEffect(() => {
+    if (!settings) return
+    workspace.syncFromSettings(settings.authorizedDirectories)
+  }, [settings])
+
+  // ── View routing helpers ────────────────────────────────────────────
 
   const handleAskZuovisBack = useCallback(() => {
     if (askIsStreaming) window.api.agent.abort('ask')
@@ -175,235 +173,77 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const handleSessionHistory = useCallback(() => {
     useAgentStore.setState({ context: 'editor' })
     setView('history')
-    setActiveTab('')
-  }, [])
+    clearTab()
+  }, [clearTab])
 
   const handleArtifacts = useCallback(() => {
     useAgentStore.setState({ context: 'editor' })
     setView('artifacts')
-    setActiveTab('')
-  }, [])
+    clearTab()
+  }, [clearTab])
 
-  // Restore/refresh workspaces from cached settings
-  const settings = useSettings()
-  const prevAuthDirsRef = useRef<string>('')
-  useEffect(() => {
-    if (!settings) return
-    const dirs = settings.authorizedDirectories
-    const key = dirs.join(',')
-    if (key === prevAuthDirsRef.current) return
-    prevAuthDirsRef.current = key
-    setWorkspacePaths(dirs)
-    const fileEntries: Record<string, FileEntry[]> = {}
-    Promise.all(
-      dirs.map(async (dir) => {
-        fileEntries[dir] = await window.api.workspace.listFiles(dir)
-      })
-    ).then(() => setFiles(fileEntries))
-  }, [settings])
-
-  const handleOpenNewWorkspaceModal = () => {
-    setNewWorkspaceName('')
-    setNewWorkspaceError('')
-    setShowNewWorkspaceModal(true)
-    requestAnimationFrame(() => setModalVisible(true))
-  }
-
-  const handleCloseNewWorkspaceModal = () => {
-    setModalVisible(false)
-    setTimeout(() => {
-      setShowNewWorkspaceModal(false)
-      setNewWorkspaceName('')
-      setNewWorkspaceError('')
-      setIsCreatingWorkspace(false)
-    }, 200)
-  }
-
-  const handleCreateWorkspace = async () => {
-    const name = newWorkspaceName.trim()
-    if (!name) {
-      setNewWorkspaceError('请输入工作区名称')
-      return
-    }
-    if (/[/\\]/.test(name) || name.includes('..')) {
-      setNewWorkspaceError('工作区名称不能包含 / \\ 或 ..')
-      return
-    }
-    setIsCreatingWorkspace(true)
-    setNewWorkspaceError('')
-    try {
-      const dirPath = await window.api.workspace.createWorkspace(name)
-      if (dirPath) {
-        if (!workspacePaths.includes(dirPath)) {
-          setWorkspacePaths((prev) => [...prev, dirPath])
-          const entries = await window.api.workspace.listFiles(dirPath)
-          setFiles((prev) => ({ ...prev, [dirPath]: entries }))
-          await window.api.settings.addDirectory(dirPath)
-        }
-        handleCloseNewWorkspaceModal()
-      } else {
-        setNewWorkspaceError('工作区已存在，请使用其他名称')
-      }
-    } catch {
-      setNewWorkspaceError('创建工作区失败，请重试')
-    } finally {
-      setIsCreatingWorkspace(false)
-    }
-  }
-
-  const handleRefreshWorkspace = useCallback(async (path: string) => {
-    const entries = await window.api.workspace.listFiles(path)
-    setFiles((prev) => ({ ...prev, [path]: entries }))
-  }, [])
-
-  const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
-    setWorkspacePaths(paths)
-    await window.api.settings.reorderDirectories(paths)
-  }, [])
+  // ── File selection (bridges workspace + tabs) ───────────────────────
 
   const handleFileSelect = useCallback(async (path: string) => {
-    // Switch back to editor context when leaving Ask Zuovis or SessionHistory
     if (view !== 'editor') {
       useAgentStore.setState({ context: 'editor' })
       setView('editor')
     }
-    // If file is already open, just switch to it
-    if (openTabs.includes(path)) {
-      setActiveTab(path)
-      return
-    }
+    await openFile(path)
+  }, [openFile, view])
 
-    // Read file content and add to tabs
-    const result = await window.api.workspace.readFile(path)
-    if (result.success && result.content !== undefined) {
-      setOpenTabs((prev) => [...prev, path])
-      setActiveTab(path)
-      setTabContents((prev) => ({ ...prev, [path]: result.content! }))
-    }
-  }, [openTabs, view])
-
-  const handleTabClose = useCallback((path: string) => {
-    setOpenTabs((prev) => {
-      const next = prev.filter((t) => t !== path)
-      // Switch to adjacent tab
-      if (activeTab === path) {
-        const closedIdx = prev.indexOf(path)
-        const newActive = next[Math.min(closedIdx, next.length - 1)] || ''
-        setActiveTab(newActive)
-      }
-      return next
-    })
-    setTabContents((prev) => {
-      const next = { ...prev }
-      delete next[path]
-      return next
-    })
-  }, [activeTab])
+  // ── File operations (bridging workspace + tabs) ─────────────────────
 
   const handleFileDelete = useCallback(async (filePath: string) => {
     const result = await window.api.workspace.deleteFile(filePath)
     if (result.success) {
-      if (openTabs.includes(filePath)) {
-        handleTabClose(filePath)
-      }
-      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
-      const entries: Record<string, FileEntry[]> = {}
-      await Promise.all(dirs.map(async (dir: string) => {
-        entries[dir] = await window.api.workspace.listFiles(dir)
-      }))
-      setFiles(entries)
+      if (openTabs.includes(filePath)) closeTab(filePath)
+      await workspace.refreshFiles(workspace.workspacePaths)
     } else {
       modal.alert({ title: '删除失败', message: result.error || '删除失败' })
     }
-  }, [openTabs, handleTabClose])
+  }, [openTabs, closeTab, workspace, modal])
 
   const handleFileRename = useCallback(async (filePath: string, newName: string) => {
     const result = await window.api.workspace.renameFile(filePath, newName)
     if (result.success) {
       if (openTabs.includes(filePath)) {
-        const wsIdx = filePath.lastIndexOf('/')
-        const wsPrefix = filePath.substring(0, wsIdx + 1)
-        handleTabClose(filePath)
-        if (result.newPath) {
-          handleFileSelect(result.newPath)
-        }
+        closeTab(filePath)
+        if (result.newPath) await openFile(result.newPath)
       }
-      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
-      const entries: Record<string, FileEntry[]> = {}
-      await Promise.all(dirs.map(async (dir: string) => {
-        entries[dir] = await window.api.workspace.listFiles(dir)
-      }))
-      setFiles(entries)
+      await workspace.refreshFiles(workspace.workspacePaths)
     } else {
       modal.alert({ title: '重命名失败', message: result.error || '重命名失败' })
     }
-  }, [openTabs, handleTabClose, handleFileSelect])
+  }, [openTabs, closeTab, openFile, workspace, modal])
 
   const handleFileMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const result = await window.api.workspace.moveFile(sourcePath, targetDir)
     if (result.success) {
       if (openTabs.includes(sourcePath)) {
-        handleTabClose(sourcePath)
-        if (result.newPath) {
-          handleFileSelect(result.newPath)
-        }
+        closeTab(sourcePath)
+        if (result.newPath) await openFile(result.newPath)
       }
-      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
-      const entries: Record<string, FileEntry[]> = {}
-      await Promise.all(dirs.map(async (dir: string) => {
-        entries[dir] = await window.api.workspace.listFiles(dir)
-      }))
-      setFiles(entries)
+      await workspace.refreshFiles(workspace.workspacePaths)
     } else {
       modal.alert({ title: '移动失败', message: result.error || '移动失败' })
     }
-  }, [openTabs, handleTabClose, handleFileSelect])
+  }, [openTabs, closeTab, openFile, workspace, modal])
 
-  const handleTabSwitch = useCallback((path: string) => {
-    setActiveTab(path)
-  }, [])
+  // ── Auto-refresh after agent finishes ───────────────────────────────
 
-  const handleSave = useCallback(async (filePath: string, content: string) => {
-    await window.api.workspace.writeFile(filePath, content)
-    setTabContents((prev) => ({ ...prev, [filePath]: content }))
-  }, [])
-
-  // Auto-reload editor, memory, and sidebar file list when Agent finishes
   useEffect(() => {
     if (!isStreaming && useAgentStore.getState().slots.editor.messages.length > 0) {
       setMemoryRefreshKey((k) => k + 1)
-      // Refresh sidebar file lists for all workspaces
-      Promise.all(
-        workspacePaths.map(async (dir) => {
-          const entries = await window.api.workspace.listFiles(dir)
-          return { dir, entries }
-        })
-      ).then((results) => {
-        setFiles((prev) => {
-          const next = { ...prev }
-          for (const { dir, entries } of results) {
-            next[dir] = entries
-          }
-          return next
-        })
-      })
+      workspace.refreshAllFiles(workspace.workspacePaths)
       if (activeTab) {
-        const timer = setTimeout(() => {
-          window.api.workspace.readFile(activeTab).then((result) => {
-            if (result.success && result.content !== undefined) {
-              setTabContents((prev) => {
-                if (prev[activeTab] !== result.content) {
-                  return { ...prev, [activeTab]: result.content! }
-                }
-                return prev
-              })
-            }
-          }).catch(() => {})
-        }, 500)
+        const timer = setTimeout(() => { refreshActiveContent().catch(() => {}) }, 500)
         return () => clearTimeout(timer)
       }
     }
-  }, [isStreaming, activeTab, workspacePaths])
+  }, [isStreaming, activeTab, refreshActiveContent, workspace])
+
+  // ── Text selection, ask-agent, stats, skill ─────────────────────────
 
   const handleSelectText = useCallback((text: string, sourceContext?: string) => {
     const target: AgentContext = sourceContext === 'ask' ? 'ask' : 'editor'
@@ -424,7 +264,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         review: `${context}\n\n请检查以上选中内容是否有问题。`,
         ask: `${context}\n\n`
       }
-
       if (action === 'ask') {
         const target: AgentContext = view === 'ask' ? 'ask' : 'editor'
         useAgentStore.setState((prev) => ({
@@ -437,7 +276,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         editorSendMessage(prompts[action], filePath)
       }
     },
-    [editorSendMessage]
+    [editorSendMessage, view]
   )
 
   const handleStatsUpdate = useCallback((words: number, chars: number) => {
@@ -468,31 +307,31 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     editorSendMessage(prompt, linkedFile || undefined)
   }, [editorSendMessage, linkedFile])
 
-  const activeContent = activeTab ? tabContents[activeTab] || '' : ''
+  // ── Render ──────────────────────────────────────────────────────────
 
   return (
     <div className="app-shell" ref={shellRef}>
       <nav aria-label="侧边栏" style={{ display: 'flex', height: '100%' }}>
       <Sidebar
-        files={files}
-        workspacePaths={workspacePaths}
-        fixedWorkspacePaths={fixedWorkspacePaths}
+        files={workspace.files}
+        workspacePaths={workspace.workspacePaths}
+        fixedWorkspacePaths={workspace.fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
         onFileSelect={handleFileSelect}
-        onNewWorkspace={handleOpenNewWorkspaceModal}
+        onNewWorkspace={workspace.handleOpenNewWorkspaceModal}
         onFileDelete={handleFileDelete}
         onFileMove={handleFileMove}
         onFileRename={handleFileRename}
-        onRefreshWorkspace={handleRefreshWorkspace}
-        onRemoveWorkspace={(path) => { setDeleteWsPath(path); setDeleteWsConfirm('') }}
+        onRefreshWorkspace={workspace.handleRefreshWorkspace}
+        onRemoveWorkspace={workspace.handleRemoveWorkspace}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
-        onReorderWorkspaces={handleReorderWorkspaces}
+        onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
-            setActiveTab('')
+            clearTab()
             setView('ask')
           }}
         isAskZuovisActive={view === 'ask'}
@@ -520,7 +359,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
-            workspacePath={workspacePaths[0]}
+            workspacePath={workspace.workspacePaths[0]}
           />
         ) : (
         <>
@@ -529,8 +368,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <EditorTabs
               tabs={openTabs}
               activeTab={activeTab}
-              onTabSwitch={handleTabSwitch}
-              onTabClose={handleTabClose}
+              onTabSwitch={switchTab}
+              onTabClose={closeTab}
             />
           )}
         </div>
@@ -547,15 +386,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             useGraphStore.getState().setShowGraph(false)
           }} />
         ) : activeTab ? (
-          <ErrorBoundary onReset={() => setActiveTab(activeTab)}>
+          <ErrorBoundary onReset={() => {}}>
           <MarkdownEditor
             content={activeContent}
             filePath={activeTab}
-            workspacePath={workspacePaths[0] || ''}
+            workspacePath={workspace.workspacePaths[0] || ''}
             sourceMode={sourceMode}
             focusMode={focusMode}
             onOpenFile={handleFileSelect}
-            onSave={handleSave}
+            onSave={saveFile}
             onAskAgent={handleAskAgent}
             onStatsUpdate={handleStatsUpdate}
           />
@@ -632,12 +471,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onUnlinkFile={() => setLinkedFile(null)}
       >
         <ErrorBoundary>
-        <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
+        <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspace.workspacePaths[0]} />
         </ErrorBoundary>
       </AgentPanel>
       </aside>
       </>
       )}
+      {/* ── Banners ── */}
       {updateAvailable && !updateDownloaded && (
         <div className="update-banner">
           <span>新版本 v{updateAvailable.version} 可用</span>
@@ -682,24 +522,20 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <PanelLeft size={14} />
         </button>
       </div>
-      {showNewWorkspaceModal && (
-        <div className={`modal-overlay${modalVisible ? ' modal-overlay-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
-          <div className={`modal-window${modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}
+      {/* ── New workspace modal ── */}
+      {workspace.showNewWorkspaceModal && (
+        <div className={`modal-overlay${workspace.modalVisible ? ' modal-overlay-visible' : ''}`} onClick={workspace.handleCloseNewWorkspaceModal}>
+          <div className={`modal-window${workspace.modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === 'Tab') {
                 const focusable = e.currentTarget.querySelectorAll<HTMLElement>('input, button:not([disabled])')
                 if (!focusable.length) return
                 const first = focusable[0]
                 const last = focusable[focusable.length - 1]
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault()
-                  last.focus()
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault()
-                  first.focus()
-                }
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
               }
-              if (e.key === 'Escape') handleCloseNewWorkspaceModal()
+              if (e.key === 'Escape') workspace.handleCloseNewWorkspaceModal()
             }}
           >
             <div className="modal-title">新建工作区</div>
@@ -707,56 +543,50 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <input
               className="modal-input"
               placeholder="工作区名称"
-              value={newWorkspaceName}
-              onChange={(e) => { setNewWorkspaceName(e.target.value); setNewWorkspaceError('') }}
+              value={workspace.newWorkspaceName}
+              onChange={(e) => { workspace.setNewWorkspaceName(e.target.value); workspace.setNewWorkspaceError('') }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.isComposing && !isCreatingWorkspace) handleCreateWorkspace()
+                if (e.key === 'Enter' && !e.isComposing && !workspace.isCreatingWorkspace) workspace.handleCreateWorkspace()
               }}
-              disabled={isCreatingWorkspace}
+              disabled={workspace.isCreatingWorkspace}
               autoFocus
-              aria-describedby={newWorkspaceError ? 'workspace-error' : undefined}
+              aria-describedby={workspace.newWorkspaceError ? 'workspace-error' : undefined}
             />
-            {newWorkspaceError && <div className="modal-error" id="workspace-error" role="alert">{newWorkspaceError}</div>}
+            {workspace.newWorkspaceError && <div className="modal-error" id="workspace-error" role="alert">{workspace.newWorkspaceError}</div>}
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={handleCloseNewWorkspaceModal} disabled={isCreatingWorkspace}>取消</button>
-              <button className="btn-modal btn-modal-primary" onClick={handleCreateWorkspace} disabled={isCreatingWorkspace}>
-                {isCreatingWorkspace ? '创建中...' : '创建'}
+              <button className="btn-modal btn-modal-cancel" onClick={workspace.handleCloseNewWorkspaceModal} disabled={workspace.isCreatingWorkspace}>取消</button>
+              <button className="btn-modal btn-modal-primary" onClick={workspace.handleCreateWorkspace} disabled={workspace.isCreatingWorkspace}>
+                {workspace.isCreatingWorkspace ? '创建中...' : '创建'}
               </button>
             </div>
           </div>
         </div>
       )}
-      {deleteWsPath && (
-        <div className="modal-overlay modal-overlay-visible" onClick={() => setDeleteWsPath(null)}>
+      {/* ── Delete workspace modal ── */}
+      {workspace.deleteWsPath && (
+        <div className="modal-overlay modal-overlay-visible" onClick={() => workspace.setDeleteWsPath(null)}>
           <div className="modal-window modal-window-visible" role="dialog" aria-modal="true" aria-label="删除工作区" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">删除工作区</div>
             <div className="modal-body">
-              此操作将永久删除工作区 <strong>{deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
+              此操作将永久删除工作区 <strong>{workspace.deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
             </div>
             <div className="modal-hint">请输入工作区名称以确认删除：</div>
             <input
               className="modal-input"
-              placeholder={deleteWsPath.split('/').pop()}
-              value={deleteWsConfirm}
-              onChange={(e) => setDeleteWsConfirm(e.target.value)}
+              placeholder={workspace.deleteWsPath.split('/').pop()}
+              value={workspace.deleteWsConfirm}
+              onChange={(e) => workspace.setDeleteWsConfirm(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') setDeleteWsPath(null)
-                if (e.key === 'Enter' && !e.isComposing && deleteWsConfirm === deleteWsPath.split('/')?.pop()) {
+                if (e.key === 'Escape') workspace.setDeleteWsPath(null)
+                if (e.key === 'Enter' && !e.isComposing && workspace.deleteWsConfirm === workspace.deleteWsPath!.split('/')?.pop()) {
                   (async () => {
-                    const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
-                    if (result.success) {
-                      setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
-                      setFiles((prev) => {
-                        const next = { ...prev }
-                        delete next[deleteWsPath!]
-                        return next
-                      })
-                      // Close tabs from deleted workspace
-                      const wsPrefix = deleteWsPath + '/'
-                      setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
-                      setDeleteWsPath(null)
-                    } else {
+                    const deletingPath = workspace.deleteWsPath
+                    if (!deletingPath) return
+                    const result = await workspace.handleDeleteWorkspace()
+                    if (!result.success) {
                       modal.alert({ title: '删除失败', message: result.error || '删除失败' })
+                    } else {
+                      closeTabsByPrefix(deletingPath + '/')
                     }
                   })()
                 }
@@ -764,22 +594,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
               autoFocus
             />
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={() => setDeleteWsPath(null)}>取消</button>
+              <button className="btn-modal btn-modal-cancel" onClick={() => workspace.setDeleteWsPath(null)}>取消</button>
               <button
                 className="btn-modal btn-modal-primary btn-modal-danger"
-                disabled={deleteWsConfirm !== deleteWsPath.split('/')?.pop()}
+                disabled={workspace.deleteWsConfirm !== workspace.deleteWsPath.split('/')?.pop()}
                 onClick={async () => {
-                  const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
+                  const deletingPath = workspace.deleteWsPath
+                  if (!deletingPath) return
+                  const result = await workspace.handleDeleteWorkspace()
                   if (result.success) {
-                    setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
-                    setFiles((prev) => {
-                      const next = { ...prev }
-                      delete next[deleteWsPath!]
-                      return next
-                    })
-                    const wsPrefix = deleteWsPath + '/'
-                    setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
-                    setDeleteWsPath(null)
+                    closeTabsByPrefix(deletingPath + '/')
                   } else {
                     modal.alert({ title: '删除失败', message: result.error || '删除失败' })
                   }
