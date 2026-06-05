@@ -1,43 +1,33 @@
-import React from 'react'
+import { create } from 'zustand'
 import type { AppSettings } from '../lib/ipc'
 
-type Listener = (settings: AppSettings) => void
+// ─── Settings Store ──────────────────────────────────────────────────
 
-let cached: AppSettings | null = null
-const listeners = new Set<Listener>()
+export type SettingsStore = {
+  settings: AppSettings | null
+  loaded: boolean
 
-function notifyAll(): void {
-  if (!cached) return
-  for (const fn of listeners) fn(cached)
+  // Actions
+  init: () => Promise<void>
+  update: (settings: AppSettings) => void
 }
 
-export function getSettingsCache(): AppSettings | null {
-  return cached
-}
+// ─── Store implementation ────────────────────────────────────────────
 
-export async function initSettingsCache(): Promise<AppSettings> {
-  cached = await window.api.settings.get()
-  notifyAll()
-  return cached
-}
+export const useSettingsStore = create<SettingsStore>((set) => ({
+  settings: null,
+  loaded: false,
 
-export function updateSettingsCache(settings: AppSettings): void {
-  cached = settings
-  notifyAll()
-}
+  init: async () => {
+    const settings = await window.api.settings.get()
+    set({ settings, loaded: true })
+  },
 
-export function onSettingsChange(fn: Listener): () => void {
-  listeners.add(fn)
-  return () => { listeners.delete(fn) }
-}
+  update: (settings) => {
+    set({ settings, loaded: true })
+  },
+}))
 
-export function useSettings(): AppSettings | null {
-  const [settings, setSettings] = React.useState<AppSettings | null>(cached)
+// ─── Selectors ───────────────────────────────────────────────────────
 
-  React.useEffect(() => {
-    if (cached) setSettings(cached)
-    return onSettingsChange(setSettings)
-  }, [])
-
-  return settings
-}
+export const useSettings = () => useSettingsStore((s) => s.settings)

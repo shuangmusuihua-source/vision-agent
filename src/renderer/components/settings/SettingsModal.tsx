@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Sun, Moon, Monitor, Users, Info, Plus, X } from 'lucide-react'
-import { useSettings, getSettingsCache } from '../../store/settings-cache'
+import { useSettings, useSettingsStore } from '../../store/settings-cache'
 import type { ModelProfile } from '../../lib/ipc'
 
 interface SettingsModalProps {
@@ -63,7 +63,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
   const handleDeleteProfile = useCallback(async (id: string) => {
     await window.api.settings.removeProfile(id)
-    const s = getSettingsCache()
+    const s = useSettingsStore.getState().settings
     if (s) {
       setProfiles(s.profiles)
       setActiveProfileId(s.activeProfileId)

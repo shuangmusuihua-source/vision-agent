@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { initSettingsCache, updateSettingsCache, useSettings } from './store/settings-cache'
+import { useSettingsStore, useSettings } from './store/settings-cache'
 import './styles/global.css'
 import './styles/layout.css'
 import './styles/editor.css'
@@ -29,9 +29,9 @@ function App(): React.ReactElement {
 
   // Init settings cache and listen for push updates from main process
   useEffect(() => {
-    initSettingsCache()
+    useSettingsStore.getState().init()
     const unsub = window.api.settings.onChanged((s) => {
-      updateSettingsCache(s as unknown as import('./lib/ipc').AppSettings)
+      useSettingsStore.getState().update(s as unknown as import('./lib/ipc').AppSettings)
     })
     return unsub
   }, [])
