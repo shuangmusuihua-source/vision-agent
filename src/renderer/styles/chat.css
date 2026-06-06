@@ -896,9 +896,9 @@
 }
 
 .chat-send-btn-active {
-  background: linear-gradient(135deg, #ff58b2, #6657ff);
-  box-shadow: 0 8px 20px rgba(102, 87, 255, 0.25);
-  color: #fff !important;
+  background: var(--color-action);
+  box-shadow: 0 4px 12px rgba(14, 21, 58, 0.25);
+  color: var(--color-action-text) !important;
   cursor: pointer;
 }
 
@@ -911,8 +911,8 @@
   height: 32px;
   border-radius: 50%;
   -electron-corner-smoothing: system-ui;
-  background: linear-gradient(135deg, #ff4757, #ff6b81);
-  color: #fff;
+  background: var(--color-action);
+  color: var(--color-action-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -925,12 +925,13 @@
 
 .chat-stop-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+  box-shadow: 0 6px 16px rgba(14, 21, 58, 0.3);
+  color: var(--color-action-text) !important;
 }
 
 @keyframes chatStopPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 21, 58, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(14, 21, 58, 0); }
 }
 
 /* --- Permission Dialog --- */
@@ -1401,7 +1402,7 @@
   -webkit-backdrop-filter: blur(16px);
   border-radius: 24px;
   -electron-corner-smoothing: system-ui;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(102, 87, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .skill-status-icon {
@@ -1410,10 +1411,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #ff58b2, #6657ff);
+  background: var(--color-action);
+  color: var(--color-action-text);
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(102, 87, 255, 0.25);
 }
 
 .skill-status-spinner {

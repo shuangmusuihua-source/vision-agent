@@ -16,6 +16,8 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.141",
     "@anthropic-ai/claude-agent-sdk-darwin-arm64": "^0.2.141",
+    "@json-render/core": "^0.19.0",
+    "@json-render/react": "^0.19.0",
     "@sentry/electron": "^7.13.0",
     "@streamdown/code": "^1.1.1",
     "@streamdown/math": "^1.0.2",
@@ -45,6 +47,7 @@
     "node-cron": "^4.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-draggable": "^4.6.0",
     "react-flip-toolkit": "^7.2.4",
     "react-force-graph-2d": "^1.29.1",
     "react-zoom-pan-pinch": "^4.0.3",
@@ -52,6 +55,7 @@
     "shiki": "^4.1.0",
     "streamdown": "^2.5.0",
     "tippy.js": "^6.3.7",
+    "zod": "^4.4.3",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

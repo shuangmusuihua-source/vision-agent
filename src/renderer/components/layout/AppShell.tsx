@@ -12,7 +12,7 @@ import AskZuovis from '../ask/AskZuovis'
 import SessionHistoryPanel from './SessionHistoryPanel'
 import ArtifactsPanel from './ArtifactsPanel'
 import { ErrorBoundary } from '../common/ErrorBoundary'
-const GraphView = lazy(() => import('../graph/GraphView'))
+const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 import DaydreamOverlay from './DaydreamOverlay'
 import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
@@ -374,18 +374,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           )}
         </div>
         <div className="main-content-scroll">
-        {showGraph ? (
-          <GraphView onNodeClick={(nodeId, nodeType) => {
-            if (nodeType === 'entity') {
-              const entityName = nodeId.replace(/^entity:/, '')
-              setSearchQuery(entityName)
-              setShowSearch(true)
-            } else {
-              handleFileSelect(nodeId)
-            }
-            useGraphStore.getState().setShowGraph(false)
-          }} />
-        ) : activeTab ? (
+        {activeTab ? (
           <ErrorBoundary onReset={() => {}}>
           <MarkdownEditor
             content={activeContent}
@@ -507,6 +496,25 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           onClose={() => { setShowSearch(false); setSearchQuery('') }}
           initialQuery={searchQuery}
         />
+      )}
+      {showGraph && (
+        <Suspense fallback={null}>
+        <GraphFloat
+          show={showGraph}
+          onClose={() => useGraphStore.getState().setShowGraph(false)}
+          activeFile={activeTab}
+          onNodeClick={(nodeId, nodeType) => {
+            if (nodeType === 'entity') {
+              const entityName = nodeId.replace(/^entity:/, '')
+              setSearchQuery(entityName)
+              setShowSearch(true)
+            } else {
+              handleFileSelect(nodeId)
+            }
+            // Don't auto-close on node click — user can keep browsing
+          }}
+        />
+        </Suspense>
       )}
       <div
         className="sidebar-toggle-area"

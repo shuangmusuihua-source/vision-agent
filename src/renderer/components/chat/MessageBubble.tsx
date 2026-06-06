@@ -13,6 +13,7 @@ import type { BundledTheme } from 'shiki'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import SkillOutputCard from './SkillOutputCard'
+import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
 
 const REMARK_PLUGINS = [remarkGfm]
 
@@ -240,6 +241,11 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
   const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
   const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutput.content.length > 0
 
+  // Extract json-render blocks from the message text
+  const { blocks: jsonRenderBlocks, cleanText } = !isStreaming
+    ? extractJsonRenderBlocks(message.textContent)
+    : { blocks: [], cleanText: message.textContent }
+
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -278,10 +284,17 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
             ))}
           </div>
         )}
+        {jsonRenderBlocks.length > 0 && (
+          <div className="message-json-render-blocks">
+            {jsonRenderBlocks.map((block, i) => (
+              <ComponentRenderer key={i} spec={block} />
+            ))}
+          </div>
+        )}
         {showSkillOutput && (
           <SkillOutputCard content={skillOutput.content} isStreaming={skillOutput.isStreaming} language={skillOutput.language} />
         )}
-        {message.textContent && (
+        {cleanText && (
           <div className="message-assistant-text">
             <div className="message-markdown">
               <Streamdown
@@ -297,7 +310,7 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
                 lineNumbers={false}
                 controls={false}
               >
-                {stripSkillOutputBlock(message.textContent)}
+                {stripSkillOutputBlock(cleanText)}
               </Streamdown>
             </div>
           </div>

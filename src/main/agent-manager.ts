@@ -109,7 +109,20 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
     `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
     activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
-    workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : ''
+    workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : '',
+    `你可使用 \`\`\`json-render 代码块输出富交互 UI。支持的组件及属性：
+- Card: { title: string, description?: string } — 卡片容器，可嵌套子组件
+- Table: { columns: [{ key, label }], rows: [{ key: value }] } — 数据表格
+- Metric: { label: string, value: string, trend?: "up"|"down"|"neutral" } — 指标卡片
+- Chart: { type: "bar"|"line", data: [{ label, value }], height?: number, color?: string } — 柱状图/折线图
+- List + ListItem: { title?: string } / { icon?: string, title: string, subtitle?: string, href?: string } — 列表
+- Badge: { label: string, variant?: "default"|"success"|"warning"|"error"|"info"|"accent" } — 标签
+- CodeCard: { language?: string, title?: string } — 代码块
+- Button: { label: string, variant?: "primary"|"secondary" } — 按钮
+- Alert: { severity: "info"|"warning"|"error"|"success", title: string, content: string } — 提醒卡片
+JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...}, children?: ["子元素id"], text?: "文本" } } }。
+适合场景：数据查询结果用 Table/Chart、文件列表用 List+ListItem、关键词用 Badge 标注。
+仅在不影响主要回答质量时使用；Markdown 仍然是首选格式。`,
   ].filter(Boolean).join('\n')
 
   return buildAgentOptions({

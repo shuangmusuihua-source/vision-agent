@@ -388,8 +388,8 @@
 }
 
 .ask-zuovis-send-btn-active {
-  background: linear-gradient(135deg, #ff58b2, #6657ff);
-  box-shadow: 0 8px 20px rgba(102, 87, 255, 0.25);
+  background: var(--color-action);
+  box-shadow: 0 4px 12px rgba(14, 21, 58, 0.25);
   cursor: pointer;
 }
 
@@ -402,8 +402,8 @@
   height: 32px;
   border-radius: 50%;
   -electron-corner-smoothing: system-ui;
-  background: linear-gradient(135deg, #ff4757, #ff6b81);
-  color: #fff;
+  background: var(--color-action);
+  color: var(--color-action-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -415,12 +415,13 @@
 
 .ask-zuovis-stop-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+  box-shadow: 0 6px 16px rgba(14, 21, 58, 0.3);
+  color: var(--color-action-text) !important;
 }
 
 @keyframes stopPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 21, 58, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(14, 21, 58, 0); }
 }
 
 /* ── File attachment ── */

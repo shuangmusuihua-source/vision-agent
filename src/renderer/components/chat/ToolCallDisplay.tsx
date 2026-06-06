@@ -1,22 +1,24 @@
-import { ChevronDown, ChevronRight, Check, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { ChevronDown, ChevronRight, Check, Loader2, FileText, FilePenLine, Terminal, Search, FolderSearch, Globe, MessageCircle, Sparkles, Wrench } from 'lucide-react'
+import { useState, type ReactElement } from 'react'
 import type { ToolCall } from '../../store/agent-store'
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall
 }
 
-const TOOL_META: Record<string, { icon: string; label: string }> = {
-  Read:       { icon: '📖', label: '读取' },
-  Write:      { icon: '✨', label: '生成' },
-  Edit:       { icon: '✏️', label: '编辑' },
-  Bash:       { icon: '⚡', label: '执行命令' },
-  Grep:       { icon: '🔎', label: '搜索内容' },
-  Glob:       { icon: '📁', label: '查找文件' },
-  WebSearch:  { icon: '🔍', label: '搜索' },
-  WebFetch:   { icon: '🌐', label: '浏览网页' },
-  AskUserQuestion: { icon: '💬', label: '询问' },
+const TOOL_META: Record<string, { icon: ReactElement; label: string }> = {
+  Read:       { icon: <FileText size={13} />,       label: '读取' },
+  Write:      { icon: <Sparkles size={13} />,       label: '生成' },
+  Edit:       { icon: <FilePenLine size={13} />,    label: '编辑' },
+  Bash:       { icon: <Terminal size={13} />,       label: '执行命令' },
+  Grep:       { icon: <Search size={13} />,         label: '搜索内容' },
+  Glob:       { icon: <FolderSearch size={13} />,   label: '查找文件' },
+  WebSearch:  { icon: <Search size={13} />,          label: '搜索' },
+  WebFetch:   { icon: <Globe size={13} />,          label: '浏览网页' },
+  AskUserQuestion: { icon: <MessageCircle size={13} />, label: '询问' },
 }
+
+const FALLBACK_META = { icon: <Wrench size={13} />, label: '' }
 
 function friendlySummary(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
@@ -59,7 +61,7 @@ function detailText(toolName: string, input: Record<string, unknown>): string | 
 
 function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement {
   const [expanded, setExpanded] = useState(false)
-  const meta = TOOL_META[toolCall.toolName] || { icon: '🔧', label: toolCall.toolName }
+  const meta = TOOL_META[toolCall.toolName] || { ...FALLBACK_META, label: toolCall.toolName }
   const summary = friendlySummary(toolCall.toolName, toolCall.input)
   const detail = expanded ? detailText(toolCall.toolName, toolCall.input) : null
   const isDone = toolCall.status === 'completed' || toolCall.status === 'error'

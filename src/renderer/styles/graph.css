@@ -13,6 +13,40 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.graph-title-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-soft);
+  user-select: none;
+}
+
+.graph-title-icon {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.graph-title-label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.graph-title-sep {
+  color: var(--color-text-tertiary);
+}
+
+.graph-title-file {
+  color: var(--color-text-primary);
+}
+
+.graph-title-hint {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
 .graph-search {
   flex: 1;
   max-width: 200px;
@@ -120,4 +154,110 @@
   width: 16px;
   height: 2px;
   flex-shrink: 0;
+}
+
+/* ── Floating Graph Window ── */
+
+.graph-float {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  -electron-corner-smoothing: system-ui;
+}
+
+.graph-float-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-soft);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.graph-float-header:active {
+  cursor: grabbing;
+}
+
+.graph-float-grip {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.graph-float-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.graph-float-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.graph-float-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.graph-float-body {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.graph-float-body .graph-view {
+  height: 100%;
+}
+
+.graph-float-body .graph-title-bar {
+  display: none;
+}
+
+.graph-node-tooltip {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.graph-node-tooltip-type {
+  color: var(--color-text-tertiary);
+}
+
+.graph-node-tooltip-path {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
 }

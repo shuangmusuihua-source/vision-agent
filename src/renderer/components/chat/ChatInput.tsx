@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, FileText, Presentation, Newspaper, CircleStop, Trash2, FolderOpen, Monitor, Paperclip, X } from 'lucide-react'
+import { ArrowUp, FileText, Presentation, Newspaper, Square, Trash2, FolderOpen, Monitor, Paperclip, X } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -235,7 +235,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
               type="button"
               title="停止生成"
             >
-              <CircleStop size={14} />
+              <Square size={14} />
             </button>
           ) : (
             <button
@@ -330,7 +330,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             type="button"
             title="停止生成"
           >
-            <CircleStop size={14} />
+            <Square size={14} />
           </button>
         ) : (
           <button

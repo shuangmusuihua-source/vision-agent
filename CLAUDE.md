@@ -11,7 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Dist**: `npm run dist` (electron-builder, creates DMG)
 - **Postinstall**: `npm run postinstall` (electron-builder install-app-deps)
 
-No test framework is configured.
+- **Test**: `npm test` (vitest run), `npm run test:watch` (vitest watch mode)
+- Test files: `tests/**/*.test.ts`, config: `vitest.config.ts`
 
 ## Architecture
 
