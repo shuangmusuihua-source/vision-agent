@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, FileText, Presentation, Newspaper, Square, Trash2, FolderOpen, Monitor, Paperclip, X } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, X } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -19,15 +19,6 @@ interface ChatInputProps {
   isStreaming?: boolean
   placeholder?: string
   variant?: 'default' | 'capsule'
-}
-
-const ICON_MAP: Record<string, React.ComponentType<{ size: number }>> = {
-  FileText,
-  Presentation,
-  Newspaper,
-  Trash2,
-  FolderOpen,
-  Monitor
 }
 
 function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
@@ -252,7 +243,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           <div className="skill-popup" ref={popupRef}>
             <div className="skill-popup-header">可用技能</div>
             {filteredSkills.map((skill, idx) => {
-              const IconComp = ICON_MAP[skill.icon]
               return (
                 <div
                   key={skill.id}
@@ -262,7 +252,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
                   onMouseEnter={() => setSelectedSkillIdx(idx)}
                 >
                   <div className="skill-popup-item-name">
-                    {IconComp && <IconComp size={14} />}
                     {skill.name}
                     {skill.argumentHint && (
                       <span className="skill-popup-item-hint">{skill.argumentHint}</span>
@@ -348,7 +337,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
         <div className="skill-popup" ref={popupRef}>
           <div className="skill-popup-header">可用技能</div>
           {filteredSkills.map((skill, idx) => {
-            const IconComp = ICON_MAP[skill.icon]
             return (
             <div
               key={skill.id}
@@ -358,7 +346,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
               onMouseEnter={() => setSelectedSkillIdx(idx)}
             >
               <div className="skill-popup-item-name">
-                {IconComp && <IconComp size={14} />}
                 {skill.name}
                 {skill.argumentHint && (
                   <span className="skill-popup-item-hint">{skill.argumentHint}</span>

@@ -121,6 +121,7 @@ function Sidebar({
   const [moveDropdownPos, setMoveDropdownPos] = useState({ left: 0, top: 0 })
   const moveDropdownRef = useRef<HTMLDivElement>(null)
   const newFileInputRef = useRef<HTMLInputElement>(null)
+  const isComposingRef = useRef(false)
 
   useEffect(() => {
     if (creatingFileIn) {
@@ -524,8 +525,10 @@ function Sidebar({
                               placeholder="文件名（自动添加 .md）"
                               value={newFileName}
                               onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
+                              onCompositionStart={() => { isComposingRef.current = true }}
+                              onCompositionEnd={() => { isComposingRef.current = false }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.isComposing) handleCreateFile(wsPath)
+                                if (e.key === 'Enter' && !e.isComposing && !isComposingRef.current) handleCreateFile(wsPath)
                                 if (e.key === 'Escape') setCreatingFileIn(null)
                               }}
                               onBlur={() => setCreatingFileIn(null)}

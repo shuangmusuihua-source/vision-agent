@@ -73,9 +73,13 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
             })}
           </div>
         )}
-        {request.multiSelect && selected.size > 0 && (
-          <button className="drawer-question-submit" onClick={handleSubmit}>
-            提交所选 ({selected.size})
+        {request.multiSelect && (
+          <button
+            className={`drawer-question-submit${selected.size > 0 ? '' : ' drawer-question-submit--disabled'}`}
+            onClick={handleSubmit}
+            disabled={selected.size === 0}
+          >
+            {selected.size > 0 ? `提交所选 (${selected.size})` : '请选择'}
           </button>
         )}
         {!request.multiSelect && (

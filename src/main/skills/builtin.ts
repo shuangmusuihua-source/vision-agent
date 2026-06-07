@@ -35,6 +35,14 @@ const builtinSkills: SkillDefinition[] = [
     outputMode: 'write',
   },
   {
+    id: 'huashu-design',
+    name: '花叔设计',
+    description: '高保真原型/交互Demo/幻灯片/动画/信息图/设计评审，40种CSS风格，支持MP4/GIF/PPTX/PDF导出',
+    icon: '',
+    promptTemplate: `使用 huashu-design skill 制作 {activeFile}`,
+    outputMode: 'write',
+  },
+  {
     id: 'system-cleanup',
     name: '系统清理',
     description: '扫描系统垃圾文件并安全清理，释放磁盘空间',

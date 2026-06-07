@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deck · Multi-file Slide Index</title>
+<!--
+  deck_index.html — 多文件 slide deck 的拼接器（双模式）
+
+  配合「每页一个独立 HTML」架构使用。与单文件 deck_stage.js 对比：
+  · 每页独立作用域（CSS/JS 都隔离），一页出 bug 不影响其他页
+  · 单页可直接在浏览器打开验证，不依赖 JS goTo()
+  · 多 agent 可并行做不同页，merge 时零冲突
+  · 适合 ≥15 页的讲座/课件/长 deck
+
+  两种模式（body[data-mode] 控制）：
+  · 概览墙 overview（默认进入）：所有页缩略成 3D 透视卡片墙，景深斜铺、悬浮投影。
+      点任意卡片 → 从该页进入演示；右下角「▶ 开始演示」从第 1 页（或记忆页）进入。
+  · 全屏演示 present：单页 fit 缩放翻页。ESC 或左上「⊞ 概览」回到概览墙。
+
+  用法：
+    1. 把本文件复制到 deck 根目录，重命名 index.html
+    2. 在同目录建 slides/ 子目录，放每一页独立 HTML
+    3. 编辑下方 MANIFEST 数组，按顺序列出文件名和人类可读标签
+    4. 每张 slide HTML 建议尺寸 1920×1080，自带背景/字体；不要依赖外层 CSS
+
+  共享资源（如果需要）：
+    · shared/tokens.css  — 跨页 CSS 变量（色板/字号）
+    · shared/chrome.html — 页眉页脚可复用片段
+    · 每页 HTML 自己 <link> 进去即可
+
+  键盘（演示模式）：← / → / Space / PgUp / PgDown / Home / End / 1-9 跳页 / P 打印 / ESC 回概览
+-->
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- EDIT THIS — deck 所有页按顺序列出                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<script>
+  window.DECK_MANIFEST = [
+    { file: "slides/01-cover.html",       label: "Cover" },
+    { file: "slides/02-quote.html",       label: "Opening Quote" },
+    { file: "slides/03-intro.html",       label: "Self-intro" },
+    // 继续往下加。file 是相对本文件的路径，label 用于计数器
+  ];
+
+  // 固定 canvas 尺寸。每页 HTML 都应该按这个尺寸设计。
+  window.DECK_WIDTH = 1920;
+  window.DECK_HEIGHT = 1080;
+</script>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #0a0a0a;
+    overflow: hidden;
+    font-family: -apple-system, "PingFang SC", sans-serif;
+  }
+
+  /* ── 模式显隐：默认 overview ───────────────────────────── */
+  body[data-mode="overview"] { background: #f0eee9; overflow: auto; }
+  body[data-mode="overview"] #present-ui { display: none; }
+  body[data-mode="present"]  #overview   { display: none; }
+  body[data-mode="present"]  .start-btn  { display: none; }
+
+  /* ════════════════════════════════════════════════════════ */
+  /* 模式 A · 概览墙（3D 透视卡片墙）                            */
+  /* ════════════════════════════════════════════════════════ */
+  #overview {
+    min-height: 100%;
+    padding: 7vw 5vw 14vw;
+    /* 透视容器：景深 */
+    perspective: 1600px;
+    perspective-origin: 50% 38%;
+  }
+  .wall {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2.4vw;
+    max-width: 1500px;
+    margin: 0 auto;
+    transform-style: preserve-3d;
+    /* 近处向左下、远处向右上铺开 */
+    transform: rotateX(28deg) rotateZ(-14deg);
+  }
+  .card {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 18px 40px rgba(40, 34, 24, 0.22),
+                0 4px 12px rgba(40, 34, 24, 0.14);
+    transition: transform 0.45s cubic-bezier(.2,.7,.2,1),
+                box-shadow 0.45s cubic-bezier(.2,.7,.2,1);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  .card:hover {
+    /* 抬起 + 微微「正过来」给预览感 */
+    transform: translateZ(80px) rotateX(-14deg) rotateZ(14deg);
+    box-shadow: 0 40px 80px rgba(40, 34, 24, 0.32),
+                0 10px 24px rgba(40, 34, 24, 0.20);
+    z-index: 2;
+  }
+  .card .thumb {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: top left;
+    /* scale 由 JS 按卡片实际宽度设置 */
+    pointer-events: none;
+  }
+  .card .thumb iframe {
+    width: 1920px;
+    height: 1080px;
+    border: 0;
+    display: block;
+    background: #fff;
+    pointer-events: none;
+  }
+  .card .num {
+    position: absolute;
+    bottom: 8px; left: 10px;
+    background: rgba(20, 16, 10, 0.72);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    z-index: 3;
+    pointer-events: none;
+  }
+  #overview-title {
+    text-align: center;
+    color: #5a5346;
+    font-size: 15px;
+    letter-spacing: 0.18em;
+    margin: 0 auto 5vw;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+  .start-btn {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: #1a1712;
+    color: #fff;
+    border: 0;
+    padding: 14px 26px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    z-index: 200;
+    box-shadow: 0 8px 28px rgba(40, 34, 24, 0.28);
+    transition: transform 0.18s, box-shadow 0.18s;
+  }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(40, 34, 24, 0.36); }
+
+  /* ════════════════════════════════════════════════════════ */
+  /* 模式 B · 全屏演示                                          */
+  /* ════════════════════════════════════════════════════════ */
+  #stage {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform-origin: top left;
+    will-change: transform;
+    background: #fff;
+    box-shadow: 0 10px 60px rgba(0,0,0,0.4);
+    /* size set by JS from DECK_WIDTH/HEIGHT */
+  }
+  #stage iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: #fff;
+  }
+  .counter {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    font-variant-numeric: tabular-nums;
+    z-index: 100;
+    user-select: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .counter:hover { opacity: 1; }
+  .counter .label { color: rgba(255,255,255,0.7); margin-left: 8px; }
+  .overview-btn {
+    position: fixed;
+    top: 20px; left: 20px;
+    background: rgba(0,0,0,0.55);
+    color: rgba(255,255,255,0.85);
+    border: 0;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    z-index: 100;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .overview-btn:hover { opacity: 1; }
+  .nav-zone {
+    position: fixed;
+    top: 0; bottom: 0;
+    width: 15%;
+    cursor: pointer;
+    z-index: 50;
+  }
+  .nav-zone.left  { left: 0; }
+  .nav-zone.right { right: 0; }
+  .nav-hint {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 44px; height: 44px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .nav-zone.left  .nav-hint { left: 20px; }
+  .nav-zone.right .nav-hint { right: 20px; }
+  .nav-zone:hover .nav-hint { opacity: 1; }
+
+  /* Print: one slide per page, no navigation UI */
+  @media print {
+    @page { size: 1920px 1080px; margin: 0; }
+    html, body { background: #fff; overflow: visible; height: auto; }
+    body[data-mode] #overview { display: none !important; }
+    #stage { position: static; transform: none !important; box-shadow: none; }
+    .counter, .nav-zone, .overview-btn, .start-btn { display: none !important; }
+    /* In print mode we render all slides sequentially — see JS */
+    .print-stack { display: block; }
+    .print-stack iframe {
+      width: 1920px;
+      height: 1080px;
+      page-break-after: always;
+      display: block;
+    }
+  }
+</style>
+</head>
+<body data-mode="overview">
+
+<!-- ── 模式 A · 概览墙 ─────────────────────────────────────── -->
+<div id="overview">
+  <div id="overview-title">Overview · 点击任意页进入演示</div>
+  <div class="wall" id="wall"></div>
+</div>
+<button class="start-btn" id="startBtn">▶ 开始演示</button>
+
+<!-- ── 模式 B · 全屏演示 ───────────────────────────────────── -->
+<div id="present-ui">
+  <div id="stage">
+    <iframe id="frame" src="about:blank"></iframe>
+  </div>
+  <button class="overview-btn" id="overviewBtn">⊞ 概览</button>
+  <div class="nav-zone left"  id="navL"><div class="nav-hint">‹</div></div>
+  <div class="nav-zone right" id="navR"><div class="nav-hint">›</div></div>
+  <div class="counter" id="counter">1 / 1</div>
+</div>
+
+<!-- Print-only stack: populated on beforeprint, stripped on afterprint -->
+<div class="print-stack" id="printStack" style="display:none;"></div>
+
+<script>
+(function () {
+  const W = window.DECK_WIDTH || 1920;
+  const H = window.DECK_HEIGHT || 1080;
+  const deck = window.DECK_MANIFEST || [];
+  const stage = document.getElementById('stage');
+  const frame = document.getElementById('frame');
+  const counter = document.getElementById('counter');
+  const printStack = document.getElementById('printStack');
+  const wall = document.getElementById('wall');
+  const storageKey = 'deck-index-' + location.pathname;
+  let current = 0;
+
+  stage.style.width  = W + 'px';
+  stage.style.height = H + 'px';
+
+  /* ── 模式切换 ─────────────────────────────────────────── */
+  function setMode(mode) {
+    document.body.setAttribute('data-mode', mode);
+    if (mode === 'present') { fit(); show(current); }
+  }
+
+  /* ════════ 模式 A · 概览墙 ════════ */
+  function buildWall() {
+    wall.innerHTML = '';
+    deck.forEach((item, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.idx = i;
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      const ifr = document.createElement('iframe');
+      ifr.src = item.file;
+      ifr.setAttribute('scrolling', 'no');
+      thumb.appendChild(ifr);
+
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = (i + 1) + (item.label ? ' · ' + item.label : '');
+
+      card.appendChild(thumb);
+      card.appendChild(num);
+      card.addEventListener('click', () => { current = i; setMode('present'); });
+      wall.appendChild(card);
+    });
+    scaleThumbs();
+  }
+
+  // 把 1920×1080 的缩略 iframe 缩放到卡片实际宽度
+  function scaleThumbs() {
+    document.querySelectorAll('.card').forEach(card => {
+      const thumb = card.querySelector('.thumb');
+      if (!thumb) return;
+      const w = card.clientWidth;
+      if (!w) return;
+      thumb.style.transform = 'scale(' + (w / W) + ')';
+    });
+  }
+
+  /* ════════ 模式 B · 全屏演示 ════════ */
+  function fit() {
+    const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+    const x = (window.innerWidth  - W * s) / 2;
+    const y = (window.innerHeight - H * s) / 2;
+    stage.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    stage.style.top = '0';
+    stage.style.left = '0';
+  }
+
+  function show(idx) {
+    if (idx < 0 || idx >= deck.length) return;
+    current = idx;
+    const wanted = deck[idx].file;
+    if (frame.getAttribute('src') !== wanted) frame.src = wanted;
+    counter.innerHTML = `${idx + 1} / ${deck.length} <span class="label">${deck[idx].label || ''}</span>`;
+    try { localStorage.setItem(storageKey, String(idx)); } catch (_) {}
+    if (location.hash !== '#' + (idx + 1)) {
+      history.replaceState(null, '', '#' + (idx + 1));
+    }
+  }
+
+  function next() { show(Math.min(current + 1, deck.length - 1)); }
+  function prev() { show(Math.max(current - 1, 0)); }
+
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    // ESC 回概览（演示模式下）
+    if (e.key === 'Escape') {
+      if (document.body.getAttribute('data-mode') === 'present') { e.preventDefault(); setMode('overview'); }
+      return;
+    }
+    if (e.key === 'p' || e.key === 'P') { window.print(); return; }
+    // 其余翻页键仅在演示模式生效
+    if (document.body.getAttribute('data-mode') !== 'present') return;
+    switch (e.key) {
+      case 'ArrowRight': case ' ': case 'PageDown': e.preventDefault(); next(); break;
+      case 'ArrowLeft':  case 'PageUp':              e.preventDefault(); prev(); break;
+      case 'Home':                                    e.preventDefault(); show(0); break;
+      case 'End':                                     e.preventDefault(); show(deck.length - 1); break;
+      default:
+        if (e.key >= '1' && e.key <= '9') {
+          const i = parseInt(e.key, 10) - 1;
+          if (i < deck.length) { e.preventDefault(); show(i); }
+        }
+    }
+  });
+
+  document.getElementById('navL').addEventListener('click', prev);
+  document.getElementById('navR').addEventListener('click', next);
+  document.getElementById('startBtn').addEventListener('click', () => setMode('present'));
+  document.getElementById('overviewBtn').addEventListener('click', () => setMode('overview'));
+  window.addEventListener('resize', () => { fit(); scaleThumbs(); });
+  window.addEventListener('hashchange', () => {
+    const m = location.hash.match(/^#(\d+)$/);
+    if (m) { current = parseInt(m[1], 10) - 1; setMode('present'); }
+  });
+
+  // 起始页：hash > localStorage > 0（决定 current；hash 还会直接进演示）
+  const hashMatch = location.hash.match(/^#(\d+)$/);
+  if (hashMatch) {
+    current = Math.min(parseInt(hashMatch[1], 10) - 1, deck.length - 1);
+  } else {
+    try {
+      const v = parseInt(localStorage.getItem(storageKey), 10);
+      if (!isNaN(v) && v >= 0 && v < deck.length) current = v;
+    } catch (_) {}
+  }
+
+  // 先把演示舞台准备好（即便默认在概览，CSS 隐藏它）
+  fit();
+  show(current);
+
+  buildWall();
+
+  // 默认进概览；但若 URL 带 #N，直接进演示从该页开始
+  if (hashMatch) setMode('present');
+  else setMode('overview');
+
+  // Print: build a stack of all iframes so browser prints every slide
+  window.addEventListener('beforeprint', () => {
+    printStack.innerHTML = '';
+    deck.forEach(item => {
+      const f = document.createElement('iframe');
+      f.src = item.file;
+      printStack.appendChild(f);
+    });
+    printStack.style.display = 'block';
+    stage.style.display = 'none';
+  });
+  window.addEventListener('afterprint', () => {
+    printStack.innerHTML = '';
+    printStack.style.display = 'none';
+    stage.style.display = '';
+  });
+})();
+</script>
+
+</body>
+</html>

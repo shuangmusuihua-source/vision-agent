@@ -102,9 +102,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     })
   }, [])
 
+  const activeTabRef = useRef(activeTab)
+  activeTabRef.current = activeTab
+  const refreshActiveContentRef = useRef(refreshActiveContent)
+  refreshActiveContentRef.current = refreshActiveContent
+
   useEffect(() => {
     return window.api.graph.onFilesChanged((data) => {
       useGraphStore.getState().handleFilesChanged(data)
+      // Also refresh the editor if the active tab was modified externally
+      const current = activeTabRef.current
+      if (current && data.files.includes(current)) {
+        refreshActiveContentRef.current()
+      }
     })
   }, [])
 

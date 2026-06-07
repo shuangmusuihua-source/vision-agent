@@ -149,8 +149,9 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
             )}
             {children}
           </div>
-          </div>
-          <div className="agent-panel-footer">
+        </div>
+        </div>
+        <div className="agent-panel-footer">
             {permissionRequest && (
               <PermissionDialog
                 request={permissionRequest}
@@ -169,7 +170,6 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
             )}
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
             {chatInput}
-          </div>
         </div>
       </div>
     </div>

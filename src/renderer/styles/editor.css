@@ -429,22 +429,24 @@
 .editor-tabs-container {
   display: flex;
   align-items: center;
-  height: 44px;
-  min-height: 44px;
   -webkit-app-region: drag;
   flex-shrink: 0;
   flex: 1;
   min-width: 0;
   padding: 0 6px;
+  overflow: visible;
 }
 
 .editor-tabs {
   display: flex;
   overflow-x: auto;
+  overflow-y: visible;
   scrollbar-width: none;
   flex: 1;
   gap: 6px;
   align-items: center;
+  padding: 6px 4px 18px;
+  margin: 0 -4px -18px;
 }
 
 .editor-tabs::-webkit-scrollbar {
@@ -488,25 +490,30 @@
   padding: 4px 10px;
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-xl);
   cursor: pointer;
   white-space: nowrap;
   max-width: 160px;
   min-width: 60px;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
-  background: var(--color-bg-secondary);
-  transition: color 0.15s;
+  background: transparent;
+  transition: color 0.15s, background 0.15s, box-shadow 0.2s, transform 0.2s var(--ease-spring);
 }
 
 .editor-tab:hover {
   color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
 }
 
 .editor-tab-active {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);
   background: var(--color-bg-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+  position: relative;
+  z-index: 1;
 }
 
 .editor-tab-name {
@@ -544,16 +551,16 @@
 }
 
 [data-theme="dark"] .editor-tab {
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
 }
 
 [data-theme="dark"] .editor-tab:hover {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-hover);
 }
 
 [data-theme="dark"] .editor-tab-active {
-  background: var(--color-bg-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* --- Editor context menu --- */

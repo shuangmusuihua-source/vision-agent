@@ -938,6 +938,13 @@
 
 /* ── Input Drawer ── */
 
+.agent-panel-footer .input-drawer {
+  position: absolute;
+  bottom: 100%;
+  left: 10%;
+  right: 10%;
+}
+
 .input-drawer {
   overflow: hidden;
   max-height: 0;
@@ -948,14 +955,13 @@
 .input-drawer--open {
   max-height: 55vh;
   opacity: 1;
-  overflow-y: auto;
-  overflow-x: visible;
-  padding: 4px;
-  margin: -4px;
+  overflow: visible;
+  padding: 20px;
+  margin: -20px;
 }
 
 .input-drawer__content {
-  padding: 14px 16px;
+  padding: 14px 16px 20px;
   background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -963,6 +969,7 @@
   border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   margin-bottom: 8px;
+  overflow-y: auto;
 }
 
 [data-theme="dark"] .input-drawer__content {
@@ -1207,10 +1214,63 @@
   transform: translateY(-50%) translateX(0);
 }
 
+.drawer-question-option-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-action);
+  color: var(--color-action-text);
+}
+
+.drawer-question-option.selected .drawer-question-option-check {
+  display: flex;
+}
+
+.drawer-question-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 16px;
+  margin-top: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-action-text);
+  background: var(--color-action);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.drawer-question-submit:hover {
+  background: var(--color-action-hover);
+  color: var(--color-action-text) !important;
+}
+
+.drawer-question-submit:disabled,
+.drawer-question-submit--disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary) !important;
+}
+
+.drawer-question-submit--disabled:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary) !important;
+}
+
 .drawer-question-hint {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   text-align: center;
+  margin-top: 6px;
 }
 
 [data-theme="dark"] .drawer-question-option:hover {

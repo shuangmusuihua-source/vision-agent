@@ -3,7 +3,7 @@
 .app-shell {
   display: flex;
   height: 100vh;
-  overflow: hidden;
+  overflow: clip;
   position: relative;
   font-family: var(--font-sans);
   font-size: 14px;
@@ -747,8 +747,6 @@
 .main-content {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  background: linear-gradient(180deg, #fefefe 0%, #fafaf8 100%);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -778,6 +776,8 @@
 .main-content-scroll {
   flex: 1;
   overflow-y: auto;
+  padding-top: 40px;
+  background: var(--color-bg-primary);
 }
 
 .main-content-header {
@@ -785,10 +785,22 @@
   align-items: center;
   flex-shrink: 0;
   -webkit-app-region: drag;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  height: 40px;
+  padding: 4px 0 6px;
+  pointer-events: auto;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-soft);
 }
 
 .main-content-header-cover-sidebar {
   padding-left: 78px;
+  left: 0;
+  right: 0;
 }
 
 .editor-placeholder {
@@ -836,6 +848,7 @@
 .agent-panel {
   background: linear-gradient(180deg, #fafaf9 0%, #f3f3f1 100%);
   display: flex;
+  flex-direction: column;
   position: relative;
   z-index: 1;
   transition: width 0.25s cubic-bezier(0.25, 1, 0.5, 1),
@@ -844,7 +857,7 @@
   border-radius: 12px;
   -electron-corner-smoothing: system-ui;
   box-shadow: -2px 0 12px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .agent-panel-edge-right {
@@ -974,8 +987,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
+  min-height: 0;
   opacity: 1;
   transition: opacity 0.2s ease 0.1s;
 }
@@ -1025,6 +1039,7 @@
 
 .agent-panel-footer {
   flex-shrink: 0;
+  position: relative;
   padding: 6px 12px;
   margin: 8px 10% 12px;
   background: rgba(255, 255, 255, 0.68);

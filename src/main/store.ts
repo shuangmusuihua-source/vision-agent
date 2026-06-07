@@ -239,12 +239,20 @@ export function ensureKnowledgeBase(): string {
 
 export function getEnabledSkills(): string[] {
   const stored = store.get('enabledSkills')
+  const builtins = getBuiltinSkills().map((s: { id: string }) => s.id)
   // On first launch, default to all built-in skills
   if (!stored || stored.length === 0) {
-    const defaults = getBuiltinSkills().map((s: { id: string }) => s.id)
-    return defaults
+    return builtins
   }
-  return stored
+  // Merge any newly added built-in skills that aren't in the stored list yet
+  const merged = [...stored]
+  for (const id of builtins) {
+    if (!merged.includes(id)) merged.push(id)
+  }
+  if (merged.length !== stored.length) {
+    store.set('enabledSkills', merged)
+  }
+  return merged
 }
 
 export function setEnabledSkills(skillIds: string[]): void {
