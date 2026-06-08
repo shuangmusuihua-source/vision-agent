@@ -63,6 +63,14 @@ export function useIPCSubscriptions() {
         ? store.getState().sessionList.find(s => s.id === migratedTempId)?.title
         : undefined
 
+      // Only update activeSessionId if the user hasn't switched away to a
+      // different session while this one was being created. Without this guard,
+      // a session created in the background would hijack activeSessionId and
+      // contaminate the editor slot with wrong-session data.
+      const isStillActiveSession =
+        migratedTempId !== null ||               // temp session was active when send was triggered
+        prevSessionId === data.sessionId          // resumed session matches current active
+
       store.setState((state) => {
         // If we have a temp session slot (from "新建对话"), migrate it to real session ID
         const nextSessionSlots = { ...state.sessionSlots }
@@ -74,17 +82,24 @@ export function useIPCSubscriptions() {
           delete nextSessionSlots[prevSessionId]
         }
 
-        return {
-          activeSessionId: data.sessionId,
-          sessionSlots: nextSessionSlots,
-          slots: {
-            ...state.slots,
-            [data.context]: {
-              ...state.slots[data.context],
-              currentSessionId: data.sessionId,
-              workspacePath: data.workspacePath || state.slots[data.context].workspacePath,
+        if (isStillActiveSession) {
+          // Normal path: this session is still what the user is viewing
+          return {
+            activeSessionId: data.sessionId,
+            sessionSlots: nextSessionSlots,
+            slots: {
+              ...state.slots,
+              [data.context]: {
+                ...state.slots[data.context],
+                currentSessionId: data.sessionId,
+                workspacePath: data.workspacePath || state.slots[data.context].workspacePath,
+              },
             },
-          },
+          }
+        } else {
+          // Background session created — update slot cache only, don't hijack
+          // the active session or contaminate the editor slot
+          return { sessionSlots: nextSessionSlots }
         }
       })
       if (data.workspacePath && !store.getState().activeWorkspacePath) {
