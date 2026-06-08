@@ -1,5 +1,4 @@
 import { BrowserWindow } from 'electron'
-import type { AgentContext } from '../shared/types'
 
 // ─── Text delta batching ──────────────────────────────────────────────
 // Batch text_delta stream events to reduce IPC/re-render frequency.
@@ -7,19 +6,22 @@ import type { AgentContext } from '../shared/types'
 //   1 IPC send → 1 Zustand set() → 1 ChatView + MessageBubble re-render
 // By merging deltas within a 30ms window, we cut IPC events by ~3-4x
 // while keeping perceived latency well below the ~100ms human threshold.
+//
+// Keyed by queryKey (sessionId || context) to support parallel streaming
+// across multiple sessions within the same context.
 
-type TextBatchEntry = { context: AgentContext; text: string; uuid: string; sessionId: string }
-const textBatches = new Map<AgentContext, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string }>()
+type TextBatchEntry = { context: string; text: string; uuid: string; sessionId: string }
+const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string }>()
 
-function ensureBatchSlot(ctx: AgentContext) {
-  if (!textBatches.has(ctx)) {
-    textBatches.set(ctx, { entries: [], timer: null, sessionId: '' })
+function ensureBatchSlot(key: string) {
+  if (!textBatches.has(key)) {
+    textBatches.set(key, { entries: [], timer: null, sessionId: '' })
   }
-  return textBatches.get(ctx)!
+  return textBatches.get(key)!
 }
 
-export function flushTextBatch(ctx: AgentContext, win: BrowserWindow): void {
-  const slot = textBatches.get(ctx)
+export function flushTextBatch(key: string, win: BrowserWindow): void {
+  const slot = textBatches.get(key)
   if (!slot || slot.entries.length === 0) return
 
   if (slot.timer) {
@@ -30,13 +32,14 @@ export function flushTextBatch(ctx: AgentContext, win: BrowserWindow): void {
   const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
   const lastUuid = slot.entries[slot.entries.length - 1].uuid
   const sessionId = slot.sessionId
+  const context = slot.entries[0]?.context || 'editor'
   slot.entries = []
 
   if (!combinedText || win.isDestroyed()) return
 
   // Emit a single combined stream_event carrying all accumulated text
   win.webContents.send('agent:event', {
-    context: ctx,
+    context,
     sessionId,
     type: 'stream_event',
     uuid: lastUuid,
@@ -57,19 +60,19 @@ export function isTextDeltaEvent(rawMessage: Record<string, unknown>): string | 
   return (delta.text as string) || ''
 }
 
-export function scheduleTextBatch(ctx: AgentContext, text: string, uuid: string, sessionId: string, win: BrowserWindow): void {
-  const slot = ensureBatchSlot(ctx)
-  slot.entries.push({ context: ctx, text, uuid, sessionId })
+export function scheduleTextBatch(key: string, text: string, uuid: string, sessionId: string, win: BrowserWindow): void {
+  const slot = ensureBatchSlot(key)
+  slot.entries.push({ context: key, text, uuid, sessionId })
   slot.sessionId = sessionId
 
   if (!slot.timer) {
-    slot.timer = setTimeout(() => flushTextBatch(ctx, win), 30)
+    slot.timer = setTimeout(() => flushTextBatch(key, win), 30)
   }
 }
 
-/** Flush any pending text batch for the given context (called during cleanup/abort) */
-export function discardTextBatch(ctx: AgentContext): void {
-  const slot = textBatches.get(ctx)
+/** Flush any pending text batch for the given key (called during cleanup/abort) */
+export function discardTextBatch(key: string): void {
+  const slot = textBatches.get(key)
   if (slot) {
     if (slot.timer) clearTimeout(slot.timer)
     slot.timer = null
@@ -77,9 +80,9 @@ export function discardTextBatch(ctx: AgentContext): void {
   }
 }
 
-/** Discard pending text batches for all contexts (called on window destroy) */
+/** Discard pending text batches for all keys (called on window destroy) */
 export function discardAllTextBatches(): void {
-  for (const ctx of textBatches.keys()) {
-    discardTextBatch(ctx)
+  for (const key of textBatches.keys()) {
+    discardTextBatch(key)
   }
 }

@@ -35,8 +35,9 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:abort', (_event, context?: AgentContext) => {
-    abortActiveQuery(context)
+  ipcMain.handle('agent:abort', (_event, contextOrSessionId?: string) => {
+    // Supports both AgentContext ('editor'|'ask') and sessionId for parallel streaming
+    abortActiveQuery(contextOrSessionId)
     return { success: true }
   })
 

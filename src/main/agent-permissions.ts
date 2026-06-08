@@ -7,6 +7,7 @@ interface PendingPermission {
   input: Record<string, unknown>
   timeout: ReturnType<typeof setTimeout>
   context: AgentContext
+  sessionId?: string
 }
 
 interface PendingAskUser {
@@ -14,6 +15,7 @@ interface PendingAskUser {
   originalInput: Record<string, unknown>
   timeout: ReturnType<typeof setTimeout>
   context: AgentContext
+  sessionId?: string
 }
 
 const pendingPermissions = new Map<string, PendingPermission>()
@@ -27,8 +29,9 @@ export function registerPendingPermission(
   input: Record<string, unknown>,
   timeout: ReturnType<typeof setTimeout>,
   context: AgentContext,
+  sessionId?: string,
 ): void {
-  pendingPermissions.set(requestId, { resolve, input, timeout, context })
+  pendingPermissions.set(requestId, { resolve, input, timeout, context, sessionId })
 }
 
 export function registerPendingAskUser(
@@ -37,8 +40,9 @@ export function registerPendingAskUser(
   originalInput: Record<string, unknown>,
   timeout: ReturnType<typeof setTimeout>,
   context: AgentContext,
+  sessionId?: string,
 ): void {
-  pendingAskUser.set(requestId, { resolve, originalInput, timeout, context })
+  pendingAskUser.set(requestId, { resolve, originalInput, timeout, context, sessionId })
 }
 
 export function hasPendingPermission(requestId: string): boolean {
@@ -95,10 +99,20 @@ export function resolveAskUser(requestId: string, answer: string): void {
 }
 
 // ─── Bulk rejection (called on abort / window destroy) ─────────────────
+// When queryKey is provided, only reject entries matching that key
+// (either by sessionId or by context if no sessionId stored).
 
-export function rejectAllPendingPermissions(context?: AgentContext): void {
+function matchesQueryKey(p: { context: AgentContext; sessionId?: string }, queryKey?: string): boolean {
+  if (!queryKey) return true // abort all
+  // Match by sessionId first, fall back to context for legacy entries
+  if (p.sessionId && p.sessionId === queryKey) return true
+  if (p.context === queryKey) return true
+  return false
+}
+
+export function rejectAllPendingPermissions(queryKey?: string): void {
   for (const [id, p] of pendingPermissions) {
-    if (context && p.context !== context) continue
+    if (!matchesQueryKey(p, queryKey)) continue
     pendingPermissions.delete(id)
     clearTimeout(p.timeout)
     cancelPermissionNotification(id)
@@ -106,9 +120,9 @@ export function rejectAllPendingPermissions(context?: AgentContext): void {
   }
 }
 
-export function rejectAllPendingAskUser(context?: AgentContext): void {
+export function rejectAllPendingAskUser(queryKey?: string): void {
   for (const [id, p] of pendingAskUser) {
-    if (context && p.context !== context) continue
+    if (!matchesQueryKey(p, queryKey)) continue
     pendingAskUser.delete(id)
     clearTimeout(p.timeout)
     p.resolve({ behavior: 'deny', message: 'Query aborted' })

@@ -131,7 +131,7 @@ interface AgentApi {
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
   loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }>
   renameSession: (sessionId: string, title: string) => Promise<void>
-  abort: (context?: AgentContext) => Promise<{ success: boolean }>
+  abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
   selectFolder: () => Promise<Electron.OpenDialogReturnValue>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>

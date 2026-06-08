@@ -101,7 +101,7 @@ function extractPathFromToolInput(
   return value
 }
 
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string) {
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, queryKey?: string) {
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = workspaceCwdOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
 
@@ -211,7 +211,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
             }
           }, 300000)
 
-          registerPendingAskUser(requestId, resolve, input, timeout, context)
+          registerPendingAskUser(requestId, resolve, input, timeout, context, queryKey)
         })
       }
 
@@ -253,7 +253,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
           }
         }, 300000)
 
-        registerPendingPermission(requestId, resolve, input, timeout, context)
+        registerPendingPermission(requestId, resolve, input, timeout, context, queryKey)
       })
     },
   })
@@ -267,8 +267,8 @@ interface ActiveQuery {
   abortController: AbortController
 }
 
-// Guard against concurrent sendMessage calls — per context slot
-const activeQueries = new Map<AgentContext, ActiveQuery>()
+// Guard against concurrent sendMessage calls — per queryKey (sessionId || context)
+const activeQueries = new Map<string, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
 // Track session IDs created by SDK mid-stream compaction.
@@ -278,16 +278,16 @@ const _skillOutputBridge = new SkillOutputBridge()
 // Initialized from electron-store to survive app restarts.
 const compactionSessionIds = new Set<string>(getCompactionSessionIds())
 
-export function abortActiveQuery(context?: AgentContext): void {
-  if (context) {
-    const entry = activeQueries.get(context)
+export function abortActiveQuery(queryKey?: string): void {
+  if (queryKey) {
+    const entry = activeQueries.get(queryKey)
     if (entry) {
       entry.abortController.abort()
-      activeQueries.delete(context)
+      activeQueries.delete(queryKey)
     }
-    rejectAllPendingPermissions(context)
-    rejectAllPendingAskUser(context)
-    discardTextBatch(context)
+    rejectAllPendingPermissions(queryKey)
+    rejectAllPendingAskUser(queryKey)
+    discardTextBatch(queryKey)
   } else {
     // Abort all
     for (const [, entry] of activeQueries) {
@@ -296,7 +296,7 @@ export function abortActiveQuery(context?: AgentContext): void {
     activeQueries.clear()
     rejectAllPendingPermissions()
     rejectAllPendingAskUser()
-    for (const ctx of ['editor', 'ask'] as AgentContext[]) discardTextBatch(ctx)
+    discardAllTextBatches()
   }
 }
 
@@ -322,10 +322,12 @@ export async function sendMessage(
   skillId?: string | null,
   workspacePath?: string
 ): Promise<void> {
-  // Abort any active query in the same context slot
-  const existing = activeQueries.get(context)
+  // Abort only the same session's previous query (if any).
+  // Different sessions in the same context can now run in parallel.
+  const queryKey = sessionId || context
+  const existing = activeQueries.get(queryKey)
   if (existing) {
-    abortActiveQuery(context)
+    abortActiveQuery(queryKey)
   }
 
   // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
@@ -365,7 +367,7 @@ export async function sendMessage(
   const effectiveWorkspaceCwd = workspacePath || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
   // Ensure workspace-local skills exist (idempotent via sentinel file)
   ensureWorkspaceSkills(effectiveWorkspaceCwd)
-  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId)
+  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, queryKey)
   let currentSessionId = sessionId
 
   try {
@@ -378,13 +380,13 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
-    activeQueries.set(context, { query: messageStream as Query, skillId: skillId ?? null, abortController })
+    activeQueries.set(queryKey, { query: messageStream as Query, skillId: skillId ?? null, abortController })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
 
       // Feed raw SDK event to skill output bridge (before conversion)
-      const activeSkillId = activeQueries.get(context)?.skillId ?? null
+      const activeSkillId = activeQueries.get(queryKey)?.skillId ?? null
       _skillOutputBridge.processRawEvent(message as Record<string, unknown>, activeSkillId)
 
       const rawMsg = message as Record<string, unknown>
@@ -397,11 +399,11 @@ export async function sendMessage(
       if (textDeltaText !== null) {
         // Batch text_delta events: accumulate and flush every ~30ms
         const uuid = (rawMsg.uuid as string) || ''
-        scheduleTextBatch(context, textDeltaText, uuid, sessionId, mainWindow)
+        scheduleTextBatch(queryKey, textDeltaText, uuid, sessionId, mainWindow)
       } else {
         // Non-text event (tool_use, content_block_start/stop, result, etc.)
         // Flush any pending text batch FIRST to preserve event ordering
-        flushTextBatch(context, mainWindow)
+        flushTextBatch(queryKey, mainWindow)
 
         if (ipcMsg) {
           mainWindow.webContents.send('agent:event', { context, sessionId, ...ipcMsg })
@@ -464,11 +466,11 @@ export async function sendMessage(
     } as AgentIPCMessage & { context: AgentContext })
   } finally {
     // Flush any remaining batched text (if stream errored before for-await finished)
-    flushTextBatch(context, mainWindow)
-    discardTextBatch(context)
-    activeQueries.delete(context)
-    rejectAllPendingPermissions(context)
-    rejectAllPendingAskUser(context)
+    flushTextBatch(queryKey, mainWindow)
+    discardTextBatch(queryKey)
+    activeQueries.delete(queryKey)
+    rejectAllPendingPermissions(queryKey)
+    rejectAllPendingAskUser(queryKey)
   }
 }
 

@@ -192,9 +192,10 @@ export function useAgent(context: AgentContext = 'editor') {
   const sendMessage = useCallback(async (prompt: string, activeFilePath?: string) => {
     const state = store.getState()
     const slot = state.slots[context]
+    const slotSid = slot.currentSessionId
     if (slot.agentState !== 'idle' && slot.agentState !== 'error') {
       state.dispatchAgentEvent({ type: 'ABORT' }, context)
-      await window.api.agent.abort(context)
+      await window.api.agent.abort(slotSid || context)
     }
     // Optimistic write: insert the user message directly into the messages array
     // before the SDK processes it. The SDK will later send back a 'user' IPC event
@@ -221,7 +222,6 @@ export function useAgent(context: AgentContext = 'editor') {
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context)
     const skillId = store.getState().slots[context].activeSkillId
     const workspacePath = context === 'ask' ? undefined : (store.getState().activeWorkspacePath || undefined)
-    const slotSid = store.getState().slots[context].currentSessionId
     // Don't pass frontend-only temp IDs as SDK sessionId — the SDK doesn't
     // recognize them, would create an untracked duplicate session.
     const effectiveSid = slotSid?.startsWith('new-') ? undefined : (slotSid || undefined)

@@ -859,16 +859,69 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const isReplay = options?.isReplay ?? false
       const ctx = msg.context || get().context
 
-      // Validate sessionId: drop events for sessions that are no longer active.
-      // This prevents stale events from a previous session contaminating the
-      // current session after a session switch (race condition between the
-      // SDK abort propagating and the slot swap).
-      const eventSessionId = (msg as Record<string, unknown>).sessionId as string | undefined
+      // Convert legacy session_id field (some SDK events use this key)
+      const eventSessionId = ((msg as Record<string, unknown>).sessionId as string)
+        || ((msg as Record<string, unknown>).session_id as string)
+        || undefined
       const activeSessionId = get().activeSessionId
-      if (eventSessionId && activeSessionId && eventSessionId !== activeSessionId) {
-        return // Drop — event belongs to a different session
+
+      // ── Parallel streaming: route background session events ──────────
+      // When a non-active session is still running in the background,
+      // temporarily swap its saved slot into slots.editor so that all
+      // handler functions (which write via updateSlot → slots[ctx])
+      // operate on the correct session's state. After processing, save
+      // the updated slot back to sessionSlots and restore the active slot.
+      if (eventSessionId && activeSessionId && eventSessionId !== activeSessionId && !isReplay) {
+        const backgroundSlot = get().sessionSlots[eventSessionId]
+        if (!backgroundSlot) return // No cached slot — nothing to update
+
+        // Swap: save active slot, pull background slot into editor
+        set(state => {
+          const activeSlot = state.slots.editor
+          return {
+            sessionSlots: { ...state.sessionSlots, [activeSessionId]: activeSlot },
+            slots: { ...state.slots, editor: backgroundSlot },
+          }
+        })
+
+        // Process event — handlers write to slots.editor (now the background slot)
+        switch (msg.type) {
+          case 'system':
+            handleSystemMessage(store, ctx, msg)
+            break
+          case 'assistant':
+            handleAssistantMessage(store, ctx, msg)
+            break
+          case 'stream_event':
+            handleStreamEventMessage(store, ctx, msg, false)
+            break
+          case 'user':
+            handleUserMessage(store, ctx, msg, false)
+            break
+          case 'result':
+            handleResultMessage(store, ctx, msg)
+            break
+        }
+
+        // Restore: save updated background slot, pull active slot back
+        set(state => {
+          const updatedBackground = state.slots.editor
+          const restoredActive = state.sessionSlots[activeSessionId]
+          const nextSessionSlots = { ...state.sessionSlots }
+          nextSessionSlots[eventSessionId] = updatedBackground
+          if (restoredActive) {
+            return {
+              sessionSlots: nextSessionSlots,
+              slots: { ...state.slots, editor: restoredActive },
+            }
+          }
+          return { sessionSlots: nextSessionSlots }
+        })
+
+        return
       }
 
+      // ── Active session / replay processing ───────────────────────────
       switch (msg.type) {
         case 'system':
           handleSystemMessage(store, ctx, msg)
@@ -1056,14 +1109,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       // which would leave the OverviewPanel stuck in loading state.
       if (state.activeSessionId === sessionId) return
 
-      // Clean up the current editor slot before swapping to a different session.
-      // Only abort if the agent is actively streaming — for idle slots, the slot
-      // state is already clean and ABORT would only clear permission/AskUser
-      // state that should be preserved for when the user switches back.
-      if (state.activeSessionId && state.slots.editor.isStreaming) {
-        window.api.agent.abort('editor').catch(() => {})
-        get().dispatchAgentEvent({ type: 'ABORT' }, 'editor')
-      }
+      // ── Parallel streaming: do NOT abort the current session. ──────────
+      // Background sessions keep running; their events are routed to
+      // sessionSlots via processIPCMessage's swap mechanism. The active
+      // slot is saved to sessionSlots (for the running session to pick up
+      // later) and restored when the user switches back.
 
       // Empty sessionId: reset editor to a clean slate (e.g. after session
       // deletion). Do not touch sessionSlots — the caller is responsible for
