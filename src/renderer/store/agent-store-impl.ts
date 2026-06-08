@@ -51,11 +51,14 @@ function updateSlot(
   if (sid) {
     // Session-scoped write: always update sessionSlots[sid].
     // If this is the active session, also mirror to slots[ctx] for UI render.
-    const slot = state.sessionSlots[sid] || state.slots[ctx]
+    // Use empty slot as base — never fall back to slots[ctx] because that
+    // would leak the active session's data into a different session's slot.
+    const cached = state.sessionSlots[sid]
+    if (!cached) return {} // Drop — no cached slot for this session yet
     const result: Partial<AgentStore> = {
       sessionSlots: {
         ...state.sessionSlots,
-        [sid]: { ...slot, ...patch },
+        [sid]: { ...cached, ...patch },
       },
     }
     if (sid === state.activeSessionId) {
@@ -784,8 +787,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       // correct session, not the active UI slot.
       const eventSid = _currentEventSessionId
       set((state) => {
-        const slot = eventSid
-          ? (state.sessionSlots[eventSid] || state.slots[ctx])
+        // Use the session-scoped slot when processing an IPC event.
+        // If no cached slot exists for this session, fall back to the
+        // active slot — the event belongs to an untracked session and
+        // will be dropped by updateSlot anyway.
+        const slot = eventSid && state.sessionSlots[eventSid]
+          ? state.sessionSlots[eventSid]
           : state.slots[ctx]
         const next = transition(slot.agentState, event)
         const slotUpdates: Partial<ContextSlot> = { agentState: next }
