@@ -36,11 +36,34 @@ import { AGENT_TRANSITIONS as TRANSITIONS, isTextBlock, isToolUseBlock, isToolRe
 
 // ─── Slot helpers ────────────────────────────────────────────────────────
 
+// Module-level variable set by processIPCMessage (and useIPCSubscriptions
+// for permission/AskUser) before dispatching to handlers. updateSlot reads
+// this to route writes to the correct session's sessionSlots entry.
+// null = write directly to slots[ctx] (non-IPC code paths).
+let _currentEventSessionId: string | null = null
+
 function updateSlot(
   state: AgentStore,
   ctx: AgentContext,
   patch: Partial<ContextSlot>
 ): Partial<AgentStore> {
+  const sid = _currentEventSessionId
+  if (sid) {
+    // Session-scoped write: always update sessionSlots[sid].
+    // If this is the active session, also mirror to slots[ctx] for UI render.
+    const slot = state.sessionSlots[sid] || state.slots[ctx]
+    const result: Partial<AgentStore> = {
+      sessionSlots: {
+        ...state.sessionSlots,
+        [sid]: { ...slot, ...patch },
+      },
+    }
+    if (sid === state.activeSessionId) {
+      result.slots = { ...state.slots, [ctx]: { ...state.slots[ctx], ...patch } }
+    }
+    return result
+  }
+  // Non-IPC path: write directly to slots[ctx]
   return {
     slots: {
       ...state.slots,
@@ -756,8 +779,14 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     dispatchAgentEvent(event: AgentEvent, eventContext?: AgentContext) {
       const ctx = eventContext || get().context
+      // When processing an IPC event (background or active session), read
+      // from the session-scoped slot so agentState transitions target the
+      // correct session, not the active UI slot.
+      const eventSid = _currentEventSessionId
       set((state) => {
-        const slot = state.slots[ctx]
+        const slot = eventSid
+          ? (state.sessionSlots[eventSid] || state.slots[ctx])
+          : state.slots[ctx]
         const next = transition(slot.agentState, event)
         const slotUpdates: Partial<ContextSlot> = { agentState: next }
 
@@ -874,28 +903,15 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const eventSessionId = ((msg as Record<string, unknown>).sessionId as string)
         || ((msg as Record<string, unknown>).session_id as string)
         || undefined
-      const activeSessionId = get().activeSessionId
 
-      // ── Parallel streaming: route background session events ──────────
-      // When a non-active session is still running in the background,
-      // temporarily swap its saved slot into slots.editor so that all
-      // handler functions (which write via updateSlot → slots[ctx])
-      // operate on the correct session's state. After processing, save
-      // the updated slot back to sessionSlots and restore the active slot.
-      if (eventSessionId && activeSessionId && eventSessionId !== activeSessionId && !isReplay) {
-        const backgroundSlot = get().sessionSlots[eventSessionId]
-        if (!backgroundSlot) return // No cached slot — nothing to update
+      // Route ALL writes to the event's session via updateSlot's session
+      // isolation. Handlers don't need to know which session they're
+      // processing — updateSlot reads _currentEventSessionId and writes
+      // to sessionSlots[eventSessionId], mirroring to slots.editor only
+      // when eventSessionId matches the active session.
+      _currentEventSessionId = eventSessionId || null
 
-        // Swap: save active slot, pull background slot into editor
-        set(state => {
-          const activeSlot = state.slots.editor
-          return {
-            sessionSlots: { ...state.sessionSlots, [activeSessionId]: activeSlot },
-            slots: { ...state.slots, editor: backgroundSlot },
-          }
-        })
-
-        // Process event — handlers write to slots.editor (now the background slot)
+      try {
         switch (msg.type) {
           case 'system':
             handleSystemMessage(store, ctx, msg)
@@ -904,69 +920,29 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             handleAssistantMessage(store, ctx, msg)
             break
           case 'stream_event':
-            handleStreamEventMessage(store, ctx, msg, false)
+            handleStreamEventMessage(store, ctx, msg, isReplay)
             break
           case 'user':
-            handleUserMessage(store, ctx, msg, false)
+            handleUserMessage(store, ctx, msg, isReplay)
             break
           case 'result':
             handleResultMessage(store, ctx, msg)
             break
         }
-
-        // Restore: save updated background slot, pull active slot back.
-        // Update pagination offsets so that new messages streamed in the
-        // background are accounted for — without this, `_sdkLoadOffset`
-        // would remain stale and loadMore would re-fetch already-displayed
-        // messages, causing duplicates.
-        set(state => {
-          const updatedBackground = state.slots.editor
-          const newCount = updatedBackground.messages.length
-          const adjustedSlot: typeof updatedBackground = {
-            ...updatedBackground,
-            _sdkLoadOffset: Math.max(updatedBackground._sdkLoadOffset ?? 0, newCount),
-            _sdkLoadedCount: Math.max(updatedBackground._sdkLoadedCount ?? 0, newCount),
-          }
-          const restoredActive = state.sessionSlots[activeSessionId]
-          const nextSessionSlots = { ...state.sessionSlots }
-          nextSessionSlots[eventSessionId] = adjustedSlot
-          if (restoredActive) {
-            return {
-              sessionSlots: nextSessionSlots,
-              slots: { ...state.slots, editor: restoredActive },
-            }
-          }
-          return { sessionSlots: nextSessionSlots }
-        })
-
-        return
-      }
-
-      // ── Active session / replay processing ───────────────────────────
-      switch (msg.type) {
-        case 'system':
-          handleSystemMessage(store, ctx, msg)
-          return
-        case 'assistant':
-          handleAssistantMessage(store, ctx, msg)
-          return
-        case 'stream_event':
-          handleStreamEventMessage(store, ctx, msg, isReplay)
-          return
-        case 'user':
-          handleUserMessage(store, ctx, msg, isReplay)
-          return
-        case 'result':
-          handleResultMessage(store, ctx, msg)
-          return
-        default:
-          return
+      } finally {
+        _currentEventSessionId = null
       }
     },
 
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
     handlePermissionRequest(req: PermissionRequestIPC) {
+      // Route writes to the correct session via updateSlot's session isolation.
+      // If req.sessionId differs from activeSessionId, the permission is stored
+      // in sessionSlots (not mirrored to slots.editor), so the UI won't show
+      // it until the user switches to that session.
+      _currentEventSessionId = req.sessionId || null
+      try {
       const activeSessionId = get().activeSessionId
       // Drop requests that don't belong to the active session.
       // Case 1: both have sessionIds and they mismatch → drop.
@@ -987,6 +963,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
         return updateSlot(state, ctx, { permissionRequest: req })
       })
+      } finally { _currentEventSessionId = null }
     },
 
     handlePermissionResponse(requestId: string, behavior: 'allow' | 'deny') {
@@ -1004,6 +981,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     handleAskUserRequest(req: AskUserRequestIPC) {
+      _currentEventSessionId = req.sessionId || null
+      try {
       const activeSessionId = get().activeSessionId
       // Drop requests that don't belong to the active session.
       // Case 1: both have sessionIds and they mismatch → drop.
@@ -1025,6 +1004,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         return updateSlot(state, ctx, { askUserRequest: req })
       })
       get().dispatchAgentEvent({ type: 'ASK_USER_REQUEST' }, ctx)
+      } finally { _currentEventSessionId = null }
     },
 
     handleAskUserResponse(requestId: string, answer: string) {
