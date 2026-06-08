@@ -208,10 +208,22 @@ export function useAgent(context: AgentContext = 'editor') {
     const state = store.getState()
     const slot = state.slots[context]
     const slotSid = slot.currentSessionId
+    const capturedActiveSid = state.activeSessionId
+
     if (slot.agentState !== 'idle' && slot.agentState !== 'error') {
       state.dispatchAgentEvent({ type: 'ABORT' }, context)
       await window.api.agent.abort(slotSid || context)
     }
+
+    // Re-validate session identity after the async yield (abort await).
+    // If the user switched sessions during the await, writing to the current
+    // slots[context] would contaminate the wrong session's messages.
+    const currentState = store.getState()
+    if (currentState.activeSessionId !== capturedActiveSid ||
+        currentState.slots[context].currentSessionId !== slotSid) {
+      return
+    }
+
     // Optimistic write: insert the user message directly into the messages array
     // before the SDK processes it. The SDK will later send back a 'user' IPC event
     // (routed through processIPCMessage → handleUserMessage) which processes

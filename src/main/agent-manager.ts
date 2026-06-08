@@ -436,7 +436,7 @@ export async function sendMessage(
     }
 
     // Flush any remaining batched text deltas after the stream ends
-    flushTextBatch(context, mainWindow)
+    flushTextBatch(queryKey, mainWindow)
 
     // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
@@ -632,6 +632,11 @@ export async function renameSdkSession(sessionId: string, title: string): Promis
 }
 
 export async function deleteSdkSession(sessionId: string): Promise<void> {
+  // Abort any running query for this session before deletion — prevents
+  // resource leaks (orphaned subprocess, pending permissions) and avoids
+  // the SDK recreating the session file from a still-running query.
+  abortActiveQuery(sessionId)
+
   // Delete from SDK storage first — the critical operation.
   // Only clean up tracking metadata after it succeeds, so a failed
   // deletion leaves the session intact rather than orphaned.

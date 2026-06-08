@@ -303,7 +303,11 @@ function handleTextDelta(
     }
 
     if (!s._firstContentSeen) {
-      setTimeout(() => get().dispatchAgentEvent({ type: 'FIRST_CONTENT' }, ctx), 0)
+      // Fire synchronously — deferring via setTimeout in an IPC handler
+      // (especially during background session swap in processIPCMessage)
+      // causes dispatchAgentEvent to fire after the slot swap is restored,
+      // transitioning the WRONG session's agentState.
+      get().dispatchAgentEvent({ type: 'FIRST_CONTENT' }, ctx)
     }
 
     return updateSlot(state, ctx, { messages: msgs, _acc: acc, _firstContentSeen: true })
@@ -903,12 +907,22 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             break
         }
 
-        // Restore: save updated background slot, pull active slot back
+        // Restore: save updated background slot, pull active slot back.
+        // Update pagination offsets so that new messages streamed in the
+        // background are accounted for — without this, `_sdkLoadOffset`
+        // would remain stale and loadMore would re-fetch already-displayed
+        // messages, causing duplicates.
         set(state => {
           const updatedBackground = state.slots.editor
+          const newCount = updatedBackground.messages.length
+          const adjustedSlot: typeof updatedBackground = {
+            ...updatedBackground,
+            _sdkLoadOffset: Math.max(updatedBackground._sdkLoadOffset ?? 0, newCount),
+            _sdkLoadedCount: Math.max(updatedBackground._sdkLoadedCount ?? 0, newCount),
+          }
           const restoredActive = state.sessionSlots[activeSessionId]
           const nextSessionSlots = { ...state.sessionSlots }
-          nextSessionSlots[eventSessionId] = updatedBackground
+          nextSessionSlots[eventSessionId] = adjustedSlot
           if (restoredActive) {
             return {
               sessionSlots: nextSessionSlots,

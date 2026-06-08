@@ -265,6 +265,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (!ok) return
     const wasActive = useAgentStore.getState().activeSessionId === sessionId
 
+    // Abort any running query for this session before deletion.
+    // Without this, a streaming session's SDK subprocess keeps running,
+    // writing events to a deleted session file — resource leak + potential
+    // session file recreation on disk.
+    const slot = useAgentStore.getState().sessionSlots[sessionId]
+    if (slot?.isStreaming || (wasActive && useAgentStore.getState().slots.editor.isStreaming)) {
+      window.api.agent.abort(sessionId).catch(() => {})
+    }
+
     // Temp sessions (frontend-only): just remove from the protocol-managed list.
     // Real sessions: delete via SDK first, then update the list.
     if (sessionId.startsWith('new-')) {
