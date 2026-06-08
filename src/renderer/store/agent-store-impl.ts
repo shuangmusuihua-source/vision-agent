@@ -967,9 +967,16 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
     handlePermissionRequest(req: PermissionRequestIPC) {
-      // Drop stale permission requests belonging to a different session
       const activeSessionId = get().activeSessionId
+      // Drop requests that don't belong to the active session.
+      // Case 1: both have sessionIds and they mismatch → drop.
       if (activeSessionId && req.sessionId && req.sessionId !== activeSessionId) {
+        return
+      }
+      // Case 2: request has no sessionId (new session, SDK hasn't assigned
+      // UUID yet) but the active session is a real session → drop to
+      // prevent permission prompts from leaking across sessions.
+      if (!req.sessionId && activeSessionId && !activeSessionId.startsWith('new-')) {
         return
       }
       const ctx = (req.context as AgentContext) || get().context
@@ -997,9 +1004,16 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     handleAskUserRequest(req: AskUserRequestIPC) {
-      // Drop stale AskUser requests belonging to a different session
       const activeSessionId = get().activeSessionId
+      // Drop requests that don't belong to the active session.
+      // Case 1: both have sessionIds and they mismatch → drop.
       if (activeSessionId && req.sessionId && req.sessionId !== activeSessionId) {
+        return
+      }
+      // Case 2: request has no sessionId (new session, SDK hasn't assigned
+      // UUID yet) but the active session is a real session → drop to
+      // prevent AskUser from leaking across sessions.
+      if (!req.sessionId && activeSessionId && !activeSessionId.startsWith('new-')) {
         return
       }
       const ctx = (req.context as AgentContext) || get().context
