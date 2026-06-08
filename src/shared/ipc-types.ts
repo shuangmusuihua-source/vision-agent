@@ -32,10 +32,6 @@ export type IPCChannelMap = {
     request: void
     response: { canceled: boolean; filePaths: string[] }
   }
-  'agent:getSessionList': {
-    request: void
-    response: unknown[]
-  }
   'agent:permissionResponse': {
     request: {
       requestId: string

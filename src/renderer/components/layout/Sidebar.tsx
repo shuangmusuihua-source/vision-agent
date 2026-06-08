@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, ChevronsUp, Trash2, X, Search, Settings, GitGraph, Plus, Pin, Eye, Move, Pencil, Ellipsis, ArrowLeft, Clock, Box } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, Clock, Box, MessageCircle, Loader2, Trash2 } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
-import type { FileEntry } from '../../lib/ipc'
+import { useAgentStore } from '../../store/agent-store-impl'
+import type { SdkSessionInfo } from '../../../shared/types'
 
 interface MemoryEntry {
   name: string
@@ -11,15 +12,22 @@ interface MemoryEntry {
 }
 
 interface SidebarProps {
-  files: Record<string, FileEntry[]>
   workspacePaths: string[]
   fixedWorkspacePaths: string[]
   memoryRefreshKey: number
-  onFileSelect: (path: string) => void
+  sessions: SdkSessionInfo[]
+  activeSessionId: string | null
+  activeSessionRunning: boolean
+  onSessionSelect: (sessionId: string, workspacePath: string) => void
+  onDeleteSession: (sessionId: string, workspacePath: string) => void
+  onNewConversation: (workspacePath: string) => void
+  onCancelNewSession: () => void
+  creatingSessionIn: string | null
+  newSessionName: string
+  onNewSessionNameChange: (name: string) => void
+  onCreateSession: (wsPath: string) => void
+  newSessionInputRef: React.RefObject<HTMLInputElement | null>
   onNewWorkspace: () => void
-  onFileDelete: (filePath: string) => void
-  onFileMove: (filePath: string, targetDir: string) => void
-  onFileRename: (filePath: string, newName: string) => void
   onRemoveWorkspace: (path: string) => void
   onRefreshWorkspace: (path: string) => void
   onReorderWorkspaces: (paths: string[]) => void
@@ -36,7 +44,6 @@ interface SidebarProps {
   isSessionHistoryActive: boolean
   onArtifacts: () => void
   isArtifactsActive: boolean
-  activeFile: string
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
@@ -76,16 +83,36 @@ function SidebarBackButton({ running, onBack }: { running: boolean; onBack: () =
   )
 }
 
+function formatSessionTime(ts?: number): string {
+  if (!ts) return ''
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins}分钟前`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}天前`
+  return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
 function Sidebar({
-  files,
   workspacePaths,
   fixedWorkspacePaths,
   memoryRefreshKey,
-  onFileSelect,
+  sessions,
+  activeSessionId,
+  activeSessionRunning,
+  onSessionSelect,
+  onDeleteSession,
+  onNewConversation,
+  onCancelNewSession,
+  creatingSessionIn,
+  newSessionName,
+  onNewSessionNameChange,
+  onCreateSession,
+  newSessionInputRef,
   onNewWorkspace,
-  onFileDelete,
-  onFileMove,
-  onFileRename,
   onRemoveWorkspace,
   onRefreshWorkspace,
   onReorderWorkspaces,
@@ -102,64 +129,17 @@ function Sidebar({
   isSessionHistoryActive,
   onArtifacts,
   isArtifactsActive,
-  activeFile,
   showGraph,
   changedFileCount,
   collapsed
 }: SidebarProps): React.ReactElement {
   const modal = useModal()
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set())
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
   const [memoryExpanded, setMemoryExpanded] = useState(true)
   const [memoryFiles, setMemoryFiles] = useState<MemoryEntry[]>([])
-  const [creatingFileIn, setCreatingFileIn] = useState<string | null>(null)
-  const [newFileName, setNewFileName] = useState('')
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [movingFilePath, setMovingFilePath] = useState<string | null>(null)
-  const [renamingPath, setRenamingPath] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
-  const [moveDropdownPos, setMoveDropdownPos] = useState({ left: 0, top: 0 })
-  const moveDropdownRef = useRef<HTMLDivElement>(null)
-  const newFileInputRef = useRef<HTMLInputElement>(null)
-  const isComposingRef = useRef(false)
-
-  useEffect(() => {
-    if (creatingFileIn) {
-      setNewFileName('')
-      setCreateError(null)
-      setTimeout(() => newFileInputRef.current?.focus(), 50)
-    }
-  }, [creatingFileIn])
-
-  const handleCreateFile = async (wsPath: string) => {
-    const name = newFileName.trim()
-    if (!name) return
-    const result = await window.api.workspace.createFile(wsPath, name)
-    if (result.success && result.path) {
-      setCreatingFileIn(null)
-      onRefreshWorkspace(wsPath)
-      onFileSelect(result.path)
-    } else {
-      setCreateError(result.error || '创建失败')
-    }
-  }
-
-  const handleDeleteDir = async (dirPath: string, wsPath: string) => {
-    const ok = await modal.confirm({ title: '删除目录', message: '确定删除此目录？目录内所有文件都将被删除，此操作不可撤销。', variant: 'danger' })
-    if (!ok) return
-    const result = await window.api.workspace.deleteDir(dirPath)
-    if (result.success) {
-      onRefreshWorkspace(wsPath)
-    }
-  }
-
-  const handleRenameDir = async (dirPath: string, newName: string, wsPath: string) => {
-    if (!newName.trim() || newName === dirPath.split('/').pop()) return
-    const result = await window.api.workspace.renameEntry(dirPath, newName.trim())
-    if (result.success) {
-      onRefreshWorkspace(wsPath)
-    }
-  }
+  // Subscribe reactively to sessionSlots so non-active session state (running indicator, title)
+  // triggers re-renders when slots are saved/restored on session switch.
+  const sessionSlots = useAgentStore((s) => s.sessionSlots)
 
   const refreshMemory = useCallback(() => {
     window.api.memory.list().then(setMemoryFiles).catch(() => setMemoryFiles([]))
@@ -175,58 +155,6 @@ function Sidebar({
     await window.api.memory.delete(filePath)
     refreshMemory()
   }, [refreshMemory])
-
-  const handleDeleteFile = useCallback(async (filePath: string) => {
-    const ok = await modal.confirm({ title: '删除文件', message: '确定删除此文件？此操作不可撤销。', variant: 'danger' })
-    if (!ok) return
-    onFileDelete(filePath)
-  }, [onFileDelete])
-
-  const handleShowMoveDropdown = useCallback((filePath: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const rect = (e.target as HTMLElement).getBoundingClientRect()
-    setMoveDropdownPos({ left: rect.left, top: rect.bottom + 4 })
-    setMovingFilePath(filePath)
-  }, [])
-
-  const handleMoveToWorkspace = useCallback((targetDir: string) => {
-    if (movingFilePath) {
-      onFileMove(movingFilePath, targetDir)
-    }
-    setMovingFilePath(null)
-  }, [movingFilePath, onFileMove])
-
-  useEffect(() => {
-    if (!movingFilePath) return
-    const handler = (e: MouseEvent) => {
-      if (moveDropdownRef.current && moveDropdownRef.current.contains(e.target as Node)) return
-      setMovingFilePath(null)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [movingFilePath])
-
-  const handleStartRename = useCallback((filePath: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setRenamingPath(filePath)
-    setRenameValue(filePath.split('/').pop() || '')
-  }, [])
-
-  const handleFinishRename = useCallback(() => {
-    if (renamingPath && renameValue.trim() && renameValue !== renamingPath.split('/')?.pop()) {
-      onFileRename(renamingPath, renameValue.trim())
-    }
-    setRenamingPath(null)
-  }, [renamingPath, renameValue, onFileRename])
-
-  const toggleDir = useCallback((path: string) => {
-    setExpandedDirs((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-  }, [])
 
   const toggleWorkspace = useCallback((path: string) => {
     setCollapsedWorkspaces((prev) => {
@@ -252,118 +180,12 @@ function Sidebar({
 
   const workspaceName = (path: string) => path.split('/').pop() || path
 
-  const renderTree = (entries: FileEntry[], depth: number, wsPath: string): React.ReactElement[] => {
-    return entries.map((entry) => {
-      const isExpanded = expandedDirs.has(entry.path)
-      const paddingLeft = 8 + depth * 16
-
-      if (entry.isDirectory) {
-        return (
-          <div key={entry.path}>
-            <div
-              className="sidebar-entry sidebar-folder"
-              style={{ paddingLeft }}
-              onClick={() => toggleDir(entry.path)}
-            >
-              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
-              {renamingPath === entry.path ? (
-                <input
-                  className="sidebar-rename-input"
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.isComposing) {
-                      handleRenameDir(entry.path, renameValue, wsPath)
-                      setRenamingPath(null)
-                    }
-                    if (e.key === 'Escape') setRenamingPath(null)
-                  }}
-                  onBlur={() => setRenamingPath(null)}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span>{entry.name}</span>
-              )}
-              <button
-                className="sidebar-file-action"
-                onClick={(e) => handleStartRename(entry.path, e)}
-                title="重命名"
-                aria-label="重命名"
-              >
-                <Pencil size={12} />
-              </button>
-              <button
-                className="sidebar-file-action"
-                onClick={(e) => { e.stopPropagation(); handleDeleteDir(entry.path, wsPath) }}
-                title="删除目录"
-                aria-label="删除目录"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-            {isExpanded && entry.children && renderTree(entry.children, depth + 1, wsPath)}
-          </div>
-        )
-      }
-
-      return (
-        <div
-          key={entry.path}
-          className={`sidebar-entry sidebar-file${activeFile === entry.path ? ' sidebar-entry-active' : ''}`}
-          style={{ paddingLeft: paddingLeft + 14 }}
-          onClick={() => {
-            if (renamingPath !== entry.path) onFileSelect(entry.path)
-          }}
-        >
-          <File size={14} />
-          {renamingPath === entry.path ? (
-            <input
-              className="sidebar-rename-input"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.isComposing) handleFinishRename()
-                if (e.key === 'Escape') setRenamingPath(null)
-              }}
-              onBlur={handleFinishRename}
-              autoFocus
-            />
-          ) : (
-            <span className="sidebar-file-name">{entry.name}</span>
-          )}
-          {renamingPath !== entry.path && workspacePaths.length > 1 && (
-            <button
-              className="sidebar-file-action"
-              onClick={(e) => handleShowMoveDropdown(entry.path, e)}
-              title="移动到其他工作区"
-              aria-label="移动到其他工作区"
-            >
-              <Move size={12} />
-            </button>
-          )}
-          {renamingPath !== entry.path && (
-            <button
-              className="sidebar-file-action"
-              onClick={(e) => handleStartRename(entry.path, e)}
-              title="重命名"
-              aria-label="重命名"
-            >
-              <Pencil size={12} />
-            </button>
-          )}
-          <button
-            className="sidebar-file-action"
-            onClick={(e) => { e.stopPropagation(); handleDeleteFile(entry.path) }}
-            title="删除文件"
-            aria-label="删除文件"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
-      )
-    })
+  // Group sessions by workspacePath
+  const sessionsByWorkspace: Record<string, SdkSessionInfo[]> = {}
+  for (const s of sessions) {
+    const wsPath = s.workspacePath || s.cwd || ''
+    if (!sessionsByWorkspace[wsPath]) sessionsByWorkspace[wsPath] = []
+    sessionsByWorkspace[wsPath].push(s)
   }
 
   const [showDaydreamPicker, setShowDaydreamPicker] = useState(false)
@@ -395,7 +217,7 @@ function Sidebar({
     <div className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-header-actions">
-          <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索 (⌘⇧F)" aria-label="搜索">
+          <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索" aria-label="搜索">
             <Search size={16} />
           </button>
           <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图" aria-label="图谱视图">
@@ -412,11 +234,11 @@ function Sidebar({
       </div>
 
       <div className="sidebar-content">
+        {/* Ask Zuovis */}
         <div
           className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`}
           onClick={onAskZuovis}
-          role="button"
-          tabIndex={0}
+          role="button" tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
         >
           <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
@@ -429,8 +251,7 @@ function Sidebar({
         <div
           className={`sidebar-ask-zuovis${isSessionHistoryActive ? ' sidebar-ask-zuovis-active' : ''}`}
           onClick={onSessionHistory}
-          role="button"
-          tabIndex={0}
+          role="button" tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSessionHistory() } }}
         >
           <div className="sidebar-history-icon"><Clock size={12} /></div>
@@ -440,15 +261,14 @@ function Sidebar({
         <div
           className={`sidebar-ask-zuovis${isArtifactsActive ? ' sidebar-ask-zuovis-active' : ''}`}
           onClick={onArtifacts}
-          role="button"
-          tabIndex={0}
+          role="button" tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onArtifacts() } }}
         >
           <div className="sidebar-history-icon sidebar-artifacts-icon"><Box size={12} /></div>
           <span className="sidebar-ask-zuovis-label">产物</span>
         </div>
 
-        {/* 工作区 */}
+        {/* Workspaces with sessions */}
         {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length > 0 && (
           <div className="sidebar-workspace-module-header">
             <span className="sidebar-workspace-module-title">工作区</span>
@@ -462,7 +282,7 @@ function Sidebar({
             </div>
           </div>
         )}
-        {workspacePaths.length === 0 ? (
+        {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length === 0 ? (
           <div className="sidebar-empty-workspace">
             <button className="sidebar-new-dir-btn" onClick={onNewWorkspace}>
               新建工作区
@@ -476,6 +296,9 @@ function Sidebar({
           >
             {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).map((wsPath, idx) => {
               const isCollapsed = collapsedWorkspaces.has(wsPath)
+              const wsSessions = (sessionsByWorkspace[wsPath] || [])
+                .sort((a, b) => (b.lastModified || b.createdAt || 0) - (a.lastModified || a.createdAt || 0))
+
               return (
                 <Flipped key={wsPath} flipId={wsPath}>
                   <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
@@ -492,51 +315,92 @@ function Sidebar({
                         <button
                           className="sidebar-workspace-pin"
                           onClick={() => handlePinToTop(wsPath)}
-                          title="置顶"
-                          aria-label="置顶"
+                          title="置顶" aria-label="置顶"
                         >
                           <Pin size={12} />
                         </button>
                       )}
                       <button
                         className="sidebar-workspace-remove"
-                        onClick={() => { setCreatingFileIn(null); onRemoveWorkspace(wsPath) }}
-                        title="移除工作区"
-                        aria-label="移除工作区"
+                        onClick={() => onRemoveWorkspace(wsPath)}
+                        title="移除工作区" aria-label="移除工作区"
                       >
                         <X size={12} />
-                      </button>
-                      <button
-                        className="sidebar-workspace-add-file"
-                        onClick={() => setCreatingFileIn(wsPath)}
-                        title="新建文件"
-                        aria-label="新建文件"
-                      >
-                        <Plus size={12} />
                       </button>
                     </div>
                     {!isCollapsed && (
                       <div className="sidebar-workspace-body">
-                        {creatingFileIn === wsPath && (
-                          <div className="sidebar-new-file-input">
+                        {/* Session list */}
+                        {wsSessions.length === 0 && creatingSessionIn !== wsPath ? (
+                          <div className="sidebar-session-empty">暂无会话</div>
+                        ) : (
+                          wsSessions.map((session) => {
+                            // Running: prefer activeSessionRunning for the active session (reactive via prop),
+                            // fall back to sessionSlots for non-active sessions (saved on switch-away)
+                            const isActive = activeSessionId === session.id
+                            const slot = isActive ? null : sessionSlots[session.id]
+                            const isRunning = isActive
+                              ? activeSessionRunning
+                              : (slot?.isStreaming || (slot?.agentState && slot.agentState !== 'idle' && slot.agentState !== 'error'))
+                            return (
+                              <div
+                                key={session.id}
+                                className={`sidebar-entry sidebar-session-entry${activeSessionId === session.id ? ' sidebar-entry-active' : ''}`}
+                                style={{ paddingLeft: 22 }}
+                                onClick={() => onSessionSelect(session.id, wsPath)}
+                              >
+                                {isRunning ? (
+                                  <Loader2 size={13} className="sidebar-session-running" />
+                                ) : (
+                                  <MessageCircle size={13} />
+                                )}
+                                <span className="sidebar-session-title">
+                                  {session.title || session.id?.slice(-8) || '未命名会话'}
+                                </span>
+                                <span className="sidebar-session-time">
+                                  {formatSessionTime(session.lastModified || session.createdAt)}
+                                </span>
+                                <button
+                                  className="sidebar-session-delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onDeleteSession(session.id, wsPath)
+                                  }}
+                                  title="删除会话"
+                                  aria-label="删除会话"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )
+                          })
+                        )}
+                        {/* New session name input */}
+                        {creatingSessionIn === wsPath && (
+                          <div className="sidebar-new-file-input" style={{ paddingLeft: 22 }}>
                             <input
-                              ref={newFileInputRef}
+                              ref={newSessionInputRef}
                               className="sidebar-new-file-field"
-                              placeholder="文件名（自动添加 .md）"
-                              value={newFileName}
-                              onChange={(e) => { setNewFileName(e.target.value); setCreateError(null) }}
-                              onCompositionStart={() => { isComposingRef.current = true }}
-                              onCompositionEnd={() => { isComposingRef.current = false }}
+                              placeholder="会话名称"
+                              value={newSessionName}
+                              onChange={(e) => onNewSessionNameChange(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.isComposing && !isComposingRef.current) handleCreateFile(wsPath)
-                                if (e.key === 'Escape') setCreatingFileIn(null)
+                                if (e.key === 'Enter' && !e.isComposing) onCreateSession(wsPath)
+                                if (e.key === 'Escape') { onNewSessionNameChange(''); onCancelNewSession() }
                               }}
-                              onBlur={() => setCreatingFileIn(null)}
                             />
-                            {createError && <span className="sidebar-new-file-error">{createError}</span>}
                           </div>
                         )}
-                        {renderTree(files[wsPath] || [], 0, wsPath)}
+                        {/* New conversation button */}
+                        {creatingSessionIn !== wsPath && (
+                          <button
+                            className="sidebar-new-conversation-btn"
+                            onClick={() => onNewConversation(wsPath)}
+                          >
+                            <Plus size={13} />
+                            <span>新建对话</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -548,7 +412,7 @@ function Sidebar({
 
         <div className="sidebar-section-divider" />
 
-        {/* 知识库 — fixed Knowledge directory */}
+        {/* Knowledge — fixed file tree */}
         {fixedWorkspacePaths.map((wsPath) => {
           const isCollapsed = collapsedWorkspaces.has(wsPath)
           return (
@@ -559,15 +423,11 @@ function Sidebar({
                   {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                 </div>
               </div>
-              {!isCollapsed && (
-                <div className="sidebar-workspace-body">
-                  {renderTree(files[wsPath] || [], 0, wsPath)}
-                </div>
-              )}
             </div>
           )
         })}
 
+        {/* Memory */}
         {memoryFiles.length > 0 && (
           <div className="sidebar-memory-section">
             <div className="sidebar-workspace-module-header" onClick={() => setMemoryExpanded((v) => !v)} style={{ cursor: 'pointer' }}>
@@ -579,11 +439,10 @@ function Sidebar({
             {memoryExpanded && memoryFiles.map((file) => (
               <div
                 key={file.path}
-                className={`sidebar-entry sidebar-file sidebar-memory-entry${activeFile === file.path ? ' sidebar-entry-active' : ''}`}
+                className="sidebar-entry sidebar-file sidebar-memory-entry"
                 style={{ paddingLeft: 20 }}
-                onClick={() => onFileSelect(file.path)}
               >
-                <File size={14} />
+                <MessageCircle size={13} />
                 <span className="sidebar-memory-name">{file.name}</span>
                 <button
                   className="sidebar-memory-delete"
@@ -592,7 +451,7 @@ function Sidebar({
                     handleDeleteMemory(file.path)
                   }}
                 >
-                  <Trash2 size={12} />
+                  <X size={12} />
                 </button>
               </div>
             ))}
@@ -619,32 +478,6 @@ function Sidebar({
           <span className="daydream-picker-preview rain-preview" />
           <span>绿野甘霖</span>
         </button>
-      </div>,
-      document.body
-    )}
-    {movingFilePath && createPortal(
-      <div
-        ref={moveDropdownRef}
-        className="move-dropdown"
-        style={{ left: moveDropdownPos.left, top: moveDropdownPos.top }}
-      >
-        <div className="move-dropdown-title">移动到工作区</div>
-        {workspacePaths
-          .filter(ws => !movingFilePath.startsWith(ws + '/'))
-          .map(ws => {
-            const wsIsFixed = fixedWorkspacePaths.includes(ws)
-            return (
-              <button
-                key={ws}
-                className="move-dropdown-item"
-                onClick={() => handleMoveToWorkspace(ws)}
-              >
-                <Folder size={14} />
-                <span>{wsIsFixed ? '知识库' : workspaceName(ws)}</span>
-              </button>
-            )
-          })
-        }
       </div>,
       document.body
     )}

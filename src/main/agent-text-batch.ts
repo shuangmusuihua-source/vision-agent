@@ -8,12 +8,12 @@ import type { AgentContext } from '../shared/types'
 // By merging deltas within a 30ms window, we cut IPC events by ~3-4x
 // while keeping perceived latency well below the ~100ms human threshold.
 
-type TextBatchEntry = { context: AgentContext; text: string; uuid: string }
-const textBatches = new Map<AgentContext, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null }>()
+type TextBatchEntry = { context: AgentContext; text: string; uuid: string; sessionId: string }
+const textBatches = new Map<AgentContext, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string }>()
 
 function ensureBatchSlot(ctx: AgentContext) {
   if (!textBatches.has(ctx)) {
-    textBatches.set(ctx, { entries: [], timer: null })
+    textBatches.set(ctx, { entries: [], timer: null, sessionId: '' })
   }
   return textBatches.get(ctx)!
 }
@@ -29,6 +29,7 @@ export function flushTextBatch(ctx: AgentContext, win: BrowserWindow): void {
 
   const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
   const lastUuid = slot.entries[slot.entries.length - 1].uuid
+  const sessionId = slot.sessionId
   slot.entries = []
 
   if (!combinedText || win.isDestroyed()) return
@@ -36,6 +37,7 @@ export function flushTextBatch(ctx: AgentContext, win: BrowserWindow): void {
   // Emit a single combined stream_event carrying all accumulated text
   win.webContents.send('agent:event', {
     context: ctx,
+    sessionId,
     type: 'stream_event',
     uuid: lastUuid,
     event: {
@@ -55,9 +57,10 @@ export function isTextDeltaEvent(rawMessage: Record<string, unknown>): string | 
   return (delta.text as string) || ''
 }
 
-export function scheduleTextBatch(ctx: AgentContext, text: string, uuid: string, win: BrowserWindow): void {
+export function scheduleTextBatch(ctx: AgentContext, text: string, uuid: string, sessionId: string, win: BrowserWindow): void {
   const slot = ensureBatchSlot(ctx)
-  slot.entries.push({ context: ctx, text, uuid })
+  slot.entries.push({ context: ctx, text, uuid, sessionId })
+  slot.sessionId = sessionId
 
   if (!slot.timer) {
     slot.timer = setTimeout(() => flushTextBatch(ctx, win), 30)

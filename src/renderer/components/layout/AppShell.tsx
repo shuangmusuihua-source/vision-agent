@@ -14,6 +14,8 @@ import ArtifactsPanel from './ArtifactsPanel'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 import DaydreamOverlay from './DaydreamOverlay'
+import OverviewPanel from './OverviewPanel'
+import './OverviewPanel.css'
 import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
@@ -21,7 +23,8 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
-import type { AgentContext } from '../../../shared/types'
+import type { AgentContext, TabDescriptor } from '../../../shared/types'
+import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
@@ -37,11 +40,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const workspace = useWorkspace()
   const {
-    openTabs, activeTab, activeContent,
-    openFile, closeTab, switchTab, clearTab, closeTabsByPrefix,
-    saveFile, refreshActiveContent,
+    openTabs, activeTab, activeContent, activeFilePath,
+    openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
+    saveFile, refreshActiveContent, hasFileTab,
   } = useTabs()
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+
+  // Stable refs for workspace values used in useCallback/useEffect deps
+  // (the workspace object changes every render — avoid putting it in dep arrays)
+  const workspacePathsRef = useRef(workspace.workspacePaths)
+  workspacePathsRef.current = workspace.workspacePaths
+  const refreshAllFilesRef = useRef(workspace.refreshAllFiles)
+  refreshAllFilesRef.current = workspace.refreshAllFiles
 
   // ── Layout hooks ────────────────────────────────────────────────────
 
@@ -83,7 +93,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── Auto-link active tab → linked file ──────────────────────────────
 
   useEffect(() => {
-    if (activeTab) setLinkedFile(activeTab)
+    if (activeTab && isFileTab(activeTab)) setLinkedFile(activeTab.path)
   }, [activeTab])
 
   // ── IPC subscriptions (update, menu, graph, main error) ─────────────
@@ -95,6 +105,106 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   const [mainError, setMainError] = useState<string | null>(null)
+  const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
+  const activeSessionId = useAgentStore((s) => s.activeSessionId)
+
+  // Load sessions when workspace changes
+  const skipNextSessionLoad = useRef(false)
+  useEffect(() => {
+    if (skipNextSessionLoad.current) {
+      skipNextSessionLoad.current = false
+      return
+    }
+    loadSessions()
+  }, [activeWorkspacePath])
+
+  // Auto-open overview tab when active session changes (per-session tabs)
+  useEffect(() => {
+    if (activeWorkspacePath && activeSessionId && view === 'editor') {
+      openFixedTab(OVERVIEW_TAB_ID)
+    }
+  }, [activeSessionId])
+
+  // Load session outputs when active session changes
+  useEffect(() => {
+    if (activeSessionId) {
+      useAgentStore.setState({ sessionOutputsLoading: true })
+      window.api.agent.getSessionOutputs(activeSessionId).then((outputs) => {
+        if (useAgentStore.getState().activeSessionId === activeSessionId) {
+          useAgentStore.getState().setSessionOutputs(outputs)
+        }
+      }).catch(() => {
+        if (useAgentStore.getState().activeSessionId === activeSessionId) {
+          useAgentStore.getState().setSessionOutputs(null)
+        }
+      })
+    } else {
+      useAgentStore.getState().setSessionOutputs(null)
+    }
+  }, [activeSessionId])
+
+  // ── Session selection / new conversation handlers ─────────────────────
+
+  const handleSessionSelect = useCallback((sessionId: string, workspacePath: string) => {
+    if (workspacePath && workspacePath !== activeWorkspacePath) {
+      useAgentStore.getState().setActiveWorkspace(workspacePath)
+    }
+    // Switch to session-isolated slot (also sets activeSessionId, loading flag,
+    // and kicks off SDK message load when the slot has _needsSdkLoad === true).
+    useAgentStore.getState().switchToSession(sessionId)
+    // session outputs loaded by useEffect on activeSessionId change
+    if (view !== 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
+    }
+    const overviewTab = openTabs.find(t => t.type === 'fixed')
+    if (overviewTab) switchTab(overviewTab)
+  }, [activeWorkspacePath, view, openTabs, switchTab])
+
+    const [creatingSessionIn, setCreatingSessionIn] = useState<string | null>(null)
+  const [newSessionName, setNewSessionName] = useState('')
+  const newSessionInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (creatingSessionIn) {
+      setNewSessionName('')
+      setTimeout(() => newSessionInputRef.current?.focus(), 50)
+    }
+  }, [creatingSessionIn])
+
+  const handleCreateSession = useCallback(async (wsPath: string) => {
+    const name = newSessionName.trim()
+    if (!name) return
+    if (wsPath !== activeWorkspacePath) {
+      skipNextSessionLoad.current = true
+      useAgentStore.getState().setActiveWorkspace(wsPath)
+    }
+    // Create a new empty editor slot with a placeholder session ID and store the title
+    const tempSessionId = `new-${Date.now()}`
+    useAgentStore.getState().switchToSession(tempSessionId)
+    // Store the user-chosen title in the session slot so sidebar can show it
+    useAgentStore.setState((s) => ({
+      sessionSlots: {
+        ...s.sessionSlots,
+        [tempSessionId]: {
+          ...(s.sessionSlots[tempSessionId] || s.slots.editor),
+        },
+      },
+    }))
+    // Add to sessionList via the protocol — single write path
+    useAgentStore.getState().dispatchSessionList({
+      type: 'CREATE_TEMP',
+      sessionId: tempSessionId,
+      title: name,
+      workspacePath: wsPath,
+    })
+    setCreatingSessionIn(null)
+    if (view !== 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
+    }
+  }, [newSessionName, activeWorkspacePath, view])
+
   useEffect(() => {
     return window.api.onMainError((error) => {
       console.error(`[Main ${error.type}]`, error.message)
@@ -102,7 +212,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     })
   }, [])
 
-  const activeTabRef = useRef(activeTab)
+  const activeTabRef = useRef<TabDescriptor | null>(activeTab)
   activeTabRef.current = activeTab
   const refreshActiveContentRef = useRef(refreshActiveContent)
   refreshActiveContentRef.current = refreshActiveContent
@@ -110,9 +220,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   useEffect(() => {
     return window.api.graph.onFilesChanged((data) => {
       useGraphStore.getState().handleFilesChanged(data)
-      // Also refresh the editor if the active tab was modified externally
       const current = activeTabRef.current
-      if (current && data.files.includes(current)) {
+      if (current && isFileTab(current) && data.files.includes(current.path)) {
         refreshActiveContentRef.current()
       }
     })
@@ -146,7 +255,46 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     respondPermission,
     respondAskUser: editorRespondAskUser,
   } = useAgent('editor')
+
+  const handleDeleteSession = useCallback(async (sessionId: string, workspacePath: string) => {
+    const ok = await modal.confirm({
+      title: '删除会话',
+      message: '确定删除此会话？会话中的所有对话记录将被永久删除，此操作不可撤销。',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const wasActive = useAgentStore.getState().activeSessionId === sessionId
+
+    // Temp sessions (frontend-only): just remove from the protocol-managed list.
+    // Real sessions: delete via SDK first, then update the list.
+    if (sessionId.startsWith('new-')) {
+      useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
+    } else {
+      try {
+        await window.api.agent.deleteSession(sessionId)
+        useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
+      } catch (err) {
+        console.error('[AppShell] deleteSession error:', err)
+        modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
+        return
+      }
+    }
+    // Remove the deleted session's cached slot from sessionSlots
+    useAgentStore.setState((s) => {
+      const { [sessionId]: _, ...rest } = s.sessionSlots
+      return { sessionSlots: rest }
+    })
+    if (wasActive) {
+      useAgentStore.getState().switchToSession('')
+      useAgentStore.getState().setSessionOutputs(null)
+      if (view !== 'editor') {
+        setView('editor')
+      }
+    }
+  }, [modal, view, loadSessions])
+
   const isStreaming = useIsStreaming('editor')
+  const prevIsStreamingRef = useRef(isStreaming)
   const editorPermission = usePermissionRequest('editor')
   const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
@@ -169,6 +317,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   useEffect(() => {
     if (!settings) return
     workspace.syncFromSettings(settings.authorizedDirectories)
+    // Set initial active workspace if not yet set
+    if (!useAgentStore.getState().activeWorkspacePath && settings.authorizedDirectories.length > 0) {
+      // Find first non-fixed workspace, or fall back to first directory
+      const nonFixed = settings.authorizedDirectories.filter(d => !settings.fixedDirectories?.includes(d))
+      const firstWs = nonFixed[0] || settings.authorizedDirectories[0]
+      if (firstWs) useAgentStore.getState().setActiveWorkspace(firstWs)
+    }
   }, [settings])
 
   // ── View routing helpers ────────────────────────────────────────────
@@ -199,59 +354,81 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       useAgentStore.setState({ context: 'editor' })
       setView('editor')
     }
+    // Set active workspace based on which workspace contains this file
+    const wsPath = workspace.workspacePaths.find(ws => path.startsWith(ws + '/') || path.startsWith(ws))
+    if (wsPath) {
+      useAgentStore.getState().setActiveWorkspace(wsPath)
+    }
     await openFile(path)
-  }, [openFile, view])
+  }, [openFile, view, workspace.workspacePaths])
 
   // ── File operations (bridging workspace + tabs) ─────────────────────
 
   const handleFileDelete = useCallback(async (filePath: string) => {
     const result = await window.api.workspace.deleteFile(filePath)
     if (result.success) {
-      if (openTabs.includes(filePath)) closeTab(filePath)
-      await workspace.refreshFiles(workspace.workspacePaths)
+      if (hasFileTab(filePath)) closeTab({ type: 'file', path: filePath })
+      await workspace.refreshFiles(workspacePathsRef.current)
     } else {
       modal.alert({ title: '删除失败', message: result.error || '删除失败' })
     }
-  }, [openTabs, closeTab, workspace, modal])
+  }, [hasFileTab, closeTab, modal])
 
   const handleFileRename = useCallback(async (filePath: string, newName: string) => {
     const result = await window.api.workspace.renameFile(filePath, newName)
     if (result.success) {
-      if (openTabs.includes(filePath)) {
-        closeTab(filePath)
+      if (hasFileTab(filePath)) {
+        closeTab({ type: 'file', path: filePath })
         if (result.newPath) await openFile(result.newPath)
       }
-      await workspace.refreshFiles(workspace.workspacePaths)
+      await workspace.refreshFiles(workspacePathsRef.current)
     } else {
       modal.alert({ title: '重命名失败', message: result.error || '重命名失败' })
     }
-  }, [openTabs, closeTab, openFile, workspace, modal])
+  }, [hasFileTab, closeTab, openFile, modal])
 
   const handleFileMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const result = await window.api.workspace.moveFile(sourcePath, targetDir)
     if (result.success) {
-      if (openTabs.includes(sourcePath)) {
-        closeTab(sourcePath)
+      if (hasFileTab(sourcePath)) {
+        closeTab({ type: 'file', path: sourcePath })
         if (result.newPath) await openFile(result.newPath)
       }
-      await workspace.refreshFiles(workspace.workspacePaths)
+      await workspace.refreshFiles(workspacePathsRef.current)
     } else {
       modal.alert({ title: '移动失败', message: result.error || '移动失败' })
     }
-  }, [openTabs, closeTab, openFile, workspace, modal])
+  }, [hasFileTab, closeTab, openFile, modal])
 
   // ── Auto-refresh after agent finishes ───────────────────────────────
 
   useEffect(() => {
-    if (!isStreaming && useAgentStore.getState().slots.editor.messages.length > 0) {
-      setMemoryRefreshKey((k) => k + 1)
-      workspace.refreshAllFiles(workspace.workspacePaths)
-      if (activeTab) {
-        const timer = setTimeout(() => { refreshActiveContent().catch(() => {}) }, 500)
-        return () => clearTimeout(timer)
-      }
+    const wasStreaming = prevIsStreamingRef.current
+    prevIsStreamingRef.current = isStreaming
+    // Only trigger on streaming → idle transition (agent just finished)
+    if (!wasStreaming || isStreaming) return
+    const hasMessages = useAgentStore.getState().slots.editor.messages.length > 0
+    if (!hasMessages) return
+
+    setMemoryRefreshKey((k) => k + 1)
+    refreshAllFilesRef.current(workspacePathsRef.current)
+
+    // Refresh session outputs so OverviewPanel shows newly produced files
+    const sid = useAgentStore.getState().activeSessionId
+    if (sid) {
+      window.api.agent.getSessionOutputs(sid).then((outputs) => {
+        if (useAgentStore.getState().activeSessionId === sid) {
+          useAgentStore.getState().setSessionOutputs(outputs)
+        }
+      }).catch(() => {})
     }
-  }, [isStreaming, activeTab, refreshActiveContent, workspace])
+
+    const tab = activeTabRef.current
+    if (tab && isFileTab(tab)) {
+      const timer = setTimeout(() => { refreshActiveContentRef.current().catch(() => {}) }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isStreaming])
 
   // ── Text selection, ask-agent, stats, skill ─────────────────────────
 
@@ -323,20 +500,27 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     <div className="app-shell" ref={shellRef}>
       <nav aria-label="侧边栏" style={{ display: 'flex', height: '100%' }}>
       <Sidebar
-        files={workspace.files}
         workspacePaths={workspace.workspacePaths}
         fixedWorkspacePaths={workspace.fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
-        onFileSelect={handleFileSelect}
+        sessions={sessionList}
+        activeSessionId={activeSessionId}
+        activeSessionRunning={isStreaming}
+        onSessionSelect={handleSessionSelect}
+        onDeleteSession={handleDeleteSession}
+        onNewConversation={(wsPath) => setCreatingSessionIn(wsPath)}
+        onCancelNewSession={() => setCreatingSessionIn(null)}
+        creatingSessionIn={creatingSessionIn}
+        newSessionName={newSessionName}
+        onNewSessionNameChange={setNewSessionName}
+        onCreateSession={handleCreateSession}
+        newSessionInputRef={newSessionInputRef}
         onNewWorkspace={workspace.handleOpenNewWorkspaceModal}
-        onFileDelete={handleFileDelete}
-        onFileMove={handleFileMove}
-        onFileRename={handleFileRename}
-        onRefreshWorkspace={workspace.handleRefreshWorkspace}
         onRemoveWorkspace={workspace.handleRemoveWorkspace}
+        onRefreshWorkspace={workspace.handleRefreshWorkspace}
+        onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => setShowSearch(true)}
-        onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
         onAskZuovis={() => {
@@ -352,7 +536,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         isArtifactsActive={view === 'artifacts'}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
-        activeFile={activeTab}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
@@ -362,7 +545,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
         {view === 'artifacts' ? (
-          <ArtifactsPanel onOpenFile={handleFileSelect} />
+          <ArtifactsPanel onOpenFile={handleFileSelect} sessionId={activeSessionId ?? undefined} />
         ) : view === 'history' ? (
           <SessionHistoryPanel />
         ) : view === 'ask' ? (
@@ -384,11 +567,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           )}
         </div>
         <div className="main-content-scroll">
-        {activeTab ? (
+        {activeTab && isFileTab(activeTab) ? (
           <ErrorBoundary onReset={() => {}}>
           <MarkdownEditor
             content={activeContent}
-            filePath={activeTab}
+            filePath={activeFilePath}
             workspacePath={workspace.workspacePaths[0] || ''}
             sourceMode={sourceMode}
             focusMode={focusMode}
@@ -398,6 +581,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             onStatsUpdate={handleStatsUpdate}
           />
           </ErrorBoundary>
+        ) : activeWorkspacePath ? (
+          <ErrorBoundary onReset={() => {}}>
+          <OverviewPanel
+            sessionId={activeSessionId}
+            onOpenFile={handleFileSelect}
+          />
+          </ErrorBoundary>
         ) : (
           <div className="editor-empty">
             <FileText size={48} className="editor-empty-icon" />
@@ -405,7 +595,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         )}
         </div>
-        {activeTab && (
+        {activeTab && isFileTab(activeTab) && (
           <div className="editor-status-bar" role="status">
             <span>{editorStats.words} words</span>
             <span>{editorStats.chars} characters</span>
@@ -443,6 +633,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <AgentPanel
         width={agentWidth}
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
+        workspacePath={activeWorkspacePath || undefined}
         usageInfo={usageInfo}
         permissionRequest={editorPermission}
         permissionQueueLength={editorPermissionQueueLen}
@@ -512,7 +703,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <GraphFloat
           show={showGraph}
           onClose={() => useGraphStore.getState().setShowGraph(false)}
-          activeFile={activeTab}
+          activeFile={activeFilePath}
           onNodeClick={(nodeId, nodeType) => {
             if (nodeType === 'entity') {
               const entityName = nodeId.replace(/^entity:/, '')
@@ -605,6 +796,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                       modal.alert({ title: '删除失败', message: result.error || '删除失败' })
                     } else {
                       closeTabsByPrefix(deletingPath + '/')
+                      const remaining = workspace.workspacePaths.filter(p => p !== deletingPath)
+                      useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
                     }
                   })()
                 }
@@ -622,6 +815,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                   const result = await workspace.handleDeleteWorkspace()
                   if (result.success) {
                     closeTabsByPrefix(deletingPath + '/')
+                    const remaining = workspace.workspacePaths.filter(p => p !== deletingPath)
+                    useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
                   } else {
                     modal.alert({ title: '删除失败', message: result.error || '删除失败' })
                   }

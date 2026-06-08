@@ -54,16 +54,59 @@ export function useIPCSubscriptions() {
       store.getState().handlePermissionTimeout(data.requestId)
     })
 
-    const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string }) => {
-      store.setState((state) => ({
-        slots: {
-          ...state.slots,
-          [data.context]: {
+    const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string; workspacePath?: string }) => {
+      // Capture the temp session ID BEFORE migration so we can clean it from sessionList
+      const prevSessionId = store.getState().activeSessionId
+      const migratedTempId = prevSessionId?.startsWith('new-') ? prevSessionId : null
+      // Capture the user-chosen title from sessionList before MATERIALIZE transforms the entry
+      const tempTitle = migratedTempId
+        ? store.getState().sessionList.find(s => s.id === migratedTempId)?.title
+        : undefined
+
+      store.setState((state) => {
+        // If we have a temp session slot (from "新建对话"), migrate it to real session ID
+        const nextSessionSlots = { ...state.sessionSlots }
+        if (prevSessionId && prevSessionId.startsWith('new-') && !nextSessionSlots[data.sessionId]) {
+          nextSessionSlots[data.sessionId] = {
             ...state.slots[data.context],
             currentSessionId: data.sessionId,
+          }
+          delete nextSessionSlots[prevSessionId]
+        }
+
+        return {
+          activeSessionId: data.sessionId,
+          sessionSlots: nextSessionSlots,
+          slots: {
+            ...state.slots,
+            [data.context]: {
+              ...state.slots[data.context],
+              currentSessionId: data.sessionId,
+              workspacePath: data.workspacePath || state.slots[data.context].workspacePath,
+            },
           },
-        },
-      }))
+        }
+      })
+      if (data.workspacePath && !store.getState().activeWorkspacePath) {
+        store.setState({ activeWorkspacePath: data.workspacePath })
+      }
+      // Session list: if this is a temp→real migration, replace the temp
+      // entry in-place. Otherwise (existing session got re-confirmed by SDK),
+      // nothing to do — the session is already in the list from loadSessions
+      // or a prior CREATE_TEMP+MATERIALIZE cycle.
+      if (data.context === 'editor' && migratedTempId) {
+        store.getState().dispatchSessionList({
+          type: 'MATERIALIZE',
+          tempId: migratedTempId,
+          realId: data.sessionId,
+        })
+        // Fire-and-forget: rename the SDK session with the user-chosen title
+        if (tempTitle) {
+          window.api.agent.renameSession(data.sessionId, tempTitle).catch(
+            (err) => console.error('[useAgent] renameSession failed:', err)
+          )
+        }
+      }
       refreshWatchdogByContext(data.context)
     })
 
@@ -153,6 +196,12 @@ export function useAgent(context: AgentContext = 'editor') {
       state.dispatchAgentEvent({ type: 'ABORT' }, context)
       await window.api.agent.abort(context)
     }
+    // Optimistic write: insert the user message directly into the messages array
+    // before the SDK processes it. The SDK will later send back a 'user' IPC event
+    // (routed through processIPCMessage → handleUserMessage) which processes
+    // associated tool results. During live operation handleUserMessage skips
+    // re-adding the user message (it only does so on replay with dedup), so this
+    // optimistic insert is the canonical source for user messages during live sessions.
     store.setState((s) => ({
       slots: {
         ...s.slots,
@@ -171,7 +220,12 @@ export function useAgent(context: AgentContext = 'editor') {
     }))
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context)
     const skillId = store.getState().slots[context].activeSkillId
-    window.api.agent.sendMessage(prompt, store.getState().slots[context].currentSessionId || undefined, activeFilePath, skillId || undefined, context)
+    const workspacePath = context === 'ask' ? undefined : (store.getState().activeWorkspacePath || undefined)
+    const slotSid = store.getState().slots[context].currentSessionId
+    // Don't pass frontend-only temp IDs as SDK sessionId — the SDK doesn't
+    // recognize them, would create an untracked duplicate session.
+    const effectiveSid = slotSid?.startsWith('new-') ? undefined : (slotSid || undefined)
+    window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath)
   }, [context, store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
@@ -196,37 +250,38 @@ export function useAgent(context: AgentContext = 'editor') {
 
   const loadSessions = useCallback(async () => {
     try {
-      const sessions = await window.api.agent.listSdkSessions()
-      store.setState({ sessionList: sessions })
+      const workspacePath = store.getState().activeWorkspacePath || undefined
+      const sessions = await window.api.agent.listSdkSessions(workspacePath)
+      // Guard: if workspace changed while loading, discard stale result.
+      if (workspacePath !== (store.getState().activeWorkspacePath || undefined)) {
+        return
+      }
+      store.getState().dispatchSessionList({
+        type: 'REPLACE_SDK',
+        sessions,
+        workspacePath,
+      })
     } catch (err) {
       console.error('[useAgent] Failed to load sessions:', err)
     }
   }, [store])
 
-  const resumeSession = useCallback(async (sessionId: string) => {
-    store.setState({ isResumingSession: true })
+  const resumeSession = useCallback((sessionId: string) => {
+    // switchToSession now handles SDK message load internally when _needsSdkLoad
+    // is true, including isResumingSession flag management.
+    store.getState().switchToSession(sessionId)
+  }, [store])
 
-    try {
-      const messages = await window.api.agent.loadSessionMessages(sessionId)
-      // Only clear the slot after successful load — preserve existing state on failure
-      store.setState((s) => ({
-        slots: {
-          ...s.slots,
-          [context]: {
-            ...emptySlot(),
-            currentSessionId: sessionId,
-          },
-        },
-      }))
-      for (const msg of messages) {
-        store.getState().processIPCMessage(msg, { isReplay: true })
-      }
-    } catch (err) {
-      console.error('[useAgent] Failed to resume session:', err)
-    } finally {
-      store.setState({ isResumingSession: false })
-    }
-  }, [context, store])
+  const loadMoreMessages = useCallback(async (sessionId: string) => {
+    await store.getState().loadMoreSessionMessages(sessionId)
+  }, [store])
+
+  const hasMoreSdkMessages = store((s) => {
+    const slot = s.slots[context]
+    return slot._sdkLoadOffset < slot._sdkLoadedCount
+  })
+
+  const isLoadingMoreMessages = store((s) => s.slots[context]._isLoadingMoreMessages)
 
   return {
     sendMessage,
@@ -235,6 +290,9 @@ export function useAgent(context: AgentContext = 'editor') {
     newSession,
     loadSessions,
     resumeSession,
+    loadMoreMessages,
+    hasMoreSdkMessages,
+    isLoadingMoreMessages,
   }
 }
 
@@ -254,3 +312,10 @@ export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) =>
 export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
 export const useSkillOutput = (context: AgentContext) => useAgentStore((s) => s.slots[context].skillOutput)
+export const useHasMoreSdkMessages = (context: AgentContext) =>
+  useAgentStore((s) => {
+    const slot = s.slots[context]
+    return slot._sdkLoadOffset < slot._sdkLoadedCount
+  })
+export const useIsLoadingMoreMessages = (context: AgentContext) =>
+  useAgentStore((s) => s.slots[context]._isLoadingMoreMessages)

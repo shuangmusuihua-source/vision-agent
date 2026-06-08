@@ -181,7 +181,7 @@ export type AgentIPCMessage =
   | ResultErrorPayload
   | StreamEventPayloadIPC
 
-export type AgentIPCMessageWithContext = AgentIPCMessage & { context: AgentContext }
+export type AgentIPCMessageWithContext = AgentIPCMessage & { context: AgentContext; sessionId?: string }
 
 // ─── Usage Info ──────────────────────────────────────────────────────
 
@@ -341,6 +341,7 @@ export type PermissionRequestIPC = {
   input: Record<string, unknown>
   description?: string
   context?: AgentContext
+  sessionId?: string
 }
 
 export type AskUserQuestionOption = {
@@ -356,6 +357,7 @@ export type AskUserRequestIPC = {
   options: AskUserQuestionOption[]
   multiSelect: boolean
   context?: AgentContext
+  sessionId?: string
 }
 
 // ─── Session Info ────────────────────────────────────────────────────
@@ -366,6 +368,19 @@ export type SdkSessionInfo = {
   createdAt?: number
   lastModified?: number
   messageCount?: number
+  cwd?: string           // SDK directory this session was stored in
+  workspacePath?: string // workspace directory this session belongs to
+  context?: string       // AgentContext ('editor' | 'ask')
+}
+
+// ─── Paginated Messages Response ─────────────────────────────────────
+
+export type PaginatedMessagesResponse = {
+  messages: ConversationMessage[]
+  total: number       // from SdkSessionInfo.messageCount
+  offset: number
+  limit: number
+  hasMore: boolean
 }
 
 // ─── Graph / Knowledge Graph ────────────────────────────────────────
@@ -407,4 +422,134 @@ export type FileEntry = {
   path: string
   isDirectory: boolean
   children?: FileEntry[]
+}
+
+// ─── Workspace Record (P0: workspace-centric architecture) ────────────
+
+export interface WorkspaceRecord {
+  id: string            // UUID, stable identity
+  name: string          // display name (directory basename)
+  path: string          // absolute filesystem path
+  icon?: string         // emoji or icon key
+  isFixed: boolean      // true for Knowledge Base, false for user workspaces
+  createdAt: number
+  lastOpenedAt: number
+}
+
+// ─── Session Record (app-owned metadata, persisted in electron-store) ──
+
+export type SessionStatus = 'active' | 'idle' | 'archived'
+
+export interface SessionRecord {
+  id: string            // SDK session_id
+  workspacePath: string // FK → WorkspaceRecord.path
+  title?: string        // user or auto-generated title
+  summary?: string      // first assistant response, truncated
+  firstPrompt?: string  // first user message, truncated
+  context: AgentContext // 'editor' | 'ask'
+  status: SessionStatus
+  tags?: string[]
+  createdAt: number
+  lastModified: number
+  messageCount: number
+  artifactCount: number
+  legacyMigration?: boolean
+}
+
+// ─── Artifact Record (per-workspace sidecar: .vision/artifacts.json) ───
+
+export type ArtifactCategory = 'file' | 'deliverable' | 'skill_output' | 'memory'
+
+export interface ArtifactRecord {
+  id: string            // UUID
+  sessionId: string     // FK → SessionRecord.id
+  workspacePath: string // FK → WorkspaceRecord.path (denormalized)
+  fileName: string
+  filePath: string      // absolute path
+  relativePath: string  // relative to workspace root
+  fileType: ArtifactFileType
+  category: ArtifactCategory
+  toolCallId?: string   // Write/Edit tool_use id
+  skillId?: string      // which skill created this
+  createdAt: number
+  updatedAt: number
+}
+
+// ─── Artifact Index File (shape of .vision/artifacts.json) ─────────────
+
+export interface ArtifactIndexFile {
+  version: 1
+  workspacePath: string
+  updatedAt: number
+  artifacts: ArtifactRecord[]
+}
+
+// ─── Session Digest (lightweight, for overview display) ────────────────
+
+export interface SessionDigest {
+  sessionId: string
+  title: string
+  firstPrompt: string       // first user message, max 80 chars
+  assistantSummary: string  // first assistant text, max 150 chars
+  createdAt: number
+  lastModified: number
+  messageCount: number
+  artifactCount: number
+  status: SessionStatus
+  artifactFiles: Array<{ fileName: string; filePath: string; fileType: ArtifactFileType }>
+}
+
+// ─── Workspace Digest (aggregate overview data) ────────────────────────
+
+export interface WorkspaceDigest {
+  workspacePath: string
+  workspaceName: string
+  stats: {
+    totalSessions: number
+    totalArtifacts: number
+    totalFiles: number
+    lastActiveAt: number | null
+  }
+  recentSessions: SessionDigest[]
+  recentFiles: Array<{ name: string; path: string }>
+}
+
+// ─── Tab Descriptor (supports fixed tabs + file tabs) ──────────────────
+
+export interface FileTab {
+  type: 'file'
+  path: string
+}
+
+export interface FixedTab {
+  type: 'fixed'
+  id: string
+}
+
+export type TabDescriptor = FileTab | FixedTab
+
+export const OVERVIEW_TAB_ID = 'workspace-overview'
+
+// Tab type guards
+export function isFileTab(t: TabDescriptor): t is FileTab { return t.type === 'file' }
+export function isFixedTab(t: TabDescriptor): t is FixedTab { return t.type === 'fixed' }
+export function isOverviewTab(t: TabDescriptor): boolean { return isFixedTab(t) && t.id === OVERVIEW_TAB_ID }
+export function tabKey(t: TabDescriptor): string { return isFileTab(t) ? t.path : t.id }
+
+// ─── Session Output (per-session file listing for overview) ──────────
+
+export interface SessionOutputEntry {
+  fileName: string
+  filePath: string
+  fileType: ArtifactFileType
+  category: 'document' | 'skill_output' | 'other'
+  source: string
+  size?: number
+  createdAt: number
+}
+
+export interface SessionOutputs {
+  sessionId: string
+  workspacePath: string
+  files: SessionOutputEntry[]
 }

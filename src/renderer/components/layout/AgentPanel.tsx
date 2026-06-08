@@ -19,6 +19,7 @@ interface AgentPanelProps {
   context?: AgentContext
   width: number
   edgeClass: string
+  workspacePath?: string
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   permissionQueueLength: number
@@ -38,7 +39,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
@@ -132,6 +133,11 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
           </div>
 
           <div className="agent-header-spacer" />
+          {workspacePath && (
+            <div className="agent-header-workspace" title={workspacePath}>
+              {workspacePath.split('/').pop()}
+            </div>
+          )}
         </div>
         <div className="agent-panel-body">
           <div className="agent-panel-content">

@@ -632,6 +632,91 @@
   white-space: nowrap;
 }
 
+/* Session entries (replaces file tree in workspace) */
+.sidebar-session-entry {
+  color: var(--color-text-primary);
+  cursor: pointer;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.sidebar-session-entry:hover {
+  background: var(--color-bg-hover);
+}
+
+.sidebar-session-running {
+  color: var(--color-action);
+  animation: sidebar-spin 1.5s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sidebar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.sidebar-session-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.sidebar-session-time {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.sidebar-session-delete {
+  display: none;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  line-height: 0;
+}
+
+.sidebar-session-delete:hover {
+  color: var(--color-danger, #ef4444);
+  background: var(--color-bg-hover);
+}
+
+.sidebar-session-entry:hover .sidebar-session-delete {
+  display: flex;
+}
+
+.sidebar-session-empty {
+  padding: 8px 22px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.sidebar-new-conversation-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 16px);
+  margin: 4px 8px;
+  padding: 6px 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-new-conversation-btn:hover {
+  background: var(--color-action-bg);
+  border-color: var(--color-action);
+}
+
 .sidebar-file-action {
   display: none;
   align-items: center;

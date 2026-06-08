@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react'
 import { Clock, MessageCircle, Loader2 } from 'lucide-react'
 import MessageBubble from '../chat/MessageBubble'
 import type { SdkSessionInfo, ConversationMessage, ArtifactData, ArtifactFileType } from '../../../shared/types'
+import { useAgentStore } from '../../store/agent-store-impl'
 import './SessionHistoryPanel.css'
 
 const FORMAT_DATE = new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format
@@ -185,18 +186,20 @@ function SessionHistoryPanel(): React.ReactElement {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
+  const workspaceName = activeWorkspacePath ? activeWorkspacePath.split('/').pop() : null
 
   const loadSessions = useCallback(async () => {
     setLoading(true)
     try {
-      const list = await window.api.agent.listSdkSessions()
+      const list = await window.api.agent.listSdkSessions(activeWorkspacePath || undefined)
       setSessions(list)
     } catch (err) {
       console.error('[SessionHistory] loadSessions:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeWorkspacePath])
 
   useEffect(() => { loadSessions() }, [loadSessions])
 

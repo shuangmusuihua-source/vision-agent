@@ -51,6 +51,8 @@ export interface AgentOptionsProfile {
   allowedTools: string[]
   /** Working directory. Defaults to getAppSkillsCwd(). */
   cwd?: string
+  /** Explicit workspace CWD for session storage/skill discovery. Takes precedence over cwd for SDK execution dir. */
+  workspaceCwd?: string
   /** Whether to include partial messages in the stream. */
   includePartialMessages?: boolean
   /** Setting sources for the SDK. */
@@ -69,6 +71,8 @@ export interface AgentOptionsProfile {
   prependUserBinPaths?: boolean
   /** When true, ANTHROPIC_BASE_URL is only set for custom API providers. */
   restrictiveBaseUrl?: boolean
+  /** Session ID to resume. SDK loads conversation history from this session. */
+  resume?: string
 }
 
 /**
@@ -128,15 +132,17 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
     Object.assign(env, profile.extraEnv)
   }
 
+  const effectiveCwd = profile.workspaceCwd ?? profile.cwd ?? getAppSkillsCwd()
+
   const options: Options = {
     model,
-    cwd: profile.cwd ?? getAppSkillsCwd(),
+    cwd: effectiveCwd,
     allowedTools: profile.allowedTools,
     permissionMode: profile.permissionMode,
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
     settings: {
-      autoMemoryDirectory: join(workspaceCwd, '.vision', 'memory'),
+      autoMemoryDirectory: join(effectiveCwd, '.vision', 'memory'),
     },
     systemPrompt: {
       type: 'preset' as const,
@@ -160,6 +166,9 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   }
   if (profile.canUseTool !== undefined) {
     options.canUseTool = profile.canUseTool
+  }
+  if (profile.resume !== undefined) {
+    options.resume = profile.resume
   }
 
   return options

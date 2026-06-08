@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { AgentStore, ContextSlot } from './agent-store'
 import { emptySlot } from './agent-store'
+import { sessionListReducer, type SessionListAction } from './session-protocol'
 import type {
   AgentContext,
   AgentIPCMessage,
@@ -507,6 +508,15 @@ function handleUserMessage(
       }
     }
 
+    // Replay dedup: during session replay (loadInitialSessionMessages /
+    // loadMoreSessionMessages), add the user message from the SDK only if it
+    // isn't already present in the messages array. Since the slot is cleared
+    // before replay begins, this would normally never encounter a duplicate —
+    // but it guards against edge cases where an optimistic insert from
+    // sendMessage happens to overlap with a concurrent replay, or when the
+    // same user message appears in both the replayed batch and the pre-existing
+    // messages (e.g. during loadMoreSessionMessages where originalMessages
+    // are merged back after replay completes).
     if (isReplay && textBlocks.length > 0) {
       const text = textBlocks.map((b) => b.text).join('')
       if (text && !msgs.some((m) => m.kind === 'user' && m.textContent === text)) {
@@ -566,6 +576,153 @@ function handleResultMessage(
   }
 }
 
+// ─── Replayed Message Builder (pure — no store access) ─────────────────
+
+/**
+ * Convert raw AgentIPCMessages (from the paginated session API) into
+ * ConversationMessage[] without touching the Zustand store.  This avoids
+ * temporal coupling: the editor slot stays intact while we build older
+ * messages locally, so streaming IPC events arriving mid-load are never lost.
+ */
+function buildReplayedMessages(rawMessages: AgentIPCMessage[]): ConversationMessage[] {
+  const messages: ConversationMessage[] = []
+
+  for (const raw of rawMessages) {
+    if (raw.type === 'assistant') {
+      const assistantMsg = raw as AssistantPayload
+      const content = assistantMsg.message.content
+      const msgId = assistantMsg.uuid || `assistant-${Date.now()}`
+      const textContent = content.filter(isTextBlock).map(b => b.text).join('')
+      const toolCalls: ToolCallState[] = content.filter(isToolUseBlock).map(tu => {
+        let input: Record<string, unknown> = {}
+        if (tu.input && typeof tu.input === 'object') input = tu.input
+        return {
+          toolUseId: tu.id || `tu-${Date.now()}`,
+          toolName: tu.name || 'unknown',
+          input,
+          status: 'running' as const,
+        }
+      })
+
+      messages.push({
+        kind: 'text',
+        id: msgId,
+        role: 'assistant',
+        phase: 'complete',
+        textContent,
+        content,
+        toolCalls: toolCalls.filter(tc => tc.toolName !== 'AskUserQuestion'),
+        createdAt: Date.now(),
+      })
+    } else if (raw.type === 'user') {
+      const userMsg = raw as UserPayload
+      const content = userMsg.message.content
+      const toolResults = content.filter(isToolResultBlock)
+      const textBlocks = content.filter(isTextBlock)
+
+      // Merge tool results into previously-built assistant messages
+      if (toolResults.length > 0) {
+        for (const tr of toolResults) {
+          const toolUseId = tr.tool_use_id
+          const resultContent = typeof tr.content === 'string'
+            ? tr.content
+            : Array.isArray(tr.content)
+              ? tr.content.map(c => (typeof c === 'object' && c && 'text' in c ? (c as { text: string }).text : '')).join('')
+              : JSON.stringify(tr.content)
+          const isError = tr.is_error === true
+
+          for (let i = 0; i < messages.length; i++) {
+            if (messages[i].kind !== 'text') continue
+            const msgRef = messages[i] as TextMessage
+            const tcIdx = msgRef.toolCalls.findIndex(tc => tc.toolUseId === toolUseId)
+            if (tcIdx >= 0) {
+              const updated = [...msgRef.toolCalls]
+              updated[tcIdx] = {
+                ...updated[tcIdx],
+                result: resultContent,
+                status: (isError ? 'error' : 'completed') as ToolCallState['status'],
+              }
+              messages[i] = { ...msgRef, toolCalls: updated } as TextMessage
+              break
+            }
+          }
+        }
+      }
+
+      // Push user text message (de-duplicated by content)
+      if (textBlocks.length > 0) {
+        const text = textBlocks.map(b => b.text).join('')
+        if (text && !messages.some(m => m.kind === 'user' && m.textContent === text)) {
+          messages.push({
+            kind: 'user',
+            id: userMsg.uuid || `user-${Date.now()}`,
+            role: 'user',
+            textContent: text,
+            createdAt: Date.now(),
+          })
+        }
+      }
+    } else if (raw.type === 'system') {
+      const sysSubtype = (raw as Record<string, unknown>).subtype as string | undefined
+      if (sysSubtype === 'permission_denied') {
+        const pd = raw as SystemPermissionDeniedPayload
+        for (let i = 0; i < messages.length; i++) {
+          if (messages[i].kind !== 'text') continue
+          const msgRef = messages[i] as TextMessage
+          const tcIdx = msgRef.toolCalls.findIndex(tc => tc.toolUseId === pd.tool_use_id)
+          if (tcIdx >= 0) {
+            const updated = [...msgRef.toolCalls]
+            updated[tcIdx] = {
+              ...updated[tcIdx],
+              status: 'error' as const,
+              result: `Permission denied: ${pd.message}`,
+            }
+            messages[i] = { ...msgRef, toolCalls: updated } as TextMessage
+            break
+          }
+        }
+      }
+      // init, status, compact_boundary are silently ignored during replay
+    } else if (raw.type === 'result') {
+      const resultSubtype = (raw as Record<string, unknown>).subtype as string | undefined
+      if (resultSubtype === 'error') {
+        const errorMsg = raw as ResultErrorPayload
+        const errorText = errorMsg.errors.join('\n') || 'Agent error'
+        const isAborted = /aborted|cancelled|canceled/i.test(errorText)
+        if (isAborted) {
+          const lastMsg = messages[messages.length - 1]
+          if (lastMsg?.kind === 'text' && lastMsg.phase === 'streaming') {
+            messages[messages.length - 1] = { ...lastMsg, phase: 'complete' }
+          }
+          messages.push({
+            kind: 'stopped',
+            id: `stop-${Date.now()}`,
+            role: 'assistant',
+            phase: 'stopped',
+            textContent: '我的思考被用户停止了',
+            createdAt: Date.now(),
+          })
+        } else {
+          messages.push({
+            kind: 'text',
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            phase: 'error',
+            textContent: errorText,
+            content: [],
+            toolCalls: [],
+            createdAt: Date.now(),
+          })
+        }
+      }
+      // success subtype doesn't add a displayable message
+    }
+    // stream_event messages are not persisted in session history — skip
+  }
+
+  return messages
+}
+
 // ─── Store ─────────────────────────────────────────────────────────────
 
 export const useAgentStore = create<AgentStore>((set, get) => {
@@ -576,6 +733,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     slots: { editor: emptySlot(), ask: emptySlot() },
     isResumingSession: false,
     sessionList: [],
+    sessionSlots: {},
+    activeWorkspacePath: null,
+    workspaceDigest: null,
+    workspaceDigestLoading: false,
+    activeSessionId: null,
+    sessionOutputs: null,
+    sessionOutputsLoading: false,
 
     // ─── State Machine ──────────────────────────────────────────────────
 
@@ -691,9 +855,19 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     // ─── Core Reducer ───────────────────────────────────────────────────
 
-    processIPCMessage(msg: AgentIPCMessage & { context?: AgentContext }, options?: { isReplay?: boolean }) {
+    processIPCMessage(msg: AgentIPCMessage & { context?: AgentContext; sessionId?: string }, options?: { isReplay?: boolean }) {
       const isReplay = options?.isReplay ?? false
       const ctx = msg.context || get().context
+
+      // Validate sessionId: drop events for sessions that are no longer active.
+      // This prevents stale events from a previous session contaminating the
+      // current session after a session switch (race condition between the
+      // SDK abort propagating and the slot swap).
+      const eventSessionId = (msg as Record<string, unknown>).sessionId as string | undefined
+      const activeSessionId = get().activeSessionId
+      if (eventSessionId && activeSessionId && eventSessionId !== activeSessionId) {
+        return // Drop — event belongs to a different session
+      }
 
       switch (msg.type) {
         case 'system':
@@ -719,6 +893,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
     handlePermissionRequest(req: PermissionRequestIPC) {
+      // Drop stale permission requests belonging to a different session
+      const activeSessionId = get().activeSessionId
+      if (activeSessionId && req.sessionId && req.sessionId !== activeSessionId) {
+        return
+      }
       const ctx = (req.context as AgentContext) || get().context
       set((state) => {
         const slot = state.slots[ctx]
@@ -744,6 +923,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     handleAskUserRequest(req: AskUserRequestIPC) {
+      // Drop stale AskUser requests belonging to a different session
+      const activeSessionId = get().activeSessionId
+      if (activeSessionId && req.sessionId && req.sessionId !== activeSessionId) {
+        return
+      }
       const ctx = (req.context as AgentContext) || get().context
       set((state) => {
         const slot = state.slots[ctx]
@@ -820,6 +1004,337 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     consumePrefill(context: AgentContext) {
       set((s) => updateSlot(s, context, { prefillText: null }))
+    },
+
+    // ─── Workspace Actions ────────────────────────────────────────────────
+
+    setActiveWorkspace(path: string | null) {
+      set((s) => {
+        const base: Partial<AgentStore> = { activeWorkspacePath: path }
+        if (path) {
+          Object.assign(base, updateSlot(s, 'editor', { workspacePath: path }))
+        }
+        return base
+      })
+    },
+
+    setWorkspaceDigest(digest) {
+      set({ workspaceDigest: digest, workspaceDigestLoading: false })
+    },
+
+    // ─── Session Actions ──────────────────────────────────────────────────
+
+    setActiveSession(sessionId: string | null) {
+      set({ activeSessionId: sessionId, sessionOutputs: null, sessionOutputsLoading: !!sessionId })
+      // Trigger async load in the component via the loading flag
+    },
+
+    setSessionOutputs(outputs) {
+      set({ sessionOutputs: outputs, sessionOutputsLoading: false })
+    },
+
+    // ─── Session List Protocol (single write path) ─────────────────────
+
+    dispatchSessionList(action: SessionListAction) {
+      set(state => ({ sessionList: sessionListReducer(state.sessionList, action) }))
+    },
+
+    // ─── Session Slot Isolation ────────────────────────────────────────
+
+    ensureSessionSlot(sessionId: string) {
+      set((state) => {
+        if (state.sessionSlots[sessionId]) return {}
+        return {
+          sessionSlots: { ...state.sessionSlots, [sessionId]: emptySlot() },
+        }
+      })
+    },
+
+    switchToSession(sessionId: string) {
+      const state = get()
+      // Same session — nothing to do. Skip to avoid resetting sessionOutputsLoading
+      // which would leave the OverviewPanel stuck in loading state.
+      if (state.activeSessionId === sessionId) return
+
+      // Clean up the current editor slot before swapping to a different session.
+      // Only abort if the agent is actively streaming — for idle slots, the slot
+      // state is already clean and ABORT would only clear permission/AskUser
+      // state that should be preserved for when the user switches back.
+      if (state.activeSessionId && state.slots.editor.isStreaming) {
+        window.api.agent.abort('editor').catch(() => {})
+        get().dispatchAgentEvent({ type: 'ABORT' }, 'editor')
+      }
+
+      // Empty sessionId: reset editor to a clean slate (e.g. after session
+      // deletion). Do not touch sessionSlots — the caller is responsible for
+      // cleaning up the deleted session's cached slot.
+      if (!sessionId) {
+        set((state) => {
+          const cleanSlot: ContextSlot = {
+            ...emptySlot(),
+            workspacePath: state.slots.editor.workspacePath || state.activeWorkspacePath,
+          }
+          return {
+            activeSessionId: null,
+            sessionOutputs: null,
+            sessionOutputsLoading: false,
+            slots: { ...state.slots, editor: cleanSlot },
+          }
+        })
+        return
+      }
+
+      set((state) => {
+        // Save current editor slot to previous session
+        const prevSessionId = state.activeSessionId
+        const nextSessionSlots = { ...state.sessionSlots }
+        if (prevSessionId && prevSessionId !== sessionId) {
+          // Defensive: only overwrite the saved slot if the editor actually has
+          // state worth saving. If the editor slot is empty but a previously-saved
+          // slot has messages, preserve the saved slot — prevents message loss
+          // from empty-slot overwrites (e.g. after watchdog ABORT or failed resume).
+          const editorHasContent = state.slots.editor.messages.length > 0
+          const savedHasContent = nextSessionSlots[prevSessionId]?.messages?.length > 0
+          if (editorHasContent || !savedHasContent) {
+            nextSessionSlots[prevSessionId] = { ...state.slots.editor }
+          }
+        }
+
+        // Load target session slot (or create empty, inheriting workspace path).
+        // If sessionId is a real UUID (not a frontend-only new-* placeholder),
+        // propagate it into currentSessionId so sendMessage can resume the SDK session.
+        const existingSlot = nextSessionSlots[sessionId]
+        const isRealSession = sessionId && !sessionId.startsWith('new-')
+        const targetSlot = existingSlot
+          ? {
+              ...(isRealSession && !existingSlot.currentSessionId
+                  ? { ...existingSlot, currentSessionId: sessionId }
+                  : existingSlot),
+              // Restore SDK pagination state; fall back for legacy slots
+              _needsSdkLoad: existingSlot._needsSdkLoad ?? false,
+              _sdkLoadedCount: existingSlot._sdkLoadedCount ?? existingSlot.messages.length,
+              _sdkLoadOffset: existingSlot._sdkLoadOffset ?? existingSlot.messages.length,
+              _isLoadingMoreMessages: existingSlot._isLoadingMoreMessages ?? false,
+            }
+          : {
+              ...emptySlot(),
+              workspacePath: state.slots.editor.workspacePath || state.activeWorkspacePath,
+              ...(isRealSession ? {
+                currentSessionId: sessionId,
+                _needsSdkLoad: true,
+                _sdkLoadedCount: 0,
+                _sdkLoadOffset: 0,
+                _isLoadingMoreMessages: false,
+              } : {}),
+            }
+        if (!existingSlot) {
+          nextSessionSlots[sessionId] = targetSlot
+        }
+
+        return {
+          activeSessionId: sessionId,
+          sessionSlots: nextSessionSlots,
+          sessionOutputs: null,
+          sessionOutputsLoading: true,
+          slots: { ...state.slots, editor: targetSlot },
+        }
+      })
+
+      // If the target slot needs SDK load (no cached messages), kick off the load.
+      // This unifies session-switch + load into a single code path, so both
+      // handleSessionSelect and resumeSession get the same behavior.
+      const editorSlot = get().slots.editor
+      if (editorSlot._needsSdkLoad && editorSlot.currentSessionId === sessionId) {
+        set({ isResumingSession: true })
+        get().loadInitialSessionMessages(sessionId).finally(() => {
+          if (get().activeSessionId === sessionId) {
+            set({ isResumingSession: false })
+          }
+        }).catch((err) => {
+          console.error('[AgentStore] switchToSession: loadInitialSessionMessages failed:', err)
+        })
+      }
+    },
+
+    // ─── SDK Paginated Message Loading ──────────────────────────────────
+
+    async loadInitialSessionMessages(sessionId: string) {
+      const slot = get().sessionSlots[sessionId]
+      if (!slot || slot._isLoadingMoreMessages) return
+
+      set((state) => ({
+        sessionSlots: {
+          ...state.sessionSlots,
+          [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: true },
+        },
+      }))
+
+      try {
+        const INITIAL_LIMIT = 200
+        // Request limit+1 to get a definitive hasMore signal:
+        // if limit+1 messages come back, there are more beyond the page.
+        const { messages: rawMessages } = await window.api.agent.loadSessionMessagesPaginated(
+          sessionId,
+          INITIAL_LIMIT + 1,
+          0
+        )
+        const hasMore = rawMessages.length > INITIAL_LIMIT
+        // Truncate the extra sentinel message so we only display limit messages.
+        const messages = hasMore ? rawMessages.slice(0, INITIAL_LIMIT) : rawMessages
+        const loadedCount = messages.length
+
+        // Guard: discard results if the user switched to a different session
+        // while the fetch was in flight.
+        if (get().activeSessionId !== sessionId) {
+          set((state) => ({
+            sessionSlots: {
+              ...state.sessionSlots,
+              [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: false },
+            },
+          }))
+          return
+        }
+
+        // Clear the editor slot and replay messages
+        set((state) => {
+          const curSlot = state.slots.editor
+          const cleared: ContextSlot = {
+            ...emptySlot(),
+            workspacePath: curSlot.workspacePath || state.activeWorkspacePath,
+            currentSessionId: sessionId,
+            _needsSdkLoad: false,
+            _sdkLoadedCount: loadedCount,
+            _sdkLoadOffset: loadedCount,
+            _isLoadingMoreMessages: true,
+          }
+          return {
+            slots: { ...state.slots, editor: cleared },
+            sessionSlots: { ...state.sessionSlots, [sessionId]: cleared },
+          }
+        })
+
+        // Replay each message into the editor slot
+        for (const msg of messages) {
+          get().processIPCMessage(msg as AgentIPCMessage & { context?: AgentContext; sessionId?: string }, { isReplay: true })
+        }
+
+        // Persist the loaded messages and finalize slot state
+        set((state) => {
+          const editorSlot = state.slots.editor
+          const finalSlot: ContextSlot = {
+            ...editorSlot,
+            _needsSdkLoad: hasMore,
+            _sdkLoadedCount: loadedCount,
+            _sdkLoadOffset: loadedCount,
+            _isLoadingMoreMessages: false,
+          }
+          return {
+            slots: { ...state.slots, editor: finalSlot },
+            sessionSlots: { ...state.sessionSlots, [sessionId]: finalSlot },
+          }
+        })
+      } catch (err) {
+        console.error('[AgentStore] loadInitialSessionMessages failed:', err)
+        set((state) => ({
+          sessionSlots: {
+            ...state.sessionSlots,
+            [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: false },
+          },
+          ...(state.slots.editor._isLoadingMoreMessages ? {
+            slots: { ...state.slots, editor: { ...state.slots.editor, _isLoadingMoreMessages: false } },
+          } : {}),
+        }))
+      }
+    },
+
+    async loadMoreSessionMessages(sessionId: string) {
+      const slot = get().sessionSlots[sessionId]
+      if (!slot || slot._isLoadingMoreMessages) return
+
+      const nextOffset = slot._sdkLoadOffset
+
+      set((state) => ({
+        sessionSlots: {
+          ...state.sessionSlots,
+          [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: true },
+        },
+        ...(state.slots.editor.currentSessionId === sessionId ? {
+          slots: { ...state.slots, editor: { ...state.slots.editor, _isLoadingMoreMessages: true } },
+        } : {}),
+      }))
+
+      try {
+        const LOAD_MORE_LIMIT = 100
+        // Request limit+1 to get a definitive hasMore signal.
+        const { messages: olderRawMessages } = await window.api.agent.loadSessionMessagesPaginated(
+          sessionId,
+          LOAD_MORE_LIMIT + 1,
+          nextOffset
+        )
+        const hasMore = olderRawMessages.length > LOAD_MORE_LIMIT
+        // Truncate the extra sentinel message so we only display limit messages.
+        const olderMessages = hasMore ? olderRawMessages.slice(0, LOAD_MORE_LIMIT) : olderRawMessages
+        const loadedCount = olderMessages.length
+
+        // Build older messages into a local array without touching the editor
+        // slot.  The editor slot stays intact so any streaming IPC events that
+        // arrive during this load are preserved — no gap where messages could
+        // be lost.
+        const olderBuiltMessages = buildReplayedMessages(olderMessages)
+
+        const newTotal = slot._sdkLoadedCount + loadedCount
+        const newOffset = nextOffset + loadedCount
+
+        // One atomic setState: prepend older messages before the CURRENT editor
+        // messages (read fresh inside the functional updater so any IPC events
+        // that arrived during the fetch are included).
+        set((state) => {
+          const editorSlot = state.slots.editor
+          const currentMessages = editorSlot.messages
+
+          const updatedEditorSlot: ContextSlot = {
+            ...editorSlot,
+            messages: [...olderBuiltMessages, ...currentMessages],
+            _sdkLoadOffset: newOffset,
+            _sdkLoadedCount: newTotal,
+            _needsSdkLoad: hasMore,
+            _isLoadingMoreMessages: false,
+          }
+          return {
+            slots: { ...state.slots, editor: updatedEditorSlot },
+            sessionSlots: {
+              ...state.sessionSlots,
+              [sessionId]: updatedEditorSlot,
+            },
+          }
+        })
+      } catch (err) {
+        console.error('[AgentStore] loadMoreSessionMessages failed:', err)
+        set((state) => ({
+          sessionSlots: {
+            ...state.sessionSlots,
+            [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: false },
+          },
+          ...(state.slots.editor.currentSessionId === sessionId ? {
+            slots: { ...state.slots, editor: { ...state.slots.editor, _isLoadingMoreMessages: false } },
+          } : {}),
+        }))
+      }
+    },
+
+    async renameCurrentSession(title: string) {
+      const sessionId = get().activeSessionId
+      if (!sessionId || sessionId.startsWith('new-')) return
+      try {
+        await window.api.agent.renameSession(sessionId, title)
+        set((state) => ({
+          sessionList: state.sessionList.map((s) =>
+            s.id === sessionId ? { ...s, title } : s
+          ),
+        }))
+      } catch (err) {
+        console.error('[AgentStore] renameCurrentSession failed:', err)
+      }
     },
   }
 })

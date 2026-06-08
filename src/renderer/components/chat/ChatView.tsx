@@ -16,9 +16,15 @@ interface ChatViewProps {
   workspacePath?: string
   /** Optional external scroll container — when provided, ChatView delegates scrolling to it */
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
+  /** Whether more messages exist on SDK disk that have not yet been loaded into the messages array */
+  hasMoreSdkMessages?: boolean
+  /** Whether an SDK load-more operation is currently in flight */
+  isLoadingMoreMessages?: boolean
+  /** Callback invoked to load the next batch of messages from the SDK disk store */
+  onLoadMoreSdkMessages?: () => Promise<void>
 }
 
-function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef }: ChatViewProps): React.ReactElement {
+function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef, hasMoreSdkMessages, isLoadingMoreMessages, onLoadMoreSdkMessages }: ChatViewProps): React.ReactElement {
   const messages = useMessages(context)
   const isStreaming = useIsStreaming(context)
   const isResuming = useIsResumingSession()
@@ -35,6 +41,15 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   }, [messages, visibleCount])
 
   const hasMore = messages.length > visibleCount
+
+  const handleLoadMore = useCallback(async () => {
+    if (hasMoreSdkMessages && onLoadMoreSdkMessages) {
+      await onLoadMoreSdkMessages()
+      setVisibleCount((c) => c + RENDER_BATCH)
+    } else {
+      setVisibleCount((c) => c + RENDER_BATCH)
+    }
+  }, [hasMoreSdkMessages, onLoadMoreSdkMessages])
 
   // Force-scroll to bottom (always, ignores user scroll position)
   const forceScrollToBottom = useCallback(() => {
@@ -87,10 +102,12 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
     prevScrollHeightRef.current = newHeight
   }, [messages, isStreaming, containerRef])
 
-  // Reset visibleCount only when messages are cleared (new session), not on threshold crossings
+  // Reset visibleCount and scroll height ref when messages are cleared (new session)
   useEffect(() => {
     if (messages.length === 0) {
       setVisibleCount(RENDER_BATCH)
+      prevScrollHeightRef.current = 0
+      prevMsgCount.current = 0
     }
   }, [messages.length])
 
@@ -107,9 +124,17 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
           <span className={styles.chatEmptyHint}>开始对话</span>
         </div>
       )}
-      {hasMore && (
-        <button className={styles.chatLoadMore} onClick={() => setVisibleCount((c) => c + RENDER_BATCH)}>
-          <ChevronUp size={14} /> 加载更早消息 ({messages.length - visibleCount} 条)
+      {isLoadingMoreMessages && (
+        <button className={styles.chatLoadMore} disabled>
+          <Loader2 size={14} className="spin" /> 加载SDK消息...
+        </button>
+      )}
+      {!isLoadingMoreMessages && hasMore && (
+        <button className={styles.chatLoadMore} onClick={handleLoadMore}>
+          <ChevronUp size={14} />{' '}
+          {hasMoreSdkMessages
+            ? `加载更早消息 (还有 ${messages.length - visibleCount} 条在磁盘上)`
+            : `加载更早消息 (${messages.length - visibleCount} 条)`}
         </button>
       )}
       {visibleMessages.items.map((msg, idx) => (

@@ -36,6 +36,7 @@ const api = {
     deleteDir: (dirPath: string) =>
       ipcRenderer.invoke('workspace:deleteDir', dirPath),
     selectFiles: () => ipcRenderer.invoke('workspace:selectFiles'),
+    getSessionOverview: (workspaceDir: string) => ipcRenderer.invoke('workspace:getSessionOverview', workspaceDir),
   },
 
   settings: {
@@ -62,18 +63,23 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask') =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context),
-    getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string) =>
+      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title),
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
     respondAskUser: (requestId: string, answer: string) =>
       ipcRenderer.invoke('agent:respondAskUser', requestId, answer),
-    listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
+    listSdkSessions: (workspaceCwd?: string) => ipcRenderer.invoke('agent:listSdkSessions', workspaceCwd),
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
+    loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) =>
+      ipcRenderer.invoke('agent:loadSessionMessagesPaginated', sessionId, limit, offset),
+    renameSession: (sessionId: string, title: string) =>
+      ipcRenderer.invoke('agent:renameSession', sessionId, title),
     abort: (context?: 'editor' | 'ask') => ipcRenderer.invoke('agent:abort', context),
     selectFolder: () => ipcRenderer.invoke('agent:selectFolder'),
+    getSessionOutputs: (sessionId: string) => ipcRenderer.invoke('agent:getSessionOutputs', sessionId),
+    deleteSession: (sessionId: string) => ipcRenderer.invoke('agent:deleteSession', sessionId),
 
     // ── Unified event channel ────────────────────────────────────────
     // All SDK messages (assistant, user, result, stream_event, system)

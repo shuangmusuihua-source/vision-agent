@@ -10,11 +10,13 @@ import {
 } from '../store'
 import { fileIndexService } from '../file-index-service'
 import { isPathAuthorized, sanitizeFileName } from '../path-validator'
+import type { WorkspaceDigest } from '../../shared/types'
 
 export function registerWorkspaceHandlers(
   scanDirectory: (dir: string) => Promise<import('../../shared/types').FileEntry[]>,
   listMarkdownFiles: (dir: string) => Promise<{ label: string; path: string }[]>,
   pushSettingsToRenderer: () => void,
+  getSessionOverview?: (workspaceDir: string) => Promise<WorkspaceDigest | null>,
 ): void {
   ipcMain.handle('workspace:listFiles', async (_event, dirPath: string) => {
     if (!isPathAuthorized(dirPath)) return []
@@ -189,4 +191,10 @@ export function registerWorkspaceHandlers(
   })
 
   ipcMain.handle('workspace:knowledgeDir', () => getKnowledgeBaseDir())
+
+  ipcMain.handle('workspace:getSessionOverview', async (_event, workspaceDir: string) => {
+    if (!getSessionOverview) return null
+    try { return await getSessionOverview(workspaceDir) }
+    catch (e) { console.error('[workspace:getSessionOverview] failed:', e); return null }
+  })
 }

@@ -6,6 +6,7 @@ import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
 import { getSettings, getAuthorizedDirectories, ensureKnowledgeBase, getKnowledgeBaseDir } from './store'
+import { migrateToV1 } from './store-migration'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
@@ -110,6 +111,11 @@ app.whenReady().then(() => {
 
   // Ensure knowledge base directory exists and is registered
   const knowledgeDir = ensureKnowledgeBase()
+
+  // Fire-and-forget store migration (non-blocking, best-effort)
+  migrateToV1().catch(err => {
+    console.error('[Init] store migration failed (non-blocking):', err)
+  })
 
   registerIpcHandlers()
   initAppSkills()

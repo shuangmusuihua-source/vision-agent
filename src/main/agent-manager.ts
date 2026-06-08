@@ -2,16 +2,16 @@ import { BrowserWindow } from 'electron'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join, resolve, basename } from 'path'
 import { execFileSync } from 'child_process'
-import { query, listSessions, getSessionMessages, Query } from '@anthropic-ai/claude-agent-sdk'
+import { query, listSessions, getSessionMessages, renameSession, deleteSession, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
-import { getAppSkillsCwd } from './skill-init'
+import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, AgentContext, AskUserQuestionOption } from '../shared/types'
-import { getApiKey, getAuthorizedDirectories, getEnabledSkills } from './store'
+import { getApiKey, getAuthorizedDirectories, getEnabledSkills, getSessionRecords, addSessionRecord, removeSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
-import { registerSession, getSessionList, getSessionInfo, type SessionInfo } from './agent-sessions'
+import { registerSession, getSessionInfo, type SessionInfo } from './agent-sessions'
 import { writeAuditLog } from './agent-audit'
 import {
   registerPendingPermission,
@@ -29,7 +29,7 @@ import { flushTextBatch, scheduleTextBatch, discardTextBatch, discardAllTextBatc
 
 // ─── Re-exports (consumed by agent-handlers and index.ts) ──────────────
 
-export { getSessionList, getSessionInfo, type SessionInfo }
+export { getSessionInfo, type SessionInfo }
 export { registerSession }
 export { resolvePermission, resolveAskUser }
 
@@ -101,12 +101,23 @@ function extractPathFromToolInput(
   return value
 }
 
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor') {
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string) {
   const dirs = getAuthorizedDirectories()
-  const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
+  const workspaceCwd = workspaceCwdOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
+
+  // Build workspace context for the agent
+  const workspaceName = workspaceCwd.split('/').pop() || workspaceCwd
+  const workspaceContextLines = [
+    `## 当前工作区`,
+    `- 工作区名称: ${workspaceName}`,
+    `- 工作区路径: ${workspaceCwd}`,
+    `- 该工作区是用户的独立工作环境，所有文件读写应在该目录下进行`,
+    `- 会话结束后，关键结论应记录为 markdown 文件保存到该工作区`,
+  ].join('\n')
 
   const systemPromptAppend = [
     '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
+    workspaceContextLines,
     `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
     activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
     workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : '',
@@ -130,9 +141,11 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
     allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
     includePartialMessages: true,
     settingSources: ['project'],
+    workspaceCwd,
     skills: getEnabledSkills(),
     systemPromptAppend,
     hooks: buildHooks(mainWindow),
+    resume: sessionId || undefined,
     canUseTool: async (
       toolName: string,
       input: Record<string, unknown>,
@@ -186,6 +199,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
           options: optionsList,
           multiSelect,
           context,
+          sessionId,
         })
 
         return new Promise<PermissionResult>((resolve) => {
@@ -208,6 +222,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         toolName,
         input,
         context,
+        sessionId,
       })
       schedulePermissionNotification(requestId, toolName)
 
@@ -256,6 +271,13 @@ interface ActiveQuery {
 const activeQueries = new Map<AgentContext, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
+// Track session IDs created by SDK mid-stream compaction.
+// When the SDK compacts a long conversation, it creates a new session file
+// on disk with a different session_id. These are internal forks that should
+// NOT appear as user-facing sessions in the sidebar.
+// Initialized from electron-store to survive app restarts.
+const compactionSessionIds = new Set<string>(getCompactionSessionIds())
+
 export function abortActiveQuery(context?: AgentContext): void {
   if (context) {
     const entry = activeQueries.get(context)
@@ -297,7 +319,8 @@ export async function sendMessage(
   sessionId?: string,
   activeFilePath?: string,
   context: AgentContext = 'editor',
-  skillId?: string | null
+  skillId?: string | null,
+  workspacePath?: string
 ): Promise<void> {
   // Abort any active query in the same context slot
   const existing = activeQueries.get(context)
@@ -339,7 +362,10 @@ export async function sendMessage(
 
   _skillOutputBridge.reset()
   _skillOutputBridge.setContext(context)
-  const options = buildOptions(mainWindow, activeFilePath, context)
+  const effectiveWorkspaceCwd = workspacePath || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
+  // Ensure workspace-local skills exist (idempotent via sentinel file)
+  ensureWorkspaceSkills(effectiveWorkspaceCwd)
+  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId)
   let currentSessionId = sessionId
 
   try {
@@ -364,26 +390,46 @@ export async function sendMessage(
       const rawMsg = message as Record<string, unknown>
       const textDeltaText = isTextDeltaEvent(rawMsg)
       const ipcMsg = toAgentIPCMessage(message)
+      // Thread sessionId through every event so the renderer can validate
+      // and drop stale events after a session switch
+      const sessionId = (message.session_id as string) || currentSessionId || ''
 
       if (textDeltaText !== null) {
         // Batch text_delta events: accumulate and flush every ~30ms
         const uuid = (rawMsg.uuid as string) || ''
-        scheduleTextBatch(context, textDeltaText, uuid, mainWindow)
+        scheduleTextBatch(context, textDeltaText, uuid, sessionId, mainWindow)
       } else {
         // Non-text event (tool_use, content_block_start/stop, result, etc.)
         // Flush any pending text batch FIRST to preserve event ordering
         flushTextBatch(context, mainWindow)
 
         if (ipcMsg) {
-          mainWindow.webContents.send('agent:event', { context, ...ipcMsg })
+          mainWindow.webContents.send('agent:event', { context, sessionId, ...ipcMsg })
         }
       }
 
       // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
-        registerSession(currentSessionId)
-        mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId })
+        registerSession(currentSessionId, effectiveWorkspaceCwd)
+        // Persist session→workspace mapping to electron-store so it survives restart
+        addSessionRecord({
+          id: currentSessionId,
+          workspacePath: effectiveWorkspaceCwd,
+          context,
+          status: 'active',
+          createdAt: Date.now(),
+          lastModified: Date.now(),
+          messageCount: 0,
+          artifactCount: 0,
+        })
+        mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId, workspacePath: effectiveWorkspaceCwd })
+      } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {
+        // SDK compacted the session — a new session file was created on disk
+        // with a different session_id. Track it so listSdkSessions filters it
+        // out (it should not appear as a separate user-facing session).
+        compactionSessionIds.add(message.session_id as string)
+        addCompactionSessionId(message.session_id as string)
       }
     }
 
@@ -408,6 +454,7 @@ export async function sendMessage(
     }
     mainWindow.webContents.send('agent:event', {
       context,
+      sessionId: currentSessionId || '',
       type: 'result',
       subtype: 'error',
       errors: [userMessage],
@@ -427,28 +474,167 @@ export async function sendMessage(
 
 // ─── SDK session listing ───────────────────────────────────────────────
 
-export async function listSdkSessions(): Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number }>> {
-  const cwd = getAppSkillsCwd()
+export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number; messageCount?: number; cwd?: string; workspacePath?: string; context?: string }>> {
   try {
-    const result = await listSessions({ dir: cwd })
-    return result.map((s) => ({
-      id: s.sessionId,
-      title: s.customTitle || s.summary || s.firstPrompt,
-      createdAt: s.createdAt,
-      lastModified: s.lastModified
-    }))
+    // Build session→workspace + context maps from electron-store SessionRecords
+    const records = getSessionRecords()
+    const sessionWorkspaceMap = new Map<string, string>()
+    const sessionContextMap = new Map<string, string>()
+    for (const r of records) {
+      if (r.workspacePath) sessionWorkspaceMap.set(r.id, r.workspacePath)
+      sessionContextMap.set(r.id, r.context)
+    }
+
+    // Query both global (userData) and workspace-specific sessions
+    const globalCwd = getAppSkillsCwd()
+    const results: Array<{ id: string; title?: string; createdAt?: number; lastModified?: number; messageCount?: number; cwd?: string; workspacePath?: string; context?: string }> = []
+    const seenIds = new Set<string>()
+
+    // Always query global (legacy sessions + app-level)
+    try {
+      const globalResult = await listSessions({ dir: globalCwd })
+      for (const s of globalResult) {
+        if (!seenIds.has(s.sessionId)) {
+          seenIds.add(s.sessionId)
+          // Skip SDK compaction forks — these are internal, not user-facing
+          if (compactionSessionIds.has(s.sessionId)) continue
+          results.push({
+            id: s.sessionId,
+            title: s.customTitle || s.summary || s.firstPrompt,
+            createdAt: s.createdAt,
+            lastModified: s.lastModified,
+            messageCount: (s as Record<string, unknown>).messageCount as number || 0,
+            cwd: globalCwd,
+            workspacePath: sessionWorkspaceMap.get(s.sessionId),
+            context: sessionContextMap.get(s.sessionId),
+          })
+        }
+      }
+    } catch (err) {
+      console.error('[AgentManager] listSessions global error:', err)
+    }
+
+    // Also query workspace-specific if different from global
+    if (workspaceCwd && workspaceCwd !== globalCwd) {
+      try {
+        const wsResult = await listSessions({ dir: workspaceCwd })
+        for (const s of wsResult) {
+          if (!seenIds.has(s.sessionId)) {
+            seenIds.add(s.sessionId)
+            // Skip SDK compaction forks — these are internal, not user-facing
+            if (compactionSessionIds.has(s.sessionId)) continue
+            results.push({
+              id: s.sessionId,
+              title: s.customTitle || s.summary || s.firstPrompt,
+              createdAt: s.createdAt,
+              lastModified: s.lastModified,
+              messageCount: (s as Record<string, unknown>).messageCount as number || 0,
+              cwd: workspaceCwd,
+              workspacePath: sessionWorkspaceMap.get(s.sessionId) || workspaceCwd,
+              context: sessionContextMap.get(s.sessionId),
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[AgentManager] listSessions workspace error:', err)
+      }
+    }
+
+    // If workspace filter is requested, filter by workspacePath from SessionRecords
+    // Exclude ask-context sessions — they belong to Ask Zuovis, not the workspace
+    if (workspaceCwd) {
+      return results.filter(s => s.workspacePath === workspaceCwd && s.context !== 'ask')
+    }
+
+    return results
   } catch (err) {
     console.error('[AgentManager] listSessions error:', err)
     return []
   }
 }
 
-export async function loadSdkSessionMessages(sessionId: string): Promise<Array<Record<string, unknown>>> {
+export async function getSdkSessionTotalMessageCount(
+  sessionId: string,
+  workspaceCwd?: string
+): Promise<number> {
   try {
-    const messages = await getSessionMessages(sessionId)
+    const dirs = [getAppSkillsCwd()]
+    if (workspaceCwd) dirs.push(workspaceCwd)
+    const seenIds = new Set<string>()
+    const compactionIds = compactionSessionIds
+    for (const dir of dirs) {
+      try {
+        const sessions = await listSessions({ dir })
+        for (const s of sessions) {
+          if (seenIds.has(s.sessionId)) continue
+          seenIds.add(s.sessionId)
+          if (compactionIds.has(s.sessionId)) continue
+          if (s.sessionId === sessionId) {
+            return ((s as Record<string, unknown>).messageCount as number) || 0
+          }
+        }
+      } catch {
+        // Continue to the next dir
+      }
+    }
+    return 0
+  } catch (err) {
+    console.error('[AgentManager] getSdkSessionTotalMessageCount error:', err)
+    return 0
+  }
+}
+
+export async function loadSdkSessionMessages(
+  sessionId: string,
+  limit?: number,
+  offset?: number
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const options: Record<string, unknown> = {}
+    if (limit !== undefined) options.limit = limit
+    if (offset !== undefined) options.offset = offset
+    const messages = await getSessionMessages(sessionId, options)
     return messages.map((m) => m as unknown as Record<string, unknown>)
   } catch (err) {
     console.error('[AgentManager] getSessionMessages error:', err)
     return []
   }
+}
+
+export async function loadSdkSessionMessagesPaginated(
+  sessionId: string,
+  limit: number,
+  offset: number
+): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }> {
+  try {
+    const sdkMessages = await getSessionMessages(sessionId, { limit, offset })
+    const messages: AgentIPCMessage[] = []
+    for (const m of sdkMessages) {
+      const converted = toAgentIPCMessage(m as any)
+      if (converted) messages.push(converted)
+    }
+    return { messages, offset, limit }
+  } catch (err) {
+    console.error('[AgentManager] loadSdkSessionMessagesPaginated error:', err)
+    return { messages: [], offset, limit }
+  }
+}
+
+export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
+  try {
+    await renameSession(sessionId, title)
+  } catch (err) {
+    console.error('[AgentManager] renameSession error:', err)
+    throw err
+  }
+}
+
+export async function deleteSdkSession(sessionId: string): Promise<void> {
+  // Delete from SDK storage first — the critical operation.
+  // Only clean up tracking metadata after it succeeds, so a failed
+  // deletion leaves the session intact rather than orphaned.
+  await deleteSession(sessionId)
+  compactionSessionIds.delete(sessionId)
+  deleteCompactionSessionId(sessionId)
+  removeSessionRecord(sessionId)
 }

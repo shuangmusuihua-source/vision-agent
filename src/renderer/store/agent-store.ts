@@ -10,7 +10,12 @@ import type {
   SdkSessionInfo,
   StreamingAccumulator,
   SkillOutputState,
+  WorkspaceRecord,
+  ArtifactRecord,
+  WorkspaceDigest,
+  SessionOutputs,
 } from '../../shared/types'
+import type { SessionListAction } from './session-protocol'
 
 // ─── Context Slot (per agent instance) ────────────────────────────────────
 
@@ -28,6 +33,11 @@ export type ContextSlot = {
   activeSkillId: string | null
   lastEditedFile: string | null
   prefillText: string | null
+  workspacePath: string | null
+  _needsSdkLoad: boolean
+  _sdkLoadedCount: number
+  _sdkLoadOffset: number
+  _isLoadingMoreMessages: boolean
   _acc: StreamingAccumulator | null
   _firstContentSeen: boolean
   _processedArtifactIds: Set<string>
@@ -50,6 +60,11 @@ function emptySlot(): ContextSlot {
     activeSkillId: null,
     lastEditedFile: null,
     prefillText: null,
+    workspacePath: null,
+    _needsSdkLoad: false,
+    _sdkLoadedCount: 0,
+    _sdkLoadOffset: 0,
+    _isLoadingMoreMessages: false,
     _acc: null,
     _firstContentSeen: false,
     _processedArtifactIds: new Set(),
@@ -69,9 +84,22 @@ export type AgentStore = {
   // Per-context state slots
   slots: Record<AgentContext, ContextSlot>
 
+  // Per-session isolated slots (keyed by session ID)
+  sessionSlots: Record<string, ContextSlot>
+
   // Shared state (not context-specific)
   isResumingSession: boolean
   sessionList: SdkSessionInfo[]
+
+  // Workspace state
+  activeWorkspacePath: string | null
+  workspaceDigest: WorkspaceDigest | null
+  workspaceDigestLoading: boolean
+
+  // Session state (sidebar + overview)
+  activeSessionId: string | null
+  sessionOutputs: SessionOutputs | null
+  sessionOutputsLoading: boolean
 
   // Actions
   dispatchAgentEvent: (event: AgentEvent, context?: AgentContext) => void
@@ -85,6 +113,16 @@ export type AgentStore = {
   handleSkillOutput: (state: SkillOutputState) => void
   setPrefill: (context: AgentContext, text: string) => void
   consumePrefill: (context: AgentContext) => void
+  setActiveWorkspace: (path: string | null) => void
+  setWorkspaceDigest: (digest: WorkspaceDigest | null) => void
+  setActiveSession: (sessionId: string | null) => void
+  setSessionOutputs: (outputs: SessionOutputs | null) => void
+  dispatchSessionList: (action: SessionListAction) => void
+  switchToSession: (sessionId: string) => void
+  ensureSessionSlot: (sessionId: string) => void
+  loadInitialSessionMessages: (sessionId: string) => Promise<void>
+  loadMoreSessionMessages: (sessionId: string) => Promise<void>
+  renameCurrentSession: (title: string) => Promise<void>
 }
 
 // ─── Backward-compatible type aliases ────────────────────────────────────

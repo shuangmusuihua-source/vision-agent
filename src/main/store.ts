@@ -2,15 +2,15 @@ import Store from 'electron-store'
 import { mkdirSync } from 'fs'
 import path from 'path'
 import { app } from 'electron'
+import { safeStorage } from 'electron'
+import type { ModelProfile, WorkspaceRecord, SessionRecord } from '../shared/types'
+import { getBuiltinSkills } from './skills/builtin'
 
 const KNOWLEDGE_BASE_NAME = 'Knowledge'
 
 export function getKnowledgeBaseDir(): string {
   return path.join(app.getPath('documents'), 'VisionAgent', KNOWLEDGE_BASE_NAME)
 }
-import { safeStorage } from 'electron'
-import type { ModelProfile } from '../shared/types'
-import { getBuiltinSkills } from './skills/builtin'
 
 const ENCRYPTION_PREFIX = 'enc:'
 
@@ -52,6 +52,9 @@ interface AppSettings {
   activeProfileId: string | null
   authorizedDirectories: string[]
   fixedDirectories: string[]
+  workspaces: WorkspaceRecord[]
+  sessions: SessionRecord[]
+  storeVersion: number
   theme: 'light' | 'dark' | 'system'
   cronTasks: CronTask[]
   enabledSkills: string[]
@@ -63,6 +66,9 @@ const store = new Store<AppSettings>({
     activeProfileId: null,
     authorizedDirectories: [],
     fixedDirectories: [],
+    workspaces: [],
+    sessions: [],
+    storeVersion: 0,
     theme: 'system',
     cronTasks: [],
     enabledSkills: []
@@ -216,6 +222,85 @@ export function getFixedDirectories(): string[] {
   return store.get('fixedDirectories')
 }
 
+// ─── Workspace Records ──────────────────────────────────────────────
+
+export function getWorkspaces(): WorkspaceRecord[] {
+  return store.get('workspaces')
+}
+
+export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
+  store.set('workspaces', workspaces)
+}
+
+export function getWorkspaceById(id: string): WorkspaceRecord | undefined {
+  return store.get('workspaces').find(w => w.id === id)
+}
+
+export function getWorkspaceByPath(path: string): WorkspaceRecord | undefined {
+  return store.get('workspaces').find(w => w.path === path)
+}
+
+export function addWorkspace(record: WorkspaceRecord): void {
+  const workspaces = store.get('workspaces')
+  if (!workspaces.some(w => w.id === record.id || w.path === record.path)) {
+    store.set('workspaces', [...workspaces, record])
+  }
+}
+
+export function removeWorkspace(id: string): void {
+  const workspaces = store.get('workspaces').filter(w => w.id !== id)
+  store.set('workspaces', workspaces)
+}
+
+// ─── Session Records ────────────────────────────────────────────────
+
+export function getSessionRecords(): SessionRecord[] {
+  return store.get('sessions')
+}
+
+export function getSessionsByWorkspace(workspacePath: string): SessionRecord[] {
+  return store.get('sessions').filter(s => s.workspacePath === workspacePath)
+}
+
+export function getSessionRecordById(id: string): SessionRecord | undefined {
+  return store.get('sessions').find(s => s.id === id)
+}
+
+export function addSessionRecord(record: SessionRecord): void {
+  const sessions = store.get('sessions')
+  const idx = sessions.findIndex(s => s.id === record.id)
+  if (idx >= 0) {
+    sessions[idx] = record
+  } else {
+    sessions.push(record)
+  }
+  store.set('sessions', sessions)
+}
+
+export function removeSessionRecord(id: string): void {
+  const sessions = store.get('sessions').filter(s => s.id !== id)
+  store.set('sessions', sessions)
+}
+
+export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): void {
+  const sessions = store.get('sessions')
+  const idx = sessions.findIndex(s => s.id === id)
+  if (idx >= 0) {
+    sessions[idx] = { ...sessions[idx], ...patch }
+    store.set('sessions', sessions)
+  }
+}
+
+// ─── Store Version ──────────────────────────────────────────────────
+
+export function getStoreVersion(): number {
+  return store.get('storeVersion')
+}
+
+export function setStoreVersion(version: number): void {
+  store.set('storeVersion', version)
+}
+
 export function ensureKnowledgeBase(): string {
   const kbDir = getKnowledgeBaseDir()
   mkdirSync(kbDir, { recursive: true })
@@ -273,6 +358,28 @@ export function toggleSkill(skillId: string, enabled: boolean): string[] {
   }
   store.set('enabledSkills', next)
   return next
+}
+
+// ─── Compaction session IDs (persisted for restart survival) ────────────────
+// SDK compaction creates internal session forks that must be filtered from
+// user-facing session lists. These IDs survive app restarts.
+
+const COMPACTION_IDS_KEY = 'compactionSessionIds'
+
+export function getCompactionSessionIds(): string[] {
+  return (store.get(COMPACTION_IDS_KEY) as string[]) || []
+}
+
+export function addCompactionSessionId(id: string): void {
+  const current = getCompactionSessionIds()
+  if (!current.includes(id)) {
+    store.set(COMPACTION_IDS_KEY, [...current, id])
+  }
+}
+
+export function deleteCompactionSessionId(id: string): void {
+  const current = getCompactionSessionIds()
+  store.set(COMPACTION_IDS_KEY, current.filter((x) => x !== id))
 }
 
 export type { ModelProfile, AppSettings }

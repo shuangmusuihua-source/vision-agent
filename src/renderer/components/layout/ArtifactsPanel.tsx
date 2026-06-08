@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { FileCode, FileText, Image, FileJson, File, CodeXml, Loader2, Trash2 } from 'lucide-react'
 import type { ComponentType } from 'react'
+import { useAgentStore } from '../../store/agent-store-impl'
 import './ArtifactsPanel.css'
 
 interface ArtifactEntry {
@@ -30,8 +31,11 @@ const TYPE_COLORS: Record<string, string> = {
   html: '#e34c26', svg: '#ff9a00', json: '#f0db4f', md: '#42a5f5', pdf: '#ef4444',
 }
 
-async function discoverArtifacts(): Promise<ArtifactEntry[]> {
-  const sessions = await window.api.agent.listSdkSessions()
+async function discoverArtifacts(sessionId?: string): Promise<ArtifactEntry[]> {
+  const sessions = sessionId
+    ? [{ id: sessionId, title: '', lastModified: Date.now() }]
+    : await window.api.agent.listSdkSessions()
+
   const results: ArtifactEntry[] = []
   const seen = new Set<string>()
 
@@ -78,23 +82,29 @@ async function discoverArtifacts(): Promise<ArtifactEntry[]> {
 
 interface ArtifactsPanelProps {
   onOpenFile?: (path: string) => void
+  sessionId?: string
 }
 
-function ArtifactsPanel({ onOpenFile }: ArtifactsPanelProps): React.ReactElement {
+function ArtifactsPanel({ onOpenFile, sessionId }: ArtifactsPanelProps): React.ReactElement {
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    if (!sessionId) {
+      setArtifacts([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const list = await discoverArtifacts()
+      const list = await discoverArtifacts(sessionId)
       setArtifacts(list)
     } catch (err) {
       console.error('[ArtifactsPanel] load:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [sessionId])
 
   useEffect(() => { load() }, [load])
 
@@ -113,6 +123,14 @@ function ArtifactsPanel({ onOpenFile }: ArtifactsPanelProps): React.ReactElement
     try {
       await window.api.workspace.deleteFile(a.filePath)
       setArtifacts((prev) => prev.filter((x) => x.filePath !== a.filePath))
+      // Also refresh session outputs so OverviewPanel reflects the deletion
+      if (a.sessionId) {
+        window.api.agent.getSessionOutputs(a.sessionId).then((outputs) => {
+          if (useAgentStore.getState().activeSessionId === a.sessionId) {
+            useAgentStore.getState().setSessionOutputs(outputs)
+          }
+        }).catch(() => {})
+      }
     } catch (err) {
       console.error('[ArtifactsPanel] delete:', err)
     }
@@ -129,7 +147,13 @@ function ArtifactsPanel({ onOpenFile }: ArtifactsPanelProps): React.ReactElement
   return (
     <div className="artifacts-panel">
       <div className="artifacts-panel-body">
-        {loading ? (
+        {!sessionId ? (
+          <div className="artifacts-panel-empty">
+            <FileCode size={32} />
+            <span>选择会话</span>
+            <span className="artifacts-panel-empty-hint">选择一个会话以查看其产物</span>
+          </div>
+        ) : loading ? (
           <div className="artifacts-panel-loading">
             <Loader2 size={20} className="spin" />
           </div>
