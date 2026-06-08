@@ -303,11 +303,18 @@ function handleTextDelta(
     }
 
     if (!s._firstContentSeen) {
-      // Fire synchronously — deferring via setTimeout in an IPC handler
-      // (especially during background session swap in processIPCMessage)
-      // causes dispatchAgentEvent to fire after the slot swap is restored,
-      // transitioning the WRONG session's agentState.
-      get().dispatchAgentEvent({ type: 'FIRST_CONTENT' }, ctx)
+      // Defer via setTimeout to avoid invalid transitions during:
+      // 1. Session replay (loadInitialSessionMessages) where agentState is
+      //    still 'idle' — FIRST_CONTENT requires 'thinking' or 'compacting'.
+      // 2. Background session swap (processIPCMessage) where the swap is
+      //    restored before this deferred callback fires — the state guard
+      //    below prevents transitioning the wrong session's agentState.
+      setTimeout(() => {
+        const currentState = get().slots[ctx].agentState
+        if (currentState === 'thinking' || currentState === 'compacting') {
+          get().dispatchAgentEvent({ type: 'FIRST_CONTENT' }, ctx)
+        }
+      }, 0)
     }
 
     return updateSlot(state, ctx, { messages: msgs, _acc: acc, _firstContentSeen: true })

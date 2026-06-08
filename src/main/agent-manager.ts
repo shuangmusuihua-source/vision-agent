@@ -373,6 +373,7 @@ export async function sendMessage(
   const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, queryKey)
   let currentSessionId = sessionId
 
+  const queryInstanceId = ++_queryInstanceCounter
   try {
     const abortController = new AbortController()
     const messageStream = query({
@@ -383,7 +384,6 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
-    const queryInstanceId = ++_queryInstanceCounter
     activeQueries.set(queryKey, { query: messageStream as Query, skillId: skillId ?? null, abortController, instanceId: queryInstanceId })
 
     for await (const message of messageStream) {
