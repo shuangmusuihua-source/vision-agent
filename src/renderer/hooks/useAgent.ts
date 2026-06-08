@@ -267,12 +267,33 @@ export function useAgent(context: AgentContext = 'editor') {
   }, [context, store])
 
   const newSession = useCallback(() => {
-    store.setState((s) => ({
-      slots: {
-        ...s.slots,
-        [context]: emptySlot(),
-      },
-    }))
+    const state = store.getState()
+    const slot = state.slots[context]
+    // Abort running query for this context so the SDK subprocess doesn't
+    // keep writing to a session we're about to detach from.
+    if (slot.isStreaming) {
+      state.dispatchAgentEvent({ type: 'ABORT' }, context)
+      window.api.agent.abort(slot.currentSessionId || context).catch(() => {})
+    }
+    // Save current slot to sessionSlots before clearing, so the old
+    // session's messages are not lost if the user navigates back.
+    const activeSid = state.activeSessionId
+    store.setState((s) => {
+      const nextSessionSlots = { ...s.sessionSlots }
+      if (activeSid) {
+        nextSessionSlots[activeSid] = { ...s.slots[context] }
+      }
+      return {
+        activeSessionId: null,
+        sessionOutputs: null,
+        sessionOutputsLoading: false,
+        sessionSlots: nextSessionSlots,
+        slots: {
+          ...s.slots,
+          [context]: { ...emptySlot(), workspacePath: s.slots[context].workspacePath },
+        },
+      }
+    })
   }, [context, store])
 
   const loadSessions = useCallback(async () => {

@@ -261,10 +261,13 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
 // ─── Query management ──────────────────────────────────────────────────
 
+let _queryInstanceCounter = 0
+
 interface ActiveQuery {
   query: Query
   skillId: string | null
   abortController: AbortController
+  instanceId: number  // monotonically increasing; guards against stale finally cleanup
 }
 
 // Guard against concurrent sendMessage calls — per queryKey (sessionId || context)
@@ -380,7 +383,8 @@ export async function sendMessage(
         ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
-    activeQueries.set(queryKey, { query: messageStream as Query, skillId: skillId ?? null, abortController })
+    const queryInstanceId = ++_queryInstanceCounter
+    activeQueries.set(queryKey, { query: messageStream as Query, skillId: skillId ?? null, abortController, instanceId: queryInstanceId })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
@@ -468,7 +472,15 @@ export async function sendMessage(
     // Flush any remaining batched text (if stream errored before for-await finished)
     flushTextBatch(queryKey, mainWindow)
     discardTextBatch(queryKey)
-    activeQueries.delete(queryKey)
+    // Only clean up if our query instance is still the active one.
+    // When two messages are sent rapidly to the same session, the second
+    // sendMessage aborts the first and registers a new query under the same
+    // queryKey. Without this instanceId guard, the first query's finally
+    // block would delete the second query's Map entry.
+    const current = activeQueries.get(queryKey)
+    if (current && current.instanceId === queryInstanceId) {
+      activeQueries.delete(queryKey)
+    }
     rejectAllPendingPermissions(queryKey)
     rejectAllPendingAskUser(queryKey)
   }
