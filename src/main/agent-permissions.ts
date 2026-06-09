@@ -104,10 +104,33 @@ export function resolveAskUser(requestId: string, answer: string): void {
 
 function matchesQueryKey(p: { context: AgentContext; sessionId?: string }, queryKey?: string): boolean {
   if (!queryKey) return true // abort all
-  // Match by sessionId first, fall back to context for legacy entries
-  if (p.sessionId && p.sessionId === queryKey) return true
-  if (p.context === queryKey) return true
-  return false
+  // Match by sessionId if it is set. If sessionId is set but does NOT match,
+  // do NOT fall through to context matching — that would leak across sessions
+  // (e.g., a queryKey of 'editor' would match permissions from a different
+  // session that happens to share the same context).
+  if (p.sessionId) return p.sessionId === queryKey
+  // Only for entries without sessionId (legacy or pre-SDK-assignment):
+  // match by context so they are still cleaned up on abort.
+  return p.context === queryKey
+}
+
+/**
+ * Update the sessionId on all pending entries that were registered with an
+ * old queryKey (typically a context string like 'editor') before the SDK
+ * assigned a real sessionId.  Called from query-runner when the first
+ * message in a stream carries back the SDK-assigned session_id.
+ */
+export function updatePendingSessionId(oldQueryKey: string, newSessionId: string): void {
+  for (const [id, p] of pendingPermissions) {
+    if (p.sessionId === oldQueryKey) {
+      pendingPermissions.set(id, { ...p, sessionId: newSessionId })
+    }
+  }
+  for (const [id, p] of pendingAskUser) {
+    if (p.sessionId === oldQueryKey) {
+      pendingAskUser.set(id, { ...p, sessionId: newSessionId })
+    }
+  }
 }
 
 export function rejectAllPendingPermissions(queryKey?: string): void {

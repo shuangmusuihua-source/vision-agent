@@ -76,6 +76,10 @@ const api = {
       ipcRenderer.invoke('agent:loadSessionMessagesPaginated', sessionId, limit, offset),
     renameSession: (sessionId: string, title: string) =>
       ipcRenderer.invoke('agent:renameSession', sessionId, title),
+    updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) =>
+      ipcRenderer.invoke('agent:updateSessionRecord', sessionId, patch),
+    removeSessionRecord: (sessionId: string) =>
+      ipcRenderer.invoke('agent:removeSessionRecord', sessionId),
     abort: (context?: 'editor' | 'ask') => ipcRenderer.invoke('agent:abort', context),
     selectFolder: () => ipcRenderer.invoke('agent:selectFolder'),
     getSessionOutputs: (sessionId: string) => ipcRenderer.invoke('agent:getSessionOutputs', sessionId),

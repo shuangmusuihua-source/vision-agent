@@ -135,6 +135,9 @@ function Sidebar({
 }: SidebarProps): React.ReactElement {
   const modal = useModal()
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set())
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameText, setRenameText] = useState('')
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
   const [memoryExpanded, setMemoryExpanded] = useState(true)
   const [memoryFiles, setMemoryFiles] = useState<MemoryEntry[]>([])
   // Subscribe reactively to sessionSlots so non-active session state (running indicator, title)
@@ -354,9 +357,42 @@ function Sidebar({
                                 ) : (
                                   <MessageCircle size={13} />
                                 )}
-                                <span className="sidebar-session-title">
-                                  {session.title || session.id?.slice(-8) || '未命名会话'}
-                                </span>
+                                {renamingId === session.id ? (
+                                  <input
+                                    ref={renameInputRef}
+                                    className="sidebar-new-file-field"
+                                    style={{ flex: 1, fontSize: 13 }}
+                                    value={renameText}
+                                    onChange={(e) => setRenameText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.isComposing) {
+                                        const name = renameText.trim()
+                                        if (name) useAgentStore.getState().renameCurrentSession(name)
+                                        setRenamingId(null)
+                                      }
+                                      if (e.key === 'Escape') setRenamingId(null)
+                                    }}
+                                    onBlur={() => {
+                                      const name = renameText.trim()
+                                      if (name) useAgentStore.getState().renameCurrentSession(name)
+                                      setRenamingId(null)
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <span
+                                    className="sidebar-session-title"
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation()
+                                      setRenamingId(session.id)
+                                      setRenameText(session.title || '')
+                                      setTimeout(() => renameInputRef.current?.select(), 0)
+                                    }}
+                                    title="双击重命名"
+                                  >
+                                    {session.title || session.id?.slice(-8) || '未命名会话'}
+                                  </span>
+                                )}
                                 <span className="sidebar-session-time">
                                   {formatSessionTime(session.lastModified || session.createdAt)}
                                 </span>

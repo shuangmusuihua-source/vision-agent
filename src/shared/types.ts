@@ -331,6 +331,7 @@ export type SkillOutputState = {
   isStreaming: boolean
   language: string
   context?: AgentContext
+  sessionId?: string
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────

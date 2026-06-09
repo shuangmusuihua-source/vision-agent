@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
+import { useUiStore, type PrimaryView } from '../../store/ui-slice'
 import { PanelLeft, FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
@@ -68,27 +69,21 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── Editor / UI state ───────────────────────────────────────────────
 
   const showGraph = useShowGraph()
-  const [showSearch, setShowSearch] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const {
+    showSearch, searchQuery, openSearch, closeSearch: closeSearchPanel,
+    sourceMode, setSourceMode, focusMode, setFocusMode,
+    editorStats, setEditorStats, linkedFile, setLinkedFile,
+    view, setView, updateAvailable, setUpdateAvailable, updateDownloaded, setUpdateDownloaded,
+    showDaydream, daydreamMode, openDaydream, closeDaydream,
+    mainError, setMainError,
+  } = useUiStore()
   const changedFileCount = useChangedFileCount()
-  const [sourceMode, setSourceMode] = useState(false)
-  const [focusMode, setFocusMode] = useState(false)
-  const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
-  const [linkedFile, setLinkedFile] = useState<string | null>(null)
 
-  type PrimaryView = 'ask' | 'editor' | 'history' | 'artifacts'
-  const [view, setView] = useState<PrimaryView>('ask')
-
-  const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
-  const [updateDownloaded, setUpdateDownloaded] = useState(false)
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
-
-  const [showDaydream, setShowDaydream] = useState(false)
-  const [daydreamMode, setDaydreamMode] = useState('matrix')
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────
 
-  useAppShortcuts({ setShowSearch, setIsChatFirst })
+  useAppShortcuts({ setShowSearch: () => openSearch(), setIsChatFirst })
 
   // ── Auto-link active tab → linked file ──────────────────────────────
 
@@ -104,7 +99,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     return () => { a(); b() }
   }, [])
 
-  const [mainError, setMainError] = useState<string | null>(null)
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
   const activeSessionId = useAgentStore((s) => s.activeSessionId)
 
@@ -161,8 +155,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (overviewTab) switchTab(overviewTab)
   }, [activeWorkspacePath, view, openTabs, switchTab])
 
-    const [creatingSessionIn, setCreatingSessionIn] = useState<string | null>(null)
-  const [newSessionName, setNewSessionName] = useState('')
+  const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
   const newSessionInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -198,6 +191,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       title: name,
       workspacePath: wsPath,
     })
+    // Persist immediately so empty named sessions survive restart even
+    // before the first message is sent (which creates the real SDK session).
+    window.api.agent.updateSessionRecord(tempSessionId, {
+      title: name,
+      workspacePath: wsPath,
+      context: 'editor',
+      status: 'empty',
+      createdAt: Date.now(),
+      lastModified: Date.now(),
+      messageCount: 0,
+      artifactCount: 0,
+    }).catch(() => {})
     setCreatingSessionIn(null)
     if (view !== 'editor') {
       useAgentStore.setState({ context: 'editor' })
@@ -233,9 +238,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         case 'open-settings': onOpenSettings(); break
         case 'toggle-sidebar': setSidebarCollapsed((v) => !v); break
         case 'toggle-agent-panel': handleToggleAgent(); break
-        case 'open-search': setShowSearch(true); break
-        case 'toggle-source-mode': setSourceMode((v) => !v); break
-        case 'toggle-focus-mode': setFocusMode((v) => !v); break
+        case 'open-search': openSearch(); break
+        case 'toggle-source-mode': setSourceMode(!sourceMode); break
+        case 'toggle-focus-mode': setFocusMode(!focusMode); break
         case 'save-file': break
       }
     })
@@ -529,9 +534,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onRefreshWorkspace={workspace.handleRefreshWorkspace}
         onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onOpenSettings={onOpenSettings}
-        onOpenSearch={() => setShowSearch(true)}
+        onOpenSearch={() => openSearch()}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
-        onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
+        onDaydream={(mode: string) => openDaydream(mode)}
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
             clearTab()
@@ -703,7 +708,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       {showSearch && (
         <SearchPanel
           onOpenFile={handleFileSelect}
-          onClose={() => { setShowSearch(false); setSearchQuery('') }}
+          onClose={() => closeSearchPanel()}
           initialQuery={searchQuery}
         />
       )}
@@ -716,8 +721,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           onNodeClick={(nodeId, nodeType) => {
             if (nodeType === 'entity') {
               const entityName = nodeId.replace(/^entity:/, '')
-              setSearchQuery(entityName)
-              setShowSearch(true)
+              openSearch(entityName)
             } else {
               handleFileSelect(nodeId)
             }
@@ -835,7 +839,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         </div>
       )}
-      {showDaydream && <DaydreamOverlay onExit={() => setShowDaydream(false)} mode={daydreamMode} />}
+      {showDaydream && <DaydreamOverlay onExit={closeDaydream} mode={daydreamMode} />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
-import { emptySlot } from '../store/agent-store'
+import { emptySlot, type AgentStore } from '../store/agent-store'
 import type { AgentContext } from '../../shared/types'
 import type {
   AskUserRequestIPC,
@@ -67,9 +67,14 @@ export function useIPCSubscriptions() {
       // different session while this one was being created. Without this guard,
       // a session created in the background would hijack activeSessionId and
       // contaminate the editor slot with wrong-session data.
+      //
+      // prevSessionId === null means no session was active — this is the very
+      // first session being created in the current context, so it IS the active
+      // session and must receive the real sessionId.
       const isStillActiveSession =
         migratedTempId !== null ||               // temp session was active when send was triggered
-        prevSessionId === data.sessionId          // resumed session matches current active
+        prevSessionId === data.sessionId ||       // resumed session matches current active
+        prevSessionId === null                    // no active session yet (first session in context)
 
       store.setState((state) => {
         // If we have a temp session slot (from "新建对话"), migrate it to real session ID
@@ -115,12 +120,17 @@ export function useIPCSubscriptions() {
           tempId: migratedTempId,
           realId: data.sessionId,
         })
-        // Fire-and-forget: rename the SDK session with the user-chosen title
+        // Rename the newly-materialized session with the user-chosen title.
+        // Persist to BOTH the SDK (customTitle) and electron-store (survives restarts).
         if (tempTitle) {
           window.api.agent.renameSession(data.sessionId, tempTitle).catch(
             (err) => console.error('[useAgent] renameSession failed:', err)
           )
+          window.api.agent.updateSessionRecord(data.sessionId, { title: tempTitle }).catch(() => {})
         }
+        // Clean up the temp SessionRecord — the real one will be created
+        // by addSessionRecord in query-runner.ts when the SDK assigns sessionId.
+        window.api.agent.removeSessionRecord(migratedTempId).catch(() => {})
       }
       refreshWatchdogByContext(data.context)
     })
@@ -230,22 +240,39 @@ export function useAgent(context: AgentContext = 'editor') {
     // associated tool results. During live operation handleUserMessage skips
     // re-adding the user message (it only does so on replay with dedup), so this
     // optimistic insert is the canonical source for user messages during live sessions.
-    store.setState((s) => ({
-      slots: {
-        ...s.slots,
-        [context]: {
-          ...s.slots[context],
-          messages: [...s.slots[context].messages, {
-            kind: 'user' as const,
-            id: `user-${Date.now()}`,
-            role: 'user',
-            textContent: prompt.replace(/<!--FILE_CONVERT:.+?-->\n?/, ''),
-            createdAt: Date.now(),
-          }],
-          isStreaming: true,
+    //
+    // Must also update sessionSlots[activeSessionId] so the optimistic message
+    // survives a session switch → switch back cycle. Without this, the user
+    // message would be lost from the cached slot when the session is restored.
+    store.setState((s) => {
+      const patch = {
+        messages: [...s.slots[context].messages, {
+          kind: 'user' as const,
+          id: `user-${Date.now()}`,
+          role: 'user',
+          textContent: prompt.replace(/<!--FILE_CONVERT:.+?-->\n?/, ''),
+          createdAt: Date.now(),
+        }],
+        isStreaming: true,
+      }
+      const result: Record<string, unknown> = {
+        slots: {
+          ...s.slots,
+          [context]: { ...s.slots[context], ...patch },
         },
-      },
-    }))
+      }
+      // Mirror to session-scoped cache so the message persists across switches
+      if (capturedActiveSid) {
+        const cached = s.sessionSlots[capturedActiveSid]
+        if (cached) {
+          result.sessionSlots = {
+            ...s.sessionSlots,
+            [capturedActiveSid]: { ...cached, ...patch },
+          }
+        }
+      }
+      return result as Partial<AgentStore>
+    })
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context)
     const skillId = store.getState().slots[context].activeSkillId
     const workspacePath = context === 'ask' ? undefined : (store.getState().activeWorkspacePath || undefined)
@@ -352,9 +379,25 @@ export const useIsStreaming = (context: AgentContext) => useAgentStore((s) => s.
 export const useCurrentSessionId = (context: AgentContext) => useAgentStore((s) => s.slots[context].currentSessionId)
 export const useAgentStatus = (context: AgentContext) => useAgentStore((s) => s.slots[context].agentState)
 export const useUsageInfo = (context: AgentContext) => useAgentStore((s) => s.slots[context].usageInfo)
-export const usePermissionRequest = (context: AgentContext) => useAgentStore((s) => s.slots[context].permissionRequest)
-export const usePermissionQueueLength = (context: AgentContext) => useAgentStore((s) => s.slots[context].permissionQueue.length)
-export const useAskUserRequest = (context: AgentContext) => useAgentStore((s) => s.slots[context].askUserRequest)
+// Permission / AskUser are session-scoped: they belong to a specific
+// agent conversation, not to the transient active context slot.  Reading
+// from sessionSlots[activeSessionId] ensures the dialog survives session
+// switches without fragile save/restore logic — the data never moves.
+export const usePermissionRequest = (context: AgentContext) => useAgentStore((s) => {
+  const sid = s.activeSessionId
+  if (sid && s.sessionSlots[sid]) return s.sessionSlots[sid].permissionRequest
+  return s.slots[context].permissionRequest
+})
+export const usePermissionQueueLength = (context: AgentContext) => useAgentStore((s) => {
+  const sid = s.activeSessionId
+  if (sid && s.sessionSlots[sid]) return s.sessionSlots[sid].permissionQueue.length
+  return s.slots[context].permissionQueue.length
+})
+export const useAskUserRequest = (context: AgentContext) => useAgentStore((s) => {
+  const sid = s.activeSessionId
+  if (sid && s.sessionSlots[sid]) return s.sessionSlots[sid].askUserRequest
+  return s.slots[context].askUserRequest
+})
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) => s.slots[context].lastEditedFile)
 export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)

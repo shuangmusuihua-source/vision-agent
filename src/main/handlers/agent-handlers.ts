@@ -1,7 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession } from '../agent-manager'
-import { getSessionRecords } from '../store'
+import { getSessionRecords, updateSessionRecord, removeSessionRecord } from '../store'
 import { access } from 'fs/promises'
 import type { SessionOutputEntry } from '../../shared/types'
 import type { AgentContext } from '../../shared/types'
@@ -35,6 +35,16 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
+  ipcMain.handle('agent:updateSessionRecord', (_event, sessionId: string, patch: Record<string, unknown>) => {
+    updateSessionRecord(sessionId, patch as any)
+    return { success: true }
+  })
+
+  ipcMain.handle('agent:removeSessionRecord', (_event, sessionId: string) => {
+    removeSessionRecord(sessionId)
+    return { success: true }
+  })
+
   ipcMain.handle('agent:abort', (_event, contextOrSessionId?: string) => {
     // Supports both AgentContext ('editor'|'ask') and sessionId for parallel streaming
     abortActiveQuery(contextOrSessionId)
@@ -42,6 +52,10 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:deleteSession', async (_event, sessionId: string) => {
+    // Abort any running query for this session before deletion — prevents
+    // resource leaks (orphaned subprocess, pending permissions) and avoids
+    // the SDK recreating the session file from a still-running query.
+    abortActiveQuery(sessionId)
     await deleteSdkSession(sessionId)
     return { success: true }
   })
