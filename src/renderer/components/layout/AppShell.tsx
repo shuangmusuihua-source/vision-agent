@@ -364,11 +364,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── File selection (bridges workspace + tabs) ───────────────────────
 
   const handleFileSelect = useCallback(async (path: string) => {
+    const ext = path.split('.').pop()?.toLowerCase()
+    // PDF and HTML slides — open with system default app, not in-editor
+    if (ext === 'pdf' || ext === 'html' || ext === 'htm') {
+      window.api.workspace.openInBrowser(path)
+      return
+    }
     if (view !== 'editor') {
       useAgentStore.setState({ context: 'editor' })
       setView('editor')
     }
-    // Set active workspace based on which workspace contains this file
     const wsPath = workspace.workspacePaths.find(ws => path.startsWith(ws + '/') || path.startsWith(ws))
     if (wsPath) {
       useAgentStore.getState().setActiveWorkspace(wsPath)
@@ -539,6 +544,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onDaydream={(mode: string) => openDaydream(mode)}
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
+            useAgentStore.getState().setActiveSession(null)
             clearTab()
             setView('ask')
           }}

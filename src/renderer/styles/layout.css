@@ -237,6 +237,28 @@
   user-select: none;
 }
 
+.sidebar-workspace-add-session {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.sidebar-workspace-header:hover .sidebar-workspace-add-session {
+  opacity: 1;
+}
+
+.sidebar-workspace-add-session:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-action);
+}
+
 .sidebar-workspace-pin {
   display: flex;
   align-items: center;
@@ -589,9 +611,6 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  width: calc(100% - 16px);
-  margin-left: 8px;
-  margin-right: 8px;
   border-radius: 14px;
   -electron-corner-smoothing: system-ui;
 }
@@ -605,9 +624,6 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  width: calc(100% - 16px);
-  margin-left: 8px;
-  margin-right: 8px;
   border-radius: 14px;
   -electron-corner-smoothing: system-ui;
 }
@@ -637,7 +653,8 @@
   color: var(--color-text-primary);
   cursor: pointer;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 4px 8px 4px 28px;
+  margin: 0 12px 2px 6px;
 }
 
 .sidebar-session-entry:hover {
@@ -690,31 +707,10 @@
 }
 
 .sidebar-session-empty {
-  padding: 8px 22px;
+  padding: 8px 0;
   font-size: 12px;
   color: var(--color-text-tertiary);
   font-style: italic;
-}
-
-.sidebar-new-conversation-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: calc(100% - 16px);
-  margin: 4px 8px;
-  padding: 6px 14px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-action);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.sidebar-new-conversation-btn:hover {
-  background: var(--color-action-bg);
-  border-color: var(--color-action);
 }
 
 .sidebar-file-action {
@@ -839,6 +835,7 @@
   margin-left: -20px;
   margin-right: 0;
   border-radius: 12px;
+  background: var(--color-bg-primary);
   -electron-corner-smoothing: system-ui;
   box-shadow: var(--shadow-xs);
   transition: margin-left 0.4s cubic-bezier(0.25, 1, 0.5, 1),

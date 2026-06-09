@@ -1,6 +1,7 @@
-import { FileText, Box, RefreshCw, Loader2 } from 'lucide-react'
+import { FileText, Box, RefreshCw, Loader2, ArrowUpRight } from 'lucide-react'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { SessionOutputEntry } from '../../../shared/types'
+import SessionOverviewCards from './SessionOverviewCards'
 
 interface OverviewPanelProps {
   sessionId: string | null
@@ -56,18 +57,18 @@ function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.Rea
   const skillOutputs = sessionOutputs.files.filter(f => f.category === 'skill_output')
   const others = sessionOutputs.files.filter(f => f.category === 'other')
 
-  const renderFileList = (files: SessionOutputEntry[]) => (
+  const renderFileList = (files: SessionOutputEntry[], variant: 'md' | 'skill' = 'md') => (
     <div className="overview-file-list">
       {files.map((f) => (
         <button
           key={f.filePath}
-          className="overview-file-chip"
+          className={`overview-file-chip overview-file-chip--${variant}`}
           onClick={() => onOpenFile(f.filePath)}
           title={f.filePath}
         >
           <FileText size={14} />
           <span className="overview-file-chip-name">{f.fileName}</span>
-          <span className="overview-file-chip-source">{f.source}</span>
+          <ArrowUpRight size={12} className="overview-file-chip-arrow" />
         </button>
       ))}
     </div>
@@ -80,10 +81,12 @@ function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.Rea
         <span className="overview-file-count">{sessionOutputs.files.length} 个文件</span>
       </div>
 
+      <SessionOverviewCards sessionId={sessionId} />
+
       {documents.length > 0 && (
         <div className="overview-section">
-          <h3 className="overview-section-title">md 文档</h3>
-          {renderFileList(documents)}
+          <h3 className="overview-section-title">MD 文档</h3>
+          {renderFileList(documents, 'md')}
         </div>
       )}
 
@@ -92,14 +95,14 @@ function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.Rea
           <h3 className="overview-section-title">
             <Box size={14} /> Skill 产物
           </h3>
-          {renderFileList(skillOutputs)}
+          {renderFileList(skillOutputs, 'skill')}
         </div>
       )}
 
       {others.length > 0 && (
         <div className="overview-section">
           <h3 className="overview-section-title">其他文件</h3>
-          {renderFileList(others)}
+          {renderFileList(others, 'md')}
         </div>
       )}
     </div>

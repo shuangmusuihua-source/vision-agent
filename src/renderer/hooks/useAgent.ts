@@ -325,16 +325,11 @@ export function useAgent(context: AgentContext = 'editor') {
 
   const loadSessions = useCallback(async () => {
     try {
-      const workspacePath = store.getState().activeWorkspacePath || undefined
-      const sessions = await window.api.agent.listSdkSessions(workspacePath)
-      // Guard: if workspace changed while loading, discard stale result.
-      if (workspacePath !== (store.getState().activeWorkspacePath || undefined)) {
-        return
-      }
+      const sessions = await window.api.agent.listSdkSessions()
       store.getState().dispatchSessionList({
         type: 'REPLACE_SDK',
         sessions,
-        workspacePath,
+        workspacePath: undefined,
       })
     } catch (err) {
       console.error('[useAgent] Failed to load sessions:', err)

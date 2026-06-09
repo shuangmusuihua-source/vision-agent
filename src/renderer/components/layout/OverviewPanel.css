@@ -286,21 +286,42 @@
 .overview-file-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-primary);
-  color: var(--color-text-secondary);
-  font-size: 12px;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: all 0.2s ease;
 }
 
 .overview-file-chip:hover {
-  border-color: var(--color-action);
-  color: var(--color-action);
-  background: var(--color-action-bg);
+  background: var(--color-bg-primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.overview-file-chip--skill {
+  background: var(--color-bg-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.overview-file-chip--skill:hover {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.overview-file-chip-arrow {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  color: var(--color-text-tertiary);
+}
+
+.overview-file-chip:hover .overview-file-chip-arrow {
+  opacity: 1;
 }
 
 .overview-file-more {
@@ -341,6 +362,93 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* ─── Session Overview Cards ─────────────────────────────────────── */
+
+.overview-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overview-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--color-bg-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.overview-card--done {
+  opacity: 0.5;
+}
+
+.overview-card--todo {
+  border-left: 3px solid var(--color-action);
+}
+
+.overview-card--decision {
+  border-left: 3px solid #f59e0b;
+}
+
+.overview-card--memo {
+  border-left: 3px solid var(--color-text-tertiary);
+}
+
+.overview-card-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.overview-card-check:hover {
+  border-color: var(--color-action);
+}
+
+.overview-card-check--done {
+  background: var(--color-action);
+  border-color: var(--color-action);
+  color: white;
+}
+
+.overview-card-type {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.overview-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.overview-card--done .overview-card-text {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
+}
+
+.overview-card-divider {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+  padding: 4px 0 2px;
+}
+
+.overview-loading {
+  animation: sidebar-spin 1.5s linear infinite;
+  color: var(--color-text-tertiary);
 }
 
 .overview-file-item {

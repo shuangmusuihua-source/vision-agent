@@ -33,18 +33,15 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
       if (r.title) sessionTitleMap.set(r.id, r.title)
     }
 
-    // Query both global (userData) and workspace-specific sessions
     const globalCwd = getAppSkillsCwd()
     const results: Array<{ id: string; title?: string; createdAt?: number; lastModified?: number; messageCount?: number; cwd?: string; workspacePath?: string; context?: string }> = []
     const seenIds = new Set<string>()
 
-    // Always query global (legacy sessions + app-level)
     try {
       const globalResult = await listSessions({ dir: globalCwd })
       for (const s of globalResult) {
         if (!seenIds.has(s.sessionId)) {
           seenIds.add(s.sessionId)
-          // Skip SDK compaction forks — these are internal, not user-facing
           if (compactionSessionIds.has(s.sessionId)) continue
           results.push({
             id: s.sessionId,
@@ -53,8 +50,6 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
             lastModified: s.lastModified,
             messageCount: (s as Record<string, unknown>).messageCount as number || 0,
             cwd: globalCwd,
-            // SessionRecord provides the canonical workspace mapping.
-            // No fallback for global sessions — they could belong to any workspace.
             workspacePath: sessionWorkspaceMap.get(s.sessionId),
             context: sessionContextMap.get(s.sessionId),
           })
@@ -64,14 +59,12 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
       console.error('[SessionStore] listSessions global error:', err)
     }
 
-    // Also query workspace-specific if different from global
     if (workspaceCwd && workspaceCwd !== globalCwd) {
       try {
         const wsResult = await listSessions({ dir: workspaceCwd })
         for (const s of wsResult) {
           if (!seenIds.has(s.sessionId)) {
             seenIds.add(s.sessionId)
-            // Skip SDK compaction forks — these are internal, not user-facing
             if (compactionSessionIds.has(s.sessionId)) continue
             results.push({
               id: s.sessionId,
@@ -80,8 +73,6 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
               lastModified: s.lastModified,
               messageCount: (s as Record<string, unknown>).messageCount as number || 0,
               cwd: workspaceCwd,
-              // Session found in the workspace-specific directory is owned by
-              // this workspace. SessionRecord can override with a different path.
               workspacePath: sessionWorkspaceMap.get(s.sessionId) || workspaceCwd,
               context: sessionContextMap.get(s.sessionId),
             })
@@ -112,11 +103,9 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
 
     // If workspace filter is requested, filter by workspacePath from SessionRecords
     // Exclude ask-context sessions — they belong to Ask Zuovis, not the workspace
-    if (workspaceCwd) {
-      return results.filter(s => s.workspacePath === workspaceCwd && s.context !== 'ask')
-    }
-
-    return results
+    // Exclude ask-context sessions — they belong to Ask Zuovis, not the workspace.
+    // No workspace-path filter — the sidebar groups sessions by workspacePath itself.
+    return results.filter(s => s.context !== 'ask')
   } catch (err) {
     console.error('[SessionStore] listSessions error:', err)
     return []

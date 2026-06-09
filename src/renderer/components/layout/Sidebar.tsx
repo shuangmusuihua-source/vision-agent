@@ -314,6 +314,13 @@ function Sidebar({
                         {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                       </button>
                       <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
+                      <button
+                        className="sidebar-workspace-add-session"
+                        onClick={(e) => { e.stopPropagation(); onNewConversation(wsPath) }}
+                        title="新建会话" aria-label="新建会话"
+                      >
+                        <Plus size={12} />
+                      </button>
                       {idx > 0 && (
                         <button
                           className="sidebar-workspace-pin"
@@ -349,14 +356,8 @@ function Sidebar({
                               <div
                                 key={session.id}
                                 className={`sidebar-entry sidebar-session-entry${activeSessionId === session.id ? ' sidebar-entry-active' : ''}`}
-                                style={{ paddingLeft: 22 }}
                                 onClick={() => onSessionSelect(session.id, wsPath)}
                               >
-                                {isRunning ? (
-                                  <Loader2 size={13} className="sidebar-session-running" />
-                                ) : (
-                                  <MessageCircle size={13} />
-                                )}
                                 {renamingId === session.id ? (
                                   <input
                                     ref={renameInputRef}
@@ -393,9 +394,11 @@ function Sidebar({
                                     {session.title || session.id?.slice(-8) || '未命名会话'}
                                   </span>
                                 )}
-                                <span className="sidebar-session-time">
-                                  {formatSessionTime(session.lastModified || session.createdAt)}
-                                </span>
+                                {!isRunning && (
+                                  <span className="sidebar-session-time">
+                                    {formatSessionTime(session.lastModified || session.createdAt)}
+                                  </span>
+                                )}
                                 <button
                                   className="sidebar-session-delete"
                                   onClick={(e) => {
@@ -407,13 +410,14 @@ function Sidebar({
                                 >
                                   <Trash2 size={11} />
                                 </button>
+                                {isRunning && <Loader2 size={12} className="sidebar-session-running" />}
                               </div>
                             )
                           })
                         )}
                         {/* New session name input */}
                         {creatingSessionIn === wsPath && (
-                          <div className="sidebar-new-file-input" style={{ paddingLeft: 22 }}>
+                          <div className="sidebar-new-file-input">
                             <input
                               ref={newSessionInputRef}
                               className="sidebar-new-file-field"
@@ -424,18 +428,13 @@ function Sidebar({
                                 if (e.key === 'Enter' && !e.isComposing) onCreateSession(wsPath)
                                 if (e.key === 'Escape') { onNewSessionNameChange(''); onCancelNewSession() }
                               }}
+                              onBlur={() => {
+                                if (!newSessionName.trim()) {
+                                  onCancelNewSession()
+                                }
+                              }}
                             />
                           </div>
-                        )}
-                        {/* New conversation button */}
-                        {creatingSessionIn !== wsPath && (
-                          <button
-                            className="sidebar-new-conversation-btn"
-                            onClick={() => onNewConversation(wsPath)}
-                          >
-                            <Plus size={13} />
-                            <span>新建对话</span>
-                          </button>
                         )}
                       </div>
                     )}
