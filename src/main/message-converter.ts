@@ -222,16 +222,22 @@ function convertStreamEvent(message: SDKPartialAssistantMessage): AgentIPCMessag
 /**
  * Adapt an SDK stream event (BetaRawMessageStreamEvent) to our IPC-friendly
  * StreamEventPayload. Returns null for event types we don't forward.
+ *
+ * message_start / message_delta / message_stop are filtered out on the main
+ * process side because the renderer discards them immediately after receiving
+ * — forwarding them across IPC is pure overhead.
  */
 function adaptStreamEvent(event: { type: string }): StreamEventPayload | null {
   switch (event.type) {
+    // Forwarded: content events carry the actual text/tool-use deltas
     case 'content_block_start':
     case 'content_block_delta':
     case 'content_block_stop':
-    case 'message_start':
-    case 'message_delta':
-    case 'message_stop':
       return event as StreamEventPayload
+
+    // Filtered: message-level lifecycle events are unused by the renderer
+    // (message_start, message_delta, message_stop) — fall through to default → null
+
     default:
       return null
   }

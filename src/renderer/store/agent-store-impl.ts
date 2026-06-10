@@ -32,6 +32,8 @@ import {
 
 // ─── Slot helpers ────────────────────────────────────────────────────────
 
+const MAX_SESSION_SLOTS = 30
+
 let _currentEventSessionId: string | null = null
 
 /**
@@ -75,11 +77,55 @@ function updateSlot(
     if (!cached) {
       cached = emptySlot()
     }
+    // Update access order: move sid to the end (most recently accessed)
+    const accessOrder = state.sessionAccessOrder.filter((id) => id !== sid)
+    accessOrder.push(sid)
+
+    // LRU eviction: if over limit, evict oldest entries that are not active
+    let newSessionSlots = {
+      ...state.sessionSlots,
+      [sid]: { ...cached, ...patch },
+    }
+
+    if (accessOrder.length > MAX_SESSION_SLOTS) {
+      // Determine protected session IDs — never evict the active session
+      // or the sessions currently bound to editor/ask contexts
+      const protectedIds = new Set<string>()
+      if (state.activeSessionId) protectedIds.add(state.activeSessionId)
+      const editorSid = state.slots.editor.currentSessionId
+      const askSid = state.slots.ask.currentSessionId
+      if (editorSid) protectedIds.add(editorSid)
+      if (askSid) protectedIds.add(askSid)
+
+      const evictCount = accessOrder.length - MAX_SESSION_SLOTS
+      let evicted = 0
+      const remainingOrder: string[] = []
+      for (const candidateId of accessOrder) {
+        if (evicted < evictCount && !protectedIds.has(candidateId)) {
+          delete (newSessionSlots as Record<string, unknown>)[candidateId]
+          evicted++
+        } else {
+          remainingOrder.push(candidateId)
+        }
+      }
+      if (evicted > 0) {
+        console.info(
+          `[AgentStore] LRU evicted ${evicted} session slot(s) ` +
+          `(limit: ${MAX_SESSION_SLOTS})`
+        )
+        return {
+          sessionSlots: newSessionSlots,
+          sessionAccessOrder: remainingOrder,
+          ...(sid === state.activeSessionId
+            ? { slots: { ...state.slots, [ctx]: { ...state.slots[ctx], ...patch } } }
+            : {}),
+        }
+      }
+    }
+
     const result: Partial<AgentStore> = {
-      sessionSlots: {
-        ...state.sessionSlots,
-        [sid]: { ...cached, ...patch },
-      },
+      sessionSlots: newSessionSlots,
+      sessionAccessOrder: accessOrder,
     }
     if (sid === state.activeSessionId) {
       result.slots = { ...state.slots, [ctx]: { ...state.slots[ctx], ...patch } }
@@ -136,6 +182,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     isResumingSession: false,
     sessionList: [],
     sessionSlots: {},
+    sessionAccessOrder: [],
     activeWorkspacePath: null,
     workspaceDigest: null,
     workspaceDigestLoading: false,
@@ -414,12 +461,17 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           if (req.sessionId) {
             set((state) => {
               const sid = req.sessionId!
-              if (!state.sessionSlots[sid]) return { sessionSlots: { ...state.sessionSlots, [sid]: emptySlot() } }
-              const bgSlot = state.sessionSlots[sid]
+              const isNew = !state.sessionSlots[sid]
+              const bgSlot = isNew ? emptySlot() : state.sessionSlots[sid]
               const patch = bgSlot.permissionRequest
                 ? { permissionQueue: [...bgSlot.permissionQueue, req] }
                 : { permissionRequest: req }
-              return { sessionSlots: { ...state.sessionSlots, [sid]: { ...bgSlot, ...patch } } }
+              const accessOrder = state.sessionAccessOrder.filter((id) => id !== sid)
+              accessOrder.push(sid)
+              return {
+                sessionSlots: { ...state.sessionSlots, [sid]: { ...bgSlot, ...patch } },
+                sessionAccessOrder: accessOrder,
+              }
             })
           }
           return
@@ -497,12 +549,17 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           if (req.sessionId) {
             set((state) => {
               const sid = req.sessionId!
-              if (!state.sessionSlots[sid]) return { sessionSlots: { ...state.sessionSlots, [sid]: emptySlot() } }
-              const bgSlot = state.sessionSlots[sid]
+              const isNew = !state.sessionSlots[sid]
+              const bgSlot = isNew ? emptySlot() : state.sessionSlots[sid]
               const patch = bgSlot.askUserRequest
                 ? { askUserQueue: [...bgSlot.askUserQueue, req] }
                 : { askUserRequest: req }
-              return { sessionSlots: { ...state.sessionSlots, [sid]: { ...bgSlot, ...patch } } }
+              const accessOrder = state.sessionAccessOrder.filter((id) => id !== sid)
+              accessOrder.push(sid)
+              return {
+                sessionSlots: { ...state.sessionSlots, [sid]: { ...bgSlot, ...patch } },
+                sessionAccessOrder: accessOrder,
+              }
             })
           }
           return
@@ -693,8 +750,19 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     ensureSessionSlot(sessionId: string) {
       set((state) => {
-        if (state.sessionSlots[sessionId]) return {}
-        return { sessionSlots: { ...state.sessionSlots, [sessionId]: emptySlot() } }
+        if (state.sessionSlots[sessionId]) {
+          // Already exists — just update access order
+          const accessOrder = state.sessionAccessOrder.filter((id) => id !== sessionId)
+          accessOrder.push(sessionId)
+          return { sessionAccessOrder: accessOrder }
+        }
+        // Create new slot and update access order
+        const accessOrder = state.sessionAccessOrder.filter((id) => id !== sessionId)
+        accessOrder.push(sessionId)
+        return {
+          sessionSlots: { ...state.sessionSlots, [sessionId]: emptySlot() },
+          sessionAccessOrder: accessOrder,
+        }
       })
     },
 
@@ -721,12 +789,18 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       set((state) => {
         const prevSessionId = state.activeSessionId
         const nextSessionSlots = { ...state.sessionSlots }
+        // Track access order: prevSessionId was just active, sessionId is being switched to
+        let accessOrder = state.sessionAccessOrder.slice()
+
         if (prevSessionId && prevSessionId !== sessionId) {
           const editorHasContent = state.slots.editor.messages.length > 0
           const savedHasContent = nextSessionSlots[prevSessionId]?.messages?.length > 0
           if (editorHasContent || !savedHasContent) {
             nextSessionSlots[prevSessionId] = { ...state.slots.editor }
           }
+          // Move prevSessionId to end of access order (just saved)
+          accessOrder = accessOrder.filter((id) => id !== prevSessionId)
+          accessOrder.push(prevSessionId)
         }
 
         const existingSlot = nextSessionSlots[sessionId]
@@ -755,10 +829,43 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         if (!existingSlot) {
           nextSessionSlots[sessionId] = targetSlot
         }
+        // Move sessionId to end of access order (just accessed)
+        accessOrder = accessOrder.filter((id) => id !== sessionId)
+        accessOrder.push(sessionId)
+
+        // LRU eviction for slots created/accessed during switch
+        if (accessOrder.length > MAX_SESSION_SLOTS) {
+          const protectedIds = new Set<string>()
+          protectedIds.add(sessionId) // the new active session
+          const editorSid = state.slots.editor.currentSessionId
+          const askSid = state.slots.ask.currentSessionId
+          if (editorSid) protectedIds.add(editorSid)
+          if (askSid) protectedIds.add(askSid)
+
+          const evictCount = accessOrder.length - MAX_SESSION_SLOTS
+          let evicted = 0
+          const remainingOrder: string[] = []
+          for (const candidateId of accessOrder) {
+            if (evicted < evictCount && !protectedIds.has(candidateId)) {
+              delete nextSessionSlots[candidateId]
+              evicted++
+            } else {
+              remainingOrder.push(candidateId)
+            }
+          }
+          if (evicted > 0) {
+            console.info(
+              `[AgentStore] LRU evicted ${evicted} session slot(s) during switchToSession ` +
+              `(limit: ${MAX_SESSION_SLOTS})`
+            )
+          }
+          accessOrder = remainingOrder
+        }
 
         return {
           activeSessionId: sessionId,
           sessionSlots: nextSessionSlots,
+          sessionAccessOrder: accessOrder,
           sessionOutputs: null,
           sessionOutputsLoading: true,
           slots: { ...state.slots, editor: targetSlot },

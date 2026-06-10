@@ -87,6 +87,9 @@ export type AgentStore = {
   // Per-session isolated slots (keyed by session ID)
   sessionSlots: Record<string, ContextSlot>
 
+  // LRU access order for session eviction — most-recently-accessed at the end
+  sessionAccessOrder: string[]
+
   // Shared state (not context-specific)
   isResumingSession: boolean
   sessionList: SdkSessionInfo[]

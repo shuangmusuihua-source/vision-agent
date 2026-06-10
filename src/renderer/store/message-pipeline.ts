@@ -52,8 +52,7 @@ export function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, 
   const hasToolUse = content.some((b) => b.type === 'tool_use')
   const hasText = content.some((b) => b.type === 'text')
 
-  const updatedMessages = [...slot.messages]
-  updatedMessages[msgIdx] = {
+  const updatedMsg: TextMessage = {
     ...existing,
     phase,
     textContent: hasText ? (content.find(isTextBlock))?.text || textContent : textContent,
@@ -66,6 +65,14 @@ export function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, 
         })
       : toolCalls,
   } as TextMessage
+
+  // Use slice-based immutable update instead of [...slot.messages] spread copy.
+  // When updating the last element (common case for streaming), slice(0, -1) avoids
+  // copying the trailing element and concat appends the new one — V8 optimizes this path.
+  const lastIdx = slot.messages.length - 1
+  const updatedMessages = msgIdx === lastIdx
+    ? slot.messages.slice(0, -1).concat([updatedMsg])
+    : (() => { const a = [...slot.messages]; a[msgIdx] = updatedMsg; return a })()
 
   return { messages: updatedMessages, _acc: null }
 }
@@ -283,9 +290,10 @@ export function reduceTextDelta(
   // Check the last message first to avoid full-array copy + findIndex scan.
   const lastIdx = slot.messages.length - 1
   if (lastIdx >= 0 && slot.messages[lastIdx].id === acc!.messageId && slot.messages[lastIdx].kind === 'text') {
-    const msgs = [...slot.messages]
-    const last = msgs[lastIdx] as TextMessage
-    msgs[lastIdx] = { ...last, textContent: acc.text, phase: 'streaming' }
+    // slice(0, -1) + concat avoids copying the last element; V8 optimizes this pattern.
+    const last = slot.messages[lastIdx] as TextMessage
+    const updatedLast = { ...last, textContent: acc.text, phase: 'streaming' as const }
+    const msgs = slot.messages.slice(0, -1).concat([updatedLast])
     firstContentSeenDuringThisCall = !slot._firstContentSeen
     return { patch: { messages: msgs, _acc: acc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
   }
@@ -315,14 +323,14 @@ export function reduceInputJsonDelta(
     // P2 optimization: check last message first to avoid full-array copy + findIndex
     const lastIdx = slot.messages.length - 1
     if (lastIdx >= 0 && slot.messages[lastIdx].id === acc.messageId && slot.messages[lastIdx].kind === 'text') {
-      const msgs = [...slot.messages]
-      const last = msgs[lastIdx] as TextMessage
+      const last = slot.messages[lastIdx] as TextMessage
       const updatedToolCalls = last.toolCalls.map((tc) =>
         tc.toolUseId === lastId
           ? { ...tc, inputJsonPartial: acc.toolUseBlocks.get(lastId)!.inputJson }
           : tc
       )
-      msgs[lastIdx] = { ...last, toolCalls: updatedToolCalls }
+      const updatedLast = { ...last, toolCalls: updatedToolCalls }
+      const msgs = slot.messages.slice(0, -1).concat([updatedLast])
       return { messages: msgs, _acc: acc }
     }
 
@@ -379,13 +387,15 @@ export function reduceContentBlockStart(
     // P2 optimization: check last message first to avoid full-array copy + findIndex
     const lastIdx = slot.messages.length - 1
     if (lastIdx >= 0 && slot.messages[lastIdx].id === acc!.messageId && slot.messages[lastIdx].kind === 'text') {
-      const msgs = [...slot.messages]
-      const last = msgs[lastIdx] as TextMessage
+      const last = slot.messages[lastIdx] as TextMessage
       const existing = last.toolCalls.some((tc) => tc.toolUseId === block.id)
       if (!existing) {
-        msgs[lastIdx] = { ...last, toolCalls: [...last.toolCalls, newToolCall], phase: 'tool_calling' }
+        const updatedLast = { ...last, toolCalls: [...last.toolCalls, newToolCall], phase: 'tool_calling' as const }
+        const msgs = slot.messages.slice(0, -1).concat([updatedLast])
+        return { patch: { messages: msgs, _acc: acc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
       }
-      return { patch: { messages: msgs, _acc: acc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
+      // No change to messages array — return same reference to skip React re-render
+      return { patch: { _acc: acc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
     }
 
     const msgs = [...slot.messages]
@@ -408,8 +418,7 @@ export function reduceContentBlockStop(slot: ContextSlot): Partial<ContextSlot> 
   // P2 optimization: check last message first to avoid full-array copy + findIndex
   const lastIdx = slot.messages.length - 1
   if (lastIdx >= 0 && slot.messages[lastIdx].id === acc.messageId && slot.messages[lastIdx].kind === 'text') {
-    const msgs = [...slot.messages]
-    const last = msgs[lastIdx] as TextMessage
+    const last = slot.messages[lastIdx] as TextMessage
     const updatedToolCalls = last.toolCalls.map((tc) => {
       const block = acc.toolUseBlocks.get(tc.toolUseId)
       if (!block) return tc
@@ -417,7 +426,8 @@ export function reduceContentBlockStop(slot: ContextSlot): Partial<ContextSlot> 
       try { input = JSON.parse(block.inputJson) } catch {}
       return { ...tc, input, inputJsonPartial: undefined, status: 'running' as const }
     })
-    msgs[lastIdx] = { ...last, toolCalls: updatedToolCalls }
+    const updatedLast = { ...last, toolCalls: updatedToolCalls }
+    const msgs = slot.messages.slice(0, -1).concat([updatedLast])
 
     const writeOrEdit = updatedToolCalls.find(
       (tc) => (tc.toolName === 'Write' || tc.toolName === 'Edit') && tc.status === 'running'
@@ -613,6 +623,8 @@ export function reduceResultMessage(
 
 export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): ConversationMessage[] {
   const messages: ConversationMessage[] = []
+  // Map tool_use_id → index in messages[] for O(1) lookup instead of O(n) linear scan
+  const toolUseIdToMsgIndex = new Map<string, number>()
 
   for (const raw of rawMessages) {
     if (raw.type === 'assistant') {
@@ -625,6 +637,12 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
         if (tu.input && typeof tu.input === 'object') input = tu.input
         return { toolUseId: tu.id || `tu-${Date.now()}`, toolName: tu.name || 'unknown', input, status: 'running' as const }
       })
+
+      const msgIndex = messages.length
+      // Record tool_use block ids → message index for O(1) lookup by subsequent user/system messages
+      for (const tu of content.filter(isToolUseBlock)) {
+        if (tu.id) toolUseIdToMsgIndex.set(tu.id, msgIndex)
+      }
 
       messages.push({
         kind: 'text',
@@ -652,9 +670,10 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
               : JSON.stringify(tr.content)
           const isError = tr.is_error === true
 
-          for (let i = 0; i < messages.length; i++) {
-            if (messages[i].kind !== 'text') continue
-            const msgRef = messages[i] as TextMessage
+          // O(1) Map lookup instead of O(n) linear scan over messages
+          const msgIdx = toolUseIdToMsgIndex.get(toolUseId)
+          if (msgIdx !== undefined) {
+            const msgRef = messages[msgIdx] as TextMessage
             const tcIdx = msgRef.toolCalls.findIndex(tc => tc.toolUseId === toolUseId)
             if (tcIdx >= 0) {
               const updated = [...msgRef.toolCalls]
@@ -663,8 +682,7 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
                 result: resultContent,
                 status: (isError ? 'error' : 'completed') as ToolCallState['status'],
               }
-              messages[i] = { ...msgRef, toolCalls: updated } as TextMessage
-              break
+              messages[msgIdx] = { ...msgRef, toolCalls: updated } as TextMessage
             }
           }
         }
@@ -686,9 +704,10 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
       const sysSubtype = (raw as Record<string, unknown>).subtype as string | undefined
       if (sysSubtype === 'permission_denied') {
         const pd = raw as SystemPermissionDeniedPayload
-        for (let i = 0; i < messages.length; i++) {
-          if (messages[i].kind !== 'text') continue
-          const msgRef = messages[i] as TextMessage
+        // O(1) Map lookup instead of O(n) linear scan over messages
+        const msgIdx = toolUseIdToMsgIndex.get(pd.tool_use_id)
+        if (msgIdx !== undefined) {
+          const msgRef = messages[msgIdx] as TextMessage
           const tcIdx = msgRef.toolCalls.findIndex(tc => tc.toolUseId === pd.tool_use_id)
           if (tcIdx >= 0) {
             const updated = [...msgRef.toolCalls]
@@ -697,8 +716,7 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
               status: 'error' as const,
               result: `Permission denied: ${pd.message}`,
             }
-            messages[i] = { ...msgRef, toolCalls: updated } as TextMessage
-            break
+            messages[msgIdx] = { ...msgRef, toolCalls: updated } as TextMessage
           }
         }
       }

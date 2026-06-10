@@ -12,10 +12,22 @@ import { getSessionRecords, removeSessionRecord, getCompactionSessionIds, addCom
 // NOT appear as user-facing sessions in the sidebar.
 // Initialized from electron-store to survive app restarts.
 
+const MAX_COMPACTION_IDS = 200
+
 const compactionSessionIds = new Set<string>(getCompactionSessionIds())
 
 /** Add a compaction fork ID to the in-memory set (called by query-runner during streaming). */
 export function addCompactionId(id: string): void {
+  // Enforce upper bound to prevent unbounded growth.
+  // Set maintains insertion order, so for...of yields oldest entries first.
+  if (compactionSessionIds.size >= MAX_COMPACTION_IDS) {
+    let toRemove = compactionSessionIds.size - MAX_COMPACTION_IDS + 1
+    for (const oldId of compactionSessionIds) {
+      if (toRemove <= 0) break
+      compactionSessionIds.delete(oldId)
+      toRemove--
+    }
+  }
   compactionSessionIds.add(id)
 }
 

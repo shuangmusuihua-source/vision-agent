@@ -61,15 +61,21 @@ export function toggleSkill(skillId: string, enabled: boolean): string[] {
 // ─── Compaction session IDs (persisted for restart survival) ────────────
 
 const COMPACTION_IDS_KEY = 'compactionSessionIds'
+const MAX_COMPACTION_IDS = 200
 
 export function getCompactionSessionIds(): string[] {
   return (store.get(COMPACTION_IDS_KEY) as string[]) || []
 }
 
 export function addCompactionSessionId(id: string): void {
-  const current = getCompactionSessionIds()
+  let current = getCompactionSessionIds()
   if (!current.includes(id)) {
-    store.set(COMPACTION_IDS_KEY, [...current, id])
+    current.push(id)
+    // Enforce upper bound — drop oldest entries first (array preserves insertion order)
+    if (current.length > MAX_COMPACTION_IDS) {
+      current = current.slice(current.length - MAX_COMPACTION_IDS)
+    }
+    store.set(COMPACTION_IDS_KEY, current)
   }
 }
 
