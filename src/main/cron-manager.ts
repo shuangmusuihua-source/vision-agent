@@ -99,11 +99,8 @@ export async function executeTask(task: CronTask): Promise<void> {
     const messageStream = query({ prompt: task.prompt, options })
     let result = ''
     for await (const message of messageStream) {
-      if (message.type === 'assistant') {
-        const blocks: Array<{ type: string; text?: string }> = (message as any).content ?? []
-        for (const block of blocks) {
-          if (block.type === 'text' && block.text) result += block.text
-        }
+      if (message.type === 'result' && message.subtype === 'success') {
+        result = message.result || ''
       }
     }
 
