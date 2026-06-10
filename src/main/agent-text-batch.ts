@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 
 // ─── Text delta batching ──────────────────────────────────────────────
 // Batch text_delta stream events to reduce IPC/re-render frequency.
@@ -53,13 +54,14 @@ export function flushTextBatch(key: string, win: BrowserWindow): void {
   })
 }
 
-export function isTextDeltaEvent(rawMessage: Record<string, unknown>): string | null {
+export function isTextDeltaEvent(rawMessage: SDKMessage): string | null {
   if (rawMessage.type !== 'stream_event') return null
-  const event = rawMessage.event as Record<string, unknown> | undefined
-  if (event?.type !== 'content_block_delta') return null
-  const delta = event.delta as Record<string, unknown> | undefined
-  if (delta?.type !== 'text_delta') return null
-  return (delta.text as string) || ''
+  // After narrowing, rawMessage is SDKPartialAssistantMessage
+  const event = (rawMessage as SDKPartialAssistantMessage).event
+  if (event.type !== 'content_block_delta') return null
+  const delta = event.delta
+  if (delta.type !== 'text_delta') return null
+  return delta.text || ''
 }
 
 export function scheduleTextBatch(key: string, text: string, uuid: string, sessionId: string, agentContext: string, win: BrowserWindow): void {

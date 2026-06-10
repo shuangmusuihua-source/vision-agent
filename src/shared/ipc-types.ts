@@ -4,6 +4,7 @@
 import type {
   AgentIPCMessage,
   AskUserRequestIPC,
+  ModelProfile,
   PermissionRequestIPC,
   SdkSessionInfo,
   UsageInfo,
@@ -25,7 +26,7 @@ export type IPCChannelMap = {
     response: { started: boolean }
   }
   'agent:abort': {
-    request: 'editor' | 'ask' | undefined
+    request: string | undefined
     response: void
   }
   'agent:selectFolder': {
@@ -36,13 +37,22 @@ export type IPCChannelMap = {
     request: {
       requestId: string
       behavior: 'allow' | 'deny'
+      options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }
     }
     response: { success: boolean }
+  }
+  'agent:setPermissionMode': {
+    request: { context: 'editor' | 'ask'; mode: string }
+    response: { success: boolean }
+  }
+  'agent:forkSession': {
+    request: { sessionId: string; options?: { upToMessageId?: string; title?: string } }
+    response: { success: boolean; sessionId?: string; error?: string }
   }
   'agent:respondAskUser': {
     request: {
       requestId: string
-      answer: string
+      answers: Record<string, string>
     }
     response: { success: boolean }
   }
@@ -52,7 +62,7 @@ export type IPCChannelMap = {
   }
   'agent:loadSessionMessages': {
     request: { sessionId: string }
-    response: Array<Record<string, unknown>>
+    response: AgentIPCMessage[]
   }
 
   // Workspace
@@ -107,11 +117,11 @@ export type IPCChannelMap = {
     response: Record<string, unknown>
   }
   'settings:addProfile': {
-    request: Record<string, unknown>
+    request: ModelProfile
     response: { success: boolean }
   }
   'settings:updateProfile': {
-    request: [string, Partial<Record<string, unknown>>]
+    request: [string, Partial<ModelProfile>]
     response: { success: boolean }
   }
   'settings:removeProfile': {
@@ -218,7 +228,7 @@ export type IPCChannelMap = {
 
 export type IPCEventMap = {
   'agent:event': AgentIPCMessage
-  'agent:sessionCreated': string
+  'agent:sessionCreated': { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }
   'agent:permissionRequest': PermissionRequestIPC
   'agent:askUser': AskUserRequestIPC
   'agent:askUserTimeout': { requestId: string; context: string }

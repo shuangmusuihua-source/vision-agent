@@ -60,8 +60,8 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
     }
   }, [pendingAskAnswer, askDrawerOpen, respondAskUser])
 
-  const handlePermissionRespond = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
-    respondPermission(requestId, behavior)
+  const handlePermissionRespond = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
+    respondPermission(requestId, behavior, options)
   }, [respondPermission])
 
   const handleAskUserRespond = useCallback((answers: Record<string, string>) => {
@@ -103,7 +103,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   const handleChatSend = useCallback((msg: string) => {
     if (askUserRequest && askDrawerRespondRef.current) {
-      askDrawerRespondRef.current(msg)
+      askDrawerRespondRef.current({ answer: msg })
     } else {
       sendMessage(msg)
     }

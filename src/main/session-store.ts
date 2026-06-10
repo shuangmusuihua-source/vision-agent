@@ -1,4 +1,5 @@
-import { listSessions, getSessionMessages, renameSession, deleteSession } from '@anthropic-ai/claude-agent-sdk'
+import { listSessions, getSessionMessages, renameSession, deleteSession, getSessionInfo, tagSession, forkSession as sdkForkSession } from '@anthropic-ai/claude-agent-sdk'
+import type { ForkSessionOptions, SessionMutationOptions } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage } from '../shared/types'
@@ -201,4 +202,48 @@ export async function deleteSdkSession(sessionId: string): Promise<void> {
   compactionSessionIds.delete(sessionId)
   deleteCompactionSessionId(sessionId)
   removeSessionRecord(sessionId)
+}
+
+// ─── SDK Session Operations ──────────────────────────────────────────────
+
+export async function tagSdkSession(sessionId: string, tag: string): Promise<boolean> {
+  try {
+    const cwd = getAppSkillsCwd()
+    const opts: SessionMutationOptions = { dir: cwd }
+    await tagSession(sessionId, tag, opts)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getSdkSessionInfo(sessionId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const cwd = getAppSkillsCwd()
+    const info = await getSessionInfo(sessionId, { dir: cwd })
+    return info as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+export async function forkSdkSession(sessionId: string, options?: ForkSessionOptions): Promise<{ sessionId: string } | null> {
+  try {
+    const cwd = getAppSkillsCwd()
+    const result = await sdkForkSession(sessionId, { ...options, dir: cwd } as ForkSessionOptions)
+    return result as { sessionId: string } | null
+  } catch {
+    return null
+  }
+}
+
+export async function loadSdkSessionMessagesTyped(sessionId: string): Promise<AgentIPCMessage[]> {
+  try {
+    const cwd = getAppSkillsCwd()
+    const raw = await getSessionMessages(sessionId, { dir: cwd })
+    if (!Array.isArray(raw)) return []
+    return raw.map(m => toAgentIPCMessage(m as any)).filter((m): m is AgentIPCMessage => m !== null)
+  } catch {
+    return []
+  }
 }

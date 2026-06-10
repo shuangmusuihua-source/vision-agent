@@ -282,9 +282,9 @@ export function useAgent(context: AgentContext = 'editor') {
     window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath)
   }, [context, store])
 
-  const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
+  const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
     store.getState().handlePermissionResponse(requestId, behavior)
-    window.api.agent.respondPermission(requestId, behavior)
+    window.api.agent.respondPermission(requestId, behavior, options)
   }, [store])
 
   const respondAskUser = useCallback((requestId: string, answers: Record<string, string>) => {
@@ -353,6 +353,10 @@ export function useAgent(context: AgentContext = 'editor') {
 
   const isLoadingMoreMessages = store((s) => s.slots[context]._isLoadingMoreMessages)
 
+  const setPermissionMode = useCallback(async (mode: string) => {
+    await window.api.agent.setPermissionMode(context, mode)
+  }, [context])
+
   return {
     sendMessage,
     respondPermission,
@@ -363,6 +367,7 @@ export function useAgent(context: AgentContext = 'editor') {
     loadMoreMessages,
     hasMoreSdkMessages,
     isLoadingMoreMessages,
+    setPermissionMode,
   }
 }
 

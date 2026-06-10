@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentContext } from '../shared/types'
 
 interface SkillOutputState {
@@ -87,38 +88,36 @@ export class SkillOutputBridge {
    * Process a raw SDK stream event.
    * Called BEFORE toAgentIPCMessage() — operates on the original event structure.
    */
-  processRawEvent(queryKey: string, rawMessage: Record<string, unknown>, activeSkillId: string | null): void {
-    const type = (rawMessage.type as string) || ''
-    if (type !== 'stream_event') return
-
-    const event = rawMessage.event as Record<string, unknown> | undefined
-    if (!event) return
-
+  processRawEvent(queryKey: string, rawMessage: SDKMessage, activeSkillId: string | null): void {
+    if (rawMessage.type !== 'stream_event') return
+    const streamMsg = rawMessage as SDKPartialAssistantMessage
+    const event = streamMsg.event
+    const eventType = event.type
     const s = this.getOrCreate(queryKey)
 
-    const eventType = (event.type as string) || ''
     switch (eventType) {
       case 'content_block_delta': {
-        const delta = event.delta as Record<string, unknown> | undefined
+        const delta = event.delta
         if (!delta) return
-        const deltaType = (delta.type as string) || ''
+        const deltaType = delta.type
 
         if (deltaType === 'text_delta') {
-          this.handleTextDelta(s, queryKey, (delta.text as string) || '', activeSkillId)
+          this.handleTextDelta(s, queryKey, (delta as { text: string }).text || '', activeSkillId)
         }
 
         if (deltaType === 'input_json_delta') {
-          this.handleJsonDelta(s, queryKey, (delta.partial_json as string) || '', activeSkillId)
+          const blockIndex = (event as { index: number }).index || 0
+          this.handleJsonDelta(s, queryKey, (delta as { partial_json: string }).partial_json || '', activeSkillId)
         }
         return
       }
 
       case 'content_block_start': {
-        const block = event.content_block as Record<string, unknown> | undefined
-        if (block && (block.type as string) === 'tool_use') {
-          const name = (block.name as string) || ''
+        const block = (event as { content_block?: unknown }).content_block as { type?: string; name?: string; id?: string } | undefined
+        if (block && block.type === 'tool_use') {
+          const name = block.name || ''
           if (name === 'Write' || name === 'Edit') {
-            const id = (block.id as string) || `tu-${Date.now()}`
+            const id = block.id || `tu-${Date.now()}`
             s.writeAccumulators.set(id, { toolName: name, json: '' })
           }
         }

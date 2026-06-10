@@ -13,6 +13,7 @@ import { restorePersistedTasks } from './cron-manager'
 import { setSkillOutputWindow, handleWindowDestroy, abortActiveQuery } from './agent-manager'
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
+import { flushAuditLog } from './agent-audit'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -188,8 +189,9 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   abortActiveQuery()
   handleWindowDestroy()
   stopAllCronJobs()
+  await flushAuditLog()
 })

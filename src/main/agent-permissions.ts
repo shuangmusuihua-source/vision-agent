@@ -1,10 +1,11 @@
-import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentContext } from '../shared/types'
 import { cancelPermissionNotification } from './notification-manager'
 
 interface PendingPermission {
   resolve: (result: PermissionResult) => void
   input: Record<string, unknown>
+  suggestions?: PermissionUpdate[]
   timeout: ReturnType<typeof setTimeout>
   context: AgentContext
   sessionId?: string
@@ -63,16 +64,29 @@ export function deletePendingAskUser(requestId: string): void {
 
 // ─── Resolution (called from agent-handlers) ────────────────────────────
 
-export function resolvePermission(requestId: string, behavior: 'allow' | 'deny'): void {
+export function resolvePermission(
+  requestId: string,
+  behavior: 'allow' | 'deny',
+  options?: { updatedPermissions?: PermissionUpdate[]; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }
+): void {
   const pending = pendingPermissions.get(requestId)
   if (!pending) return
   pendingPermissions.delete(requestId)
   clearTimeout(pending.timeout)
   cancelPermissionNotification(requestId)
   if (behavior === 'allow') {
-    pending.resolve({ behavior: 'allow', updatedInput: pending.input })
+    pending.resolve({
+      behavior: 'allow',
+      updatedInput: pending.input,
+      updatedPermissions: options?.updatedPermissions,
+      decisionClassification: options?.decisionClassification ?? 'user_temporary',
+    })
   } else {
-    pending.resolve({ behavior: 'deny', message: 'User denied permission' })
+    pending.resolve({
+      behavior: 'deny',
+      message: 'User denied permission',
+      decisionClassification: options?.decisionClassification ?? 'user_reject',
+    })
   }
 }
 

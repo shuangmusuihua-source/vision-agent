@@ -23,7 +23,7 @@ interface AgentPanelProps {
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   permissionQueueLength: number
-  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
+  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void
   askUserRequest: AskUserRequest | null
   onAskUserRespond: (requestId: string, answers: Record<string, string>) => void
   onAskUserDrawerRespond?: (respond: (answers: Record<string, string>) => void) => void

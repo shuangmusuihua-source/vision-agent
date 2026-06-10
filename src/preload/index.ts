@@ -65,8 +65,8 @@ const api = {
     // Request/response channels
     sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string) =>
       ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title),
-    respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
-      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
+    respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) =>
+      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior, options),
     respondAskUser: (requestId: string, answers: Record<string, string>) =>
       ipcRenderer.invoke('agent:respondAskUser', requestId, answers),
     listSdkSessions: (workspaceCwd?: string) => ipcRenderer.invoke('agent:listSdkSessions', workspaceCwd),
@@ -80,7 +80,11 @@ const api = {
       ipcRenderer.invoke('agent:updateSessionRecord', sessionId, patch),
     removeSessionRecord: (sessionId: string) =>
       ipcRenderer.invoke('agent:removeSessionRecord', sessionId),
-    abort: (context?: 'editor' | 'ask') => ipcRenderer.invoke('agent:abort', context),
+    abort: (contextOrSessionId?: string) => ipcRenderer.invoke('agent:abort', contextOrSessionId),
+    setPermissionMode: (context: 'editor' | 'ask', mode: string) =>
+      ipcRenderer.invoke('agent:setPermissionMode', context, mode),
+    forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) =>
+      ipcRenderer.invoke('agent:forkSession', sessionId, options),
     selectFolder: () => ipcRenderer.invoke('agent:selectFolder'),
     getSessionOutputs: (sessionId: string) => ipcRenderer.invoke('agent:getSessionOutputs', sessionId),
     deleteSession: (sessionId: string) => ipcRenderer.invoke('agent:deleteSession', sessionId),
@@ -95,8 +99,8 @@ const api = {
     },
 
     // ── Lifecycle channels (separate for request/response patterns) ──
-    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string }) => callback(data)
+    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }) => callback(data)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },

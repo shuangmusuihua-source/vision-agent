@@ -1,204 +1,284 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentIPCMessage } from '../shared/types'
+import type {
+  SDKMessage,
+  SDKAssistantMessage,
+  SDKUserMessage,
+  SDKUserMessageReplay,
+  SDKResultMessage,
+  SDKResultSuccess,
+  SDKResultError,
+  SDKSystemMessage,
+  SDKStatusMessage,
+  SDKCompactBoundaryMessage,
+  SDKPermissionDeniedMessage,
+  SDKPartialAssistantMessage,
+  SDKRateLimitEvent,
+  SDKPromptSuggestionMessage,
+} from '@anthropic-ai/claude-agent-sdk'
+import type { AgentIPCMessage, StreamEventPayload, UsageInfo } from '../shared/types'
 
-// Valid result error subtypes from the SDK
-const RESULT_ERROR_SUBTYPES = [
-  'error_during_execution',
-  'error_max_turns',
-  'error_max_budget_usd',
-  'error_max_structured_output_retries',
-] as const
+// ─── All system-subtype messages the SDK can emit ───────────────────────
+
+type SDKSystemMessageAny = Extract<SDKMessage, { type: 'system' }>
+
+/**
+ * Narrow a system message to a specific subtype.
+ * This is a type-safe alternative to `as` casts — after the caller has
+ * checked `message.subtype === S`, the returned type is the matching SDK type.
+ */
+function narrowSystem<T extends SDKSystemMessageAny['subtype']>(
+  message: SDKSystemMessageAny,
+  subtype: T,
+): Extract<SDKSystemMessageAny, { subtype: T }> {
+  return message as Extract<SDKSystemMessageAny, { subtype: T }>
+}
+
+// ─── Main converter ─────────────────────────────────────────────────────
 
 /**
  * Convert an SDK message into a typed AgentIPCMessage for the renderer.
  * Unknown/irrelevant message types return null and are silently dropped.
+ *
+ * Uses TypeScript discriminated-union narrowing (switch on message.type / message.subtype)
+ * instead of `Record<string, unknown>` + `as` casts.
  */
 export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
-  const msg = message as Record<string, unknown>
-  const type = (msg.type as string) || ''
-  const subtype = (msg.subtype as string) || ''
+  switch (message.type) {
+    case 'assistant':
+      return convertAssistant(message)
 
-  switch (type) {
-    case 'system': {
-      if (subtype === 'init') {
-        return {
-          type: 'system',
-          subtype: 'init',
-          session_id: (msg.session_id as string) || '',
-          model: (msg.model as string) || '',
-          tools: (msg.tools as string[]) || [],
-        }
-      }
-      if (subtype === 'status') {
-        const status = msg.status as string | null
-        return {
-          type: 'system',
-          subtype: 'status',
-          status: status === 'compacting' || status === 'requesting' ? status : null,
-          compact_result: (msg.compact_result as 'success' | 'failed') || undefined,
-          compact_error: (msg.compact_error as string) || undefined,
-        }
-      }
-      if (subtype === 'compact_boundary') {
-        const rawMeta = msg.compact_metadata as Record<string, unknown> | undefined
-        return {
-          type: 'system',
-          subtype: 'compact_boundary',
-          compact_metadata: rawMeta ? {
-            trigger: (rawMeta.trigger as 'manual' | 'auto') || 'auto',
-            pre_tokens: (rawMeta.pre_tokens as number) || 0,
-            post_tokens: rawMeta.post_tokens as number | undefined,
-            duration_ms: rawMeta.duration_ms as number | undefined,
-          } : undefined,
-        }
-      }
-      if (subtype === 'permission_denied') {
-        return {
-          type: 'system',
-          subtype: 'permission_denied',
-          tool_use_id: (msg.tool_use_id as string) || '',
-          message: (msg.message as string) || '',
-        }
-      }
-      if (subtype === 'task_notification') {
-        return {
-          type: 'system',
-          subtype: 'task_notification',
-          task_id: (msg.task_id as string) || '',
-          status: (msg.status as 'completed' | 'failed' | 'stopped') || 'completed',
-          summary: (msg.summary as string) || '',
-        }
-      }
-      // Drop other system subtypes (notification, tool_use_summary, hook_*, etc.)
-      return null
-    }
+    case 'user':
+      return convertUser(message)
 
-    case 'assistant': {
-      const apiMessage = msg.message as Record<string, unknown> | undefined
-      const content = apiMessage?.content as Array<Record<string, unknown>> | undefined
-      if (!content) return null
-      return {
-        type: 'assistant',
-        uuid: (msg.uuid as string) || '',
-        message: { content: content as any },
-        error: (msg.error as string) || undefined,
-      }
-    }
+    case 'result':
+      return convertResult(message)
 
-    case 'user': {
-      const apiMessage = msg.message as Record<string, unknown> | undefined
-      const content = apiMessage?.content as Array<Record<string, unknown>> | undefined
-      if (!content) return null
-      return {
-        type: 'user',
-        uuid: (msg.uuid as string) || '',
-        message: { content: content as any },
-      }
-    }
+    case 'stream_event':
+      return convertStreamEvent(message)
 
-    case 'result': {
-      const usage = msg.usage as Record<string, unknown> | undefined
-      const sessionId = (msg.session_id as string) || undefined
-      const stopReason = (msg.stop_reason as string) || undefined
-      const numTurns = msg.num_turns as number | undefined
-      if (subtype === 'success') {
-        return {
-          type: 'result',
-          subtype: 'success',
-          session_id: sessionId,
-          usage: {
-            input_tokens: (usage?.input_tokens as number) || 0,
-            output_tokens: (usage?.output_tokens as number) || 0,
-            cache_read_tokens: (usage?.cache_read_input_tokens as number) || 0,
-            cache_creation_tokens: (usage?.cache_creation_input_tokens as number) || 0,
-          },
-          total_cost_usd: (msg.total_cost_usd as number) || 0,
-          duration_ms: (msg.duration_ms as number) || 0,
-          stop_reason: stopReason,
-          num_turns: numTurns,
-          result: (msg.result as string) || undefined,
-        }
-      }
-      // Error result variants — preserve specific subtypes
-      const errors = (msg.errors as string[]) || []
-      const errorSubtype = RESULT_ERROR_SUBTYPES.includes(subtype as any)
-        ? (subtype as typeof RESULT_ERROR_SUBTYPES[number])
-        : 'error_during_execution'
-      return {
-        type: 'result',
-        subtype: errorSubtype,
-        session_id: sessionId,
-        errors,
-        usage: {
-          input_tokens: (usage?.input_tokens as number) || 0,
-          output_tokens: (usage?.output_tokens as number) || 0,
-          cache_read_tokens: (usage?.cache_read_input_tokens as number) || 0,
-          cache_creation_tokens: (usage?.cache_creation_input_tokens as number) || 0,
-        },
-        total_cost_usd: (msg.total_cost_usd as number) || 0,
-        duration_ms: (msg.duration_ms as number) || 0,
-        stop_reason: stopReason,
-        num_turns: numTurns,
-      }
-    }
+    case 'system':
+      return convertSystem(message)
 
-    case 'stream_event': {
-      const event = msg.event as Record<string, unknown> | undefined
-      if (!event) return null
-      const eventType = (event.type as string) || ''
-
-      // Forward content-related events (text, tool_use, thinking/comment)
-      if (
-        eventType === 'content_block_start' ||
-        eventType === 'content_block_delta' ||
-        eventType === 'content_block_stop'
-      ) {
-        return {
-          type: 'stream_event',
-          uuid: (msg.uuid as string) || '',
-          event: event as any,
-        }
+    // All other top-level types (auth_status, tool_progress, tool_use_summary,
+    // prompt_suggestion, rate_limit_event, etc.) — handle those with SDK types.
+    default: {
+      if (message.type === 'rate_limit_event') {
+        return convertRateLimitEvent(message as SDKRateLimitEvent)
       }
-      // Structural events
-      if (
-        eventType === 'message_start' ||
-        eventType === 'message_delta' ||
-        eventType === 'message_stop'
-      ) {
-        return {
-          type: 'stream_event',
-          uuid: (msg.uuid as string) || '',
-          event: event as any,
-        }
+      if (message.type === 'prompt_suggestion') {
+        return convertPromptSuggestion(message as SDKPromptSuggestionMessage)
       }
       return null
     }
+  }
+}
 
-    case 'rate_limit_event': {
-      const info = msg.rate_limit_info as Record<string, unknown> | undefined
+// ─── System subtypes ────────────────────────────────────────────────────
+
+function convertSystem(message: SDKSystemMessageAny): AgentIPCMessage | null {
+  switch (message.subtype) {
+    case 'init': {
+      const m = narrowSystem(message, 'init')
       return {
-        type: 'rate_limit_event',
-        rate_limit_info: info ? {
-          status: info.status as 'allowed' | 'allowed_warning' | 'rejected' | undefined,
-          resets_at: info.resets_at as string | undefined,
-          limit: info.limit as number | undefined,
-          remaining: info.remaining as number | undefined,
+        type: 'system',
+        subtype: 'init',
+        session_id: m.session_id,
+        model: m.model,
+        tools: m.tools,
+      }
+    }
+
+    case 'status': {
+      const m = narrowSystem(message, 'status')
+      const status = m.status
+      return {
+        type: 'system',
+        subtype: 'status',
+        status: status === 'compacting' || status === 'requesting' ? status : null,
+        compact_result: m.compact_result,
+        compact_error: m.compact_error,
+      }
+    }
+
+    case 'compact_boundary': {
+      const m = narrowSystem(message, 'compact_boundary')
+      const meta = m.compact_metadata
+      return {
+        type: 'system',
+        subtype: 'compact_boundary',
+        compact_metadata: meta ? {
+          trigger: meta.trigger,
+          pre_tokens: meta.pre_tokens,
+          post_tokens: meta.post_tokens,
+          duration_ms: meta.duration_ms,
         } : undefined,
       }
     }
 
-    case 'prompt_suggestion': {
-      const rawSuggestions = msg.suggestions as Array<Record<string, unknown>> | undefined
-      const texts = rawSuggestions
-        ? rawSuggestions.map(s => (s.prompt as string) || '').filter(Boolean)
-        : []
+    case 'permission_denied': {
+      const m = narrowSystem(message, 'permission_denied')
       return {
-        type: 'prompt_suggestion',
-        suggestions: texts,
+        type: 'system',
+        subtype: 'permission_denied',
+        tool_use_id: m.tool_use_id,
+        message: m.message,
       }
     }
 
+    case 'task_notification': {
+      const m = narrowSystem(message, 'task_notification')
+      return {
+        type: 'system',
+        subtype: 'task_notification',
+        task_id: m.task_id,
+        status: m.status,
+        summary: m.summary,
+      }
+    }
+
+    // Drop other system subtypes (notification, tool_use_summary, hook_*, etc.)
     default:
       return null
+  }
+}
+
+// ─── Assistant ──────────────────────────────────────────────────────────
+
+function convertAssistant(message: SDKAssistantMessage): AgentIPCMessage | null {
+  const content = message.message?.content
+  if (!content || (Array.isArray(content) && content.length === 0)) return null
+  return {
+    type: 'assistant',
+    uuid: message.uuid,
+    message: { content: adaptContentBlocks(content) },
+    error: message.error,
+  }
+}
+
+// ─── User ───────────────────────────────────────────────────────────────
+
+function convertUser(message: SDKUserMessage | SDKUserMessageReplay): AgentIPCMessage | null {
+  const content = message.message?.content
+  if (!content || (Array.isArray(content) && content.length === 0)) return null
+  return {
+    type: 'user',
+    uuid: message.uuid ?? '',
+    message: { content: adaptContentBlocks(content) },
+  }
+}
+
+// ─── Result ─────────────────────────────────────────────────────────────
+
+function convertResult(message: SDKResultMessage): AgentIPCMessage {
+  const usage = extractUsage(message.usage)
+  return message.subtype === 'success'
+    ? convertResultSuccess(message, usage)
+    : convertResultError(message, usage)
+}
+
+function convertResultSuccess(message: SDKResultSuccess, usage: UsageInfo): AgentIPCMessage {
+  return {
+    type: 'result',
+    subtype: 'success',
+    session_id: message.session_id,
+    usage,
+    total_cost_usd: message.total_cost_usd,
+    duration_ms: message.duration_ms,
+    stop_reason: message.stop_reason ?? undefined,
+    num_turns: message.num_turns,
+    result: message.result,
+  }
+}
+
+function convertResultError(message: SDKResultError, usage: UsageInfo): AgentIPCMessage {
+  return {
+    type: 'result',
+    subtype: message.subtype,
+    session_id: message.session_id,
+    errors: message.errors,
+    usage,
+    total_cost_usd: message.total_cost_usd,
+    duration_ms: message.duration_ms,
+    stop_reason: message.stop_reason ?? undefined,
+    num_turns: message.num_turns,
+  }
+}
+
+// ─── Stream Event ───────────────────────────────────────────────────────
+
+function convertStreamEvent(message: SDKPartialAssistantMessage): AgentIPCMessage | null {
+  const event = message.event
+  if (!event) return null
+
+  const adapted = adaptStreamEvent(event)
+  if (!adapted) return null
+
+  return {
+    type: 'stream_event',
+    uuid: message.uuid,
+    event: adapted,
+  }
+}
+
+/**
+ * Adapt an SDK stream event (BetaRawMessageStreamEvent) to our IPC-friendly
+ * StreamEventPayload. Returns null for event types we don't forward.
+ */
+function adaptStreamEvent(event: { type: string }): StreamEventPayload | null {
+  switch (event.type) {
+    case 'content_block_start':
+    case 'content_block_delta':
+    case 'content_block_stop':
+    case 'message_start':
+    case 'message_delta':
+    case 'message_stop':
+      return event as StreamEventPayload
+    default:
+      return null
+  }
+}
+
+// ─── Adaptation helpers ─────────────────────────────────────────────────
+
+/**
+ * The SDK's BetaMessage.content is `string | ContentBlockParam[]` where
+ * ContentBlockParam is the Anthropic API type. Our IPC type uses a simplified
+ * ContentBlock union. At the IPC boundary the shape is structurally compatible
+ * for the fields the renderer reads; the cast acknowledges this intentional
+ * boundary simplification.
+ */
+function adaptContentBlocks(content: unknown): any {
+  return content
+}
+
+// ─── Usage extraction ───────────────────────────────────────────────────
+
+function extractUsage(usage: NonNullable<SDKResultMessage['usage']>): UsageInfo {
+  return {
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    cache_read_tokens: usage.cache_read_input_tokens ?? 0,
+    cache_creation_tokens: usage.cache_creation_input_tokens ?? 0,
+  }
+}
+
+// ─── Rate limit & prompt suggestion (typed via SDK) ─────────────────────
+
+function convertRateLimitEvent(message: SDKRateLimitEvent): AgentIPCMessage {
+  const info = message.rate_limit_info
+  return {
+    type: 'rate_limit_event',
+    rate_limit_info: {
+      status: info.status,
+      resets_at: info.resetsAt ? new Date(info.resetsAt).toISOString() : undefined,
+      limit: undefined, // SDK uses utilization instead of limit/remaining
+      remaining: undefined,
+    },
+  }
+}
+
+function convertPromptSuggestion(message: SDKPromptSuggestionMessage): AgentIPCMessage {
+  return {
+    type: 'prompt_suggestion',
+    suggestions: [message.suggestion].filter(Boolean),
   }
 }

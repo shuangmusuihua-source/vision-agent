@@ -7,9 +7,9 @@ import type { ReactNode } from 'react'
 // ─── Catalog ──────────────────────────────────────────────────────────
 // Components AI agents can use to produce rich UI in chat messages.
 
-const componentSchema = schema as unknown as Record<string, unknown>
-
-export const catalog = defineCatalog(componentSchema, {
+// The schema value is a complex generic; cast to any for defineCatalog interop.
+// @ts-expect-error — schema generic inference produces `never` for the catalog param
+export const catalog = defineCatalog(schema as any, {
   components: {
     Card: {
       props: z.object({
@@ -24,7 +24,7 @@ export const catalog = defineCatalog(componentSchema, {
           key: z.string(),
           label: z.string(),
         })).describe('列定义'),
-        rows: z.array(z.record(z.unknown())).describe('数据行'),
+        rows: z.array(z.record(z.string(), z.unknown())).describe('数据行'),
       }),
     },
     Metric: {
@@ -147,7 +147,7 @@ export const registry: Record<string, (props: RegistryComponentProps) => ReactNo
       <div style={{ background: S.bg, borderRadius: S.radius, boxShadow: S.shadow, marginBottom: 14, overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px 0' }}>
           <div style={{ fontWeight: 600, fontSize: 15, color: S.text }}>{String(title ?? '')}</div>
-          {description && <div style={{ fontSize: 13, color: S.textMuted, marginTop: 4 }}>{String(description)}</div>}
+          {description != null && <div style={{ fontSize: 13, color: S.textMuted, marginTop: 4 }}>{String(description)}</div>}
         </div>
         {hasKids
           ? <div style={{ padding: '16px 22px 20px', display: 'flex', flexWrap: 'wrap', gap: 10 }}>{children}</div>
@@ -209,10 +209,10 @@ export const registry: Record<string, (props: RegistryComponentProps) => ReactNo
     const { language, title } = element.props || {}
     return (
       <div style={{ background: '#1e1e2e', borderRadius: S.radius, boxShadow: S.shadow, marginBottom: 14, overflow: 'hidden' }}>
-        {(title || language) && (
+        {(title != null || language != null) && (
           <div style={{ padding: '7px 14px', background: 'rgba(255,255,255,.05)', fontSize: 11, color: 'rgba(255,255,255,.45)', display: 'flex', justifyContent: 'space-between' }}>
             <span>{title ? String(title) : ''}</span>
-            {language && <span>{String(language)}</span>}
+            {language != null && <span>{String(language)}</span>}
           </div>
         )}
         <pre style={{ margin: 0, padding: '12px 16px', overflow: 'auto', fontSize: 13, color: '#e2e2f0', lineHeight: 1.5 }}>
@@ -255,7 +255,7 @@ export const registry: Record<string, (props: RegistryComponentProps) => ReactNo
     const { title } = element.props || {}
     return (
       <div style={{ background: S.bg, borderRadius: S.radius, boxShadow: S.shadow, marginBottom: 14, overflow: 'hidden' }}>
-        {title && (
+        {title != null && (
           <div style={{ padding: '14px 18px 0', fontWeight: 600, fontSize: 14, color: S.text }}>
             {String(title)}
           </div>
@@ -428,9 +428,9 @@ export interface JsonRenderSpec {
 export function ComponentRenderer({ spec }: { spec: JsonRenderSpec }) {
   return (
     <StateProvider initialState={{}}>
-      <ActionProvider actions={{}}>
+      <ActionProvider handlers={{}}>
         <VisibilityProvider>
-          <Renderer spec={spec} registry={registry} />
+          <Renderer spec={spec as any} registry={registry as any} />
         </VisibilityProvider>
       </ActionProvider>
     </StateProvider>

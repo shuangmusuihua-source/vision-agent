@@ -23,6 +23,10 @@ export {
   renameSdkSession,
   deleteSdkSession,
   getSdkSessionTotalMessageCount,
+  tagSdkSession,
+  getSdkSessionInfo,
+  forkSdkSession,
+  loadSdkSessionMessagesTyped,
 } from './session-store'
 
 // These are still owned by their original modules; re-exported for compatibility

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join, resolve, basename } from 'path'
 import { execFileSync } from 'child_process'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
-import type { PermissionResult, HookCallback, HookCallbackMatcher } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
@@ -27,38 +27,43 @@ import {
 import { flushTextBatch, scheduleTextBatch, discardTextBatch, discardAllTextBatches, isTextDeltaEvent } from './agent-text-batch'
 import { addCompactionSessionId } from './store'
 import { addCompactionId } from './session-store'
+import { isPathAuthorized } from './agent-path-utils'
+import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
 function buildHooks(mainWindow: BrowserWindow, sessionId?: string, workspaceCwd?: string): Partial<Record<string, HookCallbackMatcher[]>> {
   const auditPreToolUse: HookCallback = async (input, _toolUseID, _options) => {
+    const { tool_name, tool_input } = input as PreToolUseHookInput
     writeAuditLog({
       event: 'PreToolUse',
-      tool: (input as Record<string, unknown>).tool_name,
-      input: JSON.stringify((input as Record<string, unknown>).tool_input).substring(0, 500)
+      tool: tool_name,
+      input: JSON.stringify(tool_input).substring(0, 500)
     })
     return {}
   }
 
   const auditPostToolUse: HookCallback = async (input, _toolUseID, _options) => {
+    const { tool_name, tool_response } = input as PostToolUseHookInput
     writeAuditLog({
       event: 'PostToolUse',
-      tool: (input as Record<string, unknown>).tool_name,
-      result: JSON.stringify((input as Record<string, unknown>).tool_result).substring(0, 500)
+      tool: tool_name,
+      result: JSON.stringify(tool_response).substring(0, 500)
     })
     return {}
   }
 
   const notificationHook: HookCallback = async (input, _toolUseID, _options) => {
-    const msg = (input as Record<string, unknown>).message as string || ''
-    const title = (input as Record<string, unknown>).title as string || ''
-    mainWindow.webContents.send('agent:notification', {
-      type: (input as Record<string, unknown>).notification_type || 'info',
-      message: msg,
-      title,
-      sessionId: sessionId || '',
-      workspaceCwd: workspaceCwd || '',
-    })
+    const { message, title, notification_type } = input as NotificationHookInput
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('agent:notification', {
+        type: notification_type || 'info',
+        message: message || '',
+        title: title || '',
+        sessionId: sessionId || '',
+        workspaceCwd: workspaceCwd || '',
+      })
+    }
     return {}
   }
 
@@ -147,7 +152,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
     canUseTool: async (
       toolName: string,
       input: Record<string, unknown>,
-      options: { signal: AbortSignal; suggestions?: unknown[] }
+      options: Parameters<CanUseTool>[2]
     ): Promise<PermissionResult> => {
       // Respect SDK abort signal — clean up if already aborted
       if (options.signal?.aborted) {
@@ -165,9 +170,9 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         if (rawPath) {
           const agentCwd = getAppSkillsCwd()
           const pathToCheck = resolve(agentCwd, rawPath)
-          const isAuthorized = dirs.some((dir) => pathToCheck.startsWith(resolve(dir)))
+          const isAuth = isPathAuthorized(pathToCheck, dirs)
           const isAppSkill = pathToCheck.startsWith(resolve(getAppSkillsCwd()))
-          if (isAuthorized || isAppSkill) {
+          if (isAuth || isAppSkill) {
             return { behavior: 'allow', updatedInput: input }
           }
         }
@@ -193,22 +198,26 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         })
 
         const firstQ = questionItems[0]
-        mainWindow.webContents.send('agent:askUser', {
-          id: requestId,
-          questions: questionItems,
-          question: firstQ?.question || '',
-          header: firstQ?.header || '',
-          options: firstQ?.options || [],
-          multiSelect: firstQ?.multiSelect || false,
-          context,
-          sessionId: getSessionId?.() || sessionId,
-        })
+        if (!mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('agent:askUser', {
+            id: requestId,
+            questions: questionItems,
+            question: firstQ?.question || '',
+            header: firstQ?.header || '',
+            options: firstQ?.options || [],
+            multiSelect: firstQ?.multiSelect || false,
+            context,
+            sessionId: getSessionId?.() || sessionId,
+          })
+        }
 
         return new Promise<PermissionResult>((resolve) => {
           const timeout = setTimeout(() => {
             if (hasPendingAskUser(requestId)) {
               deletePendingAskUser(requestId)
-              mainWindow.webContents.send('agent:askUserTimeout', { requestId, context })
+              if (!mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('agent:askUserTimeout', { requestId, context })
+              }
               resolve({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
             }
           }, 300000)
@@ -219,18 +228,20 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
       // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      mainWindow.webContents.send('agent:permissionRequest', {
-        id: requestId,
-        toolName,
-        input,
-        context,
-        sessionId: getSessionId?.() || sessionId,
-        // Forward SDK-provided display metadata for richer permission UI
-        title: (options as Record<string, unknown>).title as string | undefined,
-        displayName: (options as Record<string, unknown>).displayName as string | undefined,
-        description: (options as Record<string, unknown>).description as string | undefined,
-        suggestions: (options as Record<string, unknown>).suggestions as unknown[] | undefined,
-      })
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('agent:permissionRequest', {
+          id: requestId,
+          toolName,
+          input,
+          context,
+          sessionId: getSessionId?.() || sessionId,
+          // Forward SDK-provided display metadata for richer permission UI
+          title: (options as Record<string, unknown>).title as string | undefined,
+          displayName: (options as Record<string, unknown>).displayName as string | undefined,
+          description: (options as Record<string, unknown>).description as string | undefined,
+          suggestions: (options as Record<string, unknown>).suggestions as unknown[] | undefined,
+        })
+      }
       schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
@@ -246,7 +257,9 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         if (options.signal) {
           options.signal.addEventListener('abort', () => {
             cleanup()
-            mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
+            if (!mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
+            }
             resolve({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
           }, { once: true })
         }
@@ -255,7 +268,9 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
           if (hasPendingPermission(requestId)) {
             deletePendingPermission(requestId)
             cancelPermissionNotification(requestId)
-            mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
+            if (!mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
+            }
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
@@ -403,23 +418,25 @@ export async function sendMessage(
 
       // Feed raw SDK event to skill output bridge (before conversion)
       const activeSkillId = activeQueries.get(queryKey)?.skillId ?? null
-      _skillOutputBridge.processRawEvent(queryKey, message as Record<string, unknown>, activeSkillId)
+      _skillOutputBridge.processRawEvent(queryKey, message, activeSkillId)
 
-      const rawMsg = message as Record<string, unknown>
-      const textDeltaText = isTextDeltaEvent(rawMsg)
-      const ipcMsg = toAgentIPCMessage(message)
-      // Thread sessionId through every event so the renderer can validate
-      // and drop stale events after a session switch
-      const sessionId = (message.session_id as string) || currentSessionId || ''
-
+      // P1 optimization: check text_delta FIRST — if it is one, batch it and
+      // skip the expensive toAgentIPCMessage conversion (the result is unused).
+      const textDeltaText = isTextDeltaEvent(message)
       if (textDeltaText !== null) {
         // Batch text_delta events: accumulate and flush every ~30ms
-        const uuid = (rawMsg.uuid as string) || ''
+        const uuid = message.uuid || ''
+        const sessionId = message.session_id || currentSessionId || ''
         scheduleTextBatch(queryKey, textDeltaText, uuid, sessionId, context, mainWindow)
       } else {
         // Non-text event (tool_use, content_block_start/stop, result, etc.)
         // Flush any pending text batch FIRST to preserve event ordering
         flushTextBatch(queryKey, mainWindow)
+
+        const ipcMsg = toAgentIPCMessage(message)
+        // Thread sessionId through every event so the renderer can validate
+        // and drop stale events after a session switch
+        const sessionId = message.session_id || currentSessionId || ''
 
         if (ipcMsg) {
           mainWindow.webContents.send('agent:event', { context, sessionId, ...ipcMsg })
@@ -480,16 +497,18 @@ export async function sendMessage(
     } else if (/429|rate.limit|quota/i.test(errMsg)) {
       userMessage = '请求频率过高，请稍后重试。'
     }
-    mainWindow.webContents.send('agent:event', {
-      context,
-      sessionId: currentSessionId || '',
-      type: 'result',
-      subtype: 'error',
-      errors: [userMessage],
-      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
-      total_cost_usd: 0,
-      duration_ms: 0,
-    } as AgentIPCMessage & { context: AgentContext })
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('agent:event', {
+        context,
+        sessionId: currentSessionId || '',
+        type: 'result',
+        subtype: 'error_during_execution',
+        errors: [userMessage],
+        usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
+        total_cost_usd: 0,
+        duration_ms: 0,
+      } as AgentIPCMessage & { context: AgentContext })
+    }
   } finally {
     // Flush any remaining batched text (if stream errored before for-await finished)
     flushTextBatch(queryKey, mainWindow)

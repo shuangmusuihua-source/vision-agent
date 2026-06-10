@@ -386,6 +386,14 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             })
             break
           }
+          case 'rate_limit_event': {
+            // Rate limit events are informational; no state change needed for now
+            break
+          }
+          case 'prompt_suggestion': {
+            // Prompt suggestions are informational; no state change needed for now
+            break
+          }
         }
       } finally {
         _currentEventSessionId = null

@@ -379,6 +379,26 @@ export type SkillOutputState = {
 
 // ─── Permission / AskUser ────────────────────────────────────────────
 
+// Re-export SDK permission types for use across IPC boundary
+export type PermissionBehavior = 'allow' | 'deny' | 'ask'
+
+export type PermissionRuleValue = {
+  toolName: string
+  ruleContent?: string
+}
+
+export type PermissionUpdateDestination = 'userSettings' | 'projectSettings' | 'localSettings' | 'session' | 'cliArg'
+
+export type PermissionUpdate =
+  | { type: 'addRules'; rules: PermissionRuleValue[]; behavior: PermissionBehavior; destination: PermissionUpdateDestination }
+  | { type: 'replaceRules'; rules: PermissionRuleValue[]; behavior: PermissionBehavior; destination: PermissionUpdateDestination }
+  | { type: 'removeRules'; rules: PermissionRuleValue[]; behavior: PermissionBehavior; destination: PermissionUpdateDestination }
+  | { type: 'setMode'; mode: string; destination: PermissionUpdateDestination }
+  | { type: 'addDirectories'; directories: string[]; destination: PermissionUpdateDestination }
+  | { type: 'removeDirectories'; directories: string[]; destination: PermissionUpdateDestination }
+
+export type PermissionDecisionClassification = 'user_temporary' | 'user_permanent' | 'user_reject'
+
 export type PermissionRequestIPC = {
   id: string
   toolName: string
@@ -386,6 +406,12 @@ export type PermissionRequestIPC = {
   description?: string
   context?: AgentContext
   sessionId?: string
+  /** SDK-provided display title (e.g. "Claude wants to read foo.txt") */
+  title?: string
+  /** Short noun phrase for the tool action (e.g. "Read file") */
+  displayName?: string
+  /** SDK-provided permission suggestions for "always allow" */
+  suggestions?: PermissionUpdate[]
 }
 
 export type AskUserQuestionOption = {

@@ -8,6 +8,9 @@ interface AttachedFile {
   name: string
   path: string
   type: 'text' | 'image' | 'pdf'
+  base64?: string
+  mimeType?: string
+  size?: number
 }
 
 interface ChatInputProps {

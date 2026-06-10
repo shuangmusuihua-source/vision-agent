@@ -13,6 +13,7 @@ import type {
   FileEntry,
   ModelProfile,
   SessionOutputs,
+  SkillOutputState,
 } from '../../shared/types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
@@ -28,13 +29,6 @@ interface AppSettings {
   sessions?: import('../../shared/types').SessionRecord[]
   storeVersion?: number
   theme: 'light' | 'dark' | 'system'
-}
-
-interface SkillOutputState {
-  skillId: string | null
-  content: string
-  isStreaming: boolean
-  language: string
 }
 
 // ─── Skill Definition ────────────────────────────────────────────────
@@ -125,7 +119,7 @@ interface SettingsApi {
 
 interface AgentApi {
   sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string) => Promise<{ started: boolean }>
-  respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
+  respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => Promise<{ success: boolean }>
   respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
@@ -133,15 +127,18 @@ interface AgentApi {
   renameSession: (sessionId: string, title: string) => Promise<void>
 	  updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
+  setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean }>
+  forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => Promise<{ success: boolean; sessionId?: string; error?: string }>
   selectFolder: () => Promise<Electron.OpenDialogReturnValue>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
+  removeSessionRecord: (sessionId: string) => Promise<void>
 
   // Unified event channel
   onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void
 
   // Lifecycle channels
-  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string }) => void) => () => void
+  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string; workspacePath?: string }) => void) => () => void
   onPermissionRequest: (callback: (data: PermissionRequestIPC) => void) => () => void
   onAskUser: (callback: (data: AskUserRequestIPC) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void

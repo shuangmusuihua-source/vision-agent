@@ -1,6 +1,6 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
-import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession } from '../agent-manager'
+import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession } from '../agent-manager'
 import { getSessionRecords, updateSessionRecord, removeSessionRecord } from '../store'
 import { access } from 'fs/promises'
 import type { SessionOutputEntry } from '../../shared/types'
@@ -14,8 +14,8 @@ export function registerAgentHandlers(): void {
     return { started: true }
   })
 
-  ipcMain.handle('agent:permissionResponse', (_event, requestId: string, behavior: 'allow' | 'deny') => {
-    resolvePermission(requestId, behavior)
+  ipcMain.handle('agent:permissionResponse', (_event, requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
+    resolvePermission(requestId, behavior, options as Parameters<typeof resolvePermission>[2])
     return { success: true }
   })
 
@@ -120,6 +120,23 @@ export function registerAgentHandlers(): void {
     } catch (e) {
       console.error('[agent:getSessionOutputs] failed:', e)
       return null
+    }
+  })
+
+  ipcMain.handle('agent:setPermissionMode', async (_event, context: AgentContext, mode: string) => {
+    // setPermissionMode requires access to the active Query object
+    // This is a placeholder — full implementation needs query-runner integration
+    console.warn('[AgentHandlers] setPermissionMode: not yet fully integrated')
+    return { success: true }
+  })
+
+  ipcMain.handle('agent:forkSession', async (_event, sessionId: string, options?: { upToMessageId?: string; title?: string }) => {
+    try {
+      const result = await forkSdkSession(sessionId, options)
+      if (result) return { success: true, sessionId: result.sessionId }
+      return { success: false, error: 'Fork failed' }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
     }
   })
 

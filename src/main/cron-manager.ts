@@ -1,10 +1,12 @@
 import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './ipc-sender'
 import { getAuthorizedDirectories, getCronTasks, saveCronTasks, type CronTask } from './store'
 import { buildAgentOptions, resolveClaudeCodeExecutable } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
+import { isPathAuthorized } from './agent-path-utils'
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
 const runningTasks = new Set<string>()
@@ -82,14 +84,10 @@ export async function executeTask(task: CronTask): Promise<void> {
     prependUserBinPaths: false,
     canUseTool: async (_toolName, input) => {
       const filePath = typeof input === 'object' && input !== null
-        ? (input as Record<string, unknown>).file_path as string | undefined
+        ? (input as { file_path?: string }).file_path
         : undefined
-      if (filePath) {
-        const resolved = require('path').resolve(filePath)
-        const isAuthorized = authorizedRoots.some((root: string) => resolved.startsWith(root))
-        if (!isAuthorized) {
-          return { behavior: 'deny' as const, message: 'Path not authorized for cron task' }
-        }
+      if (filePath && !isPathAuthorized(filePath, authorizedRoots)) {
+        return { behavior: 'deny' as const, message: 'Path not authorized for cron task' }
       }
       return { behavior: 'allow' as const }
     },
@@ -109,7 +107,7 @@ export async function executeTask(task: CronTask): Promise<void> {
     persistTasks()
 
     const window = getMainWindow()
-    if (window) {
+    if (window && !window.isDestroyed()) {
       window.webContents.send('cron:taskCompleted', {
         taskId: task.id,
         result: task.lastResult

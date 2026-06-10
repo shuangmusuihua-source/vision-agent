@@ -1083,6 +1083,23 @@
   color: var(--color-action-text);
 }
 
+.drawer-permission-btn--always {
+  background: var(--color-success, #22c55e);
+  color: #fff;
+}
+
+.drawer-permission-btn--always:hover {
+  background: var(--color-success-hover, #16a34a);
+  color: #fff;
+}
+
+.drawer-permission-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
 [data-theme="dark"] .drawer-permission-icon {
   color: var(--color-action);
 }

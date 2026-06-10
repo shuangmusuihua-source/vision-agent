@@ -51,3 +51,21 @@ export function writeAuditLog(entry: Record<string, unknown>): void {
     // silently drop — audit failures must never break agent flow
   }
 }
+
+/**
+ * Flush the audit log buffer immediately. Called on app quit to ensure
+ * pending entries are written before the process exits.
+ */
+export async function flushAuditLog(): Promise<void> {
+  if (auditFlushTimer) {
+    clearTimeout(auditFlushTimer)
+    auditFlushTimer = null
+  }
+  if (auditBuffer.length === 0) return
+  const batch = auditBuffer.splice(0)
+  try {
+    await appendFile(AUDIT_LOG_PATH, batch.join(''), { encoding: 'utf-8' })
+  } catch {
+    // Audit log write failure should not block app exit
+  }
+}

@@ -173,7 +173,7 @@ export function reduceSystemMessage(
     if (boundaryMsg.compact_metadata) {
       const meta = boundaryMsg.compact_metadata
       const preTokens = meta.pre_tokens ? `${Math.round(meta.pre_tokens / 1000)}k` : '?'
-      const postTokens = meta.post_tokens ? `${Math.round(meta.postTokens / 1000)}k` : '?'
+      const postTokens = meta.post_tokens ? `${Math.round(meta.post_tokens / 1000)}k` : '?'
       const compactInfo: StoppedMessage = {
         kind: 'stopped', id: `compact-${Date.now()}`, role: 'assistant', phase: 'stopped',
         textContent: `📦 上下文已压缩: ${preTokens} → ${postTokens} tokens`,
@@ -201,6 +201,9 @@ export function reduceSystemMessage(
       }
       return { patch: { messages: msgs }, events: [] }
     }
+    return { patch: {}, events: [] }
+  }
+  if (msg.subtype === 'task_notification') {
     return { patch: {}, events: [] }
   }
   return { patch: {}, events: [] }
@@ -276,6 +279,17 @@ export function reduceTextDelta(
 
   acc.text += text
 
+  // P2 optimization: the streaming message is almost always the last one.
+  // Check the last message first to avoid full-array copy + findIndex scan.
+  const lastIdx = slot.messages.length - 1
+  if (lastIdx >= 0 && slot.messages[lastIdx].id === acc!.messageId && slot.messages[lastIdx].kind === 'text') {
+    const msgs = [...slot.messages]
+    const last = msgs[lastIdx] as TextMessage
+    msgs[lastIdx] = { ...last, textContent: acc.text, phase: 'streaming' }
+    firstContentSeenDuringThisCall = !slot._firstContentSeen
+    return { patch: { messages: msgs, _acc: acc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
+  }
+
   const msgs = [...slot.messages]
   const idx = msgs.findIndex((m) => m.id === acc!.messageId)
   if (idx >= 0 && msgs[idx].kind === 'text') {
@@ -297,6 +311,20 @@ export function reduceInputJsonDelta(
   if (blocks.length > 0) {
     const [lastId, lastBlock] = blocks[blocks.length - 1]
     acc.toolUseBlocks.set(lastId, { ...lastBlock, inputJson: lastBlock.inputJson + partialJson })
+
+    // P2 optimization: check last message first to avoid full-array copy + findIndex
+    const lastIdx = slot.messages.length - 1
+    if (lastIdx >= 0 && slot.messages[lastIdx].id === acc.messageId && slot.messages[lastIdx].kind === 'text') {
+      const msgs = [...slot.messages]
+      const last = msgs[lastIdx] as TextMessage
+      const updatedToolCalls = last.toolCalls.map((tc) =>
+        tc.toolUseId === lastId
+          ? { ...tc, inputJsonPartial: acc.toolUseBlocks.get(lastId)!.inputJson }
+          : tc
+      )
+      msgs[lastIdx] = { ...last, toolCalls: updatedToolCalls }
+      return { messages: msgs, _acc: acc }
+    }
 
     const msgs = [...slot.messages]
     const idx = msgs.findIndex((m) => m.id === acc.messageId)
@@ -348,6 +376,18 @@ export function reduceContentBlockStart(
       toolUseId: block.id, toolName: name, input: {}, inputJsonPartial: '', status: 'pending',
     }
 
+    // P2 optimization: check last message first to avoid full-array copy + findIndex
+    const lastIdx = slot.messages.length - 1
+    if (lastIdx >= 0 && slot.messages[lastIdx].id === acc!.messageId && slot.messages[lastIdx].kind === 'text') {
+      const msgs = [...slot.messages]
+      const last = msgs[lastIdx] as TextMessage
+      const existing = last.toolCalls.some((tc) => tc.toolUseId === block.id)
+      if (!existing) {
+        msgs[lastIdx] = { ...last, toolCalls: [...last.toolCalls, newToolCall], phase: 'tool_calling' }
+      }
+      return { patch: { messages: msgs, _acc: acc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
+    }
+
     const msgs = [...slot.messages]
     const idx = msgs.findIndex((m) => m.id === acc!.messageId)
     if (idx >= 0 && msgs[idx].kind === 'text') {
@@ -364,6 +404,32 @@ export function reduceContentBlockStart(
 export function reduceContentBlockStop(slot: ContextSlot): Partial<ContextSlot> | null {
   const acc = slot._acc
   if (!acc) return null
+
+  // P2 optimization: check last message first to avoid full-array copy + findIndex
+  const lastIdx = slot.messages.length - 1
+  if (lastIdx >= 0 && slot.messages[lastIdx].id === acc.messageId && slot.messages[lastIdx].kind === 'text') {
+    const msgs = [...slot.messages]
+    const last = msgs[lastIdx] as TextMessage
+    const updatedToolCalls = last.toolCalls.map((tc) => {
+      const block = acc.toolUseBlocks.get(tc.toolUseId)
+      if (!block) return tc
+      let input: Record<string, unknown> = {}
+      try { input = JSON.parse(block.inputJson) } catch {}
+      return { ...tc, input, inputJsonPartial: undefined, status: 'running' as const }
+    })
+    msgs[lastIdx] = { ...last, toolCalls: updatedToolCalls }
+
+    const writeOrEdit = updatedToolCalls.find(
+      (tc) => (tc.toolName === 'Write' || tc.toolName === 'Edit') && tc.status === 'running'
+    )
+    if (writeOrEdit) {
+      const filePath = (writeOrEdit.input as Record<string, unknown>)?.file_path as string
+      if (filePath) {
+        return { messages: msgs, lastEditedFile: filePath, _acc: acc }
+      }
+    }
+    return { messages: msgs, _acc: acc }
+  }
 
   const msgs = [...slot.messages]
   const idx = msgs.findIndex((m) => m.id === acc.messageId)
@@ -638,7 +704,7 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
       }
     } else if (raw.type === 'result') {
       const resultSubtype = (raw as Record<string, unknown>).subtype as string | undefined
-      if (resultSubtype === 'error') {
+      if (resultSubtype?.startsWith('error')) {
         const errorMsg = raw as ResultErrorPayload
         const errorText = errorMsg.errors.join('\n') || 'Agent error'
         const isAborted = /aborted|cancelled|canceled/i.test(errorText)
