@@ -386,7 +386,6 @@ export async function sendMessage(
       options: {
         ...options,
         abortController,
-        ...(currentSessionId ? { resume: currentSessionId } : {})
       }
     })
     activeQueries.set(queryKey, { query: messageStream as Query, skillId: skillId ?? null, abortController, instanceId: queryInstanceId })

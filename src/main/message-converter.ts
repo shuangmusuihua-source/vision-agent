@@ -68,10 +68,12 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
 
     case 'result': {
       const usage = msg.usage as Record<string, unknown> | undefined
+      const sessionId = (msg.session_id as string) || undefined
       if (subtype === 'success') {
         return {
           type: 'result',
           subtype: 'success',
+          session_id: sessionId,
           usage: {
             input_tokens: (usage?.input_tokens as number) || 0,
             output_tokens: (usage?.output_tokens as number) || 0,
@@ -87,6 +89,7 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
       return {
         type: 'result',
         subtype: 'error',
+        session_id: sessionId,
         errors,
         usage: {
           input_tokens: (usage?.input_tokens as number) || 0,

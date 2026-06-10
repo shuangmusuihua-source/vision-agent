@@ -150,6 +150,7 @@ export type UserPayload = {
 export type ResultSuccessPayload = {
   type: 'result'
   subtype: 'success'
+  session_id?: string
   usage: UsageInfo
   total_cost_usd: number
   duration_ms: number
@@ -158,6 +159,7 @@ export type ResultSuccessPayload = {
 export type ResultErrorPayload = {
   type: 'result'
   subtype: 'error'
+  session_id?: string
   errors: string[]
   usage: UsageInfo
   total_cost_usd: number
