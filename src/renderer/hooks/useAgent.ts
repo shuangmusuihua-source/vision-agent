@@ -287,10 +287,10 @@ export function useAgent(context: AgentContext = 'editor') {
     window.api.agent.respondPermission(requestId, behavior)
   }, [store])
 
-  const respondAskUser = useCallback((requestId: string, answer: string) => {
-    store.getState().handleAskUserResponse(requestId, answer)
+  const respondAskUser = useCallback((requestId: string, answers: Record<string, string>) => {
+    store.getState().handleAskUserResponse(requestId, answers)
     store.getState().dispatchAgentEvent({ type: 'ASK_USER_RESPONDED' }, context)
-    window.api.agent.respondAskUser(requestId, answer)
+    window.api.agent.respondAskUser(requestId, answers)
   }, [context, store])
 
   const newSession = useCallback(() => {

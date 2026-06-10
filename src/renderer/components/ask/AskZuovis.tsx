@@ -46,8 +46,8 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   // ── AskUser interaction ──
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
-  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
-  const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
+  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
+  const askDrawerRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
 
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
@@ -55,7 +55,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   useEffect(() => {
     if (pendingAskAnswer && !askDrawerOpen) {
-      respondAskUser(pendingAskAnswer.requestId, pendingAskAnswer.answer)
+      respondAskUser(pendingAskAnswer.requestId, pendingAskAnswer.answers)
       setPendingAskAnswer(null)
     }
   }, [pendingAskAnswer, askDrawerOpen, respondAskUser])
@@ -64,9 +64,9 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
     respondPermission(requestId, behavior)
   }, [respondPermission])
 
-  const handleAskUserRespond = useCallback((answer: string) => {
+  const handleAskUserRespond = useCallback((answers: Record<string, string>) => {
     if (!askUserRequest) return
-    setPendingAskAnswer({ requestId: askUserRequest.id, answer })
+    setPendingAskAnswer({ requestId: askUserRequest.id, answers })
     setAskDrawerOpen(false)
   }, [askUserRequest])
 

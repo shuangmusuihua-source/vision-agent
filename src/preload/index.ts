@@ -67,8 +67,8 @@ const api = {
       ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title),
     respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
-    respondAskUser: (requestId: string, answer: string) =>
-      ipcRenderer.invoke('agent:respondAskUser', requestId, answer),
+    respondAskUser: (requestId: string, answers: Record<string, string>) =>
+      ipcRenderer.invoke('agent:respondAskUser', requestId, answers),
     listSdkSessions: (workspaceCwd?: string) => ipcRenderer.invoke('agent:listSdkSessions', workspaceCwd),
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
@@ -139,7 +139,7 @@ const api = {
   },
 
   memory: {
-    list: () => ipcRenderer.invoke('memory:list'),
+    list: (workspacePath?: string) => ipcRenderer.invoke('memory:list', workspacePath),
     read: (filePath: string) => ipcRenderer.invoke('memory:read', filePath),
     write: (filePath: string, content: string) => ipcRenderer.invoke('memory:write', filePath, content),
     delete: (filePath: string) => ipcRenderer.invoke('memory:delete', filePath)

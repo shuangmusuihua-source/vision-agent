@@ -76,7 +76,7 @@ export function resolvePermission(requestId: string, behavior: 'allow' | 'deny')
   }
 }
 
-export function resolveAskUser(requestId: string, answer: string): void {
+export function resolveAskUser(requestId: string, answers: Record<string, string>): void {
   const pending = pendingAskUser.get(requestId)
   if (!pending) {
     console.warn(`[AgentPermissions] resolveAskUser: ${requestId} not found in pending map`)
@@ -84,12 +84,6 @@ export function resolveAskUser(requestId: string, answer: string): void {
   }
   pendingAskUser.delete(requestId)
   clearTimeout(pending.timeout)
-
-  // Build answers map keyed by question text
-  const questions = pending.originalInput.questions as Array<Record<string, unknown>> | undefined
-  const firstQ = questions?.[0]
-  const questionText = (firstQ?.question as string) || 'answer'
-  const answers = { [questionText]: answer }
 
   try {
     pending.resolve({ behavior: 'allow', updatedInput: { ...pending.originalInput, answers } })

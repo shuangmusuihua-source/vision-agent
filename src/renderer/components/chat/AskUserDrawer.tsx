@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { CornerDownLeft, Check } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { CornerDownLeft, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
 import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
 
@@ -7,40 +7,128 @@ interface AskUserDrawerProps {
   request: AskUserRequest
   open: boolean
   onClose: () => void
-  onRespond: (answer: string) => void
+  onRespond: (answers: Record<string, string>) => void
 }
 
 function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps): React.ReactElement {
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [step, setStep] = useState(0)
+  const [selections, setSelections] = useState<Record<string, Set<string>>>({})
+  const [textInputs, setTextInputs] = useState<Record<string, string>>({})
+  const [freeText, setFreeText] = useState('')
+
+  const questions = request.questions.length > 0 ? request.questions : [{
+    question: request.question,
+    header: request.header,
+    options: request.options,
+    multiSelect: request.multiSelect,
+  }]
+
+  const currentQ = questions[step]
+  const isLastStep = step >= questions.length - 1
+  const totalSteps = questions.length
+
+  const currentSelected = selections[currentQ?.question] || new Set<string>()
+  const currentText = textInputs[currentQ?.question] || ''
 
   const handleToggle = useCallback((label: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(label)) {
-        next.delete(label)
+    setSelections((prev) => {
+      const qKey = currentQ.question
+      const prevSet = prev[qKey] || new Set<string>()
+      const nextSet = new Set(prevSet)
+      if (nextSet.has(label)) {
+        nextSet.delete(label)
       } else {
-        next.add(label)
+        nextSet.add(label)
       }
-      return next
+      return { ...prev, [qKey]: nextSet }
     })
+  }, [currentQ?.question])
+
+  const handleTextInput = useCallback((text: string) => {
+    setTextInputs((prev) => ({ ...prev, [currentQ.question]: text }))
+  }, [currentQ?.question])
+
+  const handleSingleSelect = useCallback((label: string) => {
+    if (currentQ.multiSelect) {
+      handleToggle(label)
+      return
+    }
+    // Single select — submit immediately or advance
+    const qKey = currentQ.question
+    const newSelections = { ...selections, [qKey]: new Set([label]) }
+    setSelections(newSelections)
+
+    if (isLastStep) {
+      // Build final answers map
+      const answers = buildAnswers(newSelections, textInputs, questions)
+      onRespond(answers)
+    } else {
+      setStep((s) => s + 1)
+    }
+  }, [currentQ, isLastStep, selections, textInputs, questions, onRespond, handleToggle])
+
+  const handleMultiSubmit = useCallback(() => {
+    const qKey = currentQ.question
+    const selected = selections[qKey] || new Set()
+    const answer = Array.from(selected).join(', ')
+    const updatedTextInputs = { ...textInputs, [qKey]: answer }
+    setTextInputs(updatedTextInputs)
+
+    if (isLastStep) {
+      const answers = buildAnswers(selections, updatedTextInputs, questions)
+      onRespond(answers)
+    } else {
+      setStep((s) => s + 1)
+    }
+  }, [currentQ?.question, isLastStep, selections, textInputs, questions, onRespond])
+
+  const handleFreeTextSubmit = useCallback(() => {
+    const text = freeText.trim()
+    if (!text) return
+    const qKey = currentQ.question
+    const updatedTextInputs = { ...textInputs, [qKey]: text }
+    if (isLastStep) {
+      const answers = buildAnswers(selections, updatedTextInputs, questions)
+      onRespond(answers)
+    } else {
+      setTextInputs(updatedTextInputs)
+      setFreeText('')
+      setStep((s) => s + 1)
+    }
+  }, [freeText, currentQ?.question, isLastStep, selections, textInputs, questions, onRespond])
+
+  const handlePrev = useCallback(() => {
+    setStep((s) => Math.max(0, s - 1))
+    setFreeText('')
   }, [])
 
-  const handleSubmit = useCallback(() => {
-    if (request.multiSelect) {
-      const answer = Array.from(selected).join(', ')
-      if (answer) onRespond(answer)
-    }
-  }, [selected, request.multiSelect, onRespond])
+  const hasOptions = currentQ?.options && currentQ.options.length > 0
+  const canSubmitMulti = currentQ?.multiSelect && currentSelected.size > 0
+  const canSubmitText = freeText.trim().length > 0
 
   return (
     <InputDrawer open={open} onClose={onClose}>
       <div className="drawer-question">
-        <div className="drawer-question-text">{request.question}</div>
-        {request.options && request.options.length > 0 && (
+        {totalSteps > 1 && (
+          <div className="drawer-question-steps">
+            <button
+              className="drawer-question-step-btn"
+              onClick={handlePrev}
+              disabled={step === 0}
+              aria-label="上一题"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="drawer-question-step-label">{step + 1} / {totalSteps}</span>
+            <div style={{ width: 28 }} />
+          </div>
+        )}
+        <div className="drawer-question-text">{currentQ?.question}</div>
+        {hasOptions && (
           <div className="drawer-question-options">
-            {request.options.map((opt) => {
-              const isSelected = selected.has(opt.label)
-              if (request.multiSelect) {
+            {currentQ.options.map((opt) => {
+              const isSelected = currentSelected.has(opt.label)
+              if (currentQ.multiSelect) {
                 return (
                   <button
                     key={opt.label}
@@ -61,7 +149,7 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
                 <button
                   key={opt.label}
                   className="drawer-question-option"
-                  onClick={() => onRespond(opt.label)}
+                  onClick={() => handleSingleSelect(opt.label)}
                 >
                   <span className="drawer-question-option-label">{opt.label}</span>
                   {opt.description && (
@@ -73,21 +161,43 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
             })}
           </div>
         )}
-        {request.multiSelect && (
+        {currentQ?.multiSelect && (
           <button
-            className={`drawer-question-submit${selected.size > 0 ? '' : ' drawer-question-submit--disabled'}`}
-            onClick={handleSubmit}
-            disabled={selected.size === 0}
+            className={`drawer-question-submit${canSubmitMulti ? '' : ' drawer-question-submit--disabled'}`}
+            onClick={handleMultiSubmit}
+            disabled={!canSubmitMulti}
           >
-            {selected.size > 0 ? `提交所选 (${selected.size})` : '请选择'}
+            {canSubmitMulti
+              ? isLastStep ? `提交 (${currentSelected.size})` : `下一步 (${currentSelected.size})`
+              : '请选择'}
           </button>
         )}
-        {!request.multiSelect && (
+        {!currentQ?.multiSelect && (
           <div className="drawer-question-hint">或直接在下方输入回答</div>
         )}
       </div>
     </InputDrawer>
   )
+}
+
+function buildAnswers(
+  selections: Record<string, Set<string>>,
+  textInputs: Record<string, string>,
+  questions: Array<{ question: string }>
+): Record<string, string> {
+  const answers: Record<string, string> = {}
+  for (const q of questions) {
+    const text = textInputs[q.question]
+    if (text) {
+      answers[q.question] = text
+    } else {
+      const selected = selections[q.question]
+      if (selected && selected.size > 0) {
+        answers[q.question] = Array.from(selected).join(', ')
+      }
+    }
+  }
+  return answers
 }
 
 export default AskUserDrawer

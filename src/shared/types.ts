@@ -351,11 +351,24 @@ export type AskUserQuestionOption = {
   preview?: string
 }
 
-export type AskUserRequestIPC = {
-  id: string
+export type AskUserQuestionItem = {
   question: string
   header?: string
   options: AskUserQuestionOption[]
+  multiSelect: boolean
+}
+
+export type AskUserRequestIPC = {
+  id: string
+  /** All questions from SDK (1-4). Use this for multi-question UI. */
+  questions: AskUserQuestionItem[]
+  /** Convenience: first question text (for backward compat) */
+  question: string
+  /** Convenience: first question header */
+  header?: string
+  /** Convenience: first question options */
+  options: AskUserQuestionOption[]
+  /** Convenience: first question multiSelect */
   multiSelect: boolean
   context?: AgentContext
   sessionId?: string

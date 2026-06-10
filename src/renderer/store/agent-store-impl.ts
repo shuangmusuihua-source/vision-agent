@@ -332,6 +332,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             const streamMsg = msg as StreamEventPayloadIPC
             set((state) => {
               const sourceSlot = resolveSlot(state, ctx)
+              if (!sourceSlot) return {}
               const result = reduceStreamEvent(sourceSlot, streamMsg)
               if (!result.patch) {
                 return {}
@@ -499,7 +500,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       } finally { _currentEventSessionId = null }
     },
 
-    handleAskUserResponse(requestId: string, answer: string) {
+    handleAskUserResponse(requestId: string, answers: Record<string, string>) {
+      const displayAnswer = Object.values(answers).filter(Boolean).join('；') || Object.keys(answers).join(', ')
       set((state) => {
         // 1) Search active slots
         let ctx: AgentContext = state.context
@@ -514,7 +516,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
                 const next = slot.askUserQueue[0] ?? null
                 const rest = slot.askUserQueue.slice(1)
                 return updateSlot(state, 'editor', {
-                  messages: [...slot.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: answer, createdAt: Date.now() }],
+                  messages: [...slot.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: displayAnswer, createdAt: Date.now() }],
                   askUserRequest: next, askUserQueue: rest,
                 })
               } finally { _currentEventSessionId = null }
@@ -529,7 +531,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           const next = s.askUserQueue[0] ?? null
           const rest = s.askUserQueue.slice(1)
           return updateSlot(state, ctx, {
-            messages: [...s.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: answer, createdAt: Date.now() }],
+            messages: [...s.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: displayAnswer, createdAt: Date.now() }],
             askUserRequest: next, askUserQueue: rest,
           })
         } finally { _currentEventSessionId = null }

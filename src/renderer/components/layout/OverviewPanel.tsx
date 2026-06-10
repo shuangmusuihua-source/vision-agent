@@ -1,7 +1,6 @@
 import { FileText, Box, RefreshCw, Loader2, ArrowUpRight } from 'lucide-react'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { SessionOutputEntry } from '../../../shared/types'
-import SessionOverviewCards from './SessionOverviewCards'
 
 interface OverviewPanelProps {
   sessionId: string | null
@@ -80,8 +79,6 @@ function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.Rea
         <h2 className="overview-title">会话文件</h2>
         <span className="overview-file-count">{sessionOutputs.files.length} 个文件</span>
       </div>
-
-      <SessionOverviewCards sessionId={sessionId} />
 
       {documents.length > 0 && (
         <div className="overview-section">

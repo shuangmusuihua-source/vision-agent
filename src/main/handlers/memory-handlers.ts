@@ -8,15 +8,23 @@ import { isPathAuthorized } from '../path-validator'
 export function registerMemoryHandlers(): void {
   ipcMain.handle('memory:list', async () => {
     const dirs = getAuthorizedDirectories()
-    const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
-    const memoryDir = join(cwd, '.vision', 'memory')
-    if (!existsSync(memoryDir)) return []
-    try {
-      const entries = await readdir(memoryDir, { withFileTypes: true })
-      return entries
-        .filter((e) => e.isFile() && extname(e.name) === '.md' && e.name !== 'MEMORY.md')
-        .map((e) => ({ name: e.name.replace(/\.md$/, ''), path: join(memoryDir, e.name) }))
-    } catch (e) { console.error('[memory:list] failed:', memoryDir, e); return [] }
+    const results: Array<{ name: string; path: string }> = []
+    const seen = new Set<string>()
+    for (const cwd of dirs) {
+      const memoryDir = join(cwd, '.vision', 'memory')
+      if (!existsSync(memoryDir)) continue
+      try {
+        const entries = await readdir(memoryDir, { withFileTypes: true })
+        for (const e of entries) {
+          if (!e.isFile() || extname(e.name) !== '.md' || e.name === 'MEMORY.md') continue
+          const name = e.name.replace(/\.md$/, '')
+          if (seen.has(name)) continue
+          seen.add(name)
+          results.push({ name, path: join(memoryDir, e.name) })
+        }
+      } catch (e) { console.error('[memory:list] failed:', memoryDir, e) }
+    }
+    return results
   })
 
   ipcMain.handle('memory:read', async (_event, filePath: string) => {

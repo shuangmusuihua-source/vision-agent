@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, writeFileSync } from 'fs'
 import { join, resolve, basename } from 'path'
 import { execFileSync } from 'child_process'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
@@ -7,7 +7,7 @@ import type { PermissionResult, HookCallback, HookCallbackMatcher } from '@anthr
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
-import type { AgentIPCMessage, AgentContext, AskUserQuestionOption } from '../shared/types'
+import type { AgentIPCMessage, AgentContext, AskUserQuestionOption, AskUserQuestionItem } from '../shared/types'
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
@@ -118,19 +118,8 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
     activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
     workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : '',
-    `## 会话概览
-用户可以说"记一下：xxx"或"记个结论：xxx"来添加待办、备忘或决策卡片。
 
-操作步骤：
-1. 当前会话的 sessionId 在 system init 消息中（第一条消息的 session_id 字段）。如果不知道，用 Bash 执行: ls <工作区>/.vision/session-overviews/ 找到最新的 .json 文件
-2. Read 该文件（不存在则创建）
-3. 生成卡片：{"id":"<uuid>","text":"用户说的内容","type":"todo|memo|decision","done":false,"createdAt":<当前时间戳>}
-4. 合并到 cards 数组，Write 回同一文件
-5. 告知用户"已记录 ✅"
-
-type 选择规则：用户说"待办/做/todo"→todo，说"备忘/记一下/存一下"→memo，说"结论/决策/决定"→decision
-
-你可使用 \`\`\`json-render 代码块输出富交互 UI。支持的组件及属性：
+    `你可使用 \`\`\`json-render 代码块输出富交互 UI。支持的组件及属性：
 - Card: { title: string, description?: string } — 卡片容器，可嵌套子组件
 - Table: { columns: [{ key, label }], rows: [{ key: value }] } — 数据表格
 - Metric: { label: string, value: string, trend?: "up"|"down"|"neutral" } — 指标卡片
@@ -188,25 +177,29 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
       if (toolName === 'AskUserQuestion') {
         const requestId = `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         // SDK format: { questions: [{ question, header, options: [{ label, description }], multiSelect }] }
-        const questions = input.questions as Array<Record<string, unknown>> | undefined
-        if (questions && questions.length > 1) {
-          console.warn(`[AskUserQuestion] received ${questions.length} questions; only the first is supported.`)
-        }
-        const firstQ = questions?.[0]
-        const question = (firstQ?.question as string) || ''
-        const rawOptions = firstQ?.options as Array<Record<string, string>> | undefined
-        const optionsList: AskUserQuestionOption[] = rawOptions?.map((o) => ({
-          label: o.label || '',
-          description: o.description || '',
-        })) || []
-        const multiSelect = (firstQ?.multiSelect as boolean) || false
+        const rawQuestions = input.questions as Array<Record<string, unknown>> | undefined
+        const questionItems: AskUserQuestionItem[] = (rawQuestions || []).map((q) => {
+          const rawOptions = q.options as Array<Record<string, string>> | undefined
+          const opts: AskUserQuestionOption[] = rawOptions?.map((o) => ({
+            label: o.label || '',
+            description: o.description || '',
+          })) || []
+          return {
+            question: (q.question as string) || '',
+            header: (q.header as string) || '',
+            options: opts,
+            multiSelect: (q.multiSelect as boolean) || false,
+          }
+        })
 
+        const firstQ = questionItems[0]
         mainWindow.webContents.send('agent:askUser', {
           id: requestId,
-          question,
-          header: (firstQ?.header as string) || '',
-          options: optionsList,
-          multiSelect,
+          questions: questionItems,
+          question: firstQ?.question || '',
+          header: firstQ?.header || '',
+          options: firstQ?.options || [],
+          multiSelect: firstQ?.multiSelect || false,
           context,
           sessionId: getSessionId?.() || sessionId,
         })
@@ -451,13 +444,6 @@ export async function sendMessage(
           messageCount: 0,
           artifactCount: 0,
         })
-        // Create empty session overview file so Agent can write cards via Write tool
-        const overviewDir = join(effectiveWorkspaceCwd, '.vision', 'session-overviews')
-        mkdirSync(overviewDir, { recursive: true })
-        const overviewPath = join(overviewDir, `${currentSessionId}.json`)
-        if (!existsSync(overviewPath)) {
-          writeFileSync(overviewPath, JSON.stringify({ cards: [] }, null, 2), 'utf-8')
-        }
         mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId, workspacePath: effectiveWorkspaceCwd })
       } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {
         // SDK compacted the session — a new session file was created on disk

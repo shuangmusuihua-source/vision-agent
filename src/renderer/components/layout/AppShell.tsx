@@ -10,8 +10,6 @@ import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 import AskZuovis from '../ask/AskZuovis'
-import SessionHistoryPanel from './SessionHistoryPanel'
-import ArtifactsPanel from './ArtifactsPanel'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 import DaydreamOverlay from './DaydreamOverlay'
@@ -312,7 +310,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const editorPermission = usePermissionRequest('editor')
   const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
-  const editorAskUserRespondRef = useRef<((answer: string) => void) | null>(null)
+  const editorAskUserRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
   const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
@@ -348,18 +346,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       slots: { ...prev.slots, ask: emptySlot() },
     }))
   }, [askIsStreaming])
-
-  const handleSessionHistory = useCallback(() => {
-    useAgentStore.setState({ context: 'editor' })
-    setView('history')
-    clearTab()
-  }, [clearTab])
-
-  const handleArtifacts = useCallback(() => {
-    useAgentStore.setState({ context: 'editor' })
-    setView('artifacts')
-    clearTab()
-  }, [clearTab])
 
   // ── File selection (bridges workspace + tabs) ───────────────────────
 
@@ -550,10 +536,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           }}
         isAskZuovisActive={view === 'ask'}
         onAskZuovisBack={handleAskZuovisBack}
-        onSessionHistory={handleSessionHistory}
-        isSessionHistoryActive={view === 'history'}
-        onArtifacts={handleArtifacts}
-        isArtifactsActive={view === 'artifacts'}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
         showGraph={showGraph}
@@ -564,11 +546,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
-        {view === 'artifacts' ? (
-          <ArtifactsPanel onOpenFile={handleFileSelect} sessionId={activeSessionId ?? undefined} />
-        ) : view === 'history' ? (
-          <SessionHistoryPanel />
-        ) : view === 'ask' ? (
+        {view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
@@ -669,7 +647,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         activeSkillId={activeSkillId}
         chatInput={<ChatInput context="editor" onSend={(msg) => {
           if (editorAskUser && editorAskUserRespondRef.current) {
-            editorAskUserRespondRef.current(msg)
+            const qKey = editorAskUser.questions[0]?.question || 'answer'
+            editorAskUserRespondRef.current({ [qKey]: msg })
           } else {
             editorSendMessage(msg, linkedFile || undefined)
           }

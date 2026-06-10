@@ -25,8 +25,8 @@ interface AgentPanelProps {
   permissionQueueLength: number
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
   askUserRequest: AskUserRequest | null
-  onAskUserRespond: (requestId: string, answer: string) => void
-  onAskUserDrawerRespond?: (respond: (answer: string) => void) => void
+  onAskUserRespond: (requestId: string, answers: Record<string, string>) => void
+  onAskUserDrawerRespond?: (respond: (answers: Record<string, string>) => void) => void
   sessionList: SdkSessionInfo[]
   currentSessionId: string | null
   onSelectSession: (sessionId: string) => void
@@ -44,7 +44,7 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usage
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
-  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
+  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
   const modelDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,14 +57,14 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usage
 
   useEffect(() => {
     if (pendingAskAnswer && !askDrawerOpen) {
-      onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answer)
+      onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answers)
       setPendingAskAnswer(null)
     }
   }, [pendingAskAnswer, askDrawerOpen, onAskUserRespond])
 
-  const handleAskUserRespond = useCallback((answer: string) => {
+  const handleAskUserRespond = useCallback((answers: Record<string, string>) => {
     if (!askUserRequest) return
-    setPendingAskAnswer({ requestId: askUserRequest.id, answer })
+    setPendingAskAnswer({ requestId: askUserRequest.id, answers })
     setAskDrawerOpen(false)
   }, [askUserRequest])
 

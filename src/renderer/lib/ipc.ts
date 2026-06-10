@@ -126,7 +126,7 @@ interface SettingsApi {
 interface AgentApi {
   sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string) => Promise<{ started: boolean }>
   respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
-  respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
+  respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
   loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }>
@@ -207,7 +207,7 @@ interface WindowApi {
 }
 
 interface MemoryApi {
-  list: () => Promise<Array<{ name: string; path: string }>>
+  list: (workspacePath?: string) => Promise<Array<{ name: string; path: string }>>
   read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   write: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   delete: (filePath: string) => Promise<{ success: boolean; error?: string }>

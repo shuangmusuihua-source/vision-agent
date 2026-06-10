@@ -19,8 +19,8 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:respondAskUser', (_event, requestId: string, answer: string) => {
-    resolveAskUser(requestId, answer)
+  ipcMain.handle('agent:respondAskUser', (_event, requestId: string, answers: Record<string, string>) => {
+    resolveAskUser(requestId, answers)
     return { success: true }
   })
 
@@ -84,6 +84,9 @@ export function registerAgentHandlers(): void {
           const input = block.input as Record<string, unknown> | undefined
           const filePath = input?.file_path as string | undefined
           if (!filePath || seen.has(filePath)) continue
+
+          // Skip memory files — these are managed by the Memory sidebar section
+          if (filePath.includes('/.vision/memory/')) continue
 
           // Async file existence check to avoid blocking the main process
           try {

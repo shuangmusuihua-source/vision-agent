@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, Clock, Box, MessageCircle, Loader2, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2 } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -40,10 +40,6 @@ interface SidebarProps {
   isAskZuovisActive: boolean
   isAskZuovisInChat: boolean
   isAskZuovisRunning: boolean
-  onSessionHistory: () => void
-  isSessionHistoryActive: boolean
-  onArtifacts: () => void
-  isArtifactsActive: boolean
   showGraph: boolean
   changedFileCount: number
   collapsed: boolean
@@ -125,10 +121,6 @@ function Sidebar({
   isAskZuovisActive,
   isAskZuovisInChat,
   isAskZuovisRunning,
-  onSessionHistory,
-  isSessionHistoryActive,
-  onArtifacts,
-  isArtifactsActive,
   showGraph,
   changedFileCount,
   collapsed
@@ -251,26 +243,6 @@ function Sidebar({
           )}
         </div>
 
-        <div
-          className={`sidebar-ask-zuovis${isSessionHistoryActive ? ' sidebar-ask-zuovis-active' : ''}`}
-          onClick={onSessionHistory}
-          role="button" tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSessionHistory() } }}
-        >
-          <div className="sidebar-history-icon"><Clock size={12} /></div>
-          <span className="sidebar-ask-zuovis-label">历史会话</span>
-        </div>
-
-        <div
-          className={`sidebar-ask-zuovis${isArtifactsActive ? ' sidebar-ask-zuovis-active' : ''}`}
-          onClick={onArtifacts}
-          role="button" tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onArtifacts() } }}
-        >
-          <div className="sidebar-history-icon sidebar-artifacts-icon"><Box size={12} /></div>
-          <span className="sidebar-ask-zuovis-label">产物</span>
-        </div>
-
         {/* Workspaces with sessions */}
         {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length > 0 && (
           <div className="sidebar-workspace-module-header">
@@ -305,13 +277,16 @@ function Sidebar({
               return (
                 <Flipped key={wsPath} flipId={wsPath}>
                   <div className={`sidebar-workspace-section${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
-                    <div className="sidebar-workspace-header">
-                      <button
-                        className="sidebar-workspace-toggle"
-                        onClick={() => toggleWorkspace(wsPath)}
-                        aria-label={isCollapsed ? '展开工作区' : '折叠工作区'}
-                      >
-                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                    <div
+                      className="sidebar-workspace-header"
+                      onClick={() => toggleWorkspace(wsPath)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleWorkspace(wsPath) } }}
+                      aria-label={isCollapsed ? '展开工作区' : '折叠工作区'}
+                    >
+                      <button className="sidebar-workspace-toggle" tabIndex={-1}>
+                        {isCollapsed ? <FolderClosed size={14} /> : <FolderOpen size={14} />}
                       </button>
                       <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
                       <button
@@ -324,7 +299,7 @@ function Sidebar({
                       {idx > 0 && (
                         <button
                           className="sidebar-workspace-pin"
-                          onClick={() => handlePinToTop(wsPath)}
+                          onClick={(e) => { e.stopPropagation(); handlePinToTop(wsPath) }}
                           title="置顶" aria-label="置顶"
                         >
                           <Pin size={12} />
@@ -332,14 +307,14 @@ function Sidebar({
                       )}
                       <button
                         className="sidebar-workspace-remove"
-                        onClick={() => onRemoveWorkspace(wsPath)}
+                        onClick={(e) => { e.stopPropagation(); onRemoveWorkspace(wsPath) }}
                         title="移除工作区" aria-label="移除工作区"
                       >
                         <X size={12} />
                       </button>
                     </div>
-                    {!isCollapsed && (
-                      <div className="sidebar-workspace-body">
+                    <div className="sidebar-workspace-body">
+                      <div className="sidebar-workspace-body-inner">
                         {/* Session list */}
                         {wsSessions.length === 0 && creatingSessionIn !== wsPath ? (
                           <div className="sidebar-session-empty">暂无会话</div>
@@ -437,7 +412,7 @@ function Sidebar({
                           </div>
                         )}
                       </div>
-                    )}
+                      </div>
                   </div>
                 </Flipped>
               )
