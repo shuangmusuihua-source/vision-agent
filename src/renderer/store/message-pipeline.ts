@@ -155,10 +155,33 @@ export function reduceSystemMessage(
     } else if (statusMsg.status === 'requesting') {
       events.push({ type: 'STATUS_REQUESTING' })
     }
-    return { patch: {}, events }
+    // If compacting finished with failure, inject a system message
+    const patch: Partial<ContextSlot> = {}
+    if (statusMsg.compact_result === 'failed') {
+      const compactErrorNote: StoppedMessage = {
+        kind: 'stopped', id: `compact-err-${Date.now()}`, role: 'assistant', phase: 'stopped',
+        textContent: '⚠️ 上下文压缩失败，对话可能不完整', createdAt: Date.now(),
+      }
+      patch.messages = [...slot.messages, compactErrorNote]
+    }
+    return { patch, events }
   }
   if (msg.subtype === 'compact_boundary') {
-    return { patch: {}, events: [{ type: 'COMPACT_BOUNDARY' }] }
+    const boundaryMsg = msg as SystemCompactBoundaryPayload
+    const patch: Partial<ContextSlot> = {}
+    // Show compaction diagnostic info if available
+    if (boundaryMsg.compact_metadata) {
+      const meta = boundaryMsg.compact_metadata
+      const preTokens = meta.pre_tokens ? `${Math.round(meta.pre_tokens / 1000)}k` : '?'
+      const postTokens = meta.post_tokens ? `${Math.round(meta.postTokens / 1000)}k` : '?'
+      const compactInfo: StoppedMessage = {
+        kind: 'stopped', id: `compact-${Date.now()}`, role: 'assistant', phase: 'stopped',
+        textContent: `📦 上下文已压缩: ${preTokens} → ${postTokens} tokens`,
+        createdAt: Date.now(),
+      }
+      patch.messages = [...slot.messages, compactInfo]
+    }
+    return { patch, events: [{ type: 'COMPACT_BOUNDARY' }] }
   }
   if (msg.subtype === 'permission_denied') {
     const pdMsg = msg as SystemPermissionDeniedPayload
@@ -462,12 +485,35 @@ export function reduceResultMessage(
 ): { patch: Partial<ContextSlot> | null; events: AgentEvent[] } {
   if (msg.subtype === 'success') {
     const resultMsg = msg as ResultSuccessPayload
-    return { patch: { usageInfo: resultMsg.usage }, events: [{ type: 'RESULT_SUCCESS' }] }
+    // Detect output truncation or model refusal
+    let patch: Partial<ContextSlot> = { usageInfo: resultMsg.usage }
+    if (resultMsg.stop_reason === 'max_tokens') {
+      const truncationNote: StoppedMessage = {
+        kind: 'stopped', id: `truncate-${Date.now()}`, role: 'assistant', phase: 'stopped',
+        textContent: '⚠️ 回复被截断（达到最大输出长度），内容可能不完整', createdAt: Date.now(),
+      }
+      patch = { ...patch, messages: [...slot.messages, truncationNote] }
+    } else if (resultMsg.stop_reason === 'refusal') {
+      const refusalNote: StoppedMessage = {
+        kind: 'stopped', id: `refusal-${Date.now()}`, role: 'assistant', phase: 'stopped',
+        textContent: '⚠️ 模型拒绝了此请求', createdAt: Date.now(),
+      }
+      patch = { ...patch, messages: [...slot.messages, refusalNote] }
+    }
+    return { patch, events: [{ type: 'RESULT_SUCCESS' }] }
   }
 
   const errorMsg = msg as ResultErrorPayload
   const errorText = errorMsg.errors.join('\n') || 'Agent error'
   const isAborted = /aborted|cancelled|canceled/i.test(errorText)
+
+  // Map specific error subtypes to user-friendly messages
+  const subtypeMessages: Record<string, string> = {
+    error_max_turns: '已达最大执行轮次限制，任务可能未完成',
+    error_max_budget_usd: '已超出预算限制，任务停止',
+    error_max_structured_output_retries: '结构化输出验证失败次数过多',
+  }
+  const friendlyError = subtypeMessages[errorMsg.subtype]
 
   if (abortGuardGen !== undefined && slot._queryGeneration !== abortGuardGen) {
     return { patch: null, events: [] }
@@ -489,7 +535,7 @@ export function reduceResultMessage(
     patch: {
       messages: [...slot.messages, {
         kind: 'text' as const, id: `error-${Date.now()}`, role: 'assistant', phase: 'error',
-        textContent: errorText, content: [], toolCalls: [], createdAt: Date.now(),
+        textContent: friendlyError || errorText, content: [], toolCalls: [], createdAt: Date.now(),
       }],
       usageInfo: errorMsg.usage,
     },

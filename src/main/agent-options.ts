@@ -73,6 +73,12 @@ export interface AgentOptionsProfile {
   restrictiveBaseUrl?: boolean
   /** Session ID to resume. SDK loads conversation history from this session. */
   resume?: string
+  /** Reasoning effort level. Lower = faster/cheaper, higher = deeper analysis. */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  /** Maximum number of tool-use turns before stopping. */
+  maxTurns?: number
+  /** Maximum cost in USD before stopping. */
+  maxBudgetUsd?: number
 }
 
 /**
@@ -169,6 +175,15 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   }
   if (profile.resume !== undefined) {
     options.resume = profile.resume
+  }
+  if (profile.effort !== undefined) {
+    options.effort = profile.effort
+  }
+  if (profile.maxTurns !== undefined) {
+    options.maxTurns = profile.maxTurns
+  }
+  if (profile.maxBudgetUsd !== undefined) {
+    options.maxBudgetUsd = profile.maxBudgetUsd
   }
 
   return options

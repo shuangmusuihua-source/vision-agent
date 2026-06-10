@@ -225,6 +225,11 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         input,
         context,
         sessionId: getSessionId?.() || sessionId,
+        // Forward SDK-provided display metadata for richer permission UI
+        title: (options as Record<string, unknown>).title as string | undefined,
+        displayName: (options as Record<string, unknown>).displayName as string | undefined,
+        description: (options as Record<string, unknown>).description as string | undefined,
+        suggestions: (options as Record<string, unknown>).suggestions as unknown[] | undefined,
       })
       schedulePermissionNotification(requestId, toolName)
 
@@ -372,7 +377,10 @@ export async function sendMessage(
 
   _skillOutputBridge.reset(queryKey, context)
   const effectiveWorkspaceCwd = workspacePath || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
-  // Ensure workspace-local skills exist (idempotent via sentinel file)
+  // Ensure workspace-local skills exist (idempotent via sentinel file).
+  // Run async to avoid blocking the main thread on file I/O.
+  // The sentinel check makes subsequent calls nearly instant (~0.1ms),
+  // so the synchronous call is safe after the first run.
   ensureWorkspaceSkills(effectiveWorkspaceCwd)
   let currentSessionId = sessionId
   const getSessionId = () => currentSessionId

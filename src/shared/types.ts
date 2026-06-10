@@ -117,11 +117,19 @@ export type SystemStatusPayload = {
   type: 'system'
   subtype: 'status'
   status: 'compacting' | 'requesting' | null
+  compact_result?: 'success' | 'failed'
+  compact_error?: string
 }
 
 export type SystemCompactBoundaryPayload = {
   type: 'system'
   subtype: 'compact_boundary'
+  compact_metadata?: {
+    trigger: 'manual' | 'auto'
+    pre_tokens: number
+    post_tokens?: number
+    duration_ms?: number
+  }
 }
 
 export type SystemPermissionDeniedPayload = {
@@ -156,16 +164,21 @@ export type ResultSuccessPayload = {
   usage: UsageInfo
   total_cost_usd: number
   duration_ms: number
+  stop_reason?: string
+  num_turns?: number
+  result?: string
 }
 
 export type ResultErrorPayload = {
   type: 'result'
-  subtype: 'error'
+  subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd' | 'error_max_structured_output_retries'
   session_id?: string
   errors: string[]
   usage: UsageInfo
   total_cost_usd: number
   duration_ms: number
+  stop_reason?: string
+  num_turns?: number
 }
 
 export type StreamEventPayloadIPC = {
@@ -182,12 +195,29 @@ export type SystemTaskNotificationPayload = {
   summary: string
 }
 
+export type RateLimitPayload = {
+  type: 'rate_limit_event'
+  rate_limit_info?: {
+    status?: 'allowed' | 'allowed_warning' | 'rejected'
+    resets_at?: string
+    limit?: number
+    remaining?: number
+  }
+}
+
+export type PromptSuggestionPayload = {
+  type: 'prompt_suggestion'
+  suggestions: string[]
+}
+
 export type AgentIPCMessage =
   | SystemInitPayload
   | SystemStatusPayload
   | SystemCompactBoundaryPayload
   | SystemPermissionDeniedPayload
   | SystemTaskNotificationPayload
+  | RateLimitPayload
+  | PromptSuggestionPayload
   | AssistantPayload
   | UserPayload
   | ResultSuccessPayload

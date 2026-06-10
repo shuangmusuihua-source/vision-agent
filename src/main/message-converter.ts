@@ -1,6 +1,14 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentIPCMessage } from '../shared/types'
 
+// Valid result error subtypes from the SDK
+const RESULT_ERROR_SUBTYPES = [
+  'error_during_execution',
+  'error_max_turns',
+  'error_max_budget_usd',
+  'error_max_structured_output_retries',
+] as const
+
 /**
  * Convert an SDK message into a typed AgentIPCMessage for the renderer.
  * Unknown/irrelevant message types return null and are silently dropped.
@@ -27,10 +35,22 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
           type: 'system',
           subtype: 'status',
           status: status === 'compacting' || status === 'requesting' ? status : null,
+          compact_result: (msg.compact_result as 'success' | 'failed') || undefined,
+          compact_error: (msg.compact_error as string) || undefined,
         }
       }
       if (subtype === 'compact_boundary') {
-        return { type: 'system', subtype: 'compact_boundary' }
+        const rawMeta = msg.compact_metadata as Record<string, unknown> | undefined
+        return {
+          type: 'system',
+          subtype: 'compact_boundary',
+          compact_metadata: rawMeta ? {
+            trigger: (rawMeta.trigger as 'manual' | 'auto') || 'auto',
+            pre_tokens: (rawMeta.pre_tokens as number) || 0,
+            post_tokens: rawMeta.post_tokens as number | undefined,
+            duration_ms: rawMeta.duration_ms as number | undefined,
+          } : undefined,
+        }
       }
       if (subtype === 'permission_denied') {
         return {
@@ -79,6 +99,8 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
     case 'result': {
       const usage = msg.usage as Record<string, unknown> | undefined
       const sessionId = (msg.session_id as string) || undefined
+      const stopReason = (msg.stop_reason as string) || undefined
+      const numTurns = msg.num_turns as number | undefined
       if (subtype === 'success') {
         return {
           type: 'result',
@@ -92,13 +114,19 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
           },
           total_cost_usd: (msg.total_cost_usd as number) || 0,
           duration_ms: (msg.duration_ms as number) || 0,
+          stop_reason: stopReason,
+          num_turns: numTurns,
+          result: (msg.result as string) || undefined,
         }
       }
-      // Error result variants
+      // Error result variants — preserve specific subtypes
       const errors = (msg.errors as string[]) || []
+      const errorSubtype = RESULT_ERROR_SUBTYPES.includes(subtype as any)
+        ? (subtype as typeof RESULT_ERROR_SUBTYPES[number])
+        : 'error_during_execution'
       return {
         type: 'result',
-        subtype: 'error',
+        subtype: errorSubtype,
         session_id: sessionId,
         errors,
         usage: {
@@ -109,6 +137,8 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
         },
         total_cost_usd: (msg.total_cost_usd as number) || 0,
         duration_ms: (msg.duration_ms as number) || 0,
+        stop_reason: stopReason,
+        num_turns: numTurns,
       }
     }
 
@@ -142,6 +172,30 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
         }
       }
       return null
+    }
+
+    case 'rate_limit_event': {
+      const info = msg.rate_limit_info as Record<string, unknown> | undefined
+      return {
+        type: 'rate_limit_event',
+        rate_limit_info: info ? {
+          status: info.status as 'allowed' | 'allowed_warning' | 'rejected' | undefined,
+          resets_at: info.resets_at as string | undefined,
+          limit: info.limit as number | undefined,
+          remaining: info.remaining as number | undefined,
+        } : undefined,
+      }
+    }
+
+    case 'prompt_suggestion': {
+      const rawSuggestions = msg.suggestions as Array<Record<string, unknown>> | undefined
+      const texts = rawSuggestions
+        ? rawSuggestions.map(s => (s.prompt as string) || '').filter(Boolean)
+        : []
+      return {
+        type: 'prompt_suggestion',
+        suggestions: texts,
+      }
     }
 
     default:
