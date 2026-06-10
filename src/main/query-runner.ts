@@ -407,7 +407,7 @@ export async function sendMessage(
       if (textDeltaText !== null) {
         // Batch text_delta events: accumulate and flush every ~30ms
         const uuid = (rawMsg.uuid as string) || ''
-        scheduleTextBatch(queryKey, textDeltaText, uuid, sessionId, mainWindow)
+        scheduleTextBatch(queryKey, textDeltaText, uuid, sessionId, context, mainWindow)
       } else {
         // Non-text event (tool_use, content_block_start/stop, result, etc.)
         // Flush any pending text batch FIRST to preserve event ordering

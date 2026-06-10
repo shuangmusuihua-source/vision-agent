@@ -45,7 +45,18 @@ let _currentEventSessionId: string | null = null
  */
 function resolveSlot(state: AgentStore, ctx: AgentContext): ContextSlot {
   const sid = _currentEventSessionId
-  if (sid && sid !== state.activeSessionId && state.sessionSlots[sid]) {
+  const slotSid = state.slots[ctx]?.currentSessionId
+  // Use live slot when: no sessionId on event, event matches active session,
+  // event matches slot's session, OR no session is confirmed for this context
+  // yet (sessionCreated hasn't fired). Without the !slotSid guard, auto-created
+  // sessionSlots entries (from updateSlot during system/init) shadow the live
+  // slot before sessionCreated confirms the session, causing FSM transitions
+  // to read stale 'idle' state instead of the actual 'thinking' state.
+  if (!sid || sid === state.activeSessionId || sid === slotSid || !slotSid) {
+    return state.slots[ctx]
+  }
+  // Event is for a different (background) session → use its cached slot
+  if (state.sessionSlots[sid]) {
     return state.sessionSlots[sid]
   }
   return state.slots[ctx]
@@ -138,9 +149,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const ctx = eventContext || get().context
       const eventSid = _currentEventSessionId
       set((state) => {
-        const slot = eventSid && state.sessionSlots[eventSid]
-          ? state.sessionSlots[eventSid]
-          : state.slots[ctx]
+        // Use resolveSlot to get the correct slot — it handles the case
+        // where sessionSlots has an auto-created stale entry that would
+        // shadow the live slot before sessionCreated fires.
+        const slot = resolveSlot(state, ctx)
         const next = transition(slot.agentState, event)
         const slotUpdates: Partial<ContextSlot> = { agentState: next }
 

@@ -40,7 +40,16 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
           message: (msg.message as string) || '',
         }
       }
-      // Drop other system subtypes (notification, task_notification, tool_use_summary)
+      if (subtype === 'task_notification') {
+        return {
+          type: 'system',
+          subtype: 'task_notification',
+          task_id: (msg.task_id as string) || '',
+          status: (msg.status as 'completed' | 'failed' | 'stopped') || 'completed',
+          summary: (msg.summary as string) || '',
+        }
+      }
+      // Drop other system subtypes (notification, tool_use_summary, hook_*, etc.)
       return null
     }
 
@@ -52,6 +61,7 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
         type: 'assistant',
         uuid: (msg.uuid as string) || '',
         message: { content: content as any },
+        error: (msg.error as string) || undefined,
       }
     }
 

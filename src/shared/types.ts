@@ -137,6 +137,8 @@ export type AssistantPayload = {
   message: {
     content: ContentBlock[]
   }
+  /** SDK-level error on this assistant message (authentication_failed, rate_limit, etc.) */
+  error?: string
 }
 
 export type UserPayload = {
@@ -172,11 +174,20 @@ export type StreamEventPayloadIPC = {
   event: StreamEventPayload
 }
 
+export type SystemTaskNotificationPayload = {
+  type: 'system'
+  subtype: 'task_notification'
+  task_id: string
+  status: 'completed' | 'failed' | 'stopped'
+  summary: string
+}
+
 export type AgentIPCMessage =
   | SystemInitPayload
   | SystemStatusPayload
   | SystemCompactBoundaryPayload
   | SystemPermissionDeniedPayload
+  | SystemTaskNotificationPayload
   | AssistantPayload
   | UserPayload
   | ResultSuccessPayload

@@ -149,11 +149,12 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
         />
       ))}
       {isStreaming && (() => {
-        // Keep indicator visible until actual text content arrives,
-        // bridging the gap between thinking→running and the first visible tokens.
+        // "思考中" — thinking phase, before any content arrives
+        // "整理思路中" — running/compacting, but no visible text in the last reply yet.
+        // Once text appears in the bubble, the indicator is no longer needed.
         const lastMsg = messages[messages.length - 1]
-        const hasContent = lastMsg && lastMsg.kind === 'text' && lastMsg.textContent.length > 0
-        if (agentState === 'thinking' || (agentState === 'running' && !hasContent)) {
+        const hasVisibleText = lastMsg?.kind === 'text' && (lastMsg.textContent?.length ?? 0) > 0
+        if (agentState === 'thinking' || ((agentState === 'running' || agentState === 'compacting') && !hasVisibleText)) {
           return (
             <div className="message-bubble message-assistant message-thinking-indicator">
               <div className="message-status-indicator">

@@ -10,12 +10,12 @@ import { BrowserWindow } from 'electron'
 // Keyed by queryKey (sessionId || context) to support parallel streaming
 // across multiple sessions within the same context.
 
-type TextBatchEntry = { context: string; text: string; uuid: string; sessionId: string }
-const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string }>()
+type TextBatchEntry = { context: string; text: string; uuid: string; sessionId: string; agentContext: string }
+const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string; agentContext: string }>()
 
-function ensureBatchSlot(key: string) {
+function ensureBatchSlot(key: string, agentContext: string) {
   if (!textBatches.has(key)) {
-    textBatches.set(key, { entries: [], timer: null, sessionId: '' })
+    textBatches.set(key, { entries: [], timer: null, sessionId: '', agentContext })
   }
   return textBatches.get(key)!
 }
@@ -32,14 +32,16 @@ export function flushTextBatch(key: string, win: BrowserWindow): void {
   const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
   const lastUuid = slot.entries[slot.entries.length - 1].uuid
   const sessionId = slot.sessionId
-  const context = slot.entries[0]?.context || 'editor'
+  // Use the agentContext (editor/ask) stored at batch creation, NOT queryKey context.
+  // queryKey may be a sessionId; agentContext is always the correct AgentContext.
+  const agentContext = slot.agentContext || slot.entries[0]?.context || 'editor'
   slot.entries = []
 
   if (!combinedText || win.isDestroyed()) return
 
   // Emit a single combined stream_event carrying all accumulated text
   win.webContents.send('agent:event', {
-    context,
+    context: agentContext,
     sessionId,
     type: 'stream_event',
     uuid: lastUuid,
@@ -60,9 +62,9 @@ export function isTextDeltaEvent(rawMessage: Record<string, unknown>): string | 
   return (delta.text as string) || ''
 }
 
-export function scheduleTextBatch(key: string, text: string, uuid: string, sessionId: string, win: BrowserWindow): void {
-  const slot = ensureBatchSlot(key)
-  slot.entries.push({ context: key, text, uuid, sessionId })
+export function scheduleTextBatch(key: string, text: string, uuid: string, sessionId: string, agentContext: string, win: BrowserWindow): void {
+  const slot = ensureBatchSlot(key, agentContext)
+  slot.entries.push({ context: key, text, uuid, sessionId, agentContext })
   slot.sessionId = sessionId
 
   if (!slot.timer) {
