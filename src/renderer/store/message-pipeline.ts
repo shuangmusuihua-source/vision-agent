@@ -580,9 +580,20 @@ export function reduceUserMessage(
   msg: UserPayload,
   isReplay: boolean
 ): Partial<ContextSlot> | null {
-  // SDK-injected skill/context messages (isMeta=true): internal context for
-  // the model, not visible conversation. Skip during replay.
-  if ((msg as any).isMeta) return null
+  // SDK-injected skill/context messages (isMeta=true): render as a compact
+  // system info message instead of a misleading user bubble.
+  if (msg.isMeta && isReplay) {
+    const skillName = msg.message.content && typeof msg.message.content !== 'string'
+      ? (msg.message.content as ContentBlock[]).find(b => b.type === 'text')?.text?.split('\n')[0]?.replace('Base directory for this skill: ', '')?.split('/').pop()
+      : undefined
+    return { messages: [...slot.messages, {
+      kind: 'status', id: msg.uuid || `skill-${Date.now()}`, role: 'system',
+      phase: 'complete',
+      textContent: skillName ? `📎 已加载 skill: ${skillName}` : '📎 已加载系统上下文',
+      createdAt: Date.now(),
+    }] }
+  }
+  if (msg.isMeta) return null
 
   // Compaction continuation: SDK-generated context summary, not a user message.
   // Render as a compact system divider instead of a misleading user bubble.
@@ -744,8 +755,19 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
     } else if (raw.type === 'user') {
       const userMsg = raw as UserPayload
 
-      // SDK-injected skill/context messages — skip
-      if ((userMsg as any).isMeta) continue
+      // SDK-injected skill/context messages — render as system info
+      if (userMsg.isMeta) {
+        const skillName = typeof userMsg.message.content !== 'string'
+          ? (userMsg.message.content as ContentBlock[]).find(b => b.type === 'text')?.text?.split('\n')[0]?.replace('Base directory for this skill: ', '')?.split('/').pop()
+          : undefined
+        messages.push({
+          kind: 'status', id: userMsg.uuid || `skill-${Date.now()}`, role: 'system',
+          phase: 'complete',
+          textContent: skillName ? `📎 已加载 skill: ${skillName}` : '📎 已加载系统上下文',
+          createdAt: Date.now(),
+        })
+        continue
+      }
 
       // Compaction continuation: render as system divider, not user bubble
       if (isCompactionContinuation(userMsg.message.content)) {

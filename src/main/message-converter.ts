@@ -162,6 +162,9 @@ function convertUser(message: SDKUserMessage | SDKUserMessageReplay): AgentIPCMe
   return {
     type: 'user',
     uuid: message.uuid ?? '',
+    // Preserve isMeta flag so the renderer can distinguish SDK-injected
+    // context messages (skill prompts, etc.) from real user messages.
+    ...((message as any).isMeta === true ? { isMeta: true as const } : {}),
     message: { content: adaptContentBlocks(content) },
   }
 }

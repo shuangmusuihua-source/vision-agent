@@ -154,6 +154,8 @@ export type AssistantPayload = {
 export type UserPayload = {
   type: 'user'
   uuid: string
+  // SDK-injected skill/context messages (not user-typed)
+  isMeta?: true
   message: {
     // SDK compaction produces a plain string (continuation summary) instead
     // of an array of content blocks for continuation user messages.

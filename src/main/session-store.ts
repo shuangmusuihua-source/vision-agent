@@ -180,14 +180,7 @@ function readSessionJsonlDirect(sessionId: string): Array<Record<string, unknown
     return lines.map(line => {
       try { return JSON.parse(line) as Record<string, unknown> }
       catch { return null }
-    }).filter((entry): entry is Record<string, unknown> => {
-      if (!entry) return false
-      // Skip SDK-internal metadata (skill injections, system notices) that
-      // are not part of the visible conversation.  The SDK marks these with
-      // `isMeta: true` in the JSONL.
-      if (entry.isMeta === true) return false
-      return true
-    }) as Array<Record<string, unknown>>
+    }).filter(Boolean) as Array<Record<string, unknown>>
   } catch (err) {
     console.error('[SessionStore] Direct JSONL read failed:', (err as Error).message)
     return null
