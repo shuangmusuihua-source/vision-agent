@@ -571,11 +571,28 @@ function normalizeContent(content: unknown): ContentBlock[] {
   return []
 }
 
+function isCompactionContinuation(content: unknown): content is string {
+  return typeof content === 'string'
+}
+
 export function reduceUserMessage(
   slot: ContextSlot,
   msg: UserPayload,
   isReplay: boolean
 ): Partial<ContextSlot> | null {
+  // Compaction continuation: SDK-generated context summary, not a user message.
+  // Render as a compact system divider instead of a misleading user bubble.
+  if (isCompactionContinuation(msg.message.content)) {
+    if (isReplay) {
+      return { messages: [...slot.messages, {
+        kind: 'status', id: msg.uuid || `compaction-${Date.now()}`, role: 'system',
+        phase: 'complete', textContent: '📋 上下文压缩 · 以上历史已摘要',
+        createdAt: Date.now(),
+      }] }
+    }
+    return null
+  }
+
   const content = normalizeContent(msg.message.content)
   const toolResults = content.filter(isToolResultBlock)
   const textBlocks = content.filter(isTextBlock)
@@ -722,6 +739,17 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
       })
     } else if (raw.type === 'user') {
       const userMsg = raw as UserPayload
+
+      // Compaction continuation: render as system divider, not user bubble
+      if (isCompactionContinuation(userMsg.message.content)) {
+        messages.push({
+          kind: 'status', id: userMsg.uuid || `compaction-${Date.now()}`, role: 'system',
+          phase: 'complete', textContent: '📋 上下文压缩 · 以上历史已摘要',
+          createdAt: Date.now(),
+        })
+        continue
+      }
+
       const content = normalizeContent(userMsg.message.content)
       const toolResults = content.filter(isToolResultBlock)
       const textBlocks = content.filter(isTextBlock)
