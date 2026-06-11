@@ -862,12 +862,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       try {
         const INITIAL_LIMIT = 200
-        const { messages: rawMessages } = await window.api.agent.loadSessionMessagesPaginated(
+        const { messages: rawMessages, offset: rawOffset } = await window.api.agent.loadSessionMessagesPaginated(
           sessionId, INITIAL_LIMIT + 1, 0
         )
         const hasMore = rawMessages.length > INITIAL_LIMIT
         const messages = hasMore ? rawMessages.slice(0, INITIAL_LIMIT) : rawMessages
         const loadedCount = messages.length
+        const paginationOffset = rawOffset
 
         if (get().activeSessionId.editor !== sessionId) {
           set((state) => ({
@@ -886,8 +887,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             workspacePath: curSlot.workspacePath || state.activeWorkspacePath,
             currentSessionId: sessionId,
             _needsSdkLoad: false,
-            _sdkLoadedCount: loadedCount,
-            _sdkLoadOffset: loadedCount,
+            _sdkLoadedCount: paginationOffset,
+            _sdkLoadOffset: paginationOffset,
             _isLoadingMoreMessages: true,
           }
           return {
@@ -905,8 +906,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           const finalSlot: ContextSlot = {
             ...editorSlot,
             _needsSdkLoad: hasMore,
-            _sdkLoadedCount: loadedCount,
-            _sdkLoadOffset: loadedCount,
+            _sdkLoadedCount: paginationOffset,
+            _sdkLoadOffset: paginationOffset,
             _isLoadingMoreMessages: false,
           }
           return {
@@ -946,16 +947,14 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       try {
         const LOAD_MORE_LIMIT = 100
-        const { messages: olderRawMessages } = await window.api.agent.loadSessionMessagesPaginated(
+        const { messages: olderRawMessages, offset: olderRawOffset } = await window.api.agent.loadSessionMessagesPaginated(
           sessionId, LOAD_MORE_LIMIT + 1, nextOffset
         )
         const hasMore = olderRawMessages.length > LOAD_MORE_LIMIT
         const olderMessages = hasMore ? olderRawMessages.slice(0, LOAD_MORE_LIMIT) : olderRawMessages
-        const loadedCount = olderMessages.length
 
         const olderBuiltMessages = buildReplayedMessages(olderMessages)
-        const newTotal = slot._sdkLoadedCount + loadedCount
-        const newOffset = nextOffset + loadedCount
+        const newTotal = olderRawOffset
 
         set((state) => {
           const editorSlot = state.slots.editor
@@ -964,8 +963,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           const updatedEditorSlot: ContextSlot = {
             ...editorSlot,
             messages: [...olderBuiltMessages, ...currentMessages],
-            _sdkLoadOffset: newOffset,
-            _sdkLoadedCount: newTotal,
+            _sdkLoadOffset: olderRawOffset,
+            _sdkLoadedCount: olderRawOffset,
             _needsSdkLoad: hasMore,
             _isLoadingMoreMessages: false,
           }

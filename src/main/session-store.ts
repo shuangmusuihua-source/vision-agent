@@ -220,16 +220,31 @@ export async function loadSdkSessionMessagesPaginated(
 ): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }> {
   // Direct JSONL read — SDK API truncates pre-compaction messages.
   const direct = readSessionJsonlDirect(sessionId)
-  const rawMessages = direct
-    ? direct.slice(offset, offset + limit)
-    : await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
+  let nextOffset = offset
+  if (direct) {
+    const slice = direct.slice(offset, offset + limit)
+    const messages: AgentIPCMessage[] = []
+    let consumed = 0
+    for (const m of slice) {
+      const converted = toAgentIPCMessage(m as any)
+      consumed++
+      if (converted) messages.push(converted)
+    }
+    // Return the RAW JSONL line count as nextOffset so the renderer's
+    // _sdkLoadOffset stays in sync with the JSONL file position.
+    // Using converted count would cause the next page to overlap or skip.
+    nextOffset = offset + consumed
+    return { messages, offset: nextOffset, limit }
+  }
 
+  // Fallback to SDK API
+  const sdkMessages = await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
   const messages: AgentIPCMessage[] = []
-  for (const m of rawMessages) {
+  for (const m of sdkMessages) {
     const converted = toAgentIPCMessage(m as any)
     if (converted) messages.push(converted)
   }
-  return { messages, offset, limit }
+  return { messages, offset: offset + sdkMessages.length, limit }
 }
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
