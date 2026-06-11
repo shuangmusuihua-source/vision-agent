@@ -567,6 +567,18 @@ export function reduceUserMessage(
   isReplay: boolean
 ): Partial<ContextSlot> | null {
   const content = msg.message.content
+  // SDK compaction produces user messages with a plain string content
+  // (e.g. "This session is being continued from a previous conversation...").
+  // Without this guard, .filter() throws TypeError and crashes replay.
+  if (typeof content === 'string') {
+    if (isReplay) {
+      return { messages: [...slot.messages, {
+        kind: 'user', id: msg.uuid || `user-${Date.now()}`, role: 'user',
+        textContent: content, createdAt: Date.now(),
+      }] }
+    }
+    return null
+  }
   const toolResults = content.filter(isToolResultBlock)
   const textBlocks = content.filter(isTextBlock)
   const msgs = [...slot.messages]
