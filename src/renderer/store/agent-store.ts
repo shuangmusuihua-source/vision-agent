@@ -33,6 +33,7 @@ export type ContextSlot = {
   activeSkillId: string | null
   lastEditedFile: string | null
   prefillText: string | null
+  ttftMs: number | null
   workspacePath: string | null
   _needsSdkLoad: boolean
   _sdkLoadedCount: number
@@ -60,6 +61,7 @@ function emptySlot(): ContextSlot {
     activeSkillId: null,
     lastEditedFile: null,
     prefillText: null,
+    ttftMs: null,
     workspacePath: null,
     _needsSdkLoad: false,
     _sdkLoadedCount: 0,
@@ -105,7 +107,7 @@ export type AgentStore = {
   sessionOutputsLoading: boolean
 
   // Actions
-  dispatchAgentEvent: (event: AgentEvent, context?: AgentContext) => void
+  dispatchAgentEvent: (event: AgentEvent, context?: AgentContext, eventSid?: string | null) => void
   processIPCMessage: (msg: AgentIPCMessage & { context?: AgentContext }, options?: { isReplay?: boolean }) => void
   handlePermissionRequest: (req: PermissionRequestIPC) => void
   handlePermissionResponse: (requestId: string, behavior: 'allow' | 'deny') => void

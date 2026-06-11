@@ -82,10 +82,12 @@ export type StreamContentBlockStop = {
 
 export type StreamMessageStart = {
   type: 'message_start'
+  ttft_ms?: number
 }
 
 export type StreamMessageDelta = {
   type: 'message_delta'
+  stop_reason?: string
 }
 
 export type StreamMessageStop = {

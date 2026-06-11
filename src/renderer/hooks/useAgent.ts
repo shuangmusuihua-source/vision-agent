@@ -400,6 +400,7 @@ export const useAskUserRequest = (context: AgentContext) => useAgentStore((s) =>
 })
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) => s.slots[context].lastEditedFile)
+export const useTtftMs = (context: AgentContext) => useAgentStore((s) => s.slots[context].ttftMs)
 export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
 export const useSkillOutput = (context: AgentContext) => useAgentStore((s) => s.slots[context].skillOutput)

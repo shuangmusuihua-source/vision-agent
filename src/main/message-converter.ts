@@ -209,7 +209,7 @@ function convertStreamEvent(message: SDKPartialAssistantMessage): AgentIPCMessag
   const event = message.event
   if (!event) return null
 
-  const adapted = adaptStreamEvent(event)
+  const adapted = adaptStreamEvent(event, message.ttft_ms)
   if (!adapted) return null
 
   return {
@@ -223,11 +223,14 @@ function convertStreamEvent(message: SDKPartialAssistantMessage): AgentIPCMessag
  * Adapt an SDK stream event (BetaRawMessageStreamEvent) to our IPC-friendly
  * StreamEventPayload. Returns null for event types we don't forward.
  *
- * message_start / message_delta / message_stop are filtered out on the main
- * process side because the renderer discards them immediately after receiving
- * — forwarding them across IPC is pure overhead.
+ * ttft_ms lives on the parent SDKPartialAssistantMessage, not inside the event
+ * itself — it's passed down from convertStreamEvent so message_start can carry it.
+ *
+ * message_start is forwarded when ttft_ms is present (latency display).
+ * message_delta / message_stop are still filtered — the renderer has no use
+ * for them yet and forwarding them is pure overhead.
  */
-function adaptStreamEvent(event: { type: string }): StreamEventPayload | null {
+function adaptStreamEvent(event: { type: string }, ttftMs?: number): StreamEventPayload | null {
   switch (event.type) {
     // Forwarded: content events carry the actual text/tool-use deltas
     case 'content_block_start':
@@ -235,9 +238,15 @@ function adaptStreamEvent(event: { type: string }): StreamEventPayload | null {
     case 'content_block_stop':
       return event as StreamEventPayload
 
-    // Filtered: message-level lifecycle events are unused by the renderer
-    // (message_start, message_delta, message_stop) — fall through to default → null
+    // Forward message_start only when ttft_ms is present — useful for latency display
+    case 'message_start': {
+      if (ttftMs != null) {
+        return { type: 'message_start', ttft_ms: ttftMs } as StreamEventPayload
+      }
+      return null
+    }
 
+    // Filtered: message_delta and message_stop are unused by the renderer
     default:
       return null
   }

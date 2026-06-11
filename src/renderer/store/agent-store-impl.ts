@@ -34,19 +34,17 @@ import {
 
 const MAX_SESSION_SLOTS = 30
 
-let _currentEventSessionId: string | null = null
-
 /**
  * Resolve the correct source slot for a reducer call.
- * When _currentEventSessionId is set and the event belongs to an inactive
+ * When eventSid is set and the event belongs to an inactive
  * session (i.e. the session is cached in sessionSlots but is not the active
  * one), we must read from sessionSlots[sid] — NOT from slots[ctx] which
  * now belongs to the active session.  Reading from slots[ctx] would cause
  * the reducer to operate on the wrong session's state, corrupting the
  * cached slot when the patch is written back via updateSlot.
  */
-function resolveSlot(state: AgentStore, ctx: AgentContext): ContextSlot {
-  const sid = _currentEventSessionId
+function resolveSlot(state: AgentStore, ctx: AgentContext, eventSid?: string | null): ContextSlot {
+  const sid = eventSid || null
   const slotSid = state.slots[ctx]?.currentSessionId
   // Use live slot when: no sessionId on event, event matches active session,
   // event matches slot's session, OR no session is confirmed for this context
@@ -67,9 +65,10 @@ function resolveSlot(state: AgentStore, ctx: AgentContext): ContextSlot {
 function updateSlot(
   state: AgentStore,
   ctx: AgentContext,
-  patch: Partial<ContextSlot>
+  patch: Partial<ContextSlot>,
+  eventSid?: string | null
 ): Partial<AgentStore> {
-  const sid = _currentEventSessionId
+  const sid = eventSid || null
   if (sid) {
     // Defensive: auto-create session slot if missing (handles race where
     // stream_event arrives before sessionCreated creates the slot)
@@ -167,12 +166,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
   function dispatchEffectEvents(eventSid: string | null, events: AgentEvent[], ctx: AgentContext) {
     for (const event of events) {
-      _currentEventSessionId = eventSid
-      try {
-        get().dispatchAgentEvent(event, ctx)
-      } finally {
-        _currentEventSessionId = null
-      }
+      get().dispatchAgentEvent(event, ctx, eventSid)
     }
   }
 
@@ -192,14 +186,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     // ─── State Machine ──────────────────────────────────────────────────
 
-    dispatchAgentEvent(event: AgentEvent, eventContext?: AgentContext) {
+    dispatchAgentEvent(event: AgentEvent, eventContext?: AgentContext, eventSid?: string | null) {
       const ctx = eventContext || get().context
-      const eventSid = _currentEventSessionId
       set((state) => {
         // Use resolveSlot to get the correct slot — it handles the case
         // where sessionSlots has an auto-created stale entry that would
         // shadow the live slot before sessionCreated fires.
-        const slot = resolveSlot(state, ctx)
+        const slot = resolveSlot(state, ctx, eventSid)
         const next = transition(slot.agentState, event)
         const slotUpdates: Partial<ContextSlot> = { agentState: next }
 
@@ -302,7 +295,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates.messages = msgs
         }
 
-        return updateSlot(state, ctx, slotUpdates)
+        return updateSlot(state, ctx, slotUpdates, eventSid)
       })
     },
 
@@ -315,9 +308,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         || ((msg as Record<string, unknown>).session_id as string)
         || undefined
 
-      _currentEventSessionId = eventSessionId || null
-
-      try {
+      
         // For replay, use a different dispatch path that doesn't involve reducers
         if (isReplay) {
           // Replay: stream events are skipped, others follow the normal path
@@ -329,20 +320,20 @@ export const useAgentStore = create<AgentStore>((set, get) => {
                 get().slots[ctx], msg as unknown as AgentIPCMessage & { subtype?: string; session_id?: string; message?: string; tool_use_id?: string }
               )
               if (Object.keys(patch).length > 0) {
-                set((state) => updateSlot(state, ctx, patch))
+                set((state) => updateSlot(state, ctx, patch, eventSessionId))
               }
               dispatchEffectEvents(eventSessionId || null, events, ctx)
               break
             }
             case 'assistant': {
               const { patch, events } = reduceAssistantMessage(get().slots[ctx], msg as AssistantPayload)
-              set((state) => updateSlot(state, ctx, patch))
+              set((state) => updateSlot(state, ctx, patch, eventSessionId))
               dispatchEffectEvents(eventSessionId || null, events, ctx)
               break
             }
             case 'user': {
               const patch = reduceUserMessage(get().slots[ctx], msg as UserPayload, isReplay)
-              if (patch) set((state) => updateSlot(state, ctx, patch))
+              if (patch) set((state) => updateSlot(state, ctx, patch, eventSessionId))
               break
             }
             case 'result': {
@@ -351,7 +342,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
                 msg as AgentIPCMessage & { subtype?: string },
                 get().slots[ctx]._resultGuardGen
               )
-              if (patch) set((state) => updateSlot(state, ctx, patch))
+              if (patch) set((state) => updateSlot(state, ctx, patch, eventSessionId))
               dispatchEffectEvents(eventSessionId || null, events, ctx)
               break
             }
@@ -363,7 +354,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         switch (msg.type) {
           case 'system': {
             set((state) => {
-              const sourceSlot = resolveSlot(state, ctx)
+              const sourceSlot = resolveSlot(state, ctx, eventSessionId)
               const { patch, events } = reduceSystemMessage(
                 sourceSlot, msg as unknown as AgentIPCMessage & { subtype?: string; session_id?: string; message?: string; tool_use_id?: string }
               )
@@ -372,25 +363,25 @@ export const useAgentStore = create<AgentStore>((set, get) => {
               if (events.length > 0) {
                 setTimeout(() => dispatchEffectEvents(eventSessionId || null, events, ctx), 0)
               }
-              return Object.keys(patch).length > 0 ? updateSlot(state, ctx, patch) : {}
+              return Object.keys(patch).length > 0 ? updateSlot(state, ctx, patch, eventSessionId) : {}
             })
             break
           }
           case 'assistant': {
             set((state) => {
-              const sourceSlot = resolveSlot(state, ctx)
+              const sourceSlot = resolveSlot(state, ctx, eventSessionId)
               const { patch, events } = reduceAssistantMessage(sourceSlot, msg as AssistantPayload)
               if (events.length > 0) {
                 setTimeout(() => dispatchEffectEvents(eventSessionId || null, events, ctx), 0)
               }
-              return updateSlot(state, ctx, patch)
+              return updateSlot(state, ctx, patch, eventSessionId)
             })
             break
           }
           case 'stream_event': {
             const streamMsg = msg as StreamEventPayloadIPC
             set((state) => {
-              const sourceSlot = resolveSlot(state, ctx)
+              const sourceSlot = resolveSlot(state, ctx, eventSessionId)
               if (!sourceSlot) return {}
               const result = reduceStreamEvent(sourceSlot, streamMsg)
               if (!result.patch) {
@@ -405,21 +396,21 @@ export const useAgentStore = create<AgentStore>((set, get) => {
                   }
                 }, 0)
               }
-              return updateSlot(state, ctx, result.patch)
+              return updateSlot(state, ctx, result.patch, eventSessionId)
             })
             break
           }
           case 'user': {
             set((state) => {
-              const sourceSlot = resolveSlot(state, ctx)
+              const sourceSlot = resolveSlot(state, ctx, eventSessionId)
               const patch = reduceUserMessage(sourceSlot, msg as UserPayload, isReplay)
-              return patch ? updateSlot(state, ctx, patch) : {}
+              return patch ? updateSlot(state, ctx, patch, eventSessionId) : {}
             })
             break
           }
           case 'result': {
             set((state) => {
-              const sourceSlot = resolveSlot(state, ctx)
+              const sourceSlot = resolveSlot(state, ctx, eventSessionId)
               const abortGuardGen = sourceSlot._resultGuardGen
               const { patch, events } = reduceResultMessage(
                 sourceSlot,
@@ -429,7 +420,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
               if (events.length > 0) {
                 setTimeout(() => dispatchEffectEvents(eventSessionId || null, events, ctx), 0)
               }
-              return patch ? updateSlot(state, ctx, patch) : {}
+              return patch ? updateSlot(state, ctx, patch, eventSessionId) : {}
             })
             break
           }
@@ -442,16 +433,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             break
           }
         }
-      } finally {
-        _currentEventSessionId = null
-      }
     },
 
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
     handlePermissionRequest(req: PermissionRequestIPC) {
-      _currentEventSessionId = req.sessionId || null
-      try {
+      const permReqSid = req.sessionId || null
         const activeSessionId = get().activeSessionId
         const isOtherSession = !!(activeSessionId && req.sessionId && req.sessionId !== activeSessionId)
         const isNewSessionGuard = !!(!req.sessionId && activeSessionId && !activeSessionId.startsWith('new-'))
@@ -485,7 +472,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           }
           return updateSlot(state, ctx, { permissionRequest: req })
         })
-      } finally { _currentEventSessionId = null }
+
     },
 
     // ─── Permission / AskUser response & timeout handlers ──────────────────
@@ -499,12 +486,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         for (const ctx of ['editor', 'ask'] as AgentContext[]) {
           const slot = state.slots[ctx]
           if (slot.permissionRequest?.id === requestId) {
-            _currentEventSessionId = slot.permissionRequest.sessionId || null
-            try {
-              const next = slot.permissionQueue[0] ?? null
+            const permRespSid = slot.permissionRequest.sessionId || null
+            const next = slot.permissionQueue[0] ?? null
               const rest = slot.permissionQueue.slice(1)
               return updateSlot(state, ctx, { permissionRequest: next, permissionQueue: rest })
-            } finally { _currentEventSessionId = null }
           }
           const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
           if (qIdx !== -1) {
@@ -516,21 +501,17 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         // 2) Search sessionSlots for sessions that are not currently active
         for (const [sid, slot] of Object.entries(state.sessionSlots)) {
           if (slot.permissionRequest?.id === requestId) {
-            _currentEventSessionId = sid
-            try {
+
               const next = slot.permissionQueue[0] ?? null
               const rest = slot.permissionQueue.slice(1)
               return updateSlot(state, 'editor', { permissionRequest: next, permissionQueue: rest })
-            } finally { _currentEventSessionId = null }
           }
           const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
           if (qIdx !== -1) {
-            _currentEventSessionId = sid
-            try {
+
               const filtered = [...slot.permissionQueue]
               filtered.splice(qIdx, 1)
               return updateSlot(state, 'editor', { permissionQueue: filtered })
-            } finally { _currentEventSessionId = null }
           }
         }
         return {}
@@ -538,8 +519,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     handleAskUserRequest(req: AskUserRequestIPC) {
-      _currentEventSessionId = req.sessionId || null
-      try {
+      const askReqSid = req.sessionId || null
         const activeSessionId = get().activeSessionId
         const isOtherSession = !!(activeSessionId && req.sessionId && req.sessionId !== activeSessionId)
         const isNewSessionGuard = !!(!req.sessionId && activeSessionId && !activeSessionId.startsWith('new-'))
@@ -574,7 +554,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           return updateSlot(state, ctx, { askUserRequest: req })
         })
         get().dispatchAgentEvent({ type: 'ASK_USER_REQUEST' }, ctx)
-      } finally { _currentEventSessionId = null }
+
     },
 
     handleAskUserResponse(requestId: string, answers: Record<string, string>) {
@@ -588,30 +568,25 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           // 2) Search sessionSlots
           for (const [sid, slot] of Object.entries(state.sessionSlots)) {
             if (slot.askUserRequest?.id === requestId) {
-              _currentEventSessionId = sid
-              try {
+
                 const next = slot.askUserQueue[0] ?? null
                 const rest = slot.askUserQueue.slice(1)
                 return updateSlot(state, 'editor', {
                   messages: [...slot.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: displayAnswer, createdAt: Date.now() }],
                   askUserRequest: next, askUserQueue: rest,
                 })
-              } finally { _currentEventSessionId = null }
             }
           }
           return {}
         }
 
         const s = state.slots[ctx]
-        _currentEventSessionId = s.askUserRequest?.sessionId || null
-        try {
           const next = s.askUserQueue[0] ?? null
           const rest = s.askUserQueue.slice(1)
           return updateSlot(state, ctx, {
             messages: [...s.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: displayAnswer, createdAt: Date.now() }],
             askUserRequest: next, askUserQueue: rest,
           })
-        } finally { _currentEventSessionId = null }
       })
     },
 
@@ -625,8 +600,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           // 2) Search sessionSlots
           for (const [sid, slot] of Object.entries(state.sessionSlots)) {
             if (slot.askUserRequest?.id === requestId) {
-              _currentEventSessionId = sid
-              try {
+
                 const next = slot.askUserQueue[0] ?? null
                 const rest = slot.askUserQueue.slice(1)
                 const updated = updateSlot(state, 'editor', {
@@ -635,15 +609,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
                 })
                 get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, 'editor')
                 return updated
-              } finally { _currentEventSessionId = null }
             }
           }
           return {}
         }
 
         const s = state.slots[ctx]
-        _currentEventSessionId = s.askUserRequest?.sessionId || null
-        try {
           const next = s.askUserQueue[0] ?? null
           const rest = s.askUserQueue.slice(1)
           const updated = updateSlot(state, ctx, {
@@ -652,7 +623,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           })
           get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, ctx)
           return updated
-        } finally { _currentEventSessionId = null }
       })
     },
 
@@ -662,12 +632,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         for (const ctx of ['editor', 'ask'] as AgentContext[]) {
           const slot = state.slots[ctx]
           if (slot.permissionRequest?.id === requestId) {
-            _currentEventSessionId = slot.permissionRequest.sessionId || null
-            try {
-              const next = slot.permissionQueue[0] ?? null
+            const permTOSid = slot.permissionRequest.sessionId || null
+            const next = slot.permissionQueue[0] ?? null
               const rest = slot.permissionQueue.slice(1)
               return updateSlot(state, ctx, { permissionRequest: next, permissionQueue: rest })
-            } finally { _currentEventSessionId = null }
           }
           const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
           if (qIdx !== -1) {
@@ -679,21 +647,17 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         // 2) Search sessionSlots
         for (const [sid, slot] of Object.entries(state.sessionSlots)) {
           if (slot.permissionRequest?.id === requestId) {
-            _currentEventSessionId = sid
-            try {
+
               const next = slot.permissionQueue[0] ?? null
               const rest = slot.permissionQueue.slice(1)
               return updateSlot(state, 'editor', { permissionRequest: next, permissionQueue: rest })
-            } finally { _currentEventSessionId = null }
           }
           const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
           if (qIdx !== -1) {
-            _currentEventSessionId = sid
-            try {
+
               const filtered = [...slot.permissionQueue]
               filtered.splice(qIdx, 1)
               return updateSlot(state, 'editor', { permissionQueue: filtered })
-            } finally { _currentEventSessionId = null }
           }
         }
         return {}
@@ -701,13 +665,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     handleSkillOutput(skillState: SkillOutputState) {
-      _currentEventSessionId = skillState.sessionId || null
-      try {
-        const ctx = skillState.context || get().context
+      const skillSid = skillState.sessionId || null
+      const ctx = skillState.context || get().context
         set((s) => updateSlot(s, ctx, { skillOutput: skillState }))
-      } finally {
-        _currentEventSessionId = null
-      }
+
     },
 
     setPrefill(context: AgentContext, text: string) {

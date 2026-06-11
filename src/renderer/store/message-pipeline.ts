@@ -23,6 +23,7 @@ import type {
   TextDelta,
   InputJsonDelta,
   StreamContentBlockStart,
+  StreamMessageStart,
 } from '../../shared/types'
 import { ContextSlot } from './agent-store'
 import { isTextBlock, isToolUseBlock, isToolResultBlock } from '../../shared/types'
@@ -494,7 +495,17 @@ export function reduceStreamEvent(
     case 'content_block_stop': {
       return { patch: reduceContentBlockStop(slot), firstContentSeenDuringThisCall: false }
     }
-    case 'message_start':
+    case 'message_start': {
+      // Capture ttft_ms (time-to-first-token) for latency display
+      const startEvent = event as StreamMessageStart
+      if (startEvent.ttft_ms != null) {
+        return {
+          patch: { ttftMs: startEvent.ttft_ms },
+          firstContentSeenDuringThisCall: false,
+        }
+      }
+      return { patch: null, firstContentSeenDuringThisCall: false }
+    }
     case 'message_delta':
     case 'message_stop':
       return { patch: null, firstContentSeenDuringThisCall: false }
@@ -562,7 +573,7 @@ export function reduceResultMessage(
   if (msg.subtype === 'success') {
     const resultMsg = msg as ResultSuccessPayload
     // Detect output truncation or model refusal
-    let patch: Partial<ContextSlot> = { usageInfo: resultMsg.usage }
+    let patch: Partial<ContextSlot> = { usageInfo: resultMsg.usage, ttftMs: null }
     if (resultMsg.stop_reason === 'max_tokens') {
       const truncationNote: StoppedMessage = {
         kind: 'stopped', id: `truncate-${Date.now()}`, role: 'assistant', phase: 'stopped',

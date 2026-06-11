@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
-import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
+import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
@@ -29,6 +29,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const isStreaming = useIsStreaming(context)
   const isResuming = useIsResumingSession()
   const agentState = useAgentStatus(context)
+  const ttftMs = useTtftMs(context)
   const bottomRef = useRef<HTMLDivElement>(null)
   const internalContainerRef = useRef<HTMLDivElement>(null)
   const containerRef = externalScrollRef || internalContainerRef
@@ -155,10 +156,12 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
         const lastMsg = messages[messages.length - 1]
         const hasVisibleText = lastMsg?.kind === 'text' && (lastMsg.textContent?.length ?? 0) > 0
         if (agentState === 'thinking' || ((agentState === 'running' || agentState === 'compacting') && !hasVisibleText)) {
+          // Show ttft_ms when available (after first message_start from SDK)
+          const latencyHint = ttftMs != null ? ` · 首字节 ${ttftMs < 1000 ? `${Math.round(ttftMs)}ms` : `${(ttftMs / 1000).toFixed(1)}s`}` : ''
           return (
             <div className="message-bubble message-assistant message-thinking-indicator">
               <div className="message-status-indicator">
-                {agentState === 'thinking' ? '思考中' : '整理思路中'}
+                {agentState === 'thinking' ? '思考中' : '整理思路中'}{latencyHint}
                 <span className="status-dot" />
                 <span className="status-dot" />
                 <span className="status-dot" />
