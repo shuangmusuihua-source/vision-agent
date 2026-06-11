@@ -46,13 +46,10 @@ const MAX_SESSION_SLOTS = 30
 function resolveSlot(state: AgentStore, ctx: AgentContext, eventSid?: string | null): ContextSlot {
   const sid = eventSid || null
   const slotSid = state.slots[ctx]?.currentSessionId
-  // Use live slot when: no sessionId on event, event matches active session,
-  // event matches slot's session, OR no session is confirmed for this context
-  // yet (sessionCreated hasn't fired). Without the !slotSid guard, auto-created
-  // sessionSlots entries (from updateSlot during system/init) shadow the live
-  // slot before sessionCreated confirms the session, causing FSM transitions
-  // to read stale 'idle' state instead of the actual 'thinking' state.
-  if (!sid || sid === state.activeSessionId || sid === slotSid || !slotSid) {
+  // Use live slot when: no sessionId on event, event matches this context's
+  // active session, event matches slot's session, OR no session is confirmed
+  // for this context yet (sessionCreated hasn't fired).
+  if (!sid || sid === state.activeSessionId[ctx] || sid === slotSid || !slotSid) {
     return state.slots[ctx]
   }
   // Event is for a different (background) session → use its cached slot
@@ -90,7 +87,8 @@ function updateSlot(
       // Determine protected session IDs — never evict the active session
       // or the sessions currently bound to editor/ask contexts
       const protectedIds = new Set<string>()
-      if (state.activeSessionId) protectedIds.add(state.activeSessionId)
+      if (state.activeSessionId.editor) protectedIds.add(state.activeSessionId.editor)
+      if (state.activeSessionId.ask) protectedIds.add(state.activeSessionId.ask)
       const editorSid = state.slots.editor.currentSessionId
       const askSid = state.slots.ask.currentSessionId
       if (editorSid) protectedIds.add(editorSid)
@@ -115,7 +113,7 @@ function updateSlot(
         return {
           sessionSlots: newSessionSlots,
           sessionAccessOrder: remainingOrder,
-          ...(sid === state.activeSessionId
+          ...(sid === state.activeSessionId[ctx]
             ? { slots: { ...state.slots, [ctx]: { ...state.slots[ctx], ...patch } } }
             : {}),
         }
@@ -126,7 +124,7 @@ function updateSlot(
       sessionSlots: newSessionSlots,
       sessionAccessOrder: accessOrder,
     }
-    if (sid === state.activeSessionId) {
+    if (sid === state.activeSessionId[ctx]) {
       result.slots = { ...state.slots, [ctx]: { ...state.slots[ctx], ...patch } }
     }
     return result
@@ -180,7 +178,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     activeWorkspacePath: null,
     workspaceDigest: null,
     workspaceDigestLoading: false,
-    activeSessionId: null,
+    activeSessionId: { editor: null, ask: null },
     sessionOutputs: null,
     sessionOutputsLoading: false,
 
@@ -216,6 +214,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates._firstContentSeen = false
           slotUpdates.activeSkillId = null
           slotUpdates.skillOutput = null
+          slotUpdates.todoList = null
           slotUpdates.permissionRequest = null
           slotUpdates.permissionQueue = []
           slotUpdates.askUserRequest = null
@@ -255,6 +254,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates._firstContentSeen = false
           slotUpdates.activeSkillId = null
           slotUpdates.skillOutput = null
+          slotUpdates.todoList = null
           slotUpdates.permissionRequest = null
           slotUpdates.permissionQueue = []
           slotUpdates.askUserRequest = null
@@ -283,6 +283,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates._firstContentSeen = false
           slotUpdates.activeSkillId = null
           slotUpdates.skillOutput = null
+          slotUpdates.todoList = null
           slotUpdates.permissionRequest = null
           slotUpdates.permissionQueue = []
           slotUpdates.askUserRequest = null
@@ -438,10 +439,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
     handlePermissionRequest(req: PermissionRequestIPC) {
-      const permReqSid = req.sessionId || null
-        const activeSessionId = get().activeSessionId
-        const isOtherSession = !!(activeSessionId && req.sessionId && req.sessionId !== activeSessionId)
-        const isNewSessionGuard = !!(!req.sessionId && activeSessionId && !activeSessionId.startsWith('new-'))
+        // Use the context slot's own sessionId, not global activeSessionId.
+        // activeSessionId tracks the editor's UI-state session; the ask context
+        // operates independently and must not be gatekept by editor state.
+        const ctx = (req.context as AgentContext) || get().context
+        const slotSid = get().slots[ctx]?.currentSessionId
+        const isOtherSession = !!(slotSid && req.sessionId && req.sessionId !== slotSid)
+        const isNewSessionGuard = !!(!req.sessionId && slotSid && !slotSid.startsWith('new-'))
         if (isOtherSession || isNewSessionGuard) {
           // The request belongs to a background session — don't show the dialog,
           // but DO persist into sessionSlots so it appears when the user switches.
@@ -464,7 +468,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           return
         }
 
-        const ctx = (req.context as AgentContext) || get().context
         set((state) => {
           const slot = state.slots[ctx]
           if (slot.permissionRequest) {
@@ -519,10 +522,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     handleAskUserRequest(req: AskUserRequestIPC) {
-      const askReqSid = req.sessionId || null
-        const activeSessionId = get().activeSessionId
-        const isOtherSession = !!(activeSessionId && req.sessionId && req.sessionId !== activeSessionId)
-        const isNewSessionGuard = !!(!req.sessionId && activeSessionId && !activeSessionId.startsWith('new-'))
+        // Use the context slot's own sessionId, not global activeSessionId.
+        const ctx = (req.context as AgentContext) || get().context
+        const slotSid = get().slots[ctx]?.currentSessionId
+        const isOtherSession = !!(slotSid && req.sessionId && req.sessionId !== slotSid)
+        const isNewSessionGuard = !!(!req.sessionId && slotSid && !slotSid.startsWith('new-'))
         if (isOtherSession || isNewSessionGuard) {
           // Background session — persist into sessionSlots so the dialog
           // appears naturally when the user switches to this session.
@@ -545,7 +549,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           return
         }
 
-        const ctx = (req.context as AgentContext) || get().context
         set((state) => {
           const slot = state.slots[ctx]
           if (slot.askUserRequest) {
@@ -698,7 +701,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // ─── Session Actions ──────────────────────────────────────────────────
 
     setActiveSession(sessionId: string | null) {
-      set({ activeSessionId: sessionId, sessionOutputs: null, sessionOutputsLoading: !!sessionId })
+      set((state) => ({ activeSessionId: { ...state.activeSessionId, editor: sessionId }, sessionOutputs: null, sessionOutputsLoading: !!sessionId }))
     },
 
     setSessionOutputs(outputs) {
@@ -729,7 +732,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     switchToSession(sessionId: string) {
       const state = get()
-      if (state.activeSessionId === sessionId) return
+      if (state.activeSessionId.editor === sessionId) return
 
       if (!sessionId) {
         set((state) => {
@@ -738,7 +741,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             workspacePath: state.slots.editor.workspacePath || state.activeWorkspacePath,
           }
           return {
-            activeSessionId: null,
+            activeSessionId: { ...state.activeSessionId, editor: null },
             sessionOutputs: null,
             sessionOutputsLoading: false,
             slots: { ...state.slots, editor: cleanSlot },
@@ -748,7 +751,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
 
       set((state) => {
-        const prevSessionId = state.activeSessionId
+        const prevSessionId = state.activeSessionId.editor
         const nextSessionSlots = { ...state.sessionSlots }
         // Track access order: prevSessionId was just active, sessionId is being switched to
         let accessOrder = state.sessionAccessOrder.slice()
@@ -824,7 +827,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
 
         return {
-          activeSessionId: sessionId,
+          activeSessionId: { ...state.activeSessionId, editor: sessionId },
           sessionSlots: nextSessionSlots,
           sessionAccessOrder: accessOrder,
           sessionOutputs: null,
@@ -837,7 +840,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       if (editorSlot._needsSdkLoad && editorSlot.currentSessionId === sessionId) {
         set({ isResumingSession: true })
         get().loadInitialSessionMessages(sessionId).finally(() => {
-          if (get().activeSessionId === sessionId) {
+          if (get().activeSessionId.editor === sessionId) {
             set({ isResumingSession: false })
           }
         }).catch((err) => {
@@ -866,7 +869,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         const messages = hasMore ? rawMessages.slice(0, INITIAL_LIMIT) : rawMessages
         const loadedCount = messages.length
 
-        if (get().activeSessionId !== sessionId) {
+        if (get().activeSessionId.editor !== sessionId) {
           set((state) => ({
             sessionSlots: {
               ...state.sessionSlots,
@@ -986,7 +989,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     async renameCurrentSession(title: string) {
-      const sessionId = get().activeSessionId
+      const sessionId = get().activeSessionId.editor
       if (!sessionId) return
 
       // Always update sessionList optimistically — this includes new-

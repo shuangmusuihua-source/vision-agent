@@ -10,6 +10,7 @@ import type {
   SdkSessionInfo,
   StreamingAccumulator,
   SkillOutputState,
+  TodoTaskList,
   WorkspaceRecord,
   ArtifactRecord,
   WorkspaceDigest,
@@ -34,6 +35,7 @@ export type ContextSlot = {
   lastEditedFile: string | null
   prefillText: string | null
   ttftMs: number | null
+  todoList: TodoTaskList | null
   workspacePath: string | null
   _needsSdkLoad: boolean
   _sdkLoadedCount: number
@@ -62,6 +64,7 @@ function emptySlot(): ContextSlot {
     lastEditedFile: null,
     prefillText: null,
     ttftMs: null,
+    todoList: null,
     workspacePath: null,
     _needsSdkLoad: false,
     _sdkLoadedCount: 0,
@@ -101,8 +104,8 @@ export type AgentStore = {
   workspaceDigest: WorkspaceDigest | null
   workspaceDigestLoading: boolean
 
-  // Session state (sidebar + overview)
-  activeSessionId: string | null
+  // Session state (sidebar + overview) — per-context to avoid editor/ask collision
+  activeSessionId: { editor: string | null; ask: string | null }
   sessionOutputs: SessionOutputs | null
   sessionOutputsLoading: boolean
 

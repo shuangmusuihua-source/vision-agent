@@ -98,7 +98,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
-  const activeSessionId = useAgentStore((s) => s.activeSessionId)
+  const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
 
   // Load sessions when workspace changes
   const skipNextSessionLoad = useRef(false)
@@ -122,11 +122,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (activeSessionId) {
       useAgentStore.setState({ sessionOutputsLoading: true })
       window.api.agent.getSessionOutputs(activeSessionId).then((outputs) => {
-        if (useAgentStore.getState().activeSessionId === activeSessionId) {
+        if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
           useAgentStore.getState().setSessionOutputs(outputs)
         }
       }).catch(() => {
-        if (useAgentStore.getState().activeSessionId === activeSessionId) {
+        if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
           useAgentStore.getState().setSessionOutputs(null)
         }
       })
@@ -266,7 +266,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       variant: 'danger',
     })
     if (!ok) return
-    const wasActive = useAgentStore.getState().activeSessionId === sessionId
+    const wasActive = useAgentStore.getState().activeSessionId.editor === sessionId
 
     // Abort any running query for this session before deletion.
     // Without this, a streaming session's SDK subprocess keeps running,
@@ -344,6 +344,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (askIsStreaming) window.api.agent.abort('ask')
     useAgentStore.setState((prev) => ({
       slots: { ...prev.slots, ask: emptySlot() },
+      activeSessionId: { ...prev.activeSessionId, ask: null },
     }))
   }, [askIsStreaming])
 
@@ -419,10 +420,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     refreshAllFilesRef.current(workspacePathsRef.current)
 
     // Refresh session outputs so OverviewPanel shows newly produced files
-    const sid = useAgentStore.getState().activeSessionId
+    const sid = useAgentStore.getState().activeSessionId.editor
     if (sid) {
       window.api.agent.getSessionOutputs(sid).then((outputs) => {
-        if (useAgentStore.getState().activeSessionId === sid) {
+        if (useAgentStore.getState().activeSessionId.editor === sid) {
           useAgentStore.getState().setSessionOutputs(outputs)
         }
       }).catch(() => {})

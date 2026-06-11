@@ -23,7 +23,7 @@ function compositeKey(ws: string, sid: string | null): string {
  */
 export function useTabs() {
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
-  const activeSessionId = useAgentStore((s) => s.activeSessionId)
+  const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
   const [workspaceStates, setWorkspaceStates] = useState<Record<string, WorkspaceTabState>>({})
   const workspaceStatesRef = useRef(workspaceStates)
   workspaceStatesRef.current = workspaceStates
@@ -39,7 +39,7 @@ export function useTabs() {
   const getCurrentKey = useCallback((): string | null => {
     const state = useAgentStore.getState()
     if (!state.activeWorkspacePath) return null
-    return compositeKey(state.activeWorkspacePath, state.activeSessionId)
+    return compositeKey(state.activeWorkspacePath, state.activeSessionId.editor)
   }, [])
 
   // Helper to update the current composite-key entry.
