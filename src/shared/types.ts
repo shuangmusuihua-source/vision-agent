@@ -155,7 +155,9 @@ export type UserPayload = {
   type: 'user'
   uuid: string
   message: {
-    content: ContentBlock[]
+    // SDK compaction produces a plain string (continuation summary) instead
+    // of an array of content blocks for continuation user messages.
+    content: ContentBlock[] | string
   }
 }
 
