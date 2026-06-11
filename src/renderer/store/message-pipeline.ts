@@ -580,6 +580,10 @@ export function reduceUserMessage(
   msg: UserPayload,
   isReplay: boolean
 ): Partial<ContextSlot> | null {
+  // SDK-injected skill/context messages (isMeta=true): internal context for
+  // the model, not visible conversation. Skip during replay.
+  if ((msg as any).isMeta) return null
+
   // Compaction continuation: SDK-generated context summary, not a user message.
   // Render as a compact system divider instead of a misleading user bubble.
   if (isCompactionContinuation(msg.message.content)) {
@@ -739,6 +743,9 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
       })
     } else if (raw.type === 'user') {
       const userMsg = raw as UserPayload
+
+      // SDK-injected skill/context messages — skip
+      if ((userMsg as any).isMeta) continue
 
       // Compaction continuation: render as system divider, not user bubble
       if (isCompactionContinuation(userMsg.message.content)) {
