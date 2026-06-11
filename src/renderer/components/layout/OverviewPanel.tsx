@@ -1,4 +1,4 @@
-import { FileText, Box, RefreshCw, Loader2, ArrowUpRight } from 'lucide-react'
+import { FileText, Box, ArrowUpRight } from 'lucide-react'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { SessionOutputEntry } from '../../../shared/types'
 
@@ -9,19 +9,6 @@ interface OverviewPanelProps {
 
 function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.ReactElement {
   const sessionOutputs = useAgentStore((s) => s.sessionOutputs)
-  const loading = useAgentStore((s) => s.sessionOutputsLoading)
-
-  // Loading
-  if (loading) {
-    return (
-      <div className="overview-panel">
-        <div className="overview-loading">
-          <Loader2 size={24} className="overview-spinner-icon" />
-          <span>加载会话文件...</span>
-        </div>
-      </div>
-    )
-  }
 
   // No session selected
   if (!sessionId) {

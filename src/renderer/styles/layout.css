@@ -960,8 +960,10 @@
 }
 
 .agent-panel-edge-left {
-  margin-left: -20px;
-  margin-right: 0;
+  margin-left: 0;
+  margin-right: -20px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 /* --- Divider Zone --- */
@@ -1095,7 +1097,7 @@
 .agent-panel-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding: 8px 12px 4px 32px;
   -webkit-app-region: drag;
 }

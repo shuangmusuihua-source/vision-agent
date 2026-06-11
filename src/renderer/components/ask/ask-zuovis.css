@@ -113,9 +113,9 @@
 
 .ask-zuovis-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
-  max-width: 540px;
+  max-width: 420px;
   width: 100%;
 }
 
@@ -180,6 +180,13 @@
     radial-gradient(circle at 75% 48%, rgba(80,200,220,0.7) 0% 20%, rgba(80,200,220,0) 42%),
     radial-gradient(circle at 38% 70%, rgba(70,100,240,0.7) 0% 20%, rgba(70,100,240,0) 50%);
 }
+.ask-card-green {
+  background-color: #deede0;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(100,210,120,0.88) 0% 20%, rgba(100,210,120,0) 48%),
+    radial-gradient(circle at 75% 48%, rgba(60,190,160,0.7) 0% 20%, rgba(60,190,160,0) 42%),
+    radial-gradient(circle at 38% 70%, rgba(50,140,100,0.7) 0% 20%, rgba(50,140,100,0) 50%);
+}
 
 /* ::before / ::after — crossfading gradient layers */
 .ask-zuovis-card::before,
@@ -208,6 +215,10 @@
   background:
     radial-gradient(circle at 80% 60%, rgba(180,220,255,0.75) 0% 18%, rgba(180,220,255,0) 45%);
 }
+.ask-card-green::before {
+  background:
+    radial-gradient(circle at 80% 60%, rgba(130,220,150,0.75) 0% 18%, rgba(130,220,150,0) 45%);
+}
 
 /* Per-color ::after gradients (phase B — cool tones) */
 .ask-card-purple::after {
@@ -221,6 +232,10 @@
 .ask-card-blue::after {
   background:
     radial-gradient(circle at 25% 75%, rgba(100,160,255,0.7) 0% 18%, rgba(100,160,255,0) 45%);
+}
+.ask-card-green::after {
+  background:
+    radial-gradient(circle at 25% 75%, rgba(80,180,110,0.7) 0% 18%, rgba(80,180,110,0) 45%);
 }
 
 /* Title — on the gradient background (like "9:41 AM") */
@@ -569,6 +584,14 @@
     radial-gradient(circle at 38% 70%, rgba(60,80,220,0.4) 0% 20%, rgba(60,80,220,0) 50%),
     linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4));
 }
+[data-theme="dark"] .ask-card-green {
+  background-color: #18221a;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(80,180,100,0.5) 0% 20%, rgba(80,180,100,0) 48%),
+    radial-gradient(circle at 75% 48%, rgba(50,160,130,0.4) 0% 20%, rgba(50,160,130,0) 42%),
+    radial-gradient(circle at 38% 70%, rgba(40,120,80,0.4) 0% 20%, rgba(40,120,80,0) 50%),
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4));
+}
 
 [data-theme="dark"] .ask-zuovis-capsule {
   background: rgba(255, 255, 255, 0.08);
@@ -579,3 +602,4 @@
 [data-theme="dark"] .ask-zuovis-send-btn {
   background: rgba(255, 255, 255, 0.15);
 }
+

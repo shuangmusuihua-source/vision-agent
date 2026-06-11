@@ -83,11 +83,10 @@
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  max-width: 160px;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   flex-shrink: 0;
-  margin-right: 4px;
 }
 
 .agent-header-dropdown {
@@ -1047,7 +1046,9 @@
 .drawer-permission-actions {
   display: flex;
   gap: 8px;
+  row-gap: 6px;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .drawer-permission-btn {
@@ -1059,6 +1060,8 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
   border: none;
   transition: background 0.15s, color 0.15s;
 }

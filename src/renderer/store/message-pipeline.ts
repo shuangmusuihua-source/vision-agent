@@ -7,6 +7,8 @@ import type {
   StoppedMessage,
   ContentBlock,
   ToolCallState,
+  TodoTask,
+  TodoTaskList,
   ArtifactData,
   ArtifactFileType,
   StreamingAccumulator,
@@ -219,6 +221,45 @@ export function reduceSystemMessage(
 
 // ─── Assistant message reducer ─────────────────────────────────────────
 
+// ─── Agent task tracking (TaskCreate / TaskUpdate from SDK) ─────────
+
+function mergeTasks(existing: TodoTaskList | null, content: ContentBlock[]): TodoTaskList | null {
+  const tasks = new Map<string, TodoTask>()
+  if (existing) {
+    for (const t of existing.tasks) tasks.set(t.taskId, t)
+  }
+
+  for (const block of content) {
+    if (!isToolUseBlock(block)) continue
+    if (block.name === 'TaskCreate') {
+      const input = block.input as Record<string, unknown> | undefined
+      const subject = (input?.subject as string) || ''
+      if (!subject) continue
+      const tempId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      tasks.set(tempId, {
+        taskId: tempId,
+        subject,
+        description: (input?.description as string) || undefined,
+        status: 'pending',
+        createdAt: Date.now(),
+      })
+    } else if (block.name === 'TaskUpdate') {
+      const input = block.input as Record<string, unknown> | undefined
+      const taskId = input?.taskId as string | undefined
+      const status = input?.status as TodoTask['status'] | undefined
+      if (!taskId || !status) continue
+      const existing = tasks.get(taskId)
+      if (existing) {
+        tasks.set(taskId, { ...existing, status })
+      }
+    }
+  }
+
+  const taskArr = Array.from(tasks.values())
+  if (taskArr.length === 0) return null
+  return { tasks: taskArr, totalCount: taskArr.length }
+}
+
 export function reduceAssistantMessage(
   slot: ContextSlot,
   msg: AssistantPayload
@@ -230,14 +271,18 @@ export function reduceAssistantMessage(
     events.push({ type: 'FIRST_CONTENT' })
   }
 
+  const todoList = mergeTasks(slot.todoList, content)
+
   if (slot._acc) {
     const commitUpdates = commitAccumulator(slot._acc, slot, content, 'complete')
-    return { patch: { ...commitUpdates, _firstContentSeen: true }, events }
+    return { patch: { ...commitUpdates, _firstContentSeen: true, todoList }, events }
   }
 
   const msgId = msg.uuid || `assistant-${Date.now()}`
   const textContent = content.filter(isTextBlock).map((b) => b.text).join('')
-  const toolCalls: ToolCallState[] = content.filter(isToolUseBlock).map((tu) => {
+  const toolCalls: ToolCallState[] = content.filter(isToolUseBlock)
+    .filter((tu) => tu.name !== 'TaskCreate' && tu.name !== 'TaskUpdate')
+    .map((tu) => {
     let input: Record<string, unknown> = {}
     if (tu.input && typeof tu.input === 'object') input = tu.input
     return { toolUseId: tu.id || `tu-${Date.now()}`, toolName: tu.name || 'unknown', input, status: 'running' as const }
@@ -254,7 +299,7 @@ export function reduceAssistantMessage(
     createdAt: Date.now(),
   }
 
-  return { patch: { messages: [...slot.messages, newMsg], _firstContentSeen: true }, events }
+  return { patch: { messages: [...slot.messages, newMsg], _firstContentSeen: true, todoList }, events }
 }
 
 // ─── Stream event reducers ─────────────────────────────────────────────

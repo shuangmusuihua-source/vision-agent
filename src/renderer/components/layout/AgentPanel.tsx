@@ -1,19 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, ChevronDown, X } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, X } from 'lucide-react'
 import type { UsageInfo, PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AgentContext } from '../../../shared/types'
 import type { SkillMeta } from '../../../shared/types'
-import type { AppSettings, ModelProfile } from '../../lib/ipc'
 import { useAgentStore } from '../../store/agent-store-impl'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
 import DrawerZone from './DrawerZone'
-
-const MODELS: Record<string, string> = {
-  'claude-sonnet-4-20250514': 'Sonnet 4',
-  'claude-opus-4-20250514': 'Opus 4',
-  'claude-haiku-4-5-20251001': 'Haiku 4.5',
-}
+import TodoPanel from '../chat/TodoPanel'
 
 interface AgentPanelProps {
   context?: AgentContext
@@ -40,16 +34,10 @@ interface AgentPanelProps {
 }
 
 function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
-  const [settings, setSettings] = useState<AppSettings | null>(null)
-  const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
-  const modelDropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    window.api.settings.get().then(setSettings)
-  }, [])
+  const todoList = useAgentStore((s) => s.slots[context].todoList)
 
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
@@ -88,56 +76,16 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usage
     if (activeSkillMeta?.status === 'running') setSkillDrawerHidden(false)
   }, [activeSkillMeta])
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (showModelDropdown && modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
-        setShowModelDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showModelDropdown])
-
-  const activeProfile = settings?.profiles.find(p => p.id === settings.activeProfileId)
-  const modelLabel = activeProfile ? (MODELS[activeProfile.model] || activeProfile.model) : 'Sonnet 4'
-
-  const handleSelectModel = useCallback(async (profile: ModelProfile) => {
-    await window.api.settings.setActiveProfile(profile.id)
-    const s = await window.api.settings.get()
-    setSettings(s)
-    setShowModelDropdown(false)
-  }, [])
-
   return (
     <div className={`agent-panel ${edgeClass}`} style={{ width, minWidth: width, maxWidth: width }}>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
-          <div className="agent-header-model" ref={modelDropdownRef}>
-            <button className="agent-header-model-btn" onClick={() => setShowModelDropdown(!showModelDropdown)} aria-label="选择模型">
-              {modelLabel}
-              <ChevronDown size={12} />
-            </button>
-            {showModelDropdown && (
-              <div className="agent-header-dropdown agent-header-model-dropdown">
-                {settings?.profiles.map(p => (
-                  <button
-                    key={p.id}
-                    className={`agent-header-dropdown-item${p.id === settings.activeProfileId ? ' active' : ''}`}
-                    onClick={() => handleSelectModel(p)}
-                  >
-                    {MODELS[p.model] || p.model}
-                  </button>
-                ))}
-              </div>
+          <div className="agent-header-workspace" title={workspacePath || undefined}>
+            {workspacePath ? workspacePath.split('/').pop() : ''}
+            {currentSessionId && sessionList.find(s => s.id === currentSessionId)?.title && (
+              <>｜{sessionList.find(s => s.id === currentSessionId)!.title}</>
             )}
           </div>
-
-          <div className="agent-header-spacer" />
-          {workspacePath && (
-            <div className="agent-header-workspace" title={workspacePath}>
-              {workspacePath.split('/').pop()}
-            </div>
-          )}
         </div>
         <div className="agent-panel-body">
           <div className="agent-panel-content">
@@ -175,6 +123,18 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usage
               />
             )}
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
+            {todoList && todoList.tasks.length > 0 && (
+              <div style={{ padding: '0 8px 4px 8px' }}>
+                <TodoPanel
+                  todoList={todoList}
+                  onClose={() => {
+                    useAgentStore.setState((s) => ({
+                      slots: { ...s.slots, [context]: { ...s.slots[context], todoList: null } },
+                    }))
+                  }}
+                />
+              </div>
+            )}
             {chatInput}
         </div>
       </div>

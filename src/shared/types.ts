@@ -278,6 +278,23 @@ export type MessagePhase =
   | 'stopped'
   | 'error'
 
+// ─── Agent Task Tracking (TaskCreate / TaskUpdate from SDK) ────────
+
+export type TodoTaskStatus = 'pending' | 'in_progress' | 'completed'
+
+export type TodoTask = {
+  taskId: string
+  subject: string
+  description?: string
+  status: TodoTaskStatus
+  createdAt: number
+}
+
+export type TodoTaskList = {
+  tasks: TodoTask[]
+  totalCount: number
+}
+
 export type ToolCallState = {
   toolUseId: string
   toolName: string
