@@ -6,7 +6,7 @@ import type { AgentIPCMessage } from '../shared/types'
 import { getSessionRecords, removeSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import { app } from 'electron'
+import { homedir } from 'os'
 
 // ─── Compaction tracking ───────────────────────────────────────────────
 // Track session IDs created by SDK mid-stream compaction.
@@ -172,7 +172,7 @@ function readSessionJsonlDirect(sessionId: string): Array<Record<string, unknown
     if (!wsPath) return null
 
     const sanitized = wsPath.replace(/\//g, '-')
-    const jsonlPath = join(app.getPath('userData'), '.claude', 'projects', sanitized, `${sessionId}.jsonl`)
+    const jsonlPath = join(homedir(), '.claude', 'projects', sanitized, `${sessionId}.jsonl`)
     if (!existsSync(jsonlPath)) return null
 
     const raw = readFileSync(jsonlPath, 'utf-8')
