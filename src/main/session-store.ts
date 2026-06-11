@@ -162,7 +162,7 @@ export async function loadSdkSessionMessages(
   offset?: number
 ): Promise<Array<Record<string, unknown>>> {
   try {
-    const options: Record<string, unknown> = {}
+    const options: Record<string, unknown> = { includeSystemMessages: true }
     if (limit !== undefined) options.limit = limit
     if (offset !== undefined) options.offset = offset
     const messages = await getSessionMessages(sessionId, options)
@@ -179,7 +179,7 @@ export async function loadSdkSessionMessagesPaginated(
   offset: number
 ): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }> {
   try {
-    const sdkMessages = await getSessionMessages(sessionId, { limit, offset })
+    const sdkMessages = await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
     const messages: AgentIPCMessage[] = []
     for (const m of sdkMessages) {
       const converted = toAgentIPCMessage(m as any)
