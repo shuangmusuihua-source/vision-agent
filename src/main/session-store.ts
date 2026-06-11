@@ -4,6 +4,9 @@ import { getAppSkillsCwd } from './skill-init'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage } from '../shared/types'
 import { getSessionRecords, removeSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
+import { readFileSync, existsSync } from 'fs'
+import { join } from 'path'
+import { app } from 'electron'
 
 // ─── Compaction tracking ───────────────────────────────────────────────
 // Track session IDs created by SDK mid-stream compaction.
@@ -156,11 +159,48 @@ export async function getSdkSessionTotalMessageCount(
   }
 }
 
+/**
+ * Read session JSONL directly from disk, bypassing the SDK API which
+ * truncates pre-compaction messages. SDK stores sessions at:
+ *   {userData}/.claude/projects/{workspacePath with /→-}/{sessionId}.jsonl
+ */
+function readSessionJsonlDirect(sessionId: string): Array<Record<string, unknown>> | null {
+  try {
+    const records = getSessionRecords()
+    const record = records.find(r => r.id === sessionId)
+    const wsPath = record?.workspacePath
+    if (!wsPath) return null
+
+    const sanitized = wsPath.replace(/\//g, '-')
+    const jsonlPath = join(app.getPath('userData'), '.claude', 'projects', sanitized, `${sessionId}.jsonl`)
+    if (!existsSync(jsonlPath)) return null
+
+    const raw = readFileSync(jsonlPath, 'utf-8')
+    const lines = raw.trim().split('\n')
+    return lines.map(line => {
+      try { return JSON.parse(line) as Record<string, unknown> }
+      catch { return null }
+    }).filter(Boolean) as Array<Record<string, unknown>>
+  } catch (err) {
+    console.error('[SessionStore] Direct JSONL read failed:', (err as Error).message)
+    return null
+  }
+}
+
 export async function loadSdkSessionMessages(
   sessionId: string,
   limit?: number,
   offset?: number
 ): Promise<Array<Record<string, unknown>>> {
+  // Direct JSONL read returns ALL messages including pre-compaction history.
+  const direct = readSessionJsonlDirect(sessionId)
+  if (direct) {
+    const start = offset ?? 0
+    const end = limit != null ? start + limit : undefined
+    return direct.slice(start, end)
+  }
+
+  // Fallback to SDK API (for edge cases where direct read can't find the file)
   try {
     const options: Record<string, unknown> = { includeSystemMessages: true }
     if (limit !== undefined) options.limit = limit
@@ -178,18 +218,18 @@ export async function loadSdkSessionMessagesPaginated(
   limit: number,
   offset: number
 ): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }> {
-  try {
-    const sdkMessages = await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
-    const messages: AgentIPCMessage[] = []
-    for (const m of sdkMessages) {
-      const converted = toAgentIPCMessage(m as any)
-      if (converted) messages.push(converted)
-    }
-    return { messages, offset, limit }
-  } catch (err) {
-    console.error('[SessionStore] loadSdkSessionMessagesPaginated error:', err)
-    return { messages: [], offset, limit }
+  // Direct JSONL read — SDK API truncates pre-compaction messages.
+  const direct = readSessionJsonlDirect(sessionId)
+  const rawMessages = direct
+    ? direct.slice(offset, offset + limit)
+    : await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
+
+  const messages: AgentIPCMessage[] = []
+  for (const m of rawMessages) {
+    const converted = toAgentIPCMessage(m as any)
+    if (converted) messages.push(converted)
   }
+  return { messages, offset, limit }
 }
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
