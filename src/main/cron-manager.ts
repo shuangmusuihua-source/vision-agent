@@ -1,12 +1,12 @@
 import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import type { Options } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import * as Sentry from '@sentry/electron/main'
-import { getMainWindow } from './index'
-import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getActiveProfile, getCronTasks, saveCronTasks, type CronTask } from './store'
-import { resolveClaudeCodeExecutable } from './agent-manager'
+import { getMainWindow } from './ipc-sender'
+import { getAuthorizedDirectories, getCronTasks, saveCronTasks, type CronTask } from './store'
+import { buildAgentOptions, resolveClaudeCodeExecutable } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
-import { join } from 'path'
+import { isPathAuthorized } from './agent-path-utils'
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
 const runningTasks = new Set<string>()
@@ -73,62 +73,32 @@ export async function executeTask(task: CronTask): Promise<void> {
   runningTasks.add(task.id)
 
   try {
-  const dirs = getAuthorizedDirectories()
-  const cwd = dirs.length > 0 ? dirs[0] : process.cwd()
-  const apiKey = getApiKey()
-  const model = getModel()
-  const baseUrl = getBaseUrl()
-  const profile = getActiveProfile()
-  const cliPath = resolveClaudeCodeExecutable()
-
   const authorizedRoots = getAuthorizedDirectories()
-  const env: Record<string, string | undefined> = {
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    LANG: process.env.LANG,
-    PATH: process.env.PATH,
-  }
-  if (apiKey) env.ANTHROPIC_API_KEY = apiKey
-  if (baseUrl && profile?.apiProvider === 'custom') env.ANTHROPIC_BASE_URL = baseUrl
+  const cwd = authorizedRoots.length > 0 ? authorizedRoots[0] : process.cwd()
 
-  const options: Options = {
-    model,
+  const options = buildAgentOptions({
     cwd,
     permissionMode: 'acceptEdits',
-    env,
     allowedTools: ['Read', 'Glob', 'Grep', 'Write', 'Edit'],
+    restrictiveBaseUrl: true,
+    prependUserBinPaths: false,
     canUseTool: async (_toolName, input) => {
       const filePath = typeof input === 'object' && input !== null
-        ? (input as Record<string, unknown>).file_path as string | undefined
+        ? (input as { file_path?: string }).file_path
         : undefined
-      if (filePath) {
-        const resolved = require('path').resolve(filePath)
-        const isAuthorized = authorizedRoots.some((root: string) => resolved.startsWith(root))
-        if (!isAuthorized) {
-          return { behavior: 'deny' as const, message: 'Path not authorized for cron task' }
-        }
+      if (filePath && !isPathAuthorized(filePath, authorizedRoots)) {
+        return { behavior: 'deny' as const, message: 'Path not authorized for cron task' }
       }
       return { behavior: 'allow' as const }
     },
-    ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
-    settings: {
-      autoMemoryDirectory: join(cwd, '.vision', 'memory')
-    },
-    systemPrompt: {
-      type: 'preset' as const,
-      preset: 'claude_code' as const
-    }
-  }
+  })
 
   try {
     const messageStream = query({ prompt: task.prompt, options })
     let result = ''
     for await (const message of messageStream) {
-      if (message.type === 'assistant') {
-        const blocks: Array<{ type: string; text?: string }> = (message as any).content ?? []
-        for (const block of blocks) {
-          if (block.type === 'text' && block.text) result += block.text
-        }
+      if (message.type === 'result' && message.subtype === 'success') {
+        result = message.result || ''
       }
     }
 
@@ -137,7 +107,7 @@ export async function executeTask(task: CronTask): Promise<void> {
     persistTasks()
 
     const window = getMainWindow()
-    if (window) {
+    if (window && !window.isDestroyed()) {
       window.webContents.send('cron:taskCompleted', {
         taskId: task.id,
         result: task.lastResult
@@ -169,4 +139,10 @@ export async function executeTaskById(taskId: string): Promise<string> {
   if (!entry) throw new Error('Task not found')
   await executeTask(entry.task)
   return entry.task.lastResult || ''
+}
+
+export function stopAllCronJobs(): void {
+  for (const [, entry] of tasks) {
+    entry.job.stop()
+  }
 }

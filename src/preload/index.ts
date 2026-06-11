@@ -36,6 +36,7 @@ const api = {
     deleteDir: (dirPath: string) =>
       ipcRenderer.invoke('workspace:deleteDir', dirPath),
     selectFiles: () => ipcRenderer.invoke('workspace:selectFiles'),
+    getSessionOverview: (workspaceDir: string) => ipcRenderer.invoke('workspace:getSessionOverview', workspaceDir),
   },
 
   settings: {
@@ -62,18 +63,31 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask') =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context),
-    getSessionList: () => ipcRenderer.invoke('agent:getSessionList'),
-    respondPermission: (requestId: string, behavior: 'allow' | 'deny') =>
-      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior),
-    respondAskUser: (requestId: string, answer: string) =>
-      ipcRenderer.invoke('agent:respondAskUser', requestId, answer),
-    listSdkSessions: () => ipcRenderer.invoke('agent:listSdkSessions'),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string) =>
+      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title),
+    respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) =>
+      ipcRenderer.invoke('agent:permissionResponse', requestId, behavior, options),
+    respondAskUser: (requestId: string, answers: Record<string, string>) =>
+      ipcRenderer.invoke('agent:respondAskUser', requestId, answers),
+    listSdkSessions: (workspaceCwd?: string) => ipcRenderer.invoke('agent:listSdkSessions', workspaceCwd),
     loadSessionMessages: (sessionId: string) =>
       ipcRenderer.invoke('agent:loadSessionMessages', sessionId),
-    abort: (context?: 'editor' | 'ask') => ipcRenderer.invoke('agent:abort', context),
+    loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) =>
+      ipcRenderer.invoke('agent:loadSessionMessagesPaginated', sessionId, limit, offset),
+    renameSession: (sessionId: string, title: string) =>
+      ipcRenderer.invoke('agent:renameSession', sessionId, title),
+    updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) =>
+      ipcRenderer.invoke('agent:updateSessionRecord', sessionId, patch),
+    removeSessionRecord: (sessionId: string) =>
+      ipcRenderer.invoke('agent:removeSessionRecord', sessionId),
+    abort: (contextOrSessionId?: string) => ipcRenderer.invoke('agent:abort', contextOrSessionId),
+    setPermissionMode: (context: 'editor' | 'ask', mode: string) =>
+      ipcRenderer.invoke('agent:setPermissionMode', context, mode),
+    forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) =>
+      ipcRenderer.invoke('agent:forkSession', sessionId, options),
     selectFolder: () => ipcRenderer.invoke('agent:selectFolder'),
+    getSessionOutputs: (sessionId: string) => ipcRenderer.invoke('agent:getSessionOutputs', sessionId),
+    deleteSession: (sessionId: string) => ipcRenderer.invoke('agent:deleteSession', sessionId),
 
     // ── Unified event channel ────────────────────────────────────────
     // All SDK messages (assistant, user, result, stream_event, system)
@@ -85,8 +99,8 @@ const api = {
     },
 
     // ── Lifecycle channels (separate for request/response patterns) ──
-    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string }) => callback(data)
+    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }) => callback(data)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
@@ -129,7 +143,7 @@ const api = {
   },
 
   memory: {
-    list: () => ipcRenderer.invoke('memory:list'),
+    list: (workspacePath?: string) => ipcRenderer.invoke('memory:list', workspacePath),
     read: (filePath: string) => ipcRenderer.invoke('memory:read', filePath),
     write: (filePath: string, content: string) => ipcRenderer.invoke('memory:write', filePath, content),
     delete: (filePath: string) => ipcRenderer.invoke('memory:delete', filePath)
@@ -158,7 +172,9 @@ const api = {
   },
 
   skills: {
-    list: () => ipcRenderer.invoke('skills:list')
+    list: () => ipcRenderer.invoke('skills:list'),
+    toggle: (skillId: string, enabled: boolean) => ipcRenderer.invoke('skills:toggle', skillId, enabled),
+    getEnabled: () => ipcRenderer.invoke('skills:getEnabled'),
   },
 
   search: {

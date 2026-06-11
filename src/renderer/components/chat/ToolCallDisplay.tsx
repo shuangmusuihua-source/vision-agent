@@ -1,68 +1,36 @@
-import { ChevronDown, ChevronRight, Wrench, Check, X, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { ChevronDown, ChevronRight, Check, Loader2, FileText, FilePenLine, Terminal, Search, FolderSearch, Globe, MessageCircle, Sparkles, Wrench } from 'lucide-react'
+import { useState, type ReactElement } from 'react'
 import type { ToolCall } from '../../store/agent-store'
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall
 }
 
-function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement {
-  const [expanded, setExpanded] = useState(false)
-
-  const statusIcon = {
-    running: <Loader2 size={12} className="tool-call-spinner" />,
-    completed: <Check size={12} className="tool-call-success" />,
-    error: <X size={12} className="tool-call-error" />,
-    pending: <Loader2 size={12} className="tool-call-spinner" />
-  }[toolCall.status]
-
-  const inputSummary = summarizeInput(toolCall.toolName, toolCall.input)
-  const resultPreview = toolCall.result
-    ? toolCall.result.length > 200
-      ? toolCall.result.slice(0, 200) + '...'
-      : toolCall.result
-    : null
-
-  return (
-    <div className="tool-call-display">
-      <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
-        <span className="tool-call-chevron">
-          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </span>
-        <Wrench size={12} className="tool-call-icon" />
-        <span className="tool-call-name">{toolCall.toolName}</span>
-        <span className="tool-call-summary">{inputSummary}</span>
-        <span className="tool-call-status">{statusIcon}</span>
-      </div>
-      {expanded && (
-        <div className="tool-call-details">
-          <div className="tool-call-input">
-            <div className="tool-call-label">Input</div>
-            <pre>{JSON.stringify(toolCall.input, null, 2)}</pre>
-          </div>
-          {resultPreview && (
-            <div className="tool-call-result">
-              <div className="tool-call-label">Result</div>
-              <pre>{resultPreview}</pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
+const TOOL_META: Record<string, { icon: ReactElement; label: string }> = {
+  Read:       { icon: <FileText size={13} />,       label: '读取' },
+  Write:      { icon: <Sparkles size={13} />,       label: '生成' },
+  Edit:       { icon: <FilePenLine size={13} />,    label: '编辑' },
+  Bash:       { icon: <Terminal size={13} />,       label: '执行命令' },
+  Grep:       { icon: <Search size={13} />,         label: '搜索内容' },
+  Glob:       { icon: <FolderSearch size={13} />,   label: '查找文件' },
+  WebSearch:  { icon: <Search size={13} />,          label: '搜索' },
+  WebFetch:   { icon: <Globe size={13} />,          label: '浏览网页' },
+  AskUserQuestion: { icon: <MessageCircle size={13} />, label: '询问' },
 }
 
-function summarizeInput(toolName: string, input: Record<string, unknown>): string {
+const FALLBACK_META = { icon: <Wrench size={13} />, label: '' }
+
+function friendlySummary(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
     case 'Read':
-      return String(input.file_path || '').split('/').pop() || ''
     case 'Write':
-      return String(input.file_path || '').split('/').pop() || ''
-    case 'Edit':
-      return String(input.file_path || '').split('/').pop() || ''
+    case 'Edit': {
+      const p = String(input.file_path || '')
+      const name = p.split('/').pop() || p
+      return name
+    }
     case 'Bash':
-      const cmd = String(input.command || '')
-      return cmd.length > 40 ? cmd.slice(0, 40) + '...' : cmd
+      return ''
     case 'Grep':
       return String(input.pattern || '')
     case 'Glob':
@@ -72,13 +40,57 @@ function summarizeInput(toolName: string, input: Record<string, unknown>): strin
     case 'WebFetch':
       return String(input.url || '')
     default:
-      const vals = Object.values(input)
-      if (vals.length > 0) {
-        const s = String(vals[0])
-        return s.length > 30 ? s.slice(0, 30) + '...' : s
-      }
       return ''
   }
+}
+
+function detailText(toolName: string, input: Record<string, unknown>): string | null {
+  switch (toolName) {
+    case 'Bash':
+      return String(input.command || '')
+    case 'Write':
+    case 'Edit':
+      return null // file content handled by SkillOutputCard
+    default:
+      const vals = Object.entries(input)
+        .filter(([, v]) => v !== undefined && v !== '')
+        .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+      return vals.length > 0 ? vals.join('\n') : null
+  }
+}
+
+function ToolCallDisplay({ toolCall }: ToolCallDisplayProps): React.ReactElement {
+  const [expanded, setExpanded] = useState(false)
+  const meta = TOOL_META[toolCall.toolName] || { ...FALLBACK_META, label: toolCall.toolName }
+  const summary = friendlySummary(toolCall.toolName, toolCall.input)
+  const detail = expanded ? detailText(toolCall.toolName, toolCall.input) : null
+  const isDone = toolCall.status === 'completed' || toolCall.status === 'error'
+  const hasDetail = detailText(toolCall.toolName, toolCall.input) !== null
+
+  return (
+    <div className={`tc-bar${isDone ? ' tc-bar-done' : ''}`}>
+      <div className="tc-bar-main" onClick={() => hasDetail && setExpanded(!expanded)}>
+        {hasDetail ? (
+          <span className="tc-chevron">{expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
+        ) : (
+          <span className="tc-chevron tc-chevron-invis" />
+        )}
+        <span className="tc-icon">{meta.icon}</span>
+        <span className="tc-label">{meta.label}</span>
+        {summary && <span className="tc-summary">{summary}</span>}
+        <span className="tc-status">
+          {toolCall.status === 'running' || toolCall.status === 'pending' ? (
+            <span className="tc-spinner"><Loader2 size={11} /></span>
+          ) : toolCall.status === 'completed' ? (
+            <Check size={12} className="tc-check" />
+          ) : null}
+        </span>
+      </div>
+      {expanded && detail && (
+        <pre className="tc-detail">{detail}</pre>
+      )}
+    </div>
+  )
 }
 
 export default ToolCallDisplay

@@ -1,5 +1,5 @@
 import { Notification, BrowserWindow, app } from 'electron'
-import { getMainWindow } from './index'
+import { getMainWindow } from './ipc-sender'
 
 const PERMISSION_NOTIFY_THRESHOLD_MS = 30_000
 

@@ -28,6 +28,9 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     plugins: [react()],
+    define: {
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+    },
     build: {
       outDir: resolve(__dirname, 'out/renderer')
     }

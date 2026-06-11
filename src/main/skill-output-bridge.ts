@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentContext } from '../shared/types'
 
 interface SkillOutputState {
@@ -7,6 +8,7 @@ interface SkillOutputState {
   isStreaming: boolean
   language: string
   context?: AgentContext
+  sessionId?: string
 }
 
 /**
@@ -21,96 +23,117 @@ interface SkillOutputState {
  *
  * IMPORTANT: This class processes RAW SDK events (before toAgentIPCMessage conversion),
  * because the conversion loses the stream event structure the bridge needs.
+ *
+ * Each concurrent session gets its own internal state via queryKey-scoped
+ * accumulators, so sessions A and B in the same context never interfere.
  */
 export class SkillOutputBridge {
   private win: BrowserWindow | null = null
-  private context: AgentContext = 'editor'
 
   setWindow(win: BrowserWindow) {
     this.win = win
   }
 
-  setContext(context: AgentContext) {
-    this.context = context
+  // ─── Per-session state (keyed by queryKey = sessionId || context) ──────
+
+  private sessions = new Map<string, PerSessionState>()
+
+  private getOrCreate(queryKey: string): PerSessionState {
+    let s = this.sessions.get(queryKey)
+    if (!s) {
+      s = {
+        context: 'editor',
+        state: { skillId: null, content: '', isStreaming: false, language: 'html' },
+        writeAccumulators: new Map(),
+        inSkillOutputBlock: false,
+        skillOutputAccumulator: '',
+        textBuffer: '',
+        _lastPushedLen: 0,
+      }
+      this.sessions.set(queryKey, s)
+    }
+    return s
   }
-  private state: SkillOutputState = {
-    skillId: null,
-    content: '',
-    isStreaming: false,
-    language: 'html',
+
+  /** Reset accumulators for a specific session before starting a new query. */
+  reset(queryKey: string, context: AgentContext): void {
+    const s = this.sessions.get(queryKey)
+    if (s) {
+      s.context = context
+      s.state = { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey }
+      s.writeAccumulators.clear()
+      s.inSkillOutputBlock = false
+      s.skillOutputAccumulator = ''
+      s.textBuffer = ''
+      s._lastPushedLen = 0
+    } else {
+      this.sessions.set(queryKey, {
+        context,
+        state: { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey },
+        writeAccumulators: new Map(),
+        inSkillOutputBlock: false,
+        skillOutputAccumulator: '',
+        textBuffer: '',
+        _lastPushedLen: 0,
+      })
+    }
   }
 
-  // Accumulator for Write/Edit tool content (partial JSON), keyed by tool_use block ID
-  private writeAccumulators = new Map<string, { toolName: string; json: string }>()
-
-  // Track active skill-output code block
-  private inSkillOutputBlock = false
-  private skillOutputAccumulator = ''
-  // Buffer for detecting fence markers split across deltas
-  private textBuffer = ''
-
-  reset() {
-    this.state = { skillId: null, content: '', isStreaming: false, language: 'html' }
-    this.writeAccumulators.clear()
-    this.inSkillOutputBlock = false
-    this.skillOutputAccumulator = ''
-    this.textBuffer = ''
+  /** Clean up a session's accumulators when its query completes or is aborted. */
+  cleanup(queryKey: string): void {
+    this.sessions.delete(queryKey)
   }
 
   /**
    * Process a raw SDK stream event.
    * Called BEFORE toAgentIPCMessage() — operates on the original event structure.
    */
-  processRawEvent(rawMessage: Record<string, unknown>, activeSkillId: string | null): void {
-    const type = (rawMessage.type as string) || ''
-    if (type !== 'stream_event') return
+  processRawEvent(queryKey: string, rawMessage: SDKMessage, activeSkillId: string | null): void {
+    if (rawMessage.type !== 'stream_event') return
+    const streamMsg = rawMessage as SDKPartialAssistantMessage
+    const event = streamMsg.event
+    const eventType = event.type
+    const s = this.getOrCreate(queryKey)
 
-    const event = rawMessage.event as Record<string, unknown> | undefined
-    if (!event) return
-
-    const eventType = (event.type as string) || ''
     switch (eventType) {
       case 'content_block_delta': {
-        const delta = event.delta as Record<string, unknown> | undefined
+        const delta = event.delta
         if (!delta) return
-        const deltaType = (delta.type as string) || ''
+        const deltaType = delta.type
 
         if (deltaType === 'text_delta') {
-          this.handleTextDelta((delta.text as string) || '', activeSkillId)
+          this.handleTextDelta(s, queryKey, (delta as { text: string }).text || '', activeSkillId)
         }
 
         if (deltaType === 'input_json_delta') {
-          const blockIndex = (event.index as number) || 0
-          this.handleJsonDelta((delta.partial_json as string) || '', blockIndex, activeSkillId)
+          const blockIndex = (event as { index: number }).index || 0
+          this.handleJsonDelta(s, queryKey, (delta as { partial_json: string }).partial_json || '', activeSkillId)
         }
         return
       }
 
       case 'content_block_start': {
-        const block = event.content_block as Record<string, unknown> | undefined
-        if (block && (block.type as string) === 'tool_use') {
-          const name = (block.name as string) || ''
+        const block = (event as { content_block?: unknown }).content_block as { type?: string; name?: string; id?: string } | undefined
+        if (block && block.type === 'tool_use') {
+          const name = block.name || ''
           if (name === 'Write' || name === 'Edit') {
-            const id = (block.id as string) || `tu-${Date.now()}`
-            this.writeAccumulators.set(id, { toolName: name, json: '' })
+            const id = block.id || `tu-${Date.now()}`
+            s.writeAccumulators.set(id, { toolName: name, json: '' })
           }
         }
         return
       }
 
       case 'content_block_stop': {
-        const index = (event.index as number) || 0
-        // Finalize the accumulator matching this block index
-        // The SDK sends content_block_stop events in order, so we finalize
-        // the oldest accumulator that hasn't been finalized yet.
-        if (this.writeAccumulators.size > 0) {
-          const firstEntry = this.writeAccumulators.entries().next()
+        // Finalize the oldest unfinalized Write/Edit accumulator
+        if (s.writeAccumulators.size > 0) {
+          const firstEntry = s.writeAccumulators.entries().next()
           if (!firstEntry.done) {
             const [id, acc] = firstEntry.value
             if (acc.json.length > 0) {
-              this.finalizeWriteTool(id, acc, activeSkillId)
+              this.finalizeWriteTool(s, queryKey, id, acc, activeSkillId)
             } else {
-              this.writeAccumulators.delete(id)
+              s.writeAccumulators.delete(id)
             }
           }
         }
@@ -122,121 +145,117 @@ export class SkillOutputBridge {
     }
   }
 
-  private handleTextDelta(text: string, activeSkillId: string | null): void {
-    // Buffer text to handle fence markers split across deltas
-    this.textBuffer += text
+  // ─── Private helpers ──────────────────────────────────────────────────
 
-    if (!this.inSkillOutputBlock) {
-      // Look for ```skill-output\n in the buffer
+  private handleTextDelta(s: PerSessionState, queryKey: string, text: string, activeSkillId: string | null): void {
+    s.textBuffer += text
+
+    if (!s.inSkillOutputBlock) {
       const fenceMarker = '```skill-output\n'
-      const startIdx = this.textBuffer.indexOf(fenceMarker)
+      const startIdx = s.textBuffer.indexOf(fenceMarker)
       if (startIdx !== -1) {
-        this.inSkillOutputBlock = true
-        this.skillOutputAccumulator = ''
-        this.state.skillId = activeSkillId
-        this.state.isStreaming = true
-        this.state.language = 'html'
+        s.inSkillOutputBlock = true
+        s.skillOutputAccumulator = ''
+        s.state.skillId = activeSkillId
+        s.state.isStreaming = true
+        s.state.language = 'html'
 
-        const afterFence = this.textBuffer.substring(startIdx + fenceMarker.length)
-        this.skillOutputAccumulator += afterFence
-        this.textBuffer = '' // consumed
+        const afterFence = s.textBuffer.substring(startIdx + fenceMarker.length)
+        s.skillOutputAccumulator += afterFence
+        s.textBuffer = ''
 
-        this.pushOutput({
+        this.pushOutput(s, queryKey, {
           skillId: activeSkillId,
-          content: this.skillOutputAccumulator,
+          content: s.skillOutputAccumulator,
           isStreaming: true,
-          language: this.state.language,
+          language: s.state.language,
+          context: s.context,
+          sessionId: queryKey,
         })
       } else {
-        // Keep only the tail of the buffer (enough to detect a split fence marker)
-        // The fence marker is 17 chars, so keep last 16 chars as potential partial match
-        if (this.textBuffer.length > 32) {
-          this.textBuffer = this.textBuffer.slice(-16)
+        // Keep tail for potential split fence marker (17 chars)
+        if (s.textBuffer.length > 32) {
+          s.textBuffer = s.textBuffer.slice(-16)
         }
       }
     } else {
-      // Inside skill-output block — check for closing fence
-      const closeIdx = this.textBuffer.indexOf('```')
+      const closeIdx = s.textBuffer.indexOf('```')
       if (closeIdx !== -1) {
-        this.skillOutputAccumulator += this.textBuffer.substring(0, closeIdx)
-        this.inSkillOutputBlock = false
-        this.textBuffer = ''
-        this.pushOutput({
+        s.skillOutputAccumulator += s.textBuffer.substring(0, closeIdx)
+        s.inSkillOutputBlock = false
+        s.textBuffer = ''
+        this.pushOutput(s, queryKey, {
           skillId: activeSkillId,
-          content: this.skillOutputAccumulator,
+          content: s.skillOutputAccumulator,
           isStreaming: false,
-          language: this.state.language,
+          language: s.state.language,
+          context: s.context,
+          sessionId: queryKey,
         })
         return
       }
-      this.skillOutputAccumulator += this.textBuffer
-      this.textBuffer = ''
+      s.skillOutputAccumulator += s.textBuffer
+      s.textBuffer = ''
 
-      this.pushOutput({
+      this.pushOutput(s, queryKey, {
         skillId: activeSkillId,
-        content: this.skillOutputAccumulator,
+        content: s.skillOutputAccumulator,
         isStreaming: true,
-        language: this.state.language,
+        language: s.state.language,
+        context: s.context,
+        sessionId: queryKey,
       })
     }
   }
 
-  private handleJsonDelta(partialJson: string, blockIndex: number, activeSkillId: string | null): void {
-    // Append to the accumulator matching the block index
-    // Since blocks arrive in order, we use the first (oldest) accumulator
-    if (this.writeAccumulators.size === 0) return
+  private handleJsonDelta(s: PerSessionState, queryKey: string, partialJson: string, activeSkillId: string | null): void {
+    if (s.writeAccumulators.size === 0) return
 
-    const entries = [...this.writeAccumulators.entries()]
-    // Use blockIndex to find the right accumulator — but since we key by ID not index,
-    // pick the entry at the corresponding position
-    const entryIdx = Math.min(blockIndex, entries.length - 1)
-    const [id, acc] = entries[entryIdx]
+    const entries = [...s.writeAccumulators.entries()]
+    const [, acc] = entries[entries.length - 1] // append to newest accumulator
 
     acc.json += partialJson
 
-    // Throttle: only push every ~500 chars to avoid flooding the renderer
     const content = this.extractContentFromPartialJson(acc.json)
     if (content !== null && content.length > 0) {
-      const lastPushedLen = this._lastPushedLen
-      if (content.length - lastPushedLen > 500 || !this.state.isStreaming) {
+      const lastPushedLen = s._lastPushedLen
+      if (content.length - lastPushedLen > 500 || !s.state.isStreaming) {
         const language = this.guessLanguageFromContent(content)
-        this._lastPushedLen = content.length
-        this.pushOutput({
+        s._lastPushedLen = content.length
+        this.pushOutput(s, queryKey, {
           skillId: activeSkillId,
           content,
           isStreaming: true,
           language,
+          context: s.context,
+          sessionId: queryKey,
         })
       }
     }
   }
 
-  private _lastPushedLen = 0
-
-  private finalizeWriteTool(id: string, acc: { toolName: string; json: string }, activeSkillId: string | null): void {
+  private finalizeWriteTool(s: PerSessionState, queryKey: string, id: string, acc: { toolName: string; json: string }, activeSkillId: string | null): void {
     try {
       const parsed = JSON.parse(acc.json)
       const content = parsed.content as string | undefined
       if (content) {
         const language = this.guessLanguageFromContent(content)
-        this.pushOutput({
+        this.pushOutput(s, queryKey, {
           skillId: activeSkillId,
           content,
           isStreaming: false,
           language,
+          context: s.context,
+          sessionId: queryKey,
         })
       }
     } catch {
       // JSON parse failed — content already pushed incrementally
     }
-    this.writeAccumulators.delete(id)
-    this._lastPushedLen = 0
+    s.writeAccumulators.delete(id)
+    s._lastPushedLen = 0
   }
 
-  /**
-   * Extract the "content" field value from a partial JSON string.
-   * Handles incomplete JSON where the content string is still being built.
-   */
   private extractContentFromPartialJson(json: string): string | null {
     const contentStart = json.indexOf('"content"')
     if (contentStart === -1) return null
@@ -282,15 +301,21 @@ export class SkillOutputBridge {
     return 'text'
   }
 
-  private pushOutput(state: SkillOutputState): void {
-    this.state = state
+  private pushOutput(s: PerSessionState, queryKey: string, state: SkillOutputState): void {
+    s.state = state
     if (!this.win || this.win.isDestroyed()) return
-    this.win.webContents.send('skill:output', {
-      skillId: state.skillId,
-      content: state.content,
-      isStreaming: state.isStreaming,
-      language: state.language,
-      context: this.context,
-    })
+    this.win.webContents.send('skill:output', state)
   }
+}
+
+// ─── Per-session accumulator state ──────────────────────────────────────
+
+interface PerSessionState {
+  context: AgentContext
+  state: SkillOutputState
+  writeAccumulators: Map<string, { toolName: string; json: string }>
+  inSkillOutputBlock: boolean
+  skillOutputAccumulator: string
+  textBuffer: string
+  _lastPushedLen: number
 }

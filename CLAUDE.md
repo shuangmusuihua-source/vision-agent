@@ -11,7 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Dist**: `npm run dist` (electron-builder, creates DMG)
 - **Postinstall**: `npm run postinstall` (electron-builder install-app-deps)
 
-No test framework is configured.
+- **Test**: `npm test` (vitest run), `npm run test:watch` (vitest watch mode)
+- Test files: `tests/**/*.test.ts`, config: `vitest.config.ts`
 
 ## Architecture
 
@@ -64,7 +65,7 @@ Electron three-process app: Main, Preload, Renderer.
 
 ## Conventions
 
-- Icons: `@phosphor-icons/react` with `weight="regular"`. Some legacy `lucide-react` icons remain.
+- Icons: `lucide-react`
 - CSS variables for all colors and typography. Never hardcode color values in component CSS.
 - Theme switching via `data-theme` attribute on `<html>`. Light/dark/system.
 - File paths use `workspace:listMarkdownFiles` for `.md` discovery, `workspace:readFile`/`workspace:writeFile` for I/O.

@@ -12,7 +12,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: visible;
-  padding: 24px 0;
+  padding: 24px 0 64px 0;
 }
 
 /* ── Welcome / empty state ── */
@@ -25,7 +25,6 @@
   justify-content: center;
   padding: 40px 20px;
   gap: 32px;
-  overflow-y: auto;
 }
 
 .ask-zuovis-greeting {
@@ -114,9 +113,9 @@
 
 .ask-zuovis-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
-  max-width: 540px;
+  max-width: 420px;
   width: 100%;
 }
 
@@ -138,7 +137,6 @@
               box-shadow 0.35s ease;
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.06);
-  overflow: clip;
   padding: 28px 14px 14px;
   text-align: left;
   position: relative;
@@ -151,8 +149,8 @@
   transform: translateY(-4px);
   border-color: #fff;
   box-shadow:
-    0 28px 52px rgba(16, 16, 16, 0.13),
-    0 0 0 1px rgba(255, 255, 255, 0.5);
+    0 16px 36px rgba(0, 0, 0, 0.10),
+    0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .ask-zuovis-card:active {
@@ -162,22 +160,32 @@
 
 /* Per-card base gradient (multi-color, inspired by iOS widget) */
 .ask-card-purple {
-  background:
+  background-color: #ede0ff;
+  background-image:
     radial-gradient(circle at 20% 15%, rgba(190,140,255,0.9) 0% 20%, rgba(190,140,255,0) 48%),
     radial-gradient(circle at 75% 50%, rgba(255,130,160,0.7) 0% 20%, rgba(255,130,160,0) 42%),
     radial-gradient(circle at 40% 70%, rgba(120,100,240,0.7) 0% 20%, rgba(120,100,240,0) 50%);
 }
 .ask-card-pink {
-  background:
+  background-color: #fde5e0;
+  background-image:
     radial-gradient(circle at 18% 12%, rgba(255,150,120,0.9) 0% 20%, rgba(255,150,120,0) 48%),
     radial-gradient(circle at 70% 45%, rgba(255,100,150,0.75) 0% 20%, rgba(255,100,150,0) 42%),
     radial-gradient(circle at 35% 72%, rgba(200,90,220,0.65) 0% 20%, rgba(200,90,220,0) 50%);
 }
 .ask-card-blue {
-  background:
+  background-color: #e0ecf8;
+  background-image:
     radial-gradient(circle at 20% 10%, rgba(120,180,255,0.88) 0% 20%, rgba(120,180,255,0) 48%),
     radial-gradient(circle at 75% 48%, rgba(80,200,220,0.7) 0% 20%, rgba(80,200,220,0) 42%),
     radial-gradient(circle at 38% 70%, rgba(70,100,240,0.7) 0% 20%, rgba(70,100,240,0) 50%);
+}
+.ask-card-green {
+  background-color: #deede0;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(100,210,120,0.88) 0% 20%, rgba(100,210,120,0) 48%),
+    radial-gradient(circle at 75% 48%, rgba(60,190,160,0.7) 0% 20%, rgba(60,190,160,0) 42%),
+    radial-gradient(circle at 38% 70%, rgba(50,140,100,0.7) 0% 20%, rgba(50,140,100,0) 50%);
 }
 
 /* ::before / ::after — crossfading gradient layers */
@@ -207,6 +215,10 @@
   background:
     radial-gradient(circle at 80% 60%, rgba(180,220,255,0.75) 0% 18%, rgba(180,220,255,0) 45%);
 }
+.ask-card-green::before {
+  background:
+    radial-gradient(circle at 80% 60%, rgba(130,220,150,0.75) 0% 18%, rgba(130,220,150,0) 45%);
+}
 
 /* Per-color ::after gradients (phase B — cool tones) */
 .ask-card-purple::after {
@@ -220,6 +232,10 @@
 .ask-card-blue::after {
   background:
     radial-gradient(circle at 25% 75%, rgba(100,160,255,0.7) 0% 18%, rgba(100,160,255,0) 45%);
+}
+.ask-card-green::after {
+  background:
+    radial-gradient(circle at 25% 75%, rgba(80,180,110,0.7) 0% 18%, rgba(80,180,110,0) 45%);
 }
 
 /* Title — on the gradient background (like "9:41 AM") */
@@ -298,7 +314,15 @@
 .ask-zuovis-footer {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
   gap: 8px;
+  padding: 6px 20% 12px;
+  pointer-events: none;
+}
+
+.ask-zuovis-footer > * {
+  pointer-events: auto;
 }
 
 .ask-zuovis-footer .permission-dialog,
@@ -306,9 +330,21 @@
   margin: 0;
 }
 
-/* Permission/AskUser drawer — glassmorphism matching capsule */
+/* Permission/AskUser drawer — absolute overlay, never expands footer */
+.ask-zuovis-footer .input-drawer {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 20%;
+  right: 20%;
+}
+
+.ask-zuovis-footer .input-drawer--open {
+  padding: 0 0 16px;
+  margin: 0;
+}
+
 .ask-zuovis-footer .input-drawer__content {
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
   border-radius: 18px;
@@ -381,8 +417,8 @@
 }
 
 .ask-zuovis-send-btn-active {
-  background: linear-gradient(135deg, #ff58b2, #6657ff);
-  box-shadow: 0 8px 20px rgba(102, 87, 255, 0.25);
+  background: var(--color-action);
+  box-shadow: 0 4px 12px rgba(14, 21, 58, 0.25);
   cursor: pointer;
 }
 
@@ -395,8 +431,8 @@
   height: 32px;
   border-radius: 50%;
   -electron-corner-smoothing: system-ui;
-  background: linear-gradient(135deg, #ff4757, #ff6b81);
-  color: #fff;
+  background: var(--color-action);
+  color: var(--color-action-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,12 +444,13 @@
 
 .ask-zuovis-stop-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+  box-shadow: 0 6px 16px rgba(14, 21, 58, 0.3);
+  color: var(--color-action-text) !important;
 }
 
 @keyframes stopPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 21, 58, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(14, 21, 58, 0); }
 }
 
 /* ── File attachment ── */
@@ -506,7 +543,8 @@
 }
 [data-theme="dark"] .ask-zuovis-card:hover {
   box-shadow:
-    0 28px 52px rgba(0, 0, 0, 0.4),
+    0 0 32px rgba(255, 255, 255, 0.05),
+    0 8px 24px rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 [data-theme="dark"] .ask-zuovis-card-glass {
@@ -522,21 +560,38 @@
 [data-theme="dark"] .ask-zuovis-card-desc strong {
   color: #e8e8e6;
 }
-[data-theme="dark"] .ask-card-purple { background:
+[data-theme="dark"] .ask-card-purple {
+  background-color: #1e1a28;
+  background-image:
     radial-gradient(circle at 20% 15%, rgba(160,110,240,0.55) 0% 20%, rgba(160,110,240,0) 48%),
     radial-gradient(circle at 75% 50%, rgba(240,110,140,0.4) 0% 20%, rgba(240,110,140,0) 42%),
-    radial-gradient(circle at 40% 70%, rgba(100,80,220,0.4) 0% 20%, rgba(100,80,220,0) 50%);
-    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4)); }
-[data-theme="dark"] .ask-card-pink { background:
+    radial-gradient(circle at 40% 70%, rgba(100,80,220,0.4) 0% 20%, rgba(100,80,220,0) 50%),
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4));
+}
+[data-theme="dark"] .ask-card-pink {
+  background-color: #221a1e;
+  background-image:
     radial-gradient(circle at 18% 12%, rgba(240,130,100,0.55) 0% 20%, rgba(240,130,100,0) 48%),
     radial-gradient(circle at 70% 45%, rgba(240,85,130,0.45) 0% 20%, rgba(240,85,130,0) 42%),
-    radial-gradient(circle at 35% 72%, rgba(180,75,200,0.4) 0% 20%, rgba(180,75,200,0) 50%);
-    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4)); }
-[data-theme="dark"] .ask-card-blue { background:
+    radial-gradient(circle at 35% 72%, rgba(180,75,200,0.4) 0% 20%, rgba(180,75,200,0) 50%),
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4));
+}
+[data-theme="dark"] .ask-card-blue {
+  background-color: #161e26;
+  background-image:
     radial-gradient(circle at 20% 10%, rgba(100,160,240,0.5) 0% 20%, rgba(100,160,240,0) 48%),
     radial-gradient(circle at 75% 48%, rgba(70,180,200,0.4) 0% 20%, rgba(70,180,200,0) 42%),
-    radial-gradient(circle at 38% 70%, rgba(60,80,220,0.4) 0% 20%, rgba(60,80,220,0) 50%);
-    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4)); }
+    radial-gradient(circle at 38% 70%, rgba(60,80,220,0.4) 0% 20%, rgba(60,80,220,0) 50%),
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4));
+}
+[data-theme="dark"] .ask-card-green {
+  background-color: #18221a;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(80,180,100,0.5) 0% 20%, rgba(80,180,100,0) 48%),
+    radial-gradient(circle at 75% 48%, rgba(50,160,130,0.4) 0% 20%, rgba(50,160,130,0) 42%),
+    radial-gradient(circle at 38% 70%, rgba(40,120,80,0.4) 0% 20%, rgba(40,120,80,0) 50%),
+    linear-gradient(135deg, rgba(35,35,35,0.9), rgba(30,30,30,0.4));
+}
 
 [data-theme="dark"] .ask-zuovis-capsule {
   background: rgba(255, 255, 255, 0.08);
@@ -547,3 +602,4 @@
 [data-theme="dark"] .ask-zuovis-send-btn {
   background: rgba(255, 255, 255, 0.15);
 }
+

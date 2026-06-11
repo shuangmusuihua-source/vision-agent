@@ -1,25 +1,39 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
-import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus } from '../../hooks/useAgent'
+import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs } from '../../hooks/useAgent'
 import MessageBubble from './MessageBubble'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
 
 const RENDER_BATCH = 100
+const SCROLL_NEAR_BOTTOM = 80 // px threshold for "user is at bottom"
+const SMOOTH_SCROLL_GROWTH = 10 // growth above this uses smooth scroll
 
 interface ChatViewProps {
   context: AgentContext
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
+  /** Optional external scroll container — when provided, ChatView delegates scrolling to it */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>
+  /** Whether more messages exist on SDK disk that have not yet been loaded into the messages array */
+  hasMoreSdkMessages?: boolean
+  /** Whether an SDK load-more operation is currently in flight */
+  isLoadingMoreMessages?: boolean
+  /** Callback invoked to load the next batch of messages from the SDK disk store */
+  onLoadMoreSdkMessages?: () => Promise<void>
 }
 
-function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatViewProps): React.ReactElement {
+function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef, hasMoreSdkMessages, isLoadingMoreMessages, onLoadMoreSdkMessages }: ChatViewProps): React.ReactElement {
   const messages = useMessages(context)
   const isStreaming = useIsStreaming(context)
   const isResuming = useIsResumingSession()
   const agentState = useAgentStatus(context)
+  const ttftMs = useTtftMs(context)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const internalContainerRef = useRef<HTMLDivElement>(null)
+  const containerRef = externalScrollRef || internalContainerRef
+  const userScrolledUpRef = useRef(false)
   const [visibleCount, setVisibleCount] = useState(RENDER_BATCH)
 
   const visibleMessages = useMemo(() => {
@@ -29,34 +43,77 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
 
   const hasMore = messages.length > visibleCount
 
+  const handleLoadMore = useCallback(async () => {
+    if (hasMoreSdkMessages && onLoadMoreSdkMessages) {
+      await onLoadMoreSdkMessages()
+      setVisibleCount((c) => c + RENDER_BATCH)
+    } else {
+      setVisibleCount((c) => c + RENDER_BATCH)
+    }
+  }, [hasMoreSdkMessages, onLoadMoreSdkMessages])
+
+  // Force-scroll to bottom (always, ignores user scroll position)
+  const forceScrollToBottom = useCallback(() => {
+    const el = containerRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [containerRef])
+
+  // Detect manual scroll-up to pause auto-scroll during streaming
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    userScrolledUpRef.current = distFromBottom > SCROLL_NEAR_BOTTOM
+  }, [containerRef])
+
+  // When using external scroll container, bind scroll listener via useEffect
+  useEffect(() => {
+    if (!externalScrollRef) return
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [externalScrollRef, containerRef, handleScroll])
+
+  // New message arrived (not during streaming) → always scroll to bottom
   const prevMsgCount = useRef(messages.length)
   useEffect(() => {
-    if (messages.length > prevMsgCount.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length > prevMsgCount.current && !isStreaming) {
+      forceScrollToBottom()
     }
     prevMsgCount.current = messages.length
+  }, [messages.length, isStreaming, forceScrollToBottom])
+
+  // ── Auto-scroll during streaming ──
+  // useLayoutEffect runs synchronously during React commit, BEFORE paint.
+  // With plain-text streaming (no Streamdown overhead), layout cost is minimal
+  // and the scroll adjustment happens in the same frame as the content update.
+  const prevScrollHeightRef = useRef(0)
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el || !isStreaming || userScrolledUpRef.current) return
+    const newHeight = el.scrollHeight
+    const growth = newHeight - prevScrollHeightRef.current
+    if (growth > 0 && prevScrollHeightRef.current > 0) {
+      el.scrollBy({
+        top: growth,
+        behavior: growth > SMOOTH_SCROLL_GROWTH ? 'smooth' : 'instant',
+      })
+    }
+    prevScrollHeightRef.current = newHeight
+  }, [messages, isStreaming, containerRef])
+
+  // Reset visibleCount and scroll height ref when messages are cleared (new session)
+  useEffect(() => {
+    if (messages.length === 0) {
+      setVisibleCount(RENDER_BATCH)
+      prevScrollHeightRef.current = 0
+      prevMsgCount.current = 0
+    }
   }, [messages.length])
 
-  // Scroll when thinking indicator appears
-  useEffect(() => {
-    if (isStreaming && agentState === 'thinking') {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [isStreaming && agentState === 'thinking'])
-
-  // Auto-scroll to bottom during streaming
-  useEffect(() => {
-    if (isStreaming) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages, isStreaming])
-
-  useEffect(() => {
-    setVisibleCount(RENDER_BATCH)
-  }, [messages.length > RENDER_BATCH ? 'long' : 'short'])
-
   return (
-    <div className={styles.chatView} aria-live="polite" aria-label="对话消息">
+    <div className={styles.chatView} ref={externalScrollRef ? undefined : internalContainerRef} onScroll={externalScrollRef ? undefined : handleScroll} aria-live="polite" aria-label="对话消息">
       {isResuming && (
         <div className={styles.chatLoading}>
           <Loader2 size={24} className="spin" /> 加载会话历史…
@@ -68,9 +125,17 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
           <span className={styles.chatEmptyHint}>开始对话</span>
         </div>
       )}
-      {hasMore && (
-        <button className={styles.chatLoadMore} onClick={() => setVisibleCount((c) => c + RENDER_BATCH)}>
-          <ChevronUp size={14} /> 加载更早消息 ({messages.length - visibleCount} 条)
+      {isLoadingMoreMessages && (
+        <button className={styles.chatLoadMore} disabled>
+          <Loader2 size={14} className="spin" /> 加载SDK消息...
+        </button>
+      )}
+      {!isLoadingMoreMessages && hasMore && (
+        <button className={styles.chatLoadMore} onClick={handleLoadMore}>
+          <ChevronUp size={14} />{' '}
+          {hasMoreSdkMessages
+            ? `加载更早消息 (还有 ${messages.length - visibleCount} 条在磁盘上)`
+            : `加载更早消息 (${messages.length - visibleCount} 条)`}
         </button>
       )}
       {visibleMessages.items.map((msg, idx) => (
@@ -84,16 +149,28 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath }: ChatView
           isLastMessage={idx === visibleMessages.items.length - 1}
         />
       ))}
-      {isStreaming && agentState === 'thinking' && (
-        <div className="message-bubble message-assistant message-thinking-indicator">
-          <div className="message-status-indicator">
-            思考中
-            <span className="status-dot" />
-            <span className="status-dot" />
-            <span className="status-dot" />
-          </div>
-        </div>
-      )}
+      {isStreaming && (() => {
+        // "思考中" — thinking phase, before any content arrives
+        // "整理思路中" — running/compacting, but no visible text in the last reply yet.
+        // Once text appears in the bubble, the indicator is no longer needed.
+        const lastMsg = messages[messages.length - 1]
+        const hasVisibleText = lastMsg?.kind === 'text' && (lastMsg.textContent?.length ?? 0) > 0
+        if (agentState === 'thinking' || ((agentState === 'running' || agentState === 'compacting') && !hasVisibleText)) {
+          // Show ttft_ms when available (after first message_start from SDK)
+          const latencyHint = ttftMs != null ? ` · 首字节 ${ttftMs < 1000 ? `${Math.round(ttftMs)}ms` : `${(ttftMs / 1000).toFixed(1)}s`}` : ''
+          return (
+            <div className="message-bubble message-assistant message-thinking-indicator">
+              <div className="message-status-indicator">
+                {agentState === 'thinking' ? '思考中' : '整理思路中'}{latencyHint}
+                <span className="status-dot" />
+                <span className="status-dot" />
+                <span className="status-dot" />
+              </div>
+            </div>
+          )
+        }
+        return null
+      })()}
       <div ref={bottomRef} />
     </div>
   )

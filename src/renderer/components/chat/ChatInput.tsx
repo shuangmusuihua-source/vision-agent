@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, FileText, Presentation, Newspaper, CircleStop, Trash2, FolderOpen, Monitor, Paperclip, X } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, X } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -8,6 +8,9 @@ interface AttachedFile {
   name: string
   path: string
   type: 'text' | 'image' | 'pdf'
+  base64?: string
+  mimeType?: string
+  size?: number
 }
 
 interface ChatInputProps {
@@ -19,15 +22,6 @@ interface ChatInputProps {
   isStreaming?: boolean
   placeholder?: string
   variant?: 'default' | 'capsule'
-}
-
-const ICON_MAP: Record<string, React.ComponentType<{ size: number }>> = {
-  FileText,
-  Presentation,
-  Newspaper,
-  Trash2,
-  FolderOpen,
-  Monitor
 }
 
 function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
@@ -101,7 +95,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       const ext = name.split('.').pop()?.toLowerCase() || ''
       const type = ext === 'pdf' ? 'pdf' :
         imageExts.includes(ext) ? 'image' : 'text'
-      files.push({ name, path: filePath, type, base64: '', mimeType: '', size: 0 })
+      files.push({ name, path: filePath, type })
     }
     setAttachedFiles((prev) => [...prev, ...files])
   }, [])
@@ -115,11 +109,17 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     if (hasContent && !disabled) {
       let prompt = text.trim()
       if (attachedFiles.length > 0) {
+        // Hidden marker for main process to convert non-text files (pptx/xlsx/docx/pdf)
+        const convPaths = attachedFiles
+          .filter(f => /\.(pptx|xlsx|docx|pdf)$/i.test(f.name))
+          .map(f => f.path)
         const fileParts = attachedFiles.map((f) => {
-          const label = f.type === 'image' ? 'image' : f.type === 'pdf' ? 'PDF' : 'file'
-          return `[Attached ${label}: ${f.path}]`
+          const icon = f.type === 'image' ? '🖼️' : f.type === 'pdf' ? '📕' : '📄'
+          const label = f.type === 'image' ? '图片' : f.type === 'pdf' ? 'PDF文档' : '文件'
+          return `${icon} ${label}：${f.name}`
         })
-        prompt = fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
+        const prefix = convPaths.length > 0 ? '<!--FILE_CONVERT:' + convPaths.join('|') + '-->\n' : ''
+        prompt = prefix + fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
       }
       onSend(prompt)
       setText('')
@@ -229,7 +229,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
               type="button"
               title="停止生成"
             >
-              <CircleStop size={14} />
+              <Square size={14} />
             </button>
           ) : (
             <button
@@ -246,7 +246,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           <div className="skill-popup" ref={popupRef}>
             <div className="skill-popup-header">可用技能</div>
             {filteredSkills.map((skill, idx) => {
-              const IconComp = ICON_MAP[skill.icon]
               return (
                 <div
                   key={skill.id}
@@ -256,7 +255,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
                   onMouseEnter={() => setSelectedSkillIdx(idx)}
                 >
                   <div className="skill-popup-item-name">
-                    {IconComp && <IconComp size={14} />}
                     {skill.name}
                     {skill.argumentHint && (
                       <span className="skill-popup-item-hint">{skill.argumentHint}</span>
@@ -280,7 +278,32 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   // --- Default variant: textarea (editor agent panel style) ---
   return (
     <div className="chat-input-container">
+      {attachedFiles.length > 0 && (
+        <div className="chat-input-attachments">
+          {attachedFiles.map((file, idx) => (
+            <span key={idx} className="chat-input-attachment-chip" title={file.path}>
+              <span className="chat-input-attachment-name">{file.name}</span>
+              <button
+                className="chat-input-attachment-remove"
+                onClick={() => handleRemoveFile(idx)}
+                type="button"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="chat-input-wrapper">
+        <button
+          className="chat-input-attach-btn"
+          onClick={handleAttachFiles}
+          disabled={disabled}
+          type="button"
+          title="上传文件"
+        >
+          <Paperclip size={14} />
+        </button>
         <textarea
           ref={textareaRef}
           className="chat-input"
@@ -299,7 +322,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             type="button"
             title="停止生成"
           >
-            <CircleStop size={14} />
+            <Square size={14} />
           </button>
         ) : (
           <button
@@ -317,7 +340,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
         <div className="skill-popup" ref={popupRef}>
           <div className="skill-popup-header">可用技能</div>
           {filteredSkills.map((skill, idx) => {
-            const IconComp = ICON_MAP[skill.icon]
             return (
             <div
               key={skill.id}
@@ -327,7 +349,6 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
               onMouseEnter={() => setSelectedSkillIdx(idx)}
             >
               <div className="skill-popup-item-name">
-                {IconComp && <IconComp size={14} />}
                 {skill.name}
                 {skill.argumentHint && (
                   <span className="skill-popup-item-hint">{skill.argumentHint}</span>

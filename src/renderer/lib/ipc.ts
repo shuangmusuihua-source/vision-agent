@@ -12,6 +12,8 @@ import type {
   GraphEdge,
   FileEntry,
   ModelProfile,
+  SessionOutputs,
+  SkillOutputState,
 } from '../../shared/types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
@@ -23,14 +25,10 @@ interface AppSettings {
   activeProfileId: string | null
   authorizedDirectories: string[]
   fixedDirectories: string[]
+  workspaces?: import('../../shared/types').WorkspaceRecord[]
+  sessions?: import('../../shared/types').SessionRecord[]
+  storeVersion?: number
   theme: 'light' | 'dark' | 'system'
-}
-
-interface SkillOutputState {
-  skillId: string | null
-  content: string
-  isStreaming: boolean
-  language: string
 }
 
 // ─── Skill Definition ────────────────────────────────────────────────
@@ -44,6 +42,7 @@ interface SkillDefinition {
   argumentHint?: string
   outputMode?: 'skill-output' | 'write'
   hideInSlashMenu?: boolean
+  enabled?: boolean
 }
 
 // ─── Search Result ──────────────────────────────────────────────────
@@ -100,6 +99,7 @@ interface WorkspaceApi {
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
   previewArtifact: (options: { fileName: string; content: string }) => Promise<{ success: boolean; filePath?: string }>
+  getSessionOverview: (workspaceDir: string) => Promise<import('../../shared/types').WorkspaceDigest | null>
 }
 
 interface SettingsApi {
@@ -118,22 +118,31 @@ interface SettingsApi {
 }
 
 interface AgentApi {
-  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext) => Promise<{ started: boolean }>
-  respondPermission: (requestId: string, behavior: 'allow' | 'deny') => Promise<{ success: boolean }>
-  respondAskUser: (requestId: string, answer: string) => Promise<{ success: boolean }>
-  listSdkSessions: () => Promise<SdkSessionInfo[]>
+  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string) => Promise<{ started: boolean }>
+  respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => Promise<{ success: boolean }>
+  respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
+  listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
-  abort: (context?: AgentContext) => Promise<{ success: boolean }>
+  loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }>
+  renameSession: (sessionId: string, title: string) => Promise<void>
+	  updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
+  abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
+  setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean }>
+  forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => Promise<{ success: boolean; sessionId?: string; error?: string }>
   selectFolder: () => Promise<Electron.OpenDialogReturnValue>
+  getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
+  deleteSession: (sessionId: string) => Promise<{ success: boolean }>
+  removeSessionRecord: (sessionId: string) => Promise<void>
 
   // Unified event channel
   onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void
 
   // Lifecycle channels
-  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string }) => void) => () => void
-  onPermissionRequest: (callback: (data: { id: string; toolName: string; input: unknown; context: AgentContext }) => void) => () => void
-  onAskUser: (callback: (data: { id: string; question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean; context: AgentContext }) => void) => () => void
+  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string; workspacePath?: string }) => void) => () => void
+  onPermissionRequest: (callback: (data: PermissionRequestIPC) => void) => () => void
+  onAskUser: (callback: (data: AskUserRequestIPC) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
+  onPermissionTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
   onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => () => void
   onSkillOutput: (callback: (state: SkillOutputState) => void) => () => void
 }
@@ -153,6 +162,8 @@ interface CronApi {
 
 interface SkillsApi {
   list: () => Promise<SkillDefinition[]>
+  toggle: (skillId: string, enabled: boolean) => Promise<string[]>
+  getEnabled: () => Promise<string[]>
 }
 
 interface SearchApi {
@@ -193,16 +204,10 @@ interface WindowApi {
 }
 
 interface MemoryApi {
-  list: () => Promise<Array<{ name: string; path: string }>>
+  list: (workspacePath?: string) => Promise<Array<{ name: string; path: string }>>
   read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   write: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   delete: (filePath: string) => Promise<{ success: boolean; error?: string }>
-}
-
-interface SessionInfo {
-  id: string
-  createdAt: number
-  messageCount: number
 }
 
 declare global {
@@ -228,7 +233,6 @@ export type {
   FileEntry,
   ModelProfile,
   AppSettings,
-  SessionInfo,
   SkillDefinition,
   SearchResult,
   GraphNode,

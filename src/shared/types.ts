@@ -82,10 +82,12 @@ export type StreamContentBlockStop = {
 
 export type StreamMessageStart = {
   type: 'message_start'
+  ttft_ms?: number
 }
 
 export type StreamMessageDelta = {
   type: 'message_delta'
+  stop_reason?: string
 }
 
 export type StreamMessageStop = {
@@ -117,11 +119,19 @@ export type SystemStatusPayload = {
   type: 'system'
   subtype: 'status'
   status: 'compacting' | 'requesting' | null
+  compact_result?: 'success' | 'failed'
+  compact_error?: string
 }
 
 export type SystemCompactBoundaryPayload = {
   type: 'system'
   subtype: 'compact_boundary'
+  compact_metadata?: {
+    trigger: 'manual' | 'auto'
+    pre_tokens: number
+    post_tokens?: number
+    duration_ms?: number
+  }
 }
 
 export type SystemPermissionDeniedPayload = {
@@ -137,31 +147,44 @@ export type AssistantPayload = {
   message: {
     content: ContentBlock[]
   }
+  /** SDK-level error on this assistant message (authentication_failed, rate_limit, etc.) */
+  error?: string
 }
 
 export type UserPayload = {
   type: 'user'
   uuid: string
+  // SDK-injected skill/context messages (not user-typed)
+  isMeta?: true
   message: {
-    content: ContentBlock[]
+    // SDK compaction produces a plain string (continuation summary) instead
+    // of an array of content blocks for continuation user messages.
+    content: ContentBlock[] | string
   }
 }
 
 export type ResultSuccessPayload = {
   type: 'result'
   subtype: 'success'
+  session_id?: string
   usage: UsageInfo
   total_cost_usd: number
   duration_ms: number
+  stop_reason?: string
+  num_turns?: number
+  result?: string
 }
 
 export type ResultErrorPayload = {
   type: 'result'
-  subtype: 'error'
+  subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd' | 'error_max_structured_output_retries'
+  session_id?: string
   errors: string[]
   usage: UsageInfo
   total_cost_usd: number
   duration_ms: number
+  stop_reason?: string
+  num_turns?: number
 }
 
 export type StreamEventPayloadIPC = {
@@ -170,18 +193,44 @@ export type StreamEventPayloadIPC = {
   event: StreamEventPayload
 }
 
+export type SystemTaskNotificationPayload = {
+  type: 'system'
+  subtype: 'task_notification'
+  task_id: string
+  status: 'completed' | 'failed' | 'stopped'
+  summary: string
+}
+
+export type RateLimitPayload = {
+  type: 'rate_limit_event'
+  rate_limit_info?: {
+    status?: 'allowed' | 'allowed_warning' | 'rejected'
+    resets_at?: string
+    limit?: number
+    remaining?: number
+  }
+}
+
+export type PromptSuggestionPayload = {
+  type: 'prompt_suggestion'
+  suggestions: string[]
+}
+
 export type AgentIPCMessage =
   | SystemInitPayload
   | SystemStatusPayload
   | SystemCompactBoundaryPayload
   | SystemPermissionDeniedPayload
+  | SystemTaskNotificationPayload
+  | RateLimitPayload
+  | PromptSuggestionPayload
   | AssistantPayload
   | UserPayload
   | ResultSuccessPayload
   | ResultErrorPayload
   | StreamEventPayloadIPC
 
-export type AgentIPCMessageWithContext = AgentIPCMessage & { context: AgentContext }
+export type AgentIPCMessageWithContext = AgentIPCMessage & { context: AgentContext; sessionId?: string }
 
 // ─── Usage Info ──────────────────────────────────────────────────────
 
@@ -217,7 +266,7 @@ export type AgentEvent =
 
 export const AGENT_TRANSITIONS: Record<AgentState, Partial<Record<AgentEvent['type'], AgentState>>> = {
   idle:            { SEND_MESSAGE: 'thinking' },
-  thinking:        { FIRST_CONTENT: 'running', STATUS_REQUESTING: 'thinking', COMPACT_BOUNDARY: 'compacting', RESULT_ERROR: 'error', ABORT: 'idle' },
+  thinking:        { FIRST_CONTENT: 'running', STATUS_REQUESTING: 'thinking', COMPACT_BOUNDARY: 'compacting', RESULT_SUCCESS: 'idle', RESULT_ERROR: 'error', ABORT: 'idle' },
   running:         { STATUS_REQUESTING: 'thinking', COMPACT_BOUNDARY: 'compacting', ASK_USER_REQUEST: 'waitingForUserInput', RESULT_SUCCESS: 'idle', RESULT_ERROR: 'error', ABORT: 'idle' },
   compacting:      { FIRST_CONTENT: 'running', STATUS_REQUESTING: 'thinking', RESULT_SUCCESS: 'idle', RESULT_ERROR: 'error', ABORT: 'idle' },
   waitingForUserInput: { ASK_USER_RESPONDED: 'running', ASK_USER_TIMEOUT: 'error', ABORT: 'idle' },
@@ -232,6 +281,23 @@ export type MessagePhase =
   | 'complete'
   | 'stopped'
   | 'error'
+
+// ─── Agent Task Tracking (TaskCreate / TaskUpdate from SDK) ────────
+
+export type TodoTaskStatus = 'pending' | 'in_progress' | 'completed'
+
+export type TodoTask = {
+  taskId: string
+  subject: string
+  description?: string
+  status: TodoTaskStatus
+  createdAt: number
+}
+
+export type TodoTaskList = {
+  tasks: TodoTask[]
+  totalCount: number
+}
 
 export type ToolCallState = {
   toolUseId: string
@@ -260,17 +326,56 @@ export type SkillMeta = {
   outputContent?: string
 }
 
-export type ConversationMessage = {
+// ─── Discriminated Message Union ─────────────────────────────────────
+
+interface MessageBase {
   id: string
-  role: 'user' | 'assistant' | 'system'
+  createdAt: number
+}
+
+export interface UserMessage extends MessageBase {
+  kind: 'user'
+  role: 'user'
+  textContent: string
+  skillMeta?: SkillMeta
+}
+
+export interface TextMessage extends MessageBase {
+  kind: 'text'
+  role: 'assistant'
   phase: MessagePhase
   textContent: string
   content: ContentBlock[]
   toolCalls: ToolCallState[]
-  artifact?: ArtifactData
   skillMeta?: SkillMeta
-  createdAt: number
 }
+
+export interface ArtifactMessage extends MessageBase {
+  kind: 'artifact'
+  role: 'assistant'
+  artifact: ArtifactData
+}
+
+export interface StatusMessage extends MessageBase {
+  kind: 'status'
+  role: 'system'
+  phase: MessagePhase
+  textContent: string
+}
+
+export interface StoppedMessage extends MessageBase {
+  kind: 'stopped'
+  role: 'assistant'
+  phase: 'stopped'
+  textContent: string
+}
+
+export type ConversationMessage =
+  | UserMessage
+  | TextMessage
+  | ArtifactMessage
+  | StatusMessage
+  | StoppedMessage
 
 // ─── Streaming Accumulator (store-internal) ─────────────────────────
 
@@ -292,9 +397,30 @@ export type SkillOutputState = {
   isStreaming: boolean
   language: string
   context?: AgentContext
+  sessionId?: string
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────
+
+// Re-export SDK permission types for use across IPC boundary
+export type PermissionBehavior = 'allow' | 'deny' | 'ask'
+
+export type PermissionRuleValue = {
+  toolName: string
+  ruleContent?: string
+}
+
+export type PermissionUpdateDestination = 'userSettings' | 'projectSettings' | 'localSettings' | 'session' | 'cliArg'
+
+export type PermissionUpdate =
+  | { type: 'addRules'; rules: PermissionRuleValue[]; behavior: PermissionBehavior; destination: PermissionUpdateDestination }
+  | { type: 'replaceRules'; rules: PermissionRuleValue[]; behavior: PermissionBehavior; destination: PermissionUpdateDestination }
+  | { type: 'removeRules'; rules: PermissionRuleValue[]; behavior: PermissionBehavior; destination: PermissionUpdateDestination }
+  | { type: 'setMode'; mode: string; destination: PermissionUpdateDestination }
+  | { type: 'addDirectories'; directories: string[]; destination: PermissionUpdateDestination }
+  | { type: 'removeDirectories'; directories: string[]; destination: PermissionUpdateDestination }
+
+export type PermissionDecisionClassification = 'user_temporary' | 'user_permanent' | 'user_reject'
 
 export type PermissionRequestIPC = {
   id: string
@@ -302,6 +428,13 @@ export type PermissionRequestIPC = {
   input: Record<string, unknown>
   description?: string
   context?: AgentContext
+  sessionId?: string
+  /** SDK-provided display title (e.g. "Claude wants to read foo.txt") */
+  title?: string
+  /** Short noun phrase for the tool action (e.g. "Read file") */
+  displayName?: string
+  /** SDK-provided permission suggestions for "always allow" */
+  suggestions?: PermissionUpdate[]
 }
 
 export type AskUserQuestionOption = {
@@ -310,13 +443,27 @@ export type AskUserQuestionOption = {
   preview?: string
 }
 
-export type AskUserRequestIPC = {
-  id: string
+export type AskUserQuestionItem = {
   question: string
   header?: string
   options: AskUserQuestionOption[]
   multiSelect: boolean
+}
+
+export type AskUserRequestIPC = {
+  id: string
+  /** All questions from SDK (1-4). Use this for multi-question UI. */
+  questions: AskUserQuestionItem[]
+  /** Convenience: first question text (for backward compat) */
+  question: string
+  /** Convenience: first question header */
+  header?: string
+  /** Convenience: first question options */
+  options: AskUserQuestionOption[]
+  /** Convenience: first question multiSelect */
+  multiSelect: boolean
   context?: AgentContext
+  sessionId?: string
 }
 
 // ─── Session Info ────────────────────────────────────────────────────
@@ -327,6 +474,19 @@ export type SdkSessionInfo = {
   createdAt?: number
   lastModified?: number
   messageCount?: number
+  cwd?: string           // SDK directory this session was stored in
+  workspacePath?: string // workspace directory this session belongs to
+  context?: string       // AgentContext ('editor' | 'ask')
+}
+
+// ─── Paginated Messages Response ─────────────────────────────────────
+
+export type PaginatedMessagesResponse = {
+  messages: ConversationMessage[]
+  total: number       // from SdkSessionInfo.messageCount
+  offset: number
+  limit: number
+  hasMore: boolean
 }
 
 // ─── Graph / Knowledge Graph ────────────────────────────────────────
@@ -368,4 +528,134 @@ export type FileEntry = {
   path: string
   isDirectory: boolean
   children?: FileEntry[]
+}
+
+// ─── Workspace Record (P0: workspace-centric architecture) ────────────
+
+export interface WorkspaceRecord {
+  id: string            // UUID, stable identity
+  name: string          // display name (directory basename)
+  path: string          // absolute filesystem path
+  icon?: string         // emoji or icon key
+  isFixed: boolean      // true for Knowledge Base, false for user workspaces
+  createdAt: number
+  lastOpenedAt: number
+}
+
+// ─── Session Record (app-owned metadata, persisted in electron-store) ──
+
+export type SessionStatus = 'active' | 'idle' | 'archived'
+
+export interface SessionRecord {
+  id: string            // SDK session_id
+  workspacePath: string // FK → WorkspaceRecord.path
+  title?: string        // user or auto-generated title
+  summary?: string      // first assistant response, truncated
+  firstPrompt?: string  // first user message, truncated
+  context: AgentContext // 'editor' | 'ask'
+  status: SessionStatus
+  tags?: string[]
+  createdAt: number
+  lastModified: number
+  messageCount: number
+  artifactCount: number
+  legacyMigration?: boolean
+}
+
+// ─── Artifact Record (per-workspace sidecar: .vision/artifacts.json) ───
+
+export type ArtifactCategory = 'file' | 'deliverable' | 'skill_output' | 'memory'
+
+export interface ArtifactRecord {
+  id: string            // UUID
+  sessionId: string     // FK → SessionRecord.id
+  workspacePath: string // FK → WorkspaceRecord.path (denormalized)
+  fileName: string
+  filePath: string      // absolute path
+  relativePath: string  // relative to workspace root
+  fileType: ArtifactFileType
+  category: ArtifactCategory
+  toolCallId?: string   // Write/Edit tool_use id
+  skillId?: string      // which skill created this
+  createdAt: number
+  updatedAt: number
+}
+
+// ─── Artifact Index File (shape of .vision/artifacts.json) ─────────────
+
+export interface ArtifactIndexFile {
+  version: 1
+  workspacePath: string
+  updatedAt: number
+  artifacts: ArtifactRecord[]
+}
+
+// ─── Session Digest (lightweight, for overview display) ────────────────
+
+export interface SessionDigest {
+  sessionId: string
+  title: string
+  firstPrompt: string       // first user message, max 80 chars
+  assistantSummary: string  // first assistant text, max 150 chars
+  createdAt: number
+  lastModified: number
+  messageCount: number
+  artifactCount: number
+  status: SessionStatus
+  artifactFiles: Array<{ fileName: string; filePath: string; fileType: ArtifactFileType }>
+}
+
+// ─── Workspace Digest (aggregate overview data) ────────────────────────
+
+export interface WorkspaceDigest {
+  workspacePath: string
+  workspaceName: string
+  stats: {
+    totalSessions: number
+    totalArtifacts: number
+    totalFiles: number
+    lastActiveAt: number | null
+  }
+  recentSessions: SessionDigest[]
+  recentFiles: Array<{ name: string; path: string }>
+}
+
+// ─── Tab Descriptor (supports fixed tabs + file tabs) ──────────────────
+
+export interface FileTab {
+  type: 'file'
+  path: string
+}
+
+export interface FixedTab {
+  type: 'fixed'
+  id: string
+}
+
+export type TabDescriptor = FileTab | FixedTab
+
+export const OVERVIEW_TAB_ID = 'workspace-overview'
+
+// Tab type guards
+export function isFileTab(t: TabDescriptor): t is FileTab { return t.type === 'file' }
+export function isFixedTab(t: TabDescriptor): t is FixedTab { return t.type === 'fixed' }
+export function isOverviewTab(t: TabDescriptor): boolean { return isFixedTab(t) && t.id === OVERVIEW_TAB_ID }
+export function tabKey(t: TabDescriptor): string { return isFileTab(t) ? t.path : t.id }
+
+// ─── Session Output (per-session file listing for overview) ──────────
+
+export interface SessionOutputEntry {
+  fileName: string
+  filePath: string
+  fileType: ArtifactFileType
+  category: 'document' | 'skill_output' | 'other'
+  source: string
+  size?: number
+  createdAt: number
+}
+
+export interface SessionOutputs {
+  sessionId: string
+  workspacePath: string
+  files: SessionOutputEntry[]
 }

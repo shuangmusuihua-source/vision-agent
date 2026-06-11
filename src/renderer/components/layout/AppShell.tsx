@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
+import { useUiStore, type PrimaryView } from '../../store/ui-slice'
 import { PanelLeft, FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
@@ -10,18 +11,22 @@ import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
-const GraphView = lazy(() => import('../graph/GraphView'))
+const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 import DaydreamOverlay from './DaydreamOverlay'
+import OverviewPanel from './OverviewPanel'
+import './OverviewPanel.css'
 import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
-import { useDividerDrag } from '../../hooks/useDividerDrag'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
+import { useWorkspace } from '../../hooks/useWorkspace'
+import { useTabs } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
-import type { AgentContext } from '../../../shared/types'
+import type { AgentContext, TabDescriptor } from '../../../shared/types'
+import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
-import type { ChatMessage as ConversationMessage } from '../../store/agent-store'
-import type { FileEntry, SkillDefinition } from '../../lib/ipc'
+import type { SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -29,168 +34,221 @@ interface AppShellProps {
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const modal = useModal()
-  const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
-  const [fixedWorkspacePaths, setFixedWorkspacePaths] = useState<string[]>([])
 
-  useEffect(() => {
-    window.api.workspace.knowledgeDir().then(dir => {
-      setFixedWorkspacePaths([dir])
-    })
-  }, [])
-  const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [toggleVisible, setToggleVisible] = useState(true)
-  const toggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [agentWidth, setAgentWidth] = useState(360)
-  const [agentCollapsed, setAgentCollapsed] = useState(false)
-  const shellRef = useRef<HTMLDivElement>(null)
-  const [isChatFirst, setIsChatFirst] = useState(false)
+  // ── Hooks: workspace, tabs ──────────────────────────────────────────
+
+  const workspace = useWorkspace()
+  const {
+    openTabs, activeTab, activeContent, activeFilePath,
+    openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
+    saveFile, refreshActiveContent, hasFileTab,
+  } = useTabs()
+  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+
+  // Stable refs for workspace values used in useCallback/useEffect deps
+  // (the workspace object changes every render — avoid putting it in dep arrays)
+  const workspacePathsRef = useRef(workspace.workspacePaths)
+  workspacePathsRef.current = workspace.workspacePaths
+  const refreshAllFilesRef = useRef(workspace.refreshAllFiles)
+  refreshAllFilesRef.current = workspace.refreshAllFiles
+
+  // ── Layout hooks ────────────────────────────────────────────────────
 
   const {
-    dividerHovered,
-    setDividerHovered,
-    isDragging,
-    handleSwapLayout,
-    handleExpand,
-    handleToggleAgent,
-    handleDividerMouseDown,
-  } = useDividerDrag({
-    agentCollapsed,
-    agentWidth,
-    isChatFirst,
-    setAgentWidth,
-    setAgentCollapsed,
+    sidebarCollapsed, setSidebarCollapsed,
+    agentWidth, agentCollapsed,
+    isChatFirst, setIsChatFirst,
     shellRef,
-    onSwapLayout: () => setIsChatFirst((v) => !v),
-  })
-  const [openTabs, setOpenTabs] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<string>('')
-  const [tabContents, setTabContents] = useState<Record<string, string>>({})
-  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+    dividerHovered, setDividerHovered, isDragging,
+    handleSwapLayout, handleExpand, handleToggleAgent, handleDividerMouseDown,
+    toggleVisible, handleToggleMouseEnter, handleToggleMouseLeave,
+  } = useResponsiveLayout()
+
+  // ── Editor / UI state ───────────────────────────────────────────────
+
   const showGraph = useShowGraph()
-  const [showSearch, setShowSearch] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const {
+    showSearch, searchQuery, openSearch, closeSearch: closeSearchPanel,
+    sourceMode, setSourceMode, focusMode, setFocusMode,
+    editorStats, setEditorStats, linkedFile, setLinkedFile,
+    view, setView, updateAvailable, setUpdateAvailable, updateDownloaded, setUpdateDownloaded,
+    showDaydream, daydreamMode, openDaydream, closeDaydream,
+    mainError, setMainError,
+  } = useUiStore()
   const changedFileCount = useChangedFileCount()
-  const [sourceMode, setSourceMode] = useState(false)
-  const [focusMode, setFocusMode] = useState(false)
-  const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 })
-  const [linkedFile, setLinkedFile] = useState<string | null>(null)
-  const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false)
-  const [deleteWsPath, setDeleteWsPath] = useState<string | null>(null)
-  const [deleteWsConfirm, setDeleteWsConfirm] = useState('')
-  const [newWorkspaceName, setNewWorkspaceName] = useState('')
-  const [newWorkspaceError, setNewWorkspaceError] = useState('')
-  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [showDaydream, setShowDaydream] = useState(false)
-  const [daydreamMode, setDaydreamMode] = useState('matrix')
-  const [showAskZuovis, setShowAskZuovis] = useState(true)
-  const [updateAvailable, setUpdateAvailable] = useState<{ version: string } | null>(null)
-  const [updateDownloaded, setUpdateDownloaded] = useState(false)
+
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
-  // Keyboard shortcuts
-  useAppShortcuts({ setShowSearch, setIsChatFirst })
+  // ── Keyboard shortcuts ──────────────────────────────────────────────
 
-  // Auto-link file when activeTab changes
+  useAppShortcuts({ setShowSearch: () => openSearch(), setIsChatFirst })
+
+  // ── Auto-link active tab → linked file ──────────────────────────────
+
   useEffect(() => {
-    if (activeTab) {
-      setLinkedFile(activeTab)
-    }
+    if (activeTab && isFileTab(activeTab)) setLinkedFile(activeTab.path)
   }, [activeTab])
 
-  // Responsive: auto-collapse sidebar/agent panel at small widths
+  // ── IPC subscriptions (update, menu, graph, main error) ─────────────
+
   useEffect(() => {
-    const handleResize = () => {
-      const w = window.innerWidth
-      if (w < 900) {
-        setSidebarCollapsed(true)
-        setAgentWidth(0)
-        setAgentCollapsed(true)
-      } else if (w < 1200) {
-        setSidebarCollapsed(true)
-        if (agentCollapsed) {
-          handleExpand()
+    const a = window.api.update.onAvailable((info) => setUpdateAvailable(info))
+    const b = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
+    return () => { a(); b() }
+  }, [])
+
+  const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
+  const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
+
+  // Load sessions when workspace changes
+  const skipNextSessionLoad = useRef(false)
+  useEffect(() => {
+    if (skipNextSessionLoad.current) {
+      skipNextSessionLoad.current = false
+      return
+    }
+    loadSessions()
+  }, [activeWorkspacePath])
+
+  // Auto-open overview tab when active session changes (per-session tabs)
+  useEffect(() => {
+    if (activeWorkspacePath && activeSessionId && view === 'editor') {
+      openFixedTab(OVERVIEW_TAB_ID)
+    }
+  }, [activeSessionId])
+
+  // Load session outputs when active session changes
+  useEffect(() => {
+    if (activeSessionId) {
+      useAgentStore.setState({ sessionOutputsLoading: true })
+      window.api.agent.getSessionOutputs(activeSessionId).then((outputs) => {
+        if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
+          useAgentStore.getState().setSessionOutputs(outputs)
         }
-      }
+      }).catch(() => {
+        if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
+          useAgentStore.getState().setSessionOutputs(null)
+        }
+      })
+    } else {
+      useAgentStore.getState().setSessionOutputs(null)
     }
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [agentCollapsed])
+  }, [activeSessionId])
 
-  // Auto-hide sidebar toggle button after 3s
-  useEffect(() => {
-    toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
-    return () => {
-      if (toggleTimerRef.current) clearTimeout(toggleTimerRef.current)
+  // ── Session selection / new conversation handlers ─────────────────────
+
+  const handleSessionSelect = useCallback((sessionId: string, workspacePath: string) => {
+    if (workspacePath && workspacePath !== activeWorkspacePath) {
+      useAgentStore.getState().setActiveWorkspace(workspacePath)
     }
-  }, [])
+    // Switch to session-isolated slot (also sets activeSessionId, loading flag,
+    // and kicks off SDK message load when the slot has _needsSdkLoad === true).
+    useAgentStore.getState().switchToSession(sessionId)
+    // session outputs loaded by useEffect on activeSessionId change
+    if (view !== 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
+    }
+    const overviewTab = openTabs.find(t => t.type === 'fixed')
+    if (overviewTab) switchTab(overviewTab)
+  }, [activeWorkspacePath, view, openTabs, switchTab])
 
-  const handleToggleMouseEnter = useCallback(() => {
-    if (toggleTimerRef.current) clearTimeout(toggleTimerRef.current)
-    setToggleVisible(true)
-  }, [])
+  const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
+  const newSessionInputRef = useRef<HTMLInputElement>(null)
 
-  const handleToggleMouseLeave = useCallback(() => {
-    toggleTimerRef.current = setTimeout(() => setToggleVisible(false), 3000)
-  }, [])
-
-  // Auto-update notifications
   useEffect(() => {
-    const unsubAvailable = window.api.update.onAvailable((info) => setUpdateAvailable(info))
-    const unsubDownloaded = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
-    return () => { unsubAvailable(); unsubDownloaded() }
-  }, [])
+    if (creatingSessionIn) {
+      setNewSessionName('')
+      setTimeout(() => newSessionInputRef.current?.focus(), 50)
+    }
+  }, [creatingSessionIn])
 
-  // Main process error listener
-  const [mainError, setMainError] = useState<string | null>(null)
+  const handleCreateSession = useCallback(async (wsPath: string) => {
+    const name = newSessionName.trim()
+    if (!name) return
+    if (wsPath !== activeWorkspacePath) {
+      skipNextSessionLoad.current = true
+      useAgentStore.getState().setActiveWorkspace(wsPath)
+    }
+    // Create a new empty editor slot with a placeholder session ID and store the title
+    const tempSessionId = `new-${Date.now()}`
+    useAgentStore.getState().switchToSession(tempSessionId)
+    // Store the user-chosen title in the session slot so sidebar can show it
+    useAgentStore.setState((s) => ({
+      sessionSlots: {
+        ...s.sessionSlots,
+        [tempSessionId]: {
+          ...(s.sessionSlots[tempSessionId] || s.slots.editor),
+        },
+      },
+    }))
+    // Add to sessionList via the protocol — single write path
+    useAgentStore.getState().dispatchSessionList({
+      type: 'CREATE_TEMP',
+      sessionId: tempSessionId,
+      title: name,
+      workspacePath: wsPath,
+    })
+    // Persist immediately so empty named sessions survive restart even
+    // before the first message is sent (which creates the real SDK session).
+    window.api.agent.updateSessionRecord(tempSessionId, {
+      title: name,
+      workspacePath: wsPath,
+      context: 'editor',
+      status: 'empty',
+      createdAt: Date.now(),
+      lastModified: Date.now(),
+      messageCount: 0,
+      artifactCount: 0,
+    }).catch(() => {})
+    setCreatingSessionIn(null)
+    if (view !== 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
+    }
+  }, [newSessionName, activeWorkspacePath, view])
+
   useEffect(() => {
-    const unsub = window.api.onMainError((error) => {
+    return window.api.onMainError((error) => {
       console.error(`[Main ${error.type}]`, error.message)
       setMainError(error.message)
     })
-    return unsub
   }, [])
 
-  // Menu bar actions
+  const activeTabRef = useRef<TabDescriptor | null>(activeTab)
+  activeTabRef.current = activeTab
+  const refreshActiveContentRef = useRef(refreshActiveContent)
+  refreshActiveContentRef.current = refreshActiveContent
+
   useEffect(() => {
-    const unsub = window.api.graph.onFilesChanged((data) => {
+    return window.api.graph.onFilesChanged((data) => {
       useGraphStore.getState().handleFilesChanged(data)
-    })
-    return unsub
-  }, [])
-
-  useEffect(() => {
-    const unsub = window.api.menu.onAction((action) => {
-      switch (action) {
-        case 'open-settings':
-          onOpenSettings()
-          break
-        case 'toggle-sidebar':
-          setSidebarCollapsed((v) => !v)
-          break
-        case 'toggle-agent-panel':
-          handleToggleAgent()
-          break
-        case 'open-search':
-          setShowSearch(true)
-          break
-        case 'toggle-source-mode':
-          setSourceMode((v) => !v)
-          break
-        case 'toggle-focus-mode':
-          setFocusMode((v) => !v)
-          break
-        case 'save-file':
-          break
+      const current = activeTabRef.current
+      if (current && isFileTab(current) && data.files.includes(current.path)) {
+        refreshActiveContentRef.current()
       }
     })
-    return unsub
+  }, [])
+
+  useEffect(() => {
+    return window.api.menu.onAction((action) => {
+      switch (action) {
+        case 'open-settings': onOpenSettings(); break
+        case 'toggle-sidebar': setSidebarCollapsed((v) => !v); break
+        case 'toggle-agent-panel': handleToggleAgent(); break
+        case 'open-search': openSearch(); break
+        case 'toggle-source-mode': setSourceMode(!sourceMode); break
+        case 'toggle-focus-mode': setFocusMode(!focusMode); break
+        case 'save-file': break
+      }
+    })
   }, [onOpenSettings])
 
-  // Singleton IPC subscription — routes all events to correct store slot
+  // ── Singleton IPC → agent store ─────────────────────────────────────
+
   useIPCSubscriptions()
+
+  // ── Agent hooks (editor context) ────────────────────────────────────
 
   const {
     sendMessage: editorSendMessage,
@@ -200,11 +258,59 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     respondPermission,
     respondAskUser: editorRespondAskUser,
   } = useAgent('editor')
+
+  const handleDeleteSession = useCallback(async (sessionId: string, workspacePath: string) => {
+    const ok = await modal.confirm({
+      title: '删除会话',
+      message: '确定删除此会话？会话中的所有对话记录将被永久删除，此操作不可撤销。',
+      variant: 'danger',
+    })
+    if (!ok) return
+    const wasActive = useAgentStore.getState().activeSessionId.editor === sessionId
+
+    // Abort any running query for this session before deletion.
+    // Without this, a streaming session's SDK subprocess keeps running,
+    // writing events to a deleted session file — resource leak + potential
+    // session file recreation on disk.
+    const slot = useAgentStore.getState().sessionSlots[sessionId]
+    if (slot?.isStreaming || (wasActive && useAgentStore.getState().slots.editor.isStreaming)) {
+      window.api.agent.abort(sessionId).catch(() => {})
+    }
+
+    // Temp sessions (frontend-only): just remove from the protocol-managed list.
+    // Real sessions: delete via SDK first, then update the list.
+    if (sessionId.startsWith('new-')) {
+      useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
+    } else {
+      try {
+        await window.api.agent.deleteSession(sessionId)
+        useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
+      } catch (err) {
+        console.error('[AppShell] deleteSession error:', err)
+        modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
+        return
+      }
+    }
+    // Remove the deleted session's cached slot from sessionSlots
+    useAgentStore.setState((s) => {
+      const { [sessionId]: _, ...rest } = s.sessionSlots
+      return { sessionSlots: rest }
+    })
+    if (wasActive) {
+      useAgentStore.getState().switchToSession('')
+      useAgentStore.getState().setSessionOutputs(null)
+      if (view !== 'editor') {
+        setView('editor')
+      }
+    }
+  }, [modal, view, loadSessions])
+
   const isStreaming = useIsStreaming('editor')
+  const prevIsStreamingRef = useRef(isStreaming)
   const editorPermission = usePermissionRequest('editor')
   const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
-  const editorAskUserRespondRef = useRef<((answer: string) => void) | null>(null)
+  const editorAskUserRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
   const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
@@ -212,236 +318,125 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
 
+  // ── Agent hooks (ask context) ───────────────────────────────────────
+
   const askIsStreaming = useIsStreaming('ask')
   const askMessages = useMessages('ask')
+
+  // ── Settings → workspace sync ───────────────────────────────────────
+
+  const settings = useSettings()
+  useEffect(() => {
+    if (!settings) return
+    workspace.syncFromSettings(settings.authorizedDirectories)
+    // Set initial active workspace if not yet set
+    if (!useAgentStore.getState().activeWorkspacePath && settings.authorizedDirectories.length > 0) {
+      // Find first non-fixed workspace, or fall back to first directory
+      const nonFixed = settings.authorizedDirectories.filter(d => !settings.fixedDirectories?.includes(d))
+      const firstWs = nonFixed[0] || settings.authorizedDirectories[0]
+      if (firstWs) useAgentStore.getState().setActiveWorkspace(firstWs)
+    }
+  }, [settings])
+
+  // ── View routing helpers ────────────────────────────────────────────
 
   const handleAskZuovisBack = useCallback(() => {
     if (askIsStreaming) window.api.agent.abort('ask')
     useAgentStore.setState((prev) => ({
       slots: { ...prev.slots, ask: emptySlot() },
+      activeSessionId: { ...prev.activeSessionId, ask: null },
     }))
   }, [askIsStreaming])
 
-  // Restore/refresh workspaces from cached settings
-  const settings = useSettings()
-  const prevAuthDirsRef = useRef<string>('')
-  useEffect(() => {
-    if (!settings) return
-    const dirs = settings.authorizedDirectories
-    const key = dirs.join(',')
-    if (key === prevAuthDirsRef.current) return
-    prevAuthDirsRef.current = key
-    setWorkspacePaths(dirs)
-    const fileEntries: Record<string, FileEntry[]> = {}
-    Promise.all(
-      dirs.map(async (dir) => {
-        fileEntries[dir] = await window.api.workspace.listFiles(dir)
-      })
-    ).then(() => setFiles(fileEntries))
-  }, [settings])
-
-  const handleOpenNewWorkspaceModal = () => {
-    setNewWorkspaceName('')
-    setNewWorkspaceError('')
-    setShowNewWorkspaceModal(true)
-    requestAnimationFrame(() => setModalVisible(true))
-  }
-
-  const handleCloseNewWorkspaceModal = () => {
-    setModalVisible(false)
-    setTimeout(() => {
-      setShowNewWorkspaceModal(false)
-      setNewWorkspaceName('')
-      setNewWorkspaceError('')
-      setIsCreatingWorkspace(false)
-    }, 200)
-  }
-
-  const handleCreateWorkspace = async () => {
-    const name = newWorkspaceName.trim()
-    if (!name) {
-      setNewWorkspaceError('请输入工作区名称')
-      return
-    }
-    if (/[/\\]/.test(name) || name.includes('..')) {
-      setNewWorkspaceError('工作区名称不能包含 / \\ 或 ..')
-      return
-    }
-    setIsCreatingWorkspace(true)
-    setNewWorkspaceError('')
-    try {
-      const dirPath = await window.api.workspace.createWorkspace(name)
-      if (dirPath) {
-        if (!workspacePaths.includes(dirPath)) {
-          setWorkspacePaths((prev) => [...prev, dirPath])
-          const entries = await window.api.workspace.listFiles(dirPath)
-          setFiles((prev) => ({ ...prev, [dirPath]: entries }))
-          await window.api.settings.addDirectory(dirPath)
-        }
-        handleCloseNewWorkspaceModal()
-      } else {
-        setNewWorkspaceError('工作区已存在，请使用其他名称')
-      }
-    } catch {
-      setNewWorkspaceError('创建工作区失败，请重试')
-    } finally {
-      setIsCreatingWorkspace(false)
-    }
-  }
-
-  const handleRefreshWorkspace = useCallback(async (path: string) => {
-    const entries = await window.api.workspace.listFiles(path)
-    setFiles((prev) => ({ ...prev, [path]: entries }))
-  }, [])
-
-  const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
-    setWorkspacePaths(paths)
-    await window.api.settings.reorderDirectories(paths)
-  }, [])
+  // ── File selection (bridges workspace + tabs) ───────────────────────
 
   const handleFileSelect = useCallback(async (path: string) => {
-    // Switch back to editor context when leaving Ask Zuovis
-    if (showAskZuovis) {
-      useAgentStore.setState({ context: 'editor' })
-      setShowAskZuovis(false)
-    }
-    // If file is already open, just switch to it
-    if (openTabs.includes(path)) {
-      setActiveTab(path)
+    const ext = path.split('.').pop()?.toLowerCase()
+    // PDF and HTML slides — open with system default app, not in-editor
+    if (ext === 'pdf' || ext === 'html' || ext === 'htm') {
+      window.api.workspace.openInBrowser(path)
       return
     }
-
-    // Read file content and add to tabs
-    const result = await window.api.workspace.readFile(path)
-    if (result.success && result.content !== undefined) {
-      setOpenTabs((prev) => [...prev, path])
-      setActiveTab(path)
-      setTabContents((prev) => ({ ...prev, [path]: result.content! }))
+    if (view !== 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
     }
-  }, [openTabs, showAskZuovis])
+    const wsPath = workspace.workspacePaths.find(ws => path.startsWith(ws + '/') || path.startsWith(ws))
+    if (wsPath) {
+      useAgentStore.getState().setActiveWorkspace(wsPath)
+    }
+    await openFile(path)
+  }, [openFile, view, workspace.workspacePaths])
 
-  const handleTabClose = useCallback((path: string) => {
-    setOpenTabs((prev) => {
-      const next = prev.filter((t) => t !== path)
-      // Switch to adjacent tab
-      if (activeTab === path) {
-        const closedIdx = prev.indexOf(path)
-        const newActive = next[Math.min(closedIdx, next.length - 1)] || ''
-        setActiveTab(newActive)
-      }
-      return next
-    })
-    setTabContents((prev) => {
-      const next = { ...prev }
-      delete next[path]
-      return next
-    })
-  }, [activeTab])
+  // ── File operations (bridging workspace + tabs) ─────────────────────
 
   const handleFileDelete = useCallback(async (filePath: string) => {
     const result = await window.api.workspace.deleteFile(filePath)
     if (result.success) {
-      if (openTabs.includes(filePath)) {
-        handleTabClose(filePath)
-      }
-      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
-      const entries: Record<string, FileEntry[]> = {}
-      await Promise.all(dirs.map(async (dir: string) => {
-        entries[dir] = await window.api.workspace.listFiles(dir)
-      }))
-      setFiles(entries)
+      if (hasFileTab(filePath)) closeTab({ type: 'file', path: filePath })
+      await workspace.refreshFiles(workspacePathsRef.current)
     } else {
       modal.alert({ title: '删除失败', message: result.error || '删除失败' })
     }
-  }, [openTabs, handleTabClose])
+  }, [hasFileTab, closeTab, modal])
 
   const handleFileRename = useCallback(async (filePath: string, newName: string) => {
     const result = await window.api.workspace.renameFile(filePath, newName)
     if (result.success) {
-      if (openTabs.includes(filePath)) {
-        const wsIdx = filePath.lastIndexOf('/')
-        const wsPrefix = filePath.substring(0, wsIdx + 1)
-        handleTabClose(filePath)
-        if (result.newPath) {
-          handleFileSelect(result.newPath)
-        }
+      if (hasFileTab(filePath)) {
+        closeTab({ type: 'file', path: filePath })
+        if (result.newPath) await openFile(result.newPath)
       }
-      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
-      const entries: Record<string, FileEntry[]> = {}
-      await Promise.all(dirs.map(async (dir: string) => {
-        entries[dir] = await window.api.workspace.listFiles(dir)
-      }))
-      setFiles(entries)
+      await workspace.refreshFiles(workspacePathsRef.current)
     } else {
       modal.alert({ title: '重命名失败', message: result.error || '重命名失败' })
     }
-  }, [openTabs, handleTabClose, handleFileSelect])
+  }, [hasFileTab, closeTab, openFile, modal])
 
   const handleFileMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const result = await window.api.workspace.moveFile(sourcePath, targetDir)
     if (result.success) {
-      if (openTabs.includes(sourcePath)) {
-        handleTabClose(sourcePath)
-        if (result.newPath) {
-          handleFileSelect(result.newPath)
-        }
+      if (hasFileTab(sourcePath)) {
+        closeTab({ type: 'file', path: sourcePath })
+        if (result.newPath) await openFile(result.newPath)
       }
-      const dirs = await window.api.settings.get().then(s => s.authorizedDirectories)
-      const entries: Record<string, FileEntry[]> = {}
-      await Promise.all(dirs.map(async (dir: string) => {
-        entries[dir] = await window.api.workspace.listFiles(dir)
-      }))
-      setFiles(entries)
+      await workspace.refreshFiles(workspacePathsRef.current)
     } else {
       modal.alert({ title: '移动失败', message: result.error || '移动失败' })
     }
-  }, [openTabs, handleTabClose, handleFileSelect])
+  }, [hasFileTab, closeTab, openFile, modal])
 
-  const handleTabSwitch = useCallback((path: string) => {
-    setActiveTab(path)
-  }, [])
+  // ── Auto-refresh after agent finishes ───────────────────────────────
 
-  const handleSave = useCallback(async (filePath: string, content: string) => {
-    await window.api.workspace.writeFile(filePath, content)
-    setTabContents((prev) => ({ ...prev, [filePath]: content }))
-  }, [])
-
-  // Auto-reload editor, memory, and sidebar file list when Agent finishes
   useEffect(() => {
-    if (!isStreaming && useAgentStore.getState().slots.editor.messages.length > 0) {
-      setMemoryRefreshKey((k) => k + 1)
-      // Refresh sidebar file lists for all workspaces
-      Promise.all(
-        workspacePaths.map(async (dir) => {
-          const entries = await window.api.workspace.listFiles(dir)
-          return { dir, entries }
-        })
-      ).then((results) => {
-        setFiles((prev) => {
-          const next = { ...prev }
-          for (const { dir, entries } of results) {
-            next[dir] = entries
-          }
-          return next
-        })
-      })
-      if (activeTab) {
-        const timer = setTimeout(() => {
-          window.api.workspace.readFile(activeTab).then((result) => {
-            if (result.success && result.content !== undefined) {
-              setTabContents((prev) => {
-                if (prev[activeTab] !== result.content) {
-                  return { ...prev, [activeTab]: result.content! }
-                }
-                return prev
-              })
-            }
-          }).catch(() => {})
-        }, 500)
-        return () => clearTimeout(timer)
-      }
+    const wasStreaming = prevIsStreamingRef.current
+    prevIsStreamingRef.current = isStreaming
+    // Only trigger on streaming → idle transition (agent just finished)
+    if (!wasStreaming || isStreaming) return
+    const hasMessages = useAgentStore.getState().slots.editor.messages.length > 0
+    if (!hasMessages) return
+
+    setMemoryRefreshKey((k) => k + 1)
+    refreshAllFilesRef.current(workspacePathsRef.current)
+
+    // Refresh session outputs so OverviewPanel shows newly produced files
+    const sid = useAgentStore.getState().activeSessionId.editor
+    if (sid) {
+      window.api.agent.getSessionOutputs(sid).then((outputs) => {
+        if (useAgentStore.getState().activeSessionId.editor === sid) {
+          useAgentStore.getState().setSessionOutputs(outputs)
+        }
+      }).catch(() => {})
     }
-  }, [isStreaming, activeTab, workspacePaths])
+
+    const tab = activeTabRef.current
+    if (tab && isFileTab(tab)) {
+      const timer = setTimeout(() => { refreshActiveContentRef.current().catch(() => {}) }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isStreaming])
+
+  // ── Text selection, ask-agent, stats, skill ─────────────────────────
 
   const handleSelectText = useCallback((text: string, sourceContext?: string) => {
     const target: AgentContext = sourceContext === 'ask' ? 'ask' : 'editor'
@@ -462,9 +457,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         review: `${context}\n\n请检查以上选中内容是否有问题。`,
         ask: `${context}\n\n`
       }
-
       if (action === 'ask') {
-        const target: AgentContext = showAskZuovis ? 'ask' : 'editor'
+        const target: AgentContext = view === 'ask' ? 'ask' : 'editor'
         useAgentStore.setState((prev) => ({
           slots: {
             ...prev.slots,
@@ -475,7 +469,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         editorSendMessage(prompts[action], filePath)
       }
     },
-    [editorSendMessage]
+    [editorSendMessage, view]
   )
 
   const handleStatsUpdate = useCallback((words: number, chars: number) => {
@@ -483,7 +477,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   const handleSkillSelect = useCallback((skill: SkillDefinition) => {
-    const prompt = skill.promptTemplate.replace('{activeFile}', linkedFile || '')
+    const fileName = linkedFile ? linkedFile.split('/').pop() || linkedFile : ''
+    const fileRef = fileName ? ` · ${fileName}` : ''
+    const prompt = skill.promptTemplate.replace('{activeFile}', fileRef)
     useAgentStore.setState((s) => ({
       slots: {
         ...s.slots,
@@ -491,12 +487,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           ...s.slots.editor,
           activeSkillId: skill.id,
           messages: [...s.slots.editor.messages, {
+            kind: 'user' as const,
             id: `skill-${Date.now()}`,
             role: 'user',
-            phase: 'complete',
             textContent: `执行 Skill: ${skill.name}`,
-            content: [{ type: 'text', text: `执行 Skill: ${skill.name}` }],
-            toolCalls: [],
             skillMeta: { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' },
             createdAt: Date.now(),
           }],
@@ -506,51 +500,58 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     editorSendMessage(prompt, linkedFile || undefined)
   }, [editorSendMessage, linkedFile])
 
-  const activeContent = activeTab ? tabContents[activeTab] || '' : ''
+  // ── Render ──────────────────────────────────────────────────────────
 
   return (
     <div className="app-shell" ref={shellRef}>
       <nav aria-label="侧边栏" style={{ display: 'flex', height: '100%' }}>
       <Sidebar
-        files={files}
-        workspacePaths={workspacePaths}
-        fixedWorkspacePaths={fixedWorkspacePaths}
+        workspacePaths={workspace.workspacePaths}
+        fixedWorkspacePaths={workspace.fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
-        onFileSelect={handleFileSelect}
-        onNewWorkspace={handleOpenNewWorkspaceModal}
-        onFileDelete={handleFileDelete}
-        onFileMove={handleFileMove}
-        onFileRename={handleFileRename}
-        onRefreshWorkspace={handleRefreshWorkspace}
-        onRemoveWorkspace={(path) => { setDeleteWsPath(path); setDeleteWsConfirm('') }}
+        sessions={sessionList}
+        activeSessionId={activeSessionId}
+        activeSessionRunning={isStreaming}
+        onSessionSelect={handleSessionSelect}
+        onDeleteSession={handleDeleteSession}
+        onNewConversation={(wsPath) => setCreatingSessionIn(wsPath)}
+        onCancelNewSession={() => setCreatingSessionIn(null)}
+        creatingSessionIn={creatingSessionIn}
+        newSessionName={newSessionName}
+        onNewSessionNameChange={setNewSessionName}
+        onCreateSession={handleCreateSession}
+        newSessionInputRef={newSessionInputRef}
+        onNewWorkspace={workspace.handleOpenNewWorkspaceModal}
+        onRemoveWorkspace={workspace.handleRemoveWorkspace}
+        onRefreshWorkspace={workspace.handleRefreshWorkspace}
+        onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onOpenSettings={onOpenSettings}
-        onOpenSearch={() => setShowSearch(true)}
-        onReorderWorkspaces={handleReorderWorkspaces}
+        onOpenSearch={() => openSearch()}
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
-        onDaydream={(mode: string) => { setDaydreamMode(mode); setShowDaydream(true) }}
+        onDaydream={(mode: string) => openDaydream(mode)}
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
-            setActiveTab('')
-            setShowAskZuovis(true)
+            useAgentStore.getState().setActiveSession(null)
+            clearTab()
+            setView('ask')
           }}
-        isAskZuovisActive={showAskZuovis}
+        isAskZuovisActive={view === 'ask'}
         onAskZuovisBack={handleAskZuovisBack}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
-        activeFile={activeTab}
         showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${showAskZuovis ? ' main-content-ask-zuovis' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
            aria-label="编辑器">
-        {showAskZuovis ? (
+        {view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
-            workspacePath={workspacePaths[0]}
+            workspacePath={workspace.workspacePaths[0]}
           />
         ) : (
         <>
@@ -559,35 +560,31 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <EditorTabs
               tabs={openTabs}
               activeTab={activeTab}
-              onTabSwitch={handleTabSwitch}
-              onTabClose={handleTabClose}
+              onTabSwitch={switchTab}
+              onTabClose={closeTab}
             />
           )}
         </div>
         <div className="main-content-scroll">
-        {showGraph ? (
-          <GraphView onNodeClick={(nodeId, nodeType) => {
-            if (nodeType === 'entity') {
-              const entityName = nodeId.replace(/^entity:/, '')
-              setSearchQuery(entityName)
-              setShowSearch(true)
-            } else {
-              handleFileSelect(nodeId)
-            }
-            useGraphStore.getState().setShowGraph(false)
-          }} />
-        ) : activeTab ? (
-          <ErrorBoundary onReset={() => setActiveTab(activeTab)}>
+        {activeTab && isFileTab(activeTab) ? (
+          <ErrorBoundary onReset={() => {}}>
           <MarkdownEditor
             content={activeContent}
-            filePath={activeTab}
-            workspacePath={workspacePaths[0] || ''}
+            filePath={activeFilePath}
+            workspacePath={workspace.workspacePaths[0] || ''}
             sourceMode={sourceMode}
             focusMode={focusMode}
             onOpenFile={handleFileSelect}
-            onSave={handleSave}
+            onSave={saveFile}
             onAskAgent={handleAskAgent}
             onStatsUpdate={handleStatsUpdate}
+          />
+          </ErrorBoundary>
+        ) : activeWorkspacePath ? (
+          <ErrorBoundary onReset={() => {}}>
+          <OverviewPanel
+            sessionId={activeSessionId}
+            onOpenFile={handleFileSelect}
           />
           </ErrorBoundary>
         ) : (
@@ -597,7 +594,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         )}
         </div>
-        {activeTab && (
+        {activeTab && isFileTab(activeTab) && (
           <div className="editor-status-bar" role="status">
             <span>{editorStats.words} words</span>
             <span>{editorStats.chars} characters</span>
@@ -609,7 +606,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         )}
       </main>
       {/* ── Divider Zone + Agent Panel (only in editor mode) ── */}
-      {!showAskZuovis && (
+      {view === 'editor' && (
       <>
       <div
         className={`divider-zone${dividerHovered ? ' divider-zone-hover' : ''}${isDragging ? ' divider-zone-dragging' : ''}${agentCollapsed ? ' divider-zone-collapsed' : ''}`}
@@ -621,12 +618,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <div className="divider-line" />
         {!agentCollapsed && (
           <button className="divider-swap-btn" onClick={handleSwapLayout} title="切换面板位置" aria-label="切换面板位置">
-            <ArrowLeftRight size={12} />
+            <ArrowLeftRight size={14} />
           </button>
         )}
         {agentCollapsed && (
           <button className="divider-expand-btn" onClick={handleExpand} title="展开面板" aria-label="展开面板">
-            <ChevronLeft size={12} />
+            <ChevronLeft size={14} />
           </button>
         )}
       </div>
@@ -635,6 +632,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <AgentPanel
         width={agentWidth}
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
+        workspacePath={activeWorkspacePath || undefined}
         usageInfo={usageInfo}
         permissionRequest={editorPermission}
         permissionQueueLength={editorPermissionQueueLen}
@@ -650,21 +648,26 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         activeSkillId={activeSkillId}
         chatInput={<ChatInput context="editor" onSend={(msg) => {
           if (editorAskUser && editorAskUserRespondRef.current) {
-            editorAskUserRespondRef.current(msg)
+            const qKey = editorAskUser.questions[0]?.question || 'answer'
+            editorAskUserRespondRef.current({ [qKey]: msg })
           } else {
             editorSendMessage(msg, linkedFile || undefined)
           }
-        }} onSkillSelect={handleSkillSelect} onStop={() => window.api.agent.abort('editor')} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
+        }} onSkillSelect={handleSkillSelect} onStop={() => {
+            useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'editor')
+            window.api.agent.abort('editor')
+          }} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}
       >
         <ErrorBoundary>
-        <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspacePaths[0]} />
+        <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspace.workspacePaths[0]} />
         </ErrorBoundary>
       </AgentPanel>
       </aside>
       </>
       )}
+      {/* ── Banners ── */}
       {updateAvailable && !updateDownloaded && (
         <div className="update-banner">
           <span>新版本 v{updateAvailable.version} 可用</span>
@@ -691,9 +694,27 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       {showSearch && (
         <SearchPanel
           onOpenFile={handleFileSelect}
-          onClose={() => { setShowSearch(false); setSearchQuery('') }}
+          onClose={() => closeSearchPanel()}
           initialQuery={searchQuery}
         />
+      )}
+      {showGraph && (
+        <Suspense fallback={null}>
+        <GraphFloat
+          show={showGraph}
+          onClose={() => useGraphStore.getState().setShowGraph(false)}
+          activeFile={activeFilePath}
+          onNodeClick={(nodeId, nodeType) => {
+            if (nodeType === 'entity') {
+              const entityName = nodeId.replace(/^entity:/, '')
+              openSearch(entityName)
+            } else {
+              handleFileSelect(nodeId)
+            }
+            // Don't auto-close on node click — user can keep browsing
+          }}
+        />
+        </Suspense>
       )}
       <div
         className="sidebar-toggle-area"
@@ -709,24 +730,20 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <PanelLeft size={14} />
         </button>
       </div>
-      {showNewWorkspaceModal && (
-        <div className={`modal-overlay${modalVisible ? ' modal-overlay-visible' : ''}`} onClick={handleCloseNewWorkspaceModal}>
-          <div className={`modal-window${modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}
+      {/* ── New workspace modal ── */}
+      {workspace.showNewWorkspaceModal && (
+        <div className={`modal-overlay${workspace.modalVisible ? ' modal-overlay-visible' : ''}`} onClick={workspace.handleCloseNewWorkspaceModal}>
+          <div className={`modal-window${workspace.modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === 'Tab') {
                 const focusable = e.currentTarget.querySelectorAll<HTMLElement>('input, button:not([disabled])')
                 if (!focusable.length) return
                 const first = focusable[0]
                 const last = focusable[focusable.length - 1]
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault()
-                  last.focus()
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault()
-                  first.focus()
-                }
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
               }
-              if (e.key === 'Escape') handleCloseNewWorkspaceModal()
+              if (e.key === 'Escape') workspace.handleCloseNewWorkspaceModal()
             }}
           >
             <div className="modal-title">新建工作区</div>
@@ -734,56 +751,52 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <input
               className="modal-input"
               placeholder="工作区名称"
-              value={newWorkspaceName}
-              onChange={(e) => { setNewWorkspaceName(e.target.value); setNewWorkspaceError('') }}
+              value={workspace.newWorkspaceName}
+              onChange={(e) => { workspace.setNewWorkspaceName(e.target.value); workspace.setNewWorkspaceError('') }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.isComposing && !isCreatingWorkspace) handleCreateWorkspace()
+                if (e.key === 'Enter' && !e.isComposing && !workspace.isCreatingWorkspace) workspace.handleCreateWorkspace()
               }}
-              disabled={isCreatingWorkspace}
+              disabled={workspace.isCreatingWorkspace}
               autoFocus
-              aria-describedby={newWorkspaceError ? 'workspace-error' : undefined}
+              aria-describedby={workspace.newWorkspaceError ? 'workspace-error' : undefined}
             />
-            {newWorkspaceError && <div className="modal-error" id="workspace-error" role="alert">{newWorkspaceError}</div>}
+            {workspace.newWorkspaceError && <div className="modal-error" id="workspace-error" role="alert">{workspace.newWorkspaceError}</div>}
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={handleCloseNewWorkspaceModal} disabled={isCreatingWorkspace}>取消</button>
-              <button className="btn-modal btn-modal-primary" onClick={handleCreateWorkspace} disabled={isCreatingWorkspace}>
-                {isCreatingWorkspace ? '创建中...' : '创建'}
+              <button className="btn-modal btn-modal-cancel" onClick={workspace.handleCloseNewWorkspaceModal} disabled={workspace.isCreatingWorkspace}>取消</button>
+              <button className="btn-modal btn-modal-primary" onClick={workspace.handleCreateWorkspace} disabled={workspace.isCreatingWorkspace}>
+                {workspace.isCreatingWorkspace ? '创建中...' : '创建'}
               </button>
             </div>
           </div>
         </div>
       )}
-      {deleteWsPath && (
-        <div className="modal-overlay modal-overlay-visible" onClick={() => setDeleteWsPath(null)}>
+      {/* ── Delete workspace modal ── */}
+      {workspace.deleteWsPath && (
+        <div className="modal-overlay modal-overlay-visible" onClick={() => workspace.setDeleteWsPath(null)}>
           <div className="modal-window modal-window-visible" role="dialog" aria-modal="true" aria-label="删除工作区" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">删除工作区</div>
             <div className="modal-body">
-              此操作将永久删除工作区 <strong>{deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
+              此操作将永久删除工作区 <strong>{workspace.deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
             </div>
             <div className="modal-hint">请输入工作区名称以确认删除：</div>
             <input
               className="modal-input"
-              placeholder={deleteWsPath.split('/').pop()}
-              value={deleteWsConfirm}
-              onChange={(e) => setDeleteWsConfirm(e.target.value)}
+              placeholder={workspace.deleteWsPath.split('/').pop()}
+              value={workspace.deleteWsConfirm}
+              onChange={(e) => workspace.setDeleteWsConfirm(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') setDeleteWsPath(null)
-                if (e.key === 'Enter' && !e.isComposing && deleteWsConfirm === deleteWsPath.split('/')?.pop()) {
+                if (e.key === 'Escape') workspace.setDeleteWsPath(null)
+                if (e.key === 'Enter' && !e.isComposing && workspace.deleteWsConfirm === workspace.deleteWsPath!.split('/')?.pop()) {
                   (async () => {
-                    const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
-                    if (result.success) {
-                      setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
-                      setFiles((prev) => {
-                        const next = { ...prev }
-                        delete next[deleteWsPath!]
-                        return next
-                      })
-                      // Close tabs from deleted workspace
-                      const wsPrefix = deleteWsPath + '/'
-                      setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
-                      setDeleteWsPath(null)
-                    } else {
+                    const deletingPath = workspace.deleteWsPath
+                    if (!deletingPath) return
+                    const result = await workspace.handleDeleteWorkspace()
+                    if (!result.success) {
                       modal.alert({ title: '删除失败', message: result.error || '删除失败' })
+                    } else {
+                      closeTabsByPrefix(deletingPath + '/')
+                      const remaining = workspace.workspacePaths.filter(p => p !== deletingPath)
+                      useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
                     }
                   })()
                 }
@@ -791,22 +804,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
               autoFocus
             />
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={() => setDeleteWsPath(null)}>取消</button>
+              <button className="btn-modal btn-modal-cancel" onClick={() => workspace.setDeleteWsPath(null)}>取消</button>
               <button
                 className="btn-modal btn-modal-primary btn-modal-danger"
-                disabled={deleteWsConfirm !== deleteWsPath.split('/')?.pop()}
+                disabled={workspace.deleteWsConfirm !== workspace.deleteWsPath.split('/')?.pop()}
                 onClick={async () => {
-                  const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
+                  const deletingPath = workspace.deleteWsPath
+                  if (!deletingPath) return
+                  const result = await workspace.handleDeleteWorkspace()
                   if (result.success) {
-                    setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
-                    setFiles((prev) => {
-                      const next = { ...prev }
-                      delete next[deleteWsPath!]
-                      return next
-                    })
-                    const wsPrefix = deleteWsPath + '/'
-                    setOpenTabs((prev) => prev.filter((t) => !t.startsWith(wsPrefix)))
-                    setDeleteWsPath(null)
+                    closeTabsByPrefix(deletingPath + '/')
+                    const remaining = workspace.workspacePaths.filter(p => p !== deletingPath)
+                    useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
                   } else {
                     modal.alert({ title: '删除失败', message: result.error || '删除失败' })
                   }
@@ -816,7 +825,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           </div>
         </div>
       )}
-      {showDaydream && <DaydreamOverlay onExit={() => setShowDaydream(false)} mode={daydreamMode} />}
+      {showDaydream && <DaydreamOverlay onExit={closeDaydream} mode={daydreamMode} />}
     </div>
   )
 }

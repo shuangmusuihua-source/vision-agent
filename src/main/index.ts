@@ -6,10 +6,14 @@ import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
 import { getSettings, getAuthorizedDirectories, ensureKnowledgeBase, getKnowledgeBaseDir } from './store'
+import { migrateToV1 } from './store-migration'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
-import { setSkillOutputWindow } from './agent-manager'
+import { setSkillOutputWindow, handleWindowDestroy, abortActiveQuery } from './agent-manager'
+import { stopAllCronJobs } from './cron-manager'
+import { setMainWindow, getMainWindow } from './ipc-sender'
+import { flushAuditLog } from './agent-audit'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -71,8 +75,15 @@ function createWindow(): void {
     }
   })
 
+  // Register the window in ipc-sender so other modules can reach it
+  setMainWindow(mainWindow)
+
   mainWindow.on('ready-to-show', () => {
     if (mainWindow) mainWindow.show()
+  })
+
+  mainWindow.on('closed', () => {
+    handleWindowDestroy()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -87,9 +98,8 @@ function createWindow(): void {
   }
 }
 
-export function getMainWindow(): BrowserWindow | null {
-  return mainWindow
-}
+// getMainWindow is now provided by ipc-sender module (re-exported below)
+export { getMainWindow }
 
 app.whenReady().then(() => {
   setupMenu()
@@ -102,6 +112,11 @@ app.whenReady().then(() => {
 
   // Ensure knowledge base directory exists and is registered
   const knowledgeDir = ensureKnowledgeBase()
+
+  // Fire-and-forget store migration (non-blocking, best-effort)
+  migrateToV1().catch(err => {
+    console.error('[Init] store migration failed (non-blocking):', err)
+  })
 
   registerIpcHandlers()
   initAppSkills()
@@ -172,4 +187,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', async () => {
+  abortActiveQuery()
+  handleWindowDestroy()
+  stopAllCronJobs()
+  await flushAuditLog()
 })

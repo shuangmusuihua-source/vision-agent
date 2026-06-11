@@ -1,31 +1,26 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, ChevronDown, X } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, X } from 'lucide-react'
 import type { UsageInfo, PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AgentContext } from '../../../shared/types'
 import type { SkillMeta } from '../../../shared/types'
-import type { AppSettings, ModelProfile } from '../../lib/ipc'
 import { useAgentStore } from '../../store/agent-store-impl'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
 import DrawerZone from './DrawerZone'
-
-const MODELS: Record<string, string> = {
-  'claude-sonnet-4-20250514': 'Sonnet 4',
-  'claude-opus-4-20250514': 'Opus 4',
-  'claude-haiku-4-5-20251001': 'Haiku 4.5',
-}
+import TodoPanel from '../chat/TodoPanel'
 
 interface AgentPanelProps {
   context?: AgentContext
   width: number
   edgeClass: string
+  workspacePath?: string
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   permissionQueueLength: number
-  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny') => void
+  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void
   askUserRequest: AskUserRequest | null
-  onAskUserRespond: (requestId: string, answer: string) => void
-  onAskUserDrawerRespond?: (respond: (answer: string) => void) => void
+  onAskUserRespond: (requestId: string, answers: Record<string, string>) => void
+  onAskUserDrawerRespond?: (respond: (answers: Record<string, string>) => void) => void
   sessionList: SdkSessionInfo[]
   currentSessionId: string | null
   onSelectSession: (sessionId: string) => void
@@ -38,19 +33,11 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
-  const [settings, setSettings] = useState<AppSettings | null>(null)
-  const [showModelDropdown, setShowModelDropdown] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
+function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
-  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
-  const modelDropdownRef = useRef<HTMLDivElement>(null)
-  const historyDropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    window.api.settings.get().then(setSettings)
-  }, [])
+  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
+  const todoList = useAgentStore((s) => s.slots[context].todoList)
 
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
@@ -58,14 +45,14 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
 
   useEffect(() => {
     if (pendingAskAnswer && !askDrawerOpen) {
-      onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answer)
+      onAskUserRespond(pendingAskAnswer.requestId, pendingAskAnswer.answers)
       setPendingAskAnswer(null)
     }
   }, [pendingAskAnswer, askDrawerOpen, onAskUserRespond])
 
-  const handleAskUserRespond = useCallback((answer: string) => {
+  const handleAskUserRespond = useCallback((answers: Record<string, string>) => {
     if (!askUserRequest) return
-    setPendingAskAnswer({ requestId: askUserRequest.id, answer })
+    setPendingAskAnswer({ requestId: askUserRequest.id, answers })
     setAskDrawerOpen(false)
   }, [askUserRequest])
 
@@ -77,7 +64,10 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
     if (!activeSkillId) return null
     const msgs = s.slots[context].messages
     for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].skillMeta?.id === activeSkillId) return msgs[i].skillMeta
+      const msg = msgs[i]
+      if (msg.kind === 'user' || msg.kind === 'text') {
+        if (msg.skillMeta?.id === activeSkillId) return msg.skillMeta
+      }
     }
     return null
   })
@@ -86,90 +76,16 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
     if (activeSkillMeta?.status === 'running') setSkillDrawerHidden(false)
   }, [activeSkillMeta])
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (showModelDropdown && modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
-        setShowModelDropdown(false)
-      }
-      if (showHistory && historyDropdownRef.current && !historyDropdownRef.current.contains(e.target as Node)) {
-        setShowHistory(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showModelDropdown, showHistory])
-
-  const activeProfile = settings?.profiles.find(p => p.id === settings.activeProfileId)
-  const modelLabel = activeProfile ? (MODELS[activeProfile.model] || activeProfile.model) : 'Sonnet 4'
-
-  const handleSelectModel = useCallback(async (profile: ModelProfile) => {
-    await window.api.settings.setActiveProfile(profile.id)
-    const s = await window.api.settings.get()
-    setSettings(s)
-    setShowModelDropdown(false)
-  }, [])
-
-  const handleToggleHistory = useCallback(() => {
-    setShowHistory((v) => {
-      if (!v) onRefreshSessions()
-      return !v
-    })
-  }, [onRefreshSessions])
-
   return (
     <div className={`agent-panel ${edgeClass}`} style={{ width, minWidth: width, maxWidth: width }}>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
-          <div className="agent-header-model" ref={modelDropdownRef}>
-            <button className="agent-header-model-btn" onClick={() => setShowModelDropdown(!showModelDropdown)} aria-label="选择模型">
-              {modelLabel}
-              <ChevronDown size={12} />
-            </button>
-            {showModelDropdown && (
-              <div className="agent-header-dropdown agent-header-model-dropdown">
-                {settings?.profiles.map(p => (
-                  <button
-                    key={p.id}
-                    className={`agent-header-dropdown-item${p.id === settings.activeProfileId ? ' active' : ''}`}
-                    onClick={() => handleSelectModel(p)}
-                  >
-                    {MODELS[p.model] || p.model}
-                  </button>
-                ))}
-              </div>
+          <div className="agent-header-workspace" title={workspacePath || undefined}>
+            {workspacePath ? workspacePath.split('/').pop() : ''}
+            {currentSessionId && sessionList.find(s => s.id === currentSessionId)?.title && (
+              <>｜{sessionList.find(s => s.id === currentSessionId)!.title}</>
             )}
           </div>
-
-          <div className="agent-header-session" ref={historyDropdownRef}>
-            <button className="agent-header-session-btn" onClick={onNewSession} title="新建会话" aria-label="新建会话">
-              <Plus size={14} />
-            </button>
-            <button className="agent-header-session-arrow" onClick={handleToggleHistory} title="历史会话" aria-label="历史会话">
-              <ChevronDown size={12} />
-            </button>
-            {showHistory && (
-              <div className="agent-header-dropdown agent-header-history-dropdown">
-                {sessionList.length === 0 ? (
-                  <div className="agent-header-dropdown-empty">暂无历史会话</div>
-                ) : (
-                  sessionList.map(s => (
-                    <button
-                      key={s.id}
-                      className={`agent-header-dropdown-item${s.id === currentSessionId ? ' active' : ''}`}
-                      onClick={() => { onSelectSession(s.id); setShowHistory(false) }}
-                    >
-                      <span className="agent-header-history-title">{s.title || '未命名会话'}</span>
-                      <span className="agent-header-history-time">
-                        {s.lastModified ? new Date(s.lastModified).toLocaleDateString() : ''}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="agent-header-spacer" />
         </div>
         <div className="agent-panel-body">
           <div className="agent-panel-content">
@@ -187,8 +103,9 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
             )}
             {children}
           </div>
-          </div>
-          <div className="agent-panel-footer">
+        </div>
+        </div>
+        <div className="agent-panel-footer">
             {permissionRequest && (
               <PermissionDialog
                 request={permissionRequest}
@@ -206,8 +123,19 @@ function AgentPanel({ context = 'editor', width, edgeClass, usageInfo, permissio
               />
             )}
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
+            {todoList && todoList.tasks.length > 0 && (
+              <div style={{ padding: '0 8px 4px 8px' }}>
+                <TodoPanel
+                  todoList={todoList}
+                  onClose={() => {
+                    useAgentStore.setState((s) => ({
+                      slots: { ...s.slots, [context]: { ...s.slots[context], todoList: null } },
+                    }))
+                  }}
+                />
+              </div>
+            )}
             {chatInput}
-          </div>
         </div>
       </div>
     </div>

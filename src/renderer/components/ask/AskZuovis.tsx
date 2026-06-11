@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Monitor, FolderOpen, Trash2 } from 'lucide-react'
+import { Monitor, FolderOpen, Trash2, Gauge } from 'lucide-react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
 import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
@@ -23,7 +23,8 @@ interface FeatureCard {
 const FEATURES: FeatureCard[] = [
   { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析你的桌面文件，给出智能整理方案', descBold: ['桌面文件', '整理方案'], colorClass: 'ask-card-purple', prompt: '使用整理桌面 skill 整理我的桌面', skillId: 'organize-desktop' },
   { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择一个文件夹，我来帮你归类整理', descBold: ['归类整理'], colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
-  { id: 'system-cleanup', icon: Trash2, title: '系统清理', desc: '扫描垃圾文件，释放宝贵的磁盘空间', descBold: ['垃圾文件', '磁盘空间'], colorClass: 'ask-card-blue', prompt: '扫描并清理我的系统垃圾', skillId: 'system-cleanup' },
+  { id: 'system-cleanup', icon: Trash2, title: '系统清理', desc: '扫描垃圾文件，释放宝贵的磁盘空间', descBold: ['垃圾文件', '磁盘空间'], colorClass: 'ask-card-blue', prompt: '使用系统清理 skill 扫描并清理我的系统垃圾', skillId: 'system-cleanup' },
+  { id: 'perf-optimize', icon: Gauge, title: '性能优化', desc: '查看最耗资源的应用，获取优化建议', descBold: ['最耗资源', '优化建议'], colorClass: 'ask-card-green', prompt: '请帮我分析当前系统的性能状况：运行 ps aux 查看最耗 CPU 和内存的进程，用 vm_stat 查看内存使用情况，给出优化建议。哪些应用占用资源过多？有什么方法可以释放内存和降低 CPU 使用？' },
 ]
 
 interface AskZuovisProps {
@@ -46,8 +47,8 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   // ── AskUser interaction ──
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
-  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answer: string } | null>(null)
-  const askDrawerRespondRef = useRef<((answer: string) => void) | null>(null)
+  const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
+  const askDrawerRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
 
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
@@ -55,18 +56,18 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   useEffect(() => {
     if (pendingAskAnswer && !askDrawerOpen) {
-      respondAskUser(pendingAskAnswer.requestId, pendingAskAnswer.answer)
+      respondAskUser(pendingAskAnswer.requestId, pendingAskAnswer.answers)
       setPendingAskAnswer(null)
     }
   }, [pendingAskAnswer, askDrawerOpen, respondAskUser])
 
-  const handlePermissionRespond = useCallback((requestId: string, behavior: 'allow' | 'deny') => {
-    respondPermission(requestId, behavior)
+  const handlePermissionRespond = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
+    respondPermission(requestId, behavior, options)
   }, [respondPermission])
 
-  const handleAskUserRespond = useCallback((answer: string) => {
+  const handleAskUserRespond = useCallback((answers: Record<string, string>) => {
     if (!askUserRequest) return
-    setPendingAskAnswer({ requestId: askUserRequest.id, answer })
+    setPendingAskAnswer({ requestId: askUserRequest.id, answers })
     setAskDrawerOpen(false)
   }, [askUserRequest])
 
@@ -103,7 +104,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   const handleChatSend = useCallback((msg: string) => {
     if (askUserRequest && askDrawerRespondRef.current) {
-      askDrawerRespondRef.current(msg)
+      askDrawerRespondRef.current({ answer: msg })
     } else {
       sendMessage(msg)
     }
@@ -157,10 +158,11 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
                 )
               })}
             </div>
+
           </div>
         ) : (
           <div className="ask-zuovis-messages-inner">
-            <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} />
+            <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} scrollContainerRef={scrollRef} />
           </div>
         )}
       </div>
@@ -185,7 +187,10 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           <ChatInput
           context="ask"
           onSend={handleChatSend}
-          onStop={() => window.api.agent.abort('ask')}
+          onStop={() => {
+            useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'ask')
+            window.api.agent.abort('ask')
+          }}
           disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !askUserRequest}
           isStreaming={isStreaming}
           placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}

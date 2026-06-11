@@ -1,11 +1,12 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { Info, ChevronDown } from 'lucide-react'
+import { Info, ChevronDown, Share2 } from 'lucide-react'
 import type { GraphNode } from '../../../shared/types'
 import { useGraphStore } from '../../store/graph-store'
 
 interface GraphViewProps {
   onNodeClick: (nodeId: string, nodeType: string) => void
+  activeFile?: string | null
 }
 
 interface FGNode extends GraphNode {
@@ -31,12 +32,14 @@ function getNodeColor(node: FGNode, highlighted: boolean): string {
   return FILE_COLOR
 }
 
-function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
+function GraphView({ onNodeClick, activeFile }: GraphViewProps): React.ReactElement {
   const store = useGraphStore
   const fgRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [legendCollapsed, setLegendCollapsed] = useState(false)
+  const [hoveredNode, setHoveredNode] = useState<FGNode | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const filteredData = store(s => s.filteredData)
   const searchQuery = store(s => s.searchQuery)
@@ -133,6 +136,25 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
     return node.label
   }, [])
 
+  // Click handler: single click highlights, double click navigates
+  const handleNodeClick = useCallback((node: FGNode) => {
+    if (clickTimerRef.current) {
+      // Double click — navigate
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+      onNodeClick(node.id, node.type)
+    } else {
+      // Single click — highlight
+      setHoveredNode(node)
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null
+      }, 300)
+    }
+  }, [onNodeClick])
+
+  // Active file name for title bar
+  const activeFileName = activeFile ? activeFile.split('/').pop() || activeFile : null
+
   return (
     <div ref={containerRef} className="graph-view">
       <div className="graph-toolbar">
@@ -149,8 +171,22 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
           </span>
         )}
       </div>
+      <div className="graph-title-bar">
+        <Share2 size={14} className="graph-title-icon" />
+        <span className="graph-title-label">知识图谱</span>
+        {activeFileName && (
+          <>
+            <span className="graph-title-sep">·</span>
+            <span className="graph-title-file">当前：{activeFileName}</span>
+          </>
+        )}
+        {hoveredNode && (
+          <span className="graph-title-hint">单击高亮 · 双击跳转</span>
+        )}
+      </div>
       <div className="graph-canvas">
         {fgData.nodes.length > 0 ? (
+          <>
           <ForceGraph2D
             ref={fgRef}
             width={dimensions.width}
@@ -162,7 +198,8 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
             linkDirectionalArrowLength={0}
             linkColor={() => 'transparent'}
             linkWidth={0}
-            onNodeClick={(node) => onNodeClick(node.id, node.type)}
+            onNodeClick={handleNodeClick}
+            onBackgroundClick={() => setHoveredNode(null)}
             nodeLabel={nodeLabel}
             backgroundColor="transparent"
             warmupTicks={50}
@@ -171,6 +208,13 @@ function GraphView({ onNodeClick }: GraphViewProps): React.ReactElement {
             d3VelocityDecay={0.3}
             nodeVal={(node) => node.val ?? 12}
           />
+          {hoveredNode && (
+            <div className="graph-node-tooltip">
+              <span className="graph-node-tooltip-type">{hoveredNode.type === 'memory' ? 'Memory' : 'File'}</span>
+              <span className="graph-node-tooltip-path">{hoveredNode.label}</span>
+            </div>
+          )}
+          </>
         ) : (
           <div className="graph-empty">No nodes to display</div>
         )}
