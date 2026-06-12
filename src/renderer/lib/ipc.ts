@@ -181,8 +181,10 @@ interface NotificationApi {
 interface UpdateApi {
   download: () => Promise<void>
   install: () => Promise<void>
+  checkForUpdates: () => Promise<void>
   onAvailable: (callback: (info: { version: string }) => void) => () => void
   onDownloaded: (callback: () => void) => () => void
+  onError: (callback: (error: { message: string }) => void) => () => void
 }
 
 // ─── Window API ──────────────────────────────────────────────────────

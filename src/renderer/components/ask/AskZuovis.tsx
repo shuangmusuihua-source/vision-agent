@@ -24,7 +24,7 @@ const FEATURES: FeatureCard[] = [
   { id: 'organize-desktop', icon: Monitor, title: '整理桌面', desc: '分析你的桌面文件，给出智能整理方案', descBold: ['桌面文件', '整理方案'], colorClass: 'ask-card-purple', prompt: '使用整理桌面 skill 整理我的桌面', skillId: 'organize-desktop' },
   { id: 'organize-files', icon: FolderOpen, title: '整理文件', desc: '选择一个文件夹，我来帮你归类整理', descBold: ['归类整理'], colorClass: 'ask-card-pink', prompt: '整理我的文件夹', skillId: 'organize-folder' },
   { id: 'system-cleanup', icon: Trash2, title: '系统清理', desc: '扫描垃圾文件，释放宝贵的磁盘空间', descBold: ['垃圾文件', '磁盘空间'], colorClass: 'ask-card-blue', prompt: '使用系统清理 skill 扫描并清理我的系统垃圾', skillId: 'system-cleanup' },
-  { id: 'perf-optimize', icon: Gauge, title: '性能优化', desc: '查看最耗资源的应用，获取优化建议', descBold: ['最耗资源', '优化建议'], colorClass: 'ask-card-green', prompt: '请帮我分析当前系统的性能状况：运行 ps aux 查看最耗 CPU 和内存的进程，用 vm_stat 查看内存使用情况，给出优化建议。哪些应用占用资源过多？有什么方法可以释放内存和降低 CPU 使用？' },
+  { id: 'perf-optimize', icon: Gauge, title: '性能优化', desc: '采集系统数据，分析 CPU/内存瓶颈，给出优化建议', descBold: ['CPU/内存瓶颈', '优化建议'], colorClass: 'ask-card-green', prompt: '使用性能优化 skill 分析并优化系统性能', skillId: 'perf-optimize' },
 ]
 
 interface AskZuovisProps {
@@ -104,7 +104,8 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
 
   const handleChatSend = useCallback((msg: string) => {
     if (askUserRequest && askDrawerRespondRef.current) {
-      askDrawerRespondRef.current({ answer: msg })
+      const qKey = askUserRequest.questions[0]?.question || 'answer'
+      askDrawerRespondRef.current({ [qKey]: msg })
     } else {
       sendMessage(msg)
     }

@@ -306,7 +306,7 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
                 animated={isStreaming ? { animation: 'slideUp', sep: 'word', stagger: 30, duration: 200 } : undefined}
                 parseIncompleteMarkdown={isStreaming}
                 caret="block"
-                mermaid={{ config: { startOnLoad: false } }}
+                mermaid={{ config: { startOnLoad: false, securityLevel: 'strict' } }}
                 lineNumbers={false}
                 controls={false}
               >

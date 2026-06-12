@@ -2,8 +2,18 @@ import { ipcMain } from 'electron'
 import { join, extname, dirname } from 'path'
 import { readFile, writeFile, mkdir, unlink, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
+import { resolve, sep } from 'path'
 import { getAuthorizedDirectories } from '../store'
 import { isPathAuthorized } from '../path-validator'
+
+function isMemoryPathAuthorized(filePath: string): boolean {
+  const dirs = getAuthorizedDirectories()
+  const resolved = resolve(filePath)
+  return dirs.some((dir) => {
+    const memoryRoot = resolve(dir, '.vision', 'memory') + sep
+    return resolved.startsWith(memoryRoot) && !resolved.includes('..')
+  })
+}
 
 export function registerMemoryHandlers(): void {
   ipcMain.handle('memory:list', async () => {
@@ -29,12 +39,14 @@ export function registerMemoryHandlers(): void {
 
   ipcMain.handle('memory:read', async (_event, filePath: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
+    if (!isMemoryPathAuthorized(filePath)) return { success: false, error: 'Path must be within .vision/memory/' }
     try { const content = await readFile(filePath, 'utf-8'); return { success: true, content } }
     catch (err) { return { success: false, error: (err as Error).message } }
   })
 
   ipcMain.handle('memory:write', async (_event, filePath: string, content: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
+    if (!isMemoryPathAuthorized(filePath)) return { success: false, error: 'Path must be within .vision/memory/' }
     try {
       const dir = dirname(filePath)
       if (!existsSync(dir)) await mkdir(dir, { recursive: true })
@@ -45,6 +57,7 @@ export function registerMemoryHandlers(): void {
 
   ipcMain.handle('memory:delete', async (_event, filePath: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
+    if (!isMemoryPathAuthorized(filePath)) return { success: false, error: 'Path must be within .vision/memory/' }
     try { await unlink(filePath); return { success: true } }
     catch (err) { return { success: false, error: (err as Error).message } }
   })

@@ -561,35 +561,6 @@ export interface SessionRecord {
   artifactCount: number
   legacyMigration?: boolean
 }
-
-// ─── Artifact Record (per-workspace sidecar: .vision/artifacts.json) ───
-
-export type ArtifactCategory = 'file' | 'deliverable' | 'skill_output' | 'memory'
-
-export interface ArtifactRecord {
-  id: string            // UUID
-  sessionId: string     // FK → SessionRecord.id
-  workspacePath: string // FK → WorkspaceRecord.path (denormalized)
-  fileName: string
-  filePath: string      // absolute path
-  relativePath: string  // relative to workspace root
-  fileType: ArtifactFileType
-  category: ArtifactCategory
-  toolCallId?: string   // Write/Edit tool_use id
-  skillId?: string      // which skill created this
-  createdAt: number
-  updatedAt: number
-}
-
-// ─── Artifact Index File (shape of .vision/artifacts.json) ─────────────
-
-export interface ArtifactIndexFile {
-  version: 1
-  workspacePath: string
-  updatedAt: number
-  artifacts: ArtifactRecord[]
-}
-
 // ─── Session Digest (lightweight, for overview display) ────────────────
 
 export interface SessionDigest {

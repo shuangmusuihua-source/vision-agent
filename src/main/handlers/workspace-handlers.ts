@@ -45,8 +45,11 @@ export function registerWorkspaceHandlers(
   ipcMain.handle('workspace:renameFile', async (_event, filePath: string, newName: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
+      const safeName = sanitizeFileName(newName.trim())
+      if (!safeName) return { success: false, error: 'Invalid file name' }
       const dir = dirname(filePath)
-      const destPath = join(dir, newName)
+      const destPath = join(dir, safeName)
+      if (!isPathAuthorized(destPath)) return { success: false, error: 'Path not authorized' }
       if (existsSync(destPath)) return { success: false, error: '同名文件已存在' }
       await rename(filePath, destPath)
       return { success: true, newPath: destPath }
