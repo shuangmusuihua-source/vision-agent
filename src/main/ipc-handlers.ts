@@ -2,14 +2,15 @@ import { ipcMain } from 'electron'
 import { readdir } from 'fs/promises'
 import { join, extname } from 'path'
 import { getMainWindow } from './ipc-sender'
-import { getSettings, getSessionRecords, getSessionsByWorkspace } from './store'
-import { listDeliverables, getDeliverable, deleteDeliverable } from './deliverable-service'
+import { getSettings, getSessionsByWorkspace } from './store'
+// deliverable-service used via ./handlers/deliverable-handlers
 import type { FileEntry, WorkspaceDigest } from '../shared/types'
 import { registerWorkspaceHandlers } from './handlers/workspace-handlers'
 import { registerSettingsHandlers } from './handlers/settings-handlers'
 import { registerAgentHandlers } from './handlers/agent-handlers'
 import { registerSystemHandlers } from './handlers/system-handlers'
-// session-handlers and deliverable-handlers were inlined — they were pure pass-throughs
+import { registerSessionHandlers } from './handlers/session-handlers'
+import { registerDeliverableHandlers } from './handlers/deliverable-handlers'
 
 // ─── Shared helpers ──────────────────────────────────────────────
 
@@ -68,25 +69,8 @@ export function registerIpcHandlers(): void {
   registerSettingsHandlers(pushSettingsToRenderer)
   registerAgentHandlers()
   registerSystemHandlers()
-  // ── Session list/query (inlined from session-handlers.ts) ──
-  ipcMain.handle('session:listByWorkspace', async (_event, workspacePath: string) => {
-    return getSessionsByWorkspace(workspacePath)
-  })
-  ipcMain.handle('session:list', async () => getSessionRecords())
-
-  // ── Deliverables (inlined from deliverable-handlers.ts) ──
-  ipcMain.handle('deliverable:list', async (_event, workspacePath: string) => {
-    try { return await listDeliverables(workspacePath) }
-    catch (e) { console.error('[deliverable:list] failed:', e); return [] }
-  })
-  ipcMain.handle('deliverable:get', async (_event, workspacePath: string, id: string) => {
-    try { return await getDeliverable(workspacePath, id) }
-    catch (e) { console.error('[deliverable:get] failed:', e); return null }
-  })
-  ipcMain.handle('deliverable:delete', async (_event, workspacePath: string, id: string) => {
-    try { await deleteDeliverable(workspacePath, id); return { success: true } }
-    catch (e) { return { success: false, error: (e as Error).message } }
-  })
+  registerSessionHandlers()
+  registerDeliverableHandlers()
 }
 
 // ─── Session Overview (Phase 0 stub, Phase 2 full implementation) ──

@@ -196,6 +196,7 @@ const api = {
   update: {
     download: () => ipcRenderer.invoke('update:download'),
     install: () => ipcRenderer.invoke('update:install'),
+    checkForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
     onAvailable: (callback: (info: { version: string }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
       ipcRenderer.on('update:available', handler)
@@ -205,6 +206,11 @@ const api = {
       const handler = (_event: Electron.IpcRendererEvent) => callback()
       ipcRenderer.on('update:downloaded', handler)
       return () => { ipcRenderer.removeListener('update:downloaded', handler) }
+    },
+    onError: (callback: (error: { message: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, error: { message: string }) => callback(error)
+      ipcRenderer.on('update:error', handler)
+      return () => { ipcRenderer.removeListener('update:error', handler) }
     }
   },
 

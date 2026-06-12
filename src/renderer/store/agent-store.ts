@@ -12,7 +12,6 @@ import type {
   SkillOutputState,
   TodoTaskList,
   WorkspaceRecord,
-  ArtifactRecord,
   WorkspaceDigest,
   SessionOutputs,
 } from '../../shared/types'

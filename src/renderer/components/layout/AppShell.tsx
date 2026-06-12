@@ -72,9 +72,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     sourceMode, setSourceMode, focusMode, setFocusMode,
     editorStats, setEditorStats, linkedFile, setLinkedFile,
     view, setView, updateAvailable, setUpdateAvailable, updateDownloaded, setUpdateDownloaded,
+    updateError, setUpdateError,
     showDaydream, daydreamMode, openDaydream, closeDaydream,
     mainError, setMainError,
   } = useUiStore()
+  const sourceModeRef = useRef(sourceMode)
+  sourceModeRef.current = sourceMode
+  const focusModeRef = useRef(focusMode)
+  focusModeRef.current = focusMode
   const changedFileCount = useChangedFileCount()
 
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
@@ -92,9 +97,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── IPC subscriptions (update, menu, graph, main error) ─────────────
 
   useEffect(() => {
-    const a = window.api.update.onAvailable((info) => setUpdateAvailable(info))
+    const a = window.api.update.onAvailable((info) => {
+      setUpdateAvailable(info)
+      setUpdateError(null)
+    })
     const b = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
-    return () => { a(); b() }
+    const c = window.api.update.onError((error) => setUpdateError(error.message))
+    return () => { a(); b(); c() }
   }, [])
 
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
@@ -237,12 +246,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         case 'toggle-sidebar': setSidebarCollapsed((v) => !v); break
         case 'toggle-agent-panel': handleToggleAgent(); break
         case 'open-search': openSearch(); break
-        case 'toggle-source-mode': setSourceMode(!sourceMode); break
-        case 'toggle-focus-mode': setFocusMode(!focusMode); break
+        case 'toggle-source-mode': setSourceMode(!sourceModeRef.current); break
+        case 'toggle-focus-mode': setFocusMode(!focusModeRef.current); break
         case 'save-file': break
       }
     })
-  }, [onOpenSettings])
+  }, [onOpenSettings, handleToggleAgent])
 
   // ── Singleton IPC → agent store ─────────────────────────────────────
 
@@ -668,7 +677,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       </>
       )}
       {/* ── Banners ── */}
-      {updateAvailable && !updateDownloaded && (
+      {updateAvailable && !updateDownloaded && !updateError && (
         <div className="update-banner">
           <span>新版本 v{updateAvailable.version} 可用</span>
           <button className="update-banner-btn" onClick={() => window.api.update.download()}>
@@ -683,6 +692,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <button className="update-banner-btn" onClick={() => window.api.update.install()}>
             <ExternalLink size={14} /> 重启安装
           </button>
+        </div>
+      )}
+      {updateError && (
+        <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+          <span>更新失败: {updateError.slice(0, 60)}{updateError.length > 60 ? '...' : ''}</span>
+          <button className="update-banner-btn" onClick={() => window.api.update.checkForUpdates()}>
+            <Download size={14} /> 重试
+          </button>
+          <button className="update-banner-dismiss" onClick={() => setUpdateError(null)}>✕</button>
         </div>
       )}
       {mainError && (

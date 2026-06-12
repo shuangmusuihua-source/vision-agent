@@ -120,7 +120,7 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
         mermaid.initialize({
           startOnLoad: false,
           theme: getMermaidTheme(),
-          securityLevel: 'loose'
+          securityLevel: 'strict'
         })
         return mermaid.render(id, code.trim())
       })

@@ -861,14 +861,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }))
 
       try {
-        const INITIAL_LIMIT = 200
-        const { messages: rawMessages, offset: rawOffset } = await window.api.agent.loadSessionMessagesPaginated(
-          sessionId, INITIAL_LIMIT + 1, 0
+        const INITIAL_LIMIT = 10
+        const { messages, offset: paginationOffset, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
+          sessionId, INITIAL_LIMIT, 0
         )
-        const hasMore = rawMessages.length > INITIAL_LIMIT
-        const messages = hasMore ? rawMessages.slice(0, INITIAL_LIMIT) : rawMessages
-        const loadedCount = messages.length
-        const paginationOffset = rawOffset
 
         if (get().activeSessionId.editor !== sessionId) {
           set((state) => ({
@@ -935,33 +931,56 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       const nextOffset = slot._sdkLoadOffset
 
+      // Resolve which UI context owns this session (instead of hardcoding editor).
+      const stateBefore = get()
+      const owningContext: AgentContext | null =
+        stateBefore.activeSessionId.editor === sessionId ? 'editor' :
+        stateBefore.activeSessionId.ask === sessionId ? 'ask' :
+        null
+
       set((state) => ({
         sessionSlots: {
           ...state.sessionSlots,
           [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: true },
         },
-        ...(state.slots.editor.currentSessionId === sessionId ? {
-          slots: { ...state.slots, editor: { ...state.slots.editor, _isLoadingMoreMessages: true } },
+        ...(owningContext ? {
+          slots: { ...state.slots, [owningContext]: { ...state.slots[owningContext], _isLoadingMoreMessages: true } },
         } : {}),
       }))
 
       try {
         const LOAD_MORE_LIMIT = 100
-        const { messages: olderRawMessages, offset: olderRawOffset } = await window.api.agent.loadSessionMessagesPaginated(
-          sessionId, LOAD_MORE_LIMIT + 1, nextOffset
+        const { messages: olderRawMessages, offset: olderRawOffset, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
+          sessionId, LOAD_MORE_LIMIT, nextOffset
         )
-        const hasMore = olderRawMessages.length > LOAD_MORE_LIMIT
-        const olderMessages = hasMore ? olderRawMessages.slice(0, LOAD_MORE_LIMIT) : olderRawMessages
 
-        const olderBuiltMessages = buildReplayedMessages(olderMessages)
-        const newTotal = olderRawOffset
+        // Guard: if the session is no longer active in any context, write only
+        // to sessionSlots (cache), not to any live context slot.
+        const stateAfter = get()
+        const activeContext: AgentContext | null =
+          stateAfter.activeSessionId.editor === sessionId ? 'editor' :
+          stateAfter.activeSessionId.ask === sessionId ? 'ask' :
+          null
+
+        const olderBuiltMessages = buildReplayedMessages(olderRawMessages)
 
         set((state) => {
-          const editorSlot = state.slots.editor
-          const currentMessages = editorSlot.messages
+          if (!activeContext) {
+            // Session switched away; update cache only.
+            const cached = state.sessionSlots[sessionId]
+            return {
+              sessionSlots: {
+                ...state.sessionSlots,
+                [sessionId]: { ...cached, _isLoadingMoreMessages: false },
+              },
+            }
+          }
 
-          const updatedEditorSlot: ContextSlot = {
-            ...editorSlot,
+          const targetSlot = state.slots[activeContext]
+          const currentMessages = targetSlot.messages
+
+          const updatedSlot: ContextSlot = {
+            ...targetSlot,
             messages: [...olderBuiltMessages, ...currentMessages],
             _sdkLoadOffset: olderRawOffset,
             _sdkLoadedCount: olderRawOffset,
@@ -969,19 +988,24 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             _isLoadingMoreMessages: false,
           }
           return {
-            slots: { ...state.slots, editor: updatedEditorSlot },
-            sessionSlots: { ...state.sessionSlots, [sessionId]: updatedEditorSlot },
+            slots: { ...state.slots, [activeContext]: updatedSlot },
+            sessionSlots: { ...state.sessionSlots, [sessionId]: updatedSlot },
           }
         })
       } catch (err) {
         console.error('[AgentStore] loadMoreSessionMessages failed:', err)
+        const stateErr = get()
+        const activeCtxErr: AgentContext | null =
+          stateErr.activeSessionId.editor === sessionId ? 'editor' :
+          stateErr.activeSessionId.ask === sessionId ? 'ask' :
+          null
         set((state) => ({
           sessionSlots: {
             ...state.sessionSlots,
             [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: false },
           },
-          ...(state.slots.editor.currentSessionId === sessionId ? {
-            slots: { ...state.slots, editor: { ...state.slots.editor, _isLoadingMoreMessages: false } },
+          ...(activeCtxErr ? {
+            slots: { ...state.slots, [activeCtxErr]: { ...state.slots[activeCtxErr], _isLoadingMoreMessages: false } },
           } : {}),
         }))
       }

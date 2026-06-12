@@ -66,6 +66,14 @@ const builtinSkills: SkillDefinition[] = [
     promptTemplate: `使用 organize-folder skill 整理文件夹... {activeFile}`,
     hideInSlashMenu: true,
   },
+  {
+    id: 'perf-optimize',
+    name: '性能优化',
+    description: '采集 CPU/内存/磁盘/GPU 数据，分析性能瓶颈，交互式执行优化',
+    icon: 'Gauge',
+    promptTemplate: `使用 perf-optimize skill 分析并优化系统性能... {activeFile}`,
+    hideInSlashMenu: true,
+  },
 ]
 
 export function getBuiltinSkills(): SkillDefinition[] {

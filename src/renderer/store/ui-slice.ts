@@ -32,6 +32,8 @@ interface UiSlice {
   setUpdateAvailable: (info: UpdateInfo | null) => void
   updateDownloaded: boolean
   setUpdateDownloaded: (v: boolean) => void
+  updateError: string | null
+  setUpdateError: (error: string | null) => void
 
   // ── Error banner ─────────────────────────────────────────────────
   mainError: string | null
@@ -73,6 +75,8 @@ export const useUiStore = create<UiSlice>((set) => ({
   setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
   updateDownloaded: false,
   setUpdateDownloaded: (updateDownloaded) => set({ updateDownloaded }),
+  updateError: null,
+  setUpdateError: (updateError) => set({ updateError }),
 
   mainError: null,
   setMainError: (mainError) => set({ mainError }),

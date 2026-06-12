@@ -21,8 +21,15 @@ Sentry.init({
   environment: app.isPackaged ? 'production' : 'development',
   sendDefaultPii: false,
   beforeSend(event) {
-    // Filter out events containing apiKey to prevent credential leaks
-    if (JSON.stringify(event).includes('apiKey')) return null
+    // Recursively scan string values for 'apiKey' to prevent credential leaks.
+    // Avoids JSON.stringify on every event — field-level traversal with early exit.
+    const containsApiKey = (obj: unknown): boolean => {
+      if (typeof obj === 'string') return obj.includes('apiKey')
+      if (Array.isArray(obj)) return obj.some(containsApiKey)
+      if (obj && typeof obj === 'object') return Object.values(obj as Record<string, unknown>).some(containsApiKey)
+      return false
+    }
+    if (containsApiKey(event)) return null
     return event
   },
 })
@@ -171,6 +178,10 @@ app.whenReady().then(() => {
     autoUpdater.on('error', (err) => {
       console.error('[AutoUpdater] error:', err)
       Sentry.captureException(err)
+      const win = getMainWindow()
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('update:error', { message: err.message })
+      }
     })
   }
 
@@ -182,6 +193,7 @@ app.whenReady().then(() => {
 // IPC: update actions from renderer
 ipcMain.handle('update:download', () => autoUpdater.downloadUpdate())
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
+ipcMain.handle('update:checkForUpdates', () => autoUpdater.checkForUpdates())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

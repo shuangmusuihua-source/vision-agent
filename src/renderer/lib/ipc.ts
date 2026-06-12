@@ -123,7 +123,7 @@ interface AgentApi {
   respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
-  loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }>
+  loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }>
   renameSession: (sessionId: string, title: string) => Promise<void>
 	  updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
@@ -181,8 +181,10 @@ interface NotificationApi {
 interface UpdateApi {
   download: () => Promise<void>
   install: () => Promise<void>
+  checkForUpdates: () => Promise<void>
   onAvailable: (callback: (info: { version: string }) => void) => () => void
   onDownloaded: (callback: () => void) => () => void
+  onError: (callback: (error: { message: string }) => void) => () => void
 }
 
 // ─── Window API ──────────────────────────────────────────────────────
