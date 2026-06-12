@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
-import { useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId } from '../../hooks/useAgent'
+import { useAgentStore } from '../../store/agent-store-impl'
 import MessageBubble from './MessageBubble'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
@@ -16,15 +17,9 @@ interface ChatViewProps {
   workspacePath?: string
   /** Optional external scroll container — when provided, ChatView delegates scrolling to it */
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
-  /** Whether more messages exist on SDK disk that have not yet been loaded into the messages array */
-  hasMoreSdkMessages?: boolean
-  /** Whether an SDK load-more operation is currently in flight */
-  isLoadingMoreMessages?: boolean
-  /** Callback invoked to load the next batch of messages from the SDK disk store */
-  onLoadMoreSdkMessages?: () => Promise<void>
 }
 
-function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef, hasMoreSdkMessages, isLoadingMoreMessages, onLoadMoreSdkMessages }: ChatViewProps): React.ReactElement {
+function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef }: ChatViewProps): React.ReactElement {
   const messages = useMessages(context)
   const isStreaming = useIsStreaming(context)
   const isResuming = useIsResumingSession()
@@ -36,6 +31,10 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const userScrolledUpRef = useRef(false)
   const [visibleCount, setVisibleCount] = useState(RENDER_BATCH)
 
+  // ── SDK load-more wiring (self-contained, per context) ────────────────
+  const { loadMoreMessages, hasMoreSdkMessages, isLoadingMoreMessages } = useAgent(context)
+  const currentSessionId = useCurrentSessionId(context)
+
   const visibleMessages = useMemo(() => {
     const start = Math.max(0, messages.length - visibleCount)
     return { items: messages.slice(start), start }
@@ -44,36 +43,37 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const hasMore = messages.length > visibleCount
 
   const handleLoadMore = useCallback(async () => {
-    if (hasMoreSdkMessages && onLoadMoreSdkMessages) {
-      await onLoadMoreSdkMessages()
-      setVisibleCount((c) => c + RENDER_BATCH)
+    if (hasMoreSdkMessages) {
+      const sid = currentSessionId
+      // Capture scrollHeight before prepend so we can adjust scrollTop
+      // to keep the user's reading position stable after older messages
+      // are inserted above the viewport.
+      const el = containerRef.current
+      const prevScrollHeight = el ? el.scrollHeight : 0
+      if (sid) await loadMoreMessages(sid)
+      // SDK load prepends messages to the front — the visible window
+      // starts from the end, so expand to show everything loaded so far.
+      // Read fresh state from Zustand directly (bypasses React render cycle
+      // timing — more reliable than a ref synced via useEffect).
+      setVisibleCount(useAgentStore.getState().slots[context].messages.length)
+      // After React renders the prepended content, adjust scrollTop to
+      // compensate for the scrollHeight growth — keeps reading position stable.
+      if (el && prevScrollHeight > 0) {
+        requestAnimationFrame(() => {
+          const growth = el.scrollHeight - prevScrollHeight
+          if (growth > 0) el.scrollTop += growth
+        })
+      }
     } else {
       setVisibleCount((c) => c + RENDER_BATCH)
     }
-  }, [hasMoreSdkMessages, onLoadMoreSdkMessages])
+  }, [hasMoreSdkMessages, currentSessionId, loadMoreMessages, context, containerRef])
 
   // Force-scroll to bottom (always, ignores user scroll position)
   const forceScrollToBottom = useCallback(() => {
     const el = containerRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [containerRef])
-
-  // Detect manual scroll-up to pause auto-scroll during streaming
-  const handleScroll = useCallback(() => {
-    const el = containerRef.current
-    if (!el) return
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    userScrolledUpRef.current = distFromBottom > SCROLL_NEAR_BOTTOM
-  }, [containerRef])
-
-  // When using external scroll container, bind scroll listener via useEffect
-  useEffect(() => {
-    if (!externalScrollRef) return
-    const el = containerRef.current
-    if (!el) return
-    el.addEventListener('scroll', handleScroll, { passive: true })
-    return () => el.removeEventListener('scroll', handleScroll)
-  }, [externalScrollRef, containerRef, handleScroll])
 
   // New message arrived (not during streaming) → always scroll to bottom
   const prevMsgCount = useRef(messages.length)
@@ -112,6 +112,23 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
     }
   }, [messages.length])
 
+  // Scroll handler: detect manual scroll-up to pause auto-scroll during streaming
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    userScrolledUpRef.current = distFromBottom > SCROLL_NEAR_BOTTOM
+  }, [containerRef])
+
+  // When using external scroll container, bind scroll listener via useEffect
+  useEffect(() => {
+    if (!externalScrollRef) return
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [externalScrollRef, containerRef, handleScroll])
+
   return (
     <div className={styles.chatView} ref={externalScrollRef ? undefined : internalContainerRef} onScroll={externalScrollRef ? undefined : handleScroll} aria-live="polite" aria-label="对话消息">
       {isResuming && (
@@ -130,11 +147,11 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
           <Loader2 size={14} className="spin" /> 加载SDK消息...
         </button>
       )}
-      {!isLoadingMoreMessages && hasMore && (
+      {!isLoadingMoreMessages && (hasMore || hasMoreSdkMessages) && (
         <button className={styles.chatLoadMore} onClick={handleLoadMore}>
           <ChevronUp size={14} />{' '}
           {hasMoreSdkMessages
-            ? `加载更早消息 (还有 ${messages.length - visibleCount} 条在磁盘上)`
+            ? `加载更早消息`
             : `加载更早消息 (${messages.length - visibleCount} 条)`}
         </button>
       )}

@@ -217,34 +217,47 @@ export async function loadSdkSessionMessagesPaginated(
   sessionId: string,
   limit: number,
   offset: number
-): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number }> {
+): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }> {
   // Direct JSONL read — SDK API truncates pre-compaction messages.
+  // JSONL is append-only (oldest → newest). We read backward:
+  //   offset=0 → newest messages (from end of file)
+  //   offset>0 → older messages before the current window (backward)
   const direct = readSessionJsonlDirect(sessionId)
   let nextOffset = offset
-  if (direct) {
-    const slice = direct.slice(offset, offset + limit)
+  if (direct && direct.length > 0) {
+    let slice: Array<Record<string, unknown>>
+    if (offset === 0) {
+      // Initial load: newest messages from the tail.
+      const startIdx = Math.max(0, direct.length - limit)
+      slice = direct.slice(startIdx)
+      nextOffset = startIdx
+    } else {
+      // Load more: older messages before the current window.
+      const startIdx = Math.max(0, offset - limit)
+      slice = direct.slice(startIdx, offset)
+      nextOffset = startIdx
+    }
     const messages: AgentIPCMessage[] = []
-    let consumed = 0
     for (const m of slice) {
       const converted = toAgentIPCMessage(m as any)
-      consumed++
       if (converted) messages.push(converted)
     }
-    // Return the RAW JSONL line count as nextOffset so the renderer's
-    // _sdkLoadOffset stays in sync with the JSONL file position.
-    // Using converted count would cause the next page to overlap or skip.
-    nextOffset = offset + consumed
-    return { messages, offset: nextOffset, limit }
+    return { messages, offset: nextOffset, limit, hasMore: nextOffset > 0 }
   }
 
-  // Fallback to SDK API
+  // Fallback to SDK API — used only when direct JSONL read fails
+  // (no workspacePath in session record). SDK API uses forward pagination
+  // (oldest→newest, offset increases); the direct path uses backward
+  // (newest→oldest, offset decreases).  This fallback does NOT match the
+  // direct path's "newest first" behavior for initial load — it returns
+  // the oldest messages instead.  Acceptable because this path is rarely hit.
   const sdkMessages = await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
   const messages: AgentIPCMessage[] = []
   for (const m of sdkMessages) {
     const converted = toAgentIPCMessage(m as any)
     if (converted) messages.push(converted)
   }
-  return { messages, offset: offset + sdkMessages.length, limit }
+  return { messages, offset: offset + sdkMessages.length, limit, hasMore: sdkMessages.length >= limit }
 }
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {

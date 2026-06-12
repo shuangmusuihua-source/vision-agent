@@ -359,10 +359,7 @@ export function useAgent(context: AgentContext = 'editor') {
     await store.getState().loadMoreSessionMessages(sessionId)
   }, [store])
 
-  const hasMoreSdkMessages = store((s) => {
-    const slot = s.slots[context]
-    return slot._sdkLoadOffset < slot._sdkLoadedCount
-  })
+  const hasMoreSdkMessages = store((s) => s.slots[context]._needsSdkLoad)
 
   const isLoadingMoreMessages = store((s) => s.slots[context]._isLoadingMoreMessages)
 
@@ -427,9 +424,6 @@ export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => 
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
 export const useSkillOutput = (context: AgentContext) => useAgentStore((s) => s.slots[context].skillOutput)
 export const useHasMoreSdkMessages = (context: AgentContext) =>
-  useAgentStore((s) => {
-    const slot = s.slots[context]
-    return slot._sdkLoadOffset < slot._sdkLoadedCount
-  })
+  useAgentStore((s) => s.slots[context]._needsSdkLoad)
 export const useIsLoadingMoreMessages = (context: AgentContext) =>
   useAgentStore((s) => s.slots[context]._isLoadingMoreMessages)
