@@ -1,5 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Sun, Moon, Monitor, Users, Info, Plus, X } from 'lucide-react'
+import {
+  CheckCircle2,
+  Cpu,
+  Eye,
+  EyeOff,
+  Info,
+  KeyRound,
+  Monitor,
+  Moon,
+  Palette,
+  Pencil,
+  Plus,
+  Save,
+  Server,
+  Sun,
+  Trash2,
+  Users,
+  X,
+  Zap
+} from 'lucide-react'
 import { useSettings, useSettingsStore } from '../../store/settings-cache'
 import type { ModelProfile } from '../../lib/ipc'
 
@@ -9,10 +28,21 @@ interface SettingsModalProps {
 
 type SettingsPage = 'appearance' | 'profiles' | 'about'
 
-const PAGES: Array<{ id: SettingsPage; label: string; icon: React.ReactElement }> = [
-  { id: 'appearance', label: '外观', icon: <Sun size={16} /> },
-  { id: 'profiles', label: '模型配置', icon: <Users size={16} /> },
-  { id: 'about', label: '关于', icon: <Info size={16} /> }
+const PAGES: Array<{ id: SettingsPage; label: string; description: string; icon: React.ReactElement }> = [
+  { id: 'appearance', label: '外观', description: '界面主题与显示偏好', icon: <Palette size={16} /> },
+  { id: 'profiles', label: '模型配置', description: '管理 Agent 使用的模型连接', icon: <Users size={16} /> },
+  { id: 'about', label: '关于', description: '版本与产品信息', icon: <Info size={16} /> }
+]
+
+const THEME_OPTIONS: Array<{
+  id: 'light' | 'dark' | 'system'
+  label: string
+  description: string
+  icon: React.ReactElement
+}> = [
+  { id: 'light', label: '浅色', description: '清爽高亮，适合白天工作', icon: <Sun size={18} /> },
+  { id: 'dark', label: '深色', description: '低亮度界面，适合夜间专注', icon: <Moon size={18} /> },
+  { id: 'system', label: '跟随系统', description: '自动同步 macOS 外观', icon: <Monitor size={18} /> }
 ]
 
 const NEW_PROFILE: Omit<ModelProfile, 'id'> = {
@@ -217,92 +247,154 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
     return () => el.removeEventListener('keydown', handleTab)
   }, [])
 
+  const activePageMeta = PAGES.find((page) => page.id === activePage) || PAGES[0]
+  const activeProfile = profiles.find((profile) => profile.id === activeProfileId)
+  const themeLabel = THEME_OPTIONS.find((option) => option.id === theme)?.label || '未设置'
+
   return (
     <div className="settings-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="settings-window" role="dialog" aria-modal="true" aria-label="设置" onClick={(e) => e.stopPropagation()}>
-        <div className="settings-sidebar">
-          {PAGES.map((page) => (
-            <button
-              key={page.id}
-              className={`settings-sidebar-item ${activePage === page.id ? 'active' : ''}`}
-              onClick={() => setActivePage(page.id)}
-              aria-current={activePage === page.id ? 'page' : undefined}
-            >
-              {page.icon}
-              <span>{page.label}</span>
-            </button>
-          ))}
-          <div className="settings-sidebar-spacer" />
-          <div className="settings-sidebar-version">Vision Agent v1.0.0</div>
-        </div>
+        <aside className="settings-sidebar" aria-label="设置分类">
+          <div className="settings-brand">
+            <div className="settings-brand-mark">V</div>
+            <div className="settings-brand-copy">
+              <div className="settings-brand-title">Vision Agent</div>
+              <div className="settings-brand-subtitle">设置中心</div>
+            </div>
+          </div>
 
-        <div className="settings-content">
+          <nav className="settings-nav">
+            {PAGES.map((page) => (
+              <button
+                key={page.id}
+                className={`settings-sidebar-item ${activePage === page.id ? 'active' : ''}`}
+                onClick={() => setActivePage(page.id)}
+                aria-current={activePage === page.id ? 'page' : undefined}
+              >
+                <span className="settings-sidebar-icon">{page.icon}</span>
+                <span className="settings-sidebar-copy">
+                  <span className="settings-sidebar-label">{page.label}</span>
+                  <span className="settings-sidebar-desc">{page.description}</span>
+                </span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="settings-sidebar-spacer" />
+          <div className="settings-sidebar-summary">
+            <div className="settings-summary-label">当前配置</div>
+            <div className="settings-summary-value">{activeProfile?.name || '未选择'}</div>
+            <div className="settings-summary-meta">{themeLabel}</div>
+          </div>
+          <div className="settings-sidebar-version">Version 1.0.0</div>
+        </aside>
+
+        <section className="settings-content">
           <button className="settings-close-btn" onClick={onClose} aria-label="关闭设置">
-            <X size={16} />
+            <X size={17} />
           </button>
+
+          <header className="settings-content-header">
+            <div>
+              <div className="settings-kicker">Settings</div>
+              <h2 className="settings-page-title">{activePageMeta.label}</h2>
+              <p className="settings-page-subtitle">{activePageMeta.description}</p>
+            </div>
+          </header>
 
           {activePage === 'appearance' && (
             <div className="settings-page">
-              <div className="settings-page-title">外观</div>
-              <div className="settings-section">
-                <div className="settings-section-title">主题</div>
-                <div className="theme-options" role="radiogroup" aria-label="选择主题">
-                  <button
-                    className={`theme-option ${theme === 'light' ? 'active' : ''}`}
-                    onClick={() => handleThemeChange('light')}
-                    role="radio"
-                    aria-checked={theme === 'light'}
-                  >
-                    <Sun size={22} />
-                    <span className="theme-option-label">浅色</span>
-                  </button>
-                  <button
-                    className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
-                    onClick={() => handleThemeChange('dark')}
-                    role="radio"
-                    aria-checked={theme === 'dark'}
-                  >
-                    <Moon size={22} />
-                    <span className="theme-option-label">深色</span>
-                  </button>
-                  <button
-                    className={`theme-option ${theme === 'system' ? 'active' : ''}`}
-                    onClick={() => handleThemeChange('system')}
-                    role="radio"
-                    aria-checked={theme === 'system'}
-                  >
-                    <Monitor size={22} />
-                    <span className="theme-option-label">跟随系统</span>
-                  </button>
+              <section className="settings-hero-card" aria-label="外观概览">
+                <div className="settings-hero-icon">
+                  <Palette size={20} />
                 </div>
-              </div>
+                <div>
+                  <div className="settings-hero-title">界面外观</div>
+                  <div className="settings-hero-desc">主题会立即应用到整个应用窗口，保持编辑区、侧栏和 Agent 面板一致。</div>
+                </div>
+              </section>
+
+              <section className="settings-card">
+                <div className="settings-section-heading">
+                  <div>
+                    <div className="settings-section-title">主题</div>
+                    <div className="settings-section-subtitle">选择你当前工作环境下最舒服的视觉模式</div>
+                  </div>
+                </div>
+                <div className="theme-options" role="radiogroup" aria-label="选择主题">
+                  {THEME_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      className={`theme-option ${theme === option.id ? 'active' : ''}`}
+                      onClick={() => handleThemeChange(option.id)}
+                      role="radio"
+                      aria-checked={theme === option.id}
+                    >
+                      <span className="theme-option-icon">{option.icon}</span>
+                      <span className="theme-option-copy">
+                        <span className="theme-option-label">{option.label}</span>
+                        <span className="theme-option-desc">{option.description}</span>
+                      </span>
+                      {theme === option.id && <CheckCircle2 className="theme-option-check" size={17} aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
 
           {activePage === 'profiles' && (
             <div className="settings-page">
-              <div className="settings-page-title">模型配置</div>
+              <div className="settings-toolbar">
+                <div>
+                  <div className="settings-section-title">模型连接</div>
+                  <div className="settings-section-subtitle">这些配置会被 Agent 请求使用，切换激活项不会改写历史会话。</div>
+                </div>
+                <button className="add-profile-btn add-profile-btn-compact" onClick={handleAddProfile}>
+                  <Plus size={16} />
+                  添加配置
+                </button>
+              </div>
+
               {profiles.map((profile) => {
                 const isEditing = editingProfileId === profile.id
                 const fieldId = (field: string) => `profile-${profile.id}-${field}`
                 const isActive = activeProfileId === profile.id
+                const displayName = (isEditing ? editForm.name : profile.name) || profile.name || '未命名配置'
+                const displayModel = (isEditing ? editForm.model : profile.model) || profile.model || '未设置模型'
+                const displayProvider = (isEditing ? editForm.apiProvider : profile.apiProvider) || profile.apiProvider || '未填写'
+                const displayBaseUrl = (isEditing ? editForm.baseUrl : profile.baseUrl) || profile.baseUrl || '未填写'
+
                 return (
-                  <div className="settings-section" key={profile.id}>
-                    <div className="settings-section-title">
-                      {isEditing && isNewProfile ? '新配置' : profile.name || '未命名'}
-                    </div>
-                    <div className="profile-card">
-                      <div className="profile-card-header">
+                  <section className={`profile-card ${isEditing ? 'profile-card-editing' : ''}`} key={profile.id}>
+                    <div className="profile-card-header">
+                      <div className="profile-card-identity">
+                        <div className={`profile-card-icon ${isActive ? 'profile-card-icon-active' : ''}`}>
+                          <Cpu size={18} />
+                        </div>
+                        <div className="profile-card-title-block">
+                          <div className="profile-card-name">{displayName}</div>
+                          <div className="profile-card-model">{displayModel}</div>
+                        </div>
+                      </div>
+
+                      <div className="profile-card-header-right">
                         <span className={`profile-status-badge ${isActive ? 'profile-status-active' : 'profile-status-inactive'}`}>
                           <span className="profile-status-dot" />
                           {isActive ? '当前激活' : '未激活'}
                         </span>
                         <div className="profile-card-actions">
                           {!isActive && !isNewProfile && (
-                            <button className="profile-card-btn" onClick={() => handleSetActive(profile.id)}>激活</button>
+                            <button className="profile-card-btn profile-card-btn-primary" onClick={() => handleSetActive(profile.id)} title="激活配置" aria-label="激活配置">
+                              <Zap size={15} />
+                              激活
+                            </button>
                           )}
                           {!isEditing && (
-                            <button className="profile-card-btn" onClick={() => startEditing(profile)}>编辑</button>
+                            <button className="profile-card-btn" onClick={() => startEditing(profile)} title="编辑配置" aria-label="编辑配置">
+                              <Pencil size={15} />
+                              编辑
+                            </button>
                           )}
                           <button className="profile-card-btn danger" onClick={() => {
                             if (isNewProfile) {
@@ -314,12 +406,17 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                             } else {
                               handleDeleteProfile(profile.id)
                             }
-                          }}>删除</button>
+                          }} title="删除配置" aria-label="删除配置">
+                            <Trash2 size={15} />
+                            删除
+                          </button>
                         </div>
                       </div>
+                    </div>
 
-                      {isEditing ? (
-                        <>
+                    {isEditing ? (
+                      <>
+                        <div className="profile-edit-grid">
                           <div className={`profile-field ${validationErrors.name ? 'field-error' : ''}`}>
                             <label className="profile-field-label" htmlFor={fieldId('name')}>
                               配置名称 <span className="required-mark" aria-hidden="true">*</span>
@@ -342,6 +439,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               <div className="field-error-msg" role="alert">请填写配置名称</div>
                             )}
                           </div>
+
                           <div className="profile-field">
                             <label className="profile-field-label" htmlFor={fieldId('apiProvider')}>API Provider</label>
                             <input
@@ -353,7 +451,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               onChange={(e) => setEditForm((f) => ({ ...f, apiProvider: e.target.value }))}
                             />
                           </div>
-                          <div className={`profile-field ${validationErrors.baseUrl ? 'field-error' : ''}`}>
+
+                          <div className={`profile-field profile-field-span-2 ${validationErrors.baseUrl ? 'field-error' : ''}`}>
                             <label className="profile-field-label" htmlFor={fieldId('baseUrl')}>
                               Base URL <span className="required-mark" aria-hidden="true">*</span>
                             </label>
@@ -375,7 +474,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               <div className="field-error-msg" role="alert">请填写 Base URL</div>
                             )}
                           </div>
-                          <div className={`profile-field ${validationErrors.apiKey ? 'field-error' : ''}`}>
+
+                          <div className={`profile-field profile-field-span-2 ${validationErrors.apiKey ? 'field-error' : ''}`}>
                             <label className="profile-field-label" htmlFor={fieldId('apiKey')}>
                               API Key <span className="required-mark" aria-hidden="true">*</span>
                             </label>
@@ -399,14 +499,15 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                                 onClick={() => toggleApiKey(profile.id)}
                                 aria-label={showApiKey[profile.id] ? '隐藏 API Key' : '显示 API Key'}
                               >
-                                {showApiKey[profile.id] ? '隐藏' : '显示'}
+                                {showApiKey[profile.id] ? <EyeOff size={15} /> : <Eye size={15} />}
                               </button>
                             </div>
                             {validationErrors.apiKey && (
                               <div className="field-error-msg" role="alert">请填写 API Key</div>
                             )}
                           </div>
-                          <div className={`profile-field ${validationErrors.model ? 'field-error' : ''}`}>
+
+                          <div className={`profile-field profile-field-span-2 ${validationErrors.model ? 'field-error' : ''}`}>
                             <label className="profile-field-label" htmlFor={fieldId('model')}>
                               模型 <span className="required-mark" aria-hidden="true">*</span>
                             </label>
@@ -428,34 +529,47 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                               <div className="field-error-msg" role="alert">请填写模型</div>
                             )}
                           </div>
-                          <div className="profile-edit-actions">
-                            <button
-                              className="profile-card-btn profile-test-btn"
-                              onClick={testConnection}
-                              disabled={connectionTest.status === 'testing'}
-                            >
-                              {connectionTest.status === 'testing' ? '测试中...' : '测试连接'}
-                            </button>
-                            {connectionTest.status !== 'idle' && connectionTest.message && (
-                              <span className={`profile-test-result ${connectionTest.status === 'success' ? 'profile-test-success' : 'profile-test-error'}`} role="status">
-                                {connectionTest.message}
-                              </span>
-                            )}
-                            <button className="profile-card-btn" onClick={cancelEditing}>取消</button>
-                            <button className="profile-card-btn profile-save-btn" onClick={() => saveEditing(profile.id)}>保存</button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="profile-field">
+                        </div>
+
+                        <div className="profile-edit-actions">
+                          <button
+                            className="profile-card-btn profile-test-btn"
+                            onClick={testConnection}
+                            disabled={connectionTest.status === 'testing'}
+                          >
+                            {connectionTest.status === 'testing' ? '测试中...' : '测试连接'}
+                          </button>
+                          {connectionTest.status !== 'idle' && connectionTest.message && (
+                            <span className={`profile-test-result ${connectionTest.status === 'success' ? 'profile-test-success' : 'profile-test-error'}`} role="status">
+                              {connectionTest.message}
+                            </span>
+                          )}
+                          <button className="profile-card-btn" onClick={cancelEditing}>取消</button>
+                          <button className="profile-card-btn profile-save-btn" onClick={() => saveEditing(profile.id)}>
+                            <Save size={15} />
+                            保存
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="profile-detail-grid">
+                        <div className="profile-detail-item">
+                          <Server size={15} />
+                          <div>
                             <div className="profile-field-label">API Provider</div>
-                            <div className="profile-field-value">{profile.apiProvider}</div>
+                            <div className="profile-field-value">{displayProvider}</div>
                           </div>
-                          <div className="profile-field">
+                        </div>
+                        <div className="profile-detail-item profile-detail-item-wide">
+                          <Monitor size={15} />
+                          <div>
                             <div className="profile-field-label">Base URL</div>
-                            <div className="profile-field-value">{profile.baseUrl}</div>
+                            <div className="profile-field-value profile-field-url">{displayBaseUrl}</div>
                           </div>
-                          <div className="profile-field">
+                        </div>
+                        <div className="profile-detail-item profile-detail-item-wide">
+                          <KeyRound size={15} />
+                          <div>
                             <div className="profile-field-label">API Key</div>
                             <div className="api-key-row">
                               <span className="profile-field-value api-key-value">
@@ -466,41 +580,53 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                                 onClick={() => toggleApiKey(profile.id)}
                                 aria-label={showApiKey[profile.id] ? '隐藏 API Key' : '显示 API Key'}
                               >
-                                {showApiKey[profile.id] ? '隐藏' : '显示'}
+                                {showApiKey[profile.id] ? <EyeOff size={15} /> : <Eye size={15} />}
                               </button>
                             </div>
                           </div>
-                          <div className="profile-field">
-                            <div className="profile-field-label">模型</div>
-                            <div className="profile-field-value">{profile.model}</div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
                 )
               })}
-              <button className="add-profile-btn" onClick={handleAddProfile}>
-                <Plus size={16} />
-                添加配置
-              </button>
+
+              {profiles.length === 0 && (
+                <button className="add-profile-btn add-profile-btn-empty" onClick={handleAddProfile}>
+                  <Plus size={18} />
+                  添加第一个模型配置
+                </button>
+              )}
             </div>
           )}
 
           {activePage === 'about' && (
             <div className="settings-page">
-              <div className="settings-page-title">关于</div>
-              <div className="about-section">
+              <section className="about-section">
+                <div className="about-logo-mark">V</div>
                 <div className="about-logo">Vision Agent</div>
                 <div className="about-version">Version 1.0.0</div>
                 <div className="about-desc">
-                  基于 Claude Agent SDK 的智能编程助手。<br />
-                  集成文件编辑、代码审查、定时任务等功能。
+                  基于 Claude Agent SDK 的智能编程助手。集成文件编辑、代码审查、定时任务与多会话工作流。
                 </div>
-              </div>
+                <div className="about-facts">
+                  <div className="about-fact">
+                    <CheckCircle2 size={16} />
+                    本地优先
+                  </div>
+                  <div className="about-fact">
+                    <CheckCircle2 size={16} />
+                    多工作区
+                  </div>
+                  <div className="about-fact">
+                    <CheckCircle2 size={16} />
+                    Agent 会话
+                  </div>
+                </div>
+              </section>
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )
