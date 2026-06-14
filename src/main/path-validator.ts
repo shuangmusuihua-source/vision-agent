@@ -1,6 +1,7 @@
 import path from 'path'
 import { app } from 'electron'
 import { getAuthorizedDirectories } from './store'
+import { isPathAuthorized as isPathInsideAuthorizedRoots } from './agent-path-utils'
 
 let cachedExtraRoots: string[] = []
 
@@ -12,13 +13,9 @@ export function addAuthorizedRoot(p: string): void {
 }
 
 export function isPathAuthorized(filePath: string): boolean {
-  const resolved = path.resolve(filePath)
   const dirs = getAuthorizedDirectories()
   const allowedRoots = [...dirs, ...cachedExtraRoots, app.getPath('temp'), app.getPath('userData')]
-  return allowedRoots.some((root) => {
-    const resolvedRoot = path.resolve(root)
-    return resolved === resolvedRoot || resolved.startsWith(resolvedRoot + path.sep)
-  })
+  return isPathInsideAuthorizedRoots(filePath, allowedRoots)
 }
 
 export function sanitizeFileName(name: string): string {

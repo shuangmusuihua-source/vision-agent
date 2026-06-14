@@ -4,6 +4,7 @@ import { createLowlight, common } from 'lowlight'
 const lowlight = createLowlight(common)
 
 const TAIL_LINES = 5
+const SAFE_CLASS_TOKEN = /^[A-Za-z0-9_-]+$/
 
 interface SkillOutputCardProps {
   content: string
@@ -11,18 +12,41 @@ interface SkillOutputCardProps {
   language?: string
 }
 
-function treeToHtml(tree: any): string {
-  if (tree.type === 'text') return tree.value
+type HighlightNode = {
+  type?: string
+  value?: string
+  tagName?: string
+  properties?: Record<string, unknown>
+  children?: HighlightNode[]
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function safeClassName(value: unknown): string {
+  const tokens = Array.isArray(value)
+    ? value.flatMap((v) => String(v).split(/\s+/))
+    : String(value || '').split(/\s+/)
+  return tokens.filter((token) => SAFE_CLASS_TOKEN.test(token)).join(' ')
+}
+
+export function treeToSafeHtml(tree: HighlightNode): string {
+  if (tree.type === 'text') return escapeHtml(tree.value || '')
   if (tree.type === 'element') {
-    const attrs = tree.properties
-      ? Object.entries(tree.properties)
-          .map(([k, v]) => ` ${k}="${String(v)}"`)
-          .join('')
-      : ''
-    const children = tree.children ? tree.children.map(treeToHtml).join('') : ''
-    return `<${tree.tagName}${attrs}>${children}</${tree.tagName}>`
+    const children = tree.children ? tree.children.map(treeToSafeHtml).join('') : ''
+    if (tree.tagName !== 'span') return children
+    const className = safeClassName(tree.properties?.className || tree.properties?.class)
+    return className
+      ? `<span class="${escapeHtml(className)}">${children}</span>`
+      : `<span>${children}</span>`
   }
-  if (tree.children) return tree.children.map(treeToHtml).join('')
+  if (tree.children) return tree.children.map(treeToSafeHtml).join('')
   return ''
 }
 
@@ -100,9 +124,9 @@ export default function SkillOutputCard({ content, isStreaming, language = 'html
   const highlightedHtml = useMemo(() => {
     try {
       const tree = lowlight.highlight(language, tailContent)
-      return treeToHtml(tree)
+      return treeToSafeHtml(tree)
     } catch {
-      return tailContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      return escapeHtml(tailContent)
     }
   }, [tailContent, language])
 
