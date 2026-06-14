@@ -18,6 +18,33 @@
 
 import type { SdkSessionInfo } from '../../shared/types'
 
+const isTempSession = (session: SdkSessionInfo) => session.id.startsWith('new-')
+
+const sessionWorkspacePath = (session: SdkSessionInfo): string | undefined => {
+  if (session.workspacePath) return session.workspacePath
+  if (session.context === 'ask') return undefined
+  return session.cwd
+}
+
+const sessionMatches = (a: SdkSessionInfo, b: SdkSessionInfo): boolean => {
+  return a.id === b.id ||
+    (!!a.sdkSessionId && (a.sdkSessionId === b.sdkSessionId || a.sdkSessionId === b.id)) ||
+    (!!b.sdkSessionId && (b.sdkSessionId === a.sdkSessionId || b.sdkSessionId === a.id))
+}
+
+const mergeSession = (existing: SdkSessionInfo, incoming: SdkSessionInfo): SdkSessionInfo => {
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    sdkSessionId: incoming.sdkSessionId ?? existing.sdkSessionId,
+    workspacePath: incoming.workspacePath ?? existing.workspacePath,
+    context: incoming.context ?? existing.context,
+    cwd: incoming.cwd ?? existing.cwd,
+    title: incoming.title ?? existing.title,
+  }
+}
+
 // ─── Actions ──────────────────────────────────────────────────────────────
 
 export type SessionListAction =
@@ -126,17 +153,47 @@ export function sessionListReducer(
 
     // ── Workspace changed → reload from SDK ────────────────────────
     case 'REPLACE_SDK': {
-      // Preserve temp sessions that:
-      // - Belong to the current workspace (or any workspace if none specified)
-      // - May already be materialized; in that case they suppress the SDK
-      //   duplicate so the app-owned id remains stable.
-      const tempSessions = state.filter(s =>
-        s.id.startsWith('new-') &&
-        (!action.workspacePath || s.workspacePath === action.workspacePath)
-      )
-      const retainedSdkIds = new Set(tempSessions.map(s => s.sdkSessionId).filter(Boolean) as string[])
-      const sdkSessions = action.sessions.filter(s => !retainedSdkIds.has(s.sdkSessionId || s.id))
-      return [...sdkSessions, ...tempSessions]
+      if (state.length === 0) return action.sessions
+
+      const isInRefreshScope = (session: SdkSessionInfo): boolean => {
+        const workspacePath = sessionWorkspacePath(session)
+        if (action.workspacePath) return workspacePath === action.workspacePath
+        return !workspacePath || session.context === 'ask'
+      }
+
+      const incoming = action.sessions.filter(isInRefreshScope)
+      const usedIncoming = new Set<number>()
+      const next: SdkSessionInfo[] = []
+
+      for (const existing of state) {
+        if (!isInRefreshScope(existing)) {
+          next.push(existing)
+          continue
+        }
+
+        const incomingIndex = incoming.findIndex((candidate, index) =>
+          !usedIncoming.has(index) && sessionMatches(existing, candidate)
+        )
+
+        if (incomingIndex >= 0) {
+          usedIncoming.add(incomingIndex)
+          next.push(mergeSession(existing, incoming[incomingIndex]))
+        } else if (isTempSession(existing)) {
+          next.push(existing)
+        }
+      }
+
+      for (let index = 0; index < incoming.length; index += 1) {
+        if (!usedIncoming.has(index)) next.push(incoming[index])
+      }
+
+      for (const candidate of action.sessions) {
+        if (isInRefreshScope(candidate)) continue
+        if (state.some(existing => sessionMatches(existing, candidate))) continue
+        next.push(candidate)
+      }
+
+      return next
     }
   }
 }

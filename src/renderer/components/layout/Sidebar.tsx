@@ -271,7 +271,7 @@ function Sidebar({
           >
             {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).map((wsPath, idx) => {
               const isCollapsed = collapsedWorkspaces.has(wsPath)
-              const wsSessions = (sessionsByWorkspace[wsPath] || [])
+              const wsSessions = [...(sessionsByWorkspace[wsPath] || [])]
                 .sort((a, b) => (b.lastModified || b.createdAt || 0) - (a.lastModified || a.createdAt || 0))
 
               return (

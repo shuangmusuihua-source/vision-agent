@@ -167,8 +167,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
       if (toolName === 'Read') {
         const rawPath = extractPathFromToolInput(toolName, input)
         if (rawPath) {
-          const agentCwd = getAppSkillsCwd()
-          const pathToCheck = resolve(agentCwd, rawPath)
+          const pathToCheck = resolve(workspaceCwd, rawPath)
           const isAuth = isPathAuthorized(pathToCheck, dirs)
           const isAppSkill = pathToCheck.startsWith(resolve(getAppSkillsCwd()))
           if (isAuth || isAppSkill) {

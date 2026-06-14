@@ -719,10 +719,15 @@
 }
 
 .sidebar-session-empty {
-  padding: 8px 0;
-  font-size: 12px;
+  margin: 4px 8px 6px 30px;
+  padding: 7px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  font-size: 11px;
+  line-height: 1.4;
   color: var(--color-text-tertiary);
-  font-style: italic;
+  text-align: center;
 }
 
 .sidebar-file-action {

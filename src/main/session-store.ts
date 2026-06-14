@@ -5,8 +5,7 @@ import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
 import { getSessionRecords, removeSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
+import { resolveClaudeSessionJsonlPath } from './claude-session-path'
 
 // ─── Compaction tracking ───────────────────────────────────────────────
 // Track session IDs created by SDK mid-stream compaction.
@@ -32,6 +31,30 @@ export function addCompactionId(id: string): void {
     }
   }
   compactionSessionIds.add(id)
+}
+
+function getRecordForSession(sessionId: string) {
+  return getSessionRecords().find(r => r.id === sessionId || r.sdkSessionId === sessionId)
+}
+
+function getSdkSessionId(sessionId: string): string {
+  return getRecordForSession(sessionId)?.sdkSessionId || sessionId
+}
+
+function getAppSessionId(sessionId: string): string {
+  return getRecordForSession(sessionId)?.id || sessionId
+}
+
+function getSessionDir(sessionId: string): string | undefined {
+  const record = getRecordForSession(sessionId)
+  if (record?.workspacePath) return record.workspacePath
+  if (record?.context === 'ask') return getAppSkillsCwd()
+  return undefined
+}
+
+function getSessionMutationOptions(sessionId: string): SessionMutationOptions | undefined {
+  const dir = getSessionDir(sessionId)
+  return dir ? { dir } : undefined
 }
 
 // ─── SDK session listing ───────────────────────────────────────────────
@@ -140,8 +163,11 @@ export async function getSdkSessionTotalMessageCount(
   workspaceCwd?: string
 ): Promise<number> {
   try {
+    const sdkSessionId = getSdkSessionId(sessionId)
     const dirs = [getAppSkillsCwd()]
-    if (workspaceCwd) dirs.push(workspaceCwd)
+    const sessionDir = getSessionDir(sessionId)
+    if (sessionDir && !dirs.includes(sessionDir)) dirs.push(sessionDir)
+    if (workspaceCwd && !dirs.includes(workspaceCwd)) dirs.push(workspaceCwd)
     const seenIds = new Set<string>()
     const compactionIds = compactionSessionIds
     for (const dir of dirs) {
@@ -151,7 +177,7 @@ export async function getSdkSessionTotalMessageCount(
           if (seenIds.has(s.sessionId)) continue
           seenIds.add(s.sessionId)
           if (compactionIds.has(s.sessionId)) continue
-          if (s.sessionId === sessionId) {
+          if (s.sessionId === sdkSessionId) {
             return ((s as Record<string, unknown>).messageCount as number) || 0
           }
         }
@@ -173,14 +199,11 @@ export async function getSdkSessionTotalMessageCount(
  */
 function readSessionJsonlDirect(sessionId: string): Array<Record<string, unknown>> | null {
   try {
-    const records = getSessionRecords()
-    const record = records.find(r => r.id === sessionId || r.sdkSessionId === sessionId)
-    const wsPath = record?.workspacePath
-    if (!wsPath) return null
+    const record = getRecordForSession(sessionId)
+    const fileSessionId = getSdkSessionId(sessionId)
+    const jsonlPath = resolveClaudeSessionJsonlPath(fileSessionId, record?.workspacePath)
 
-    const sanitized = wsPath.replace(/\//g, '-')
-    const jsonlPath = join(homedir(), '.claude', 'projects', sanitized, `${sessionId}.jsonl`)
-    if (!existsSync(jsonlPath)) return null
+    if (!jsonlPath || !existsSync(jsonlPath)) return null
 
     const raw = readFileSync(jsonlPath, 'utf-8')
     const lines = raw.trim().split('\n')
@@ -209,10 +232,13 @@ export async function loadSdkSessionMessages(
 
   // Fallback to SDK API (for edge cases where direct read can't find the file)
   try {
+    const sdkSessionId = getSdkSessionId(sessionId)
     const options: Record<string, unknown> = { includeSystemMessages: true }
+    const dir = getSessionDir(sessionId)
+    if (dir) options.dir = dir
     if (limit !== undefined) options.limit = limit
     if (offset !== undefined) options.offset = offset
-    const messages = await getSessionMessages(sessionId, options)
+    const messages = await getSessionMessages(sdkSessionId, options)
     return messages.map((m) => m as unknown as Record<string, unknown>)
   } catch (err) {
     console.error('[SessionStore] getSessionMessages error:', err)
@@ -258,7 +284,13 @@ export async function loadSdkSessionMessagesPaginated(
   // (newest→oldest, offset decreases).  This fallback does NOT match the
   // direct path's "newest first" behavior for initial load — it returns
   // the oldest messages instead.  Acceptable because this path is rarely hit.
-  const sdkMessages = await getSessionMessages(sessionId, { limit, offset, includeSystemMessages: true })
+  const dir = getSessionDir(sessionId)
+  const sdkMessages = await getSessionMessages(getSdkSessionId(sessionId), {
+    limit,
+    offset,
+    includeSystemMessages: true,
+    ...(dir ? { dir } : {}),
+  })
   const messages: AgentIPCMessage[] = []
   for (const m of sdkMessages) {
     const converted = toAgentIPCMessage(m as any)
@@ -269,7 +301,7 @@ export async function loadSdkSessionMessagesPaginated(
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
   try {
-    await renameSession(sessionId, title)
+    await renameSession(getSdkSessionId(sessionId), title, getSessionMutationOptions(sessionId))
   } catch (err) {
     console.error('[SessionStore] renameSession error:', err)
     throw err
@@ -285,19 +317,19 @@ export async function deleteSdkSession(sessionId: string): Promise<void> {
   // Delete from SDK storage first — the critical operation.
   // Only clean up tracking metadata after it succeeds, so a failed
   // deletion leaves the session intact rather than orphaned.
-  await deleteSession(sessionId)
-  compactionSessionIds.delete(sessionId)
-  deleteCompactionSessionId(sessionId)
-  removeSessionRecord(sessionId)
+  const sdkSessionId = getSdkSessionId(sessionId)
+  const appSessionId = getAppSessionId(sessionId)
+  await deleteSession(sdkSessionId, getSessionMutationOptions(sessionId))
+  compactionSessionIds.delete(sdkSessionId)
+  deleteCompactionSessionId(sdkSessionId)
+  removeSessionRecord(appSessionId)
 }
 
 // ─── SDK Session Operations ──────────────────────────────────────────────
 
 export async function tagSdkSession(sessionId: string, tag: string): Promise<boolean> {
   try {
-    const cwd = getAppSkillsCwd()
-    const opts: SessionMutationOptions = { dir: cwd }
-    await tagSession(sessionId, tag, opts)
+    await tagSession(getSdkSessionId(sessionId), tag, getSessionMutationOptions(sessionId))
     return true
   } catch {
     return false
@@ -306,8 +338,7 @@ export async function tagSdkSession(sessionId: string, tag: string): Promise<boo
 
 export async function getSdkSessionInfo(sessionId: string): Promise<Record<string, unknown> | null> {
   try {
-    const cwd = getAppSkillsCwd()
-    const info = await getSessionInfo(sessionId, { dir: cwd })
+    const info = await getSessionInfo(getSdkSessionId(sessionId), getSessionMutationOptions(sessionId))
     return info as Record<string, unknown>
   } catch {
     return null
@@ -316,8 +347,11 @@ export async function getSdkSessionInfo(sessionId: string): Promise<Record<strin
 
 export async function forkSdkSession(sessionId: string, options?: ForkSessionOptions): Promise<{ sessionId: string } | null> {
   try {
-    const cwd = getAppSkillsCwd()
-    const result = await sdkForkSession(sessionId, { ...options, dir: cwd } as ForkSessionOptions)
+    const dir = getSessionDir(sessionId) || options?.dir
+    const result = await sdkForkSession(getSdkSessionId(sessionId), {
+      ...options,
+      ...(dir ? { dir } : {}),
+    } as ForkSessionOptions)
     return result as { sessionId: string } | null
   } catch {
     return null
@@ -326,8 +360,8 @@ export async function forkSdkSession(sessionId: string, options?: ForkSessionOpt
 
 export async function loadSdkSessionMessagesTyped(sessionId: string): Promise<AgentIPCMessage[]> {
   try {
-    const cwd = getAppSkillsCwd()
-    const raw = await getSessionMessages(sessionId, { dir: cwd })
+    const dir = getSessionDir(sessionId) || getAppSkillsCwd()
+    const raw = await getSessionMessages(getSdkSessionId(sessionId), { dir })
     if (!Array.isArray(raw)) return []
     return raw.map(m => toAgentIPCMessage(m as any)).filter((m): m is AgentIPCMessage => m !== null)
   } catch {

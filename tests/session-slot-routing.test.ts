@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import { sessionListReducer } from '../src/renderer/store/session-protocol'
-import type { AgentIPCMessage, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SkillOutputState } from '../src/shared/types'
+import type { AgentIPCMessage, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SkillOutputState } from '../src/shared/types'
 
 function resetStore() {
   useAgentStore.setState({
@@ -53,6 +53,19 @@ function askUser(id: string, sessionId: string): AskUserRequestIPC {
     multiSelect: false,
     context: 'editor',
     sessionId,
+  }
+}
+
+function sdkSession(id: string, workspacePath: string, lastModified = 1): SdkSessionInfo {
+  return {
+    id,
+    sdkSessionId: `sdk-${id}`,
+    title: id,
+    workspacePath,
+    context: 'editor',
+    createdAt: lastModified,
+    lastModified,
+    messageCount: 1,
   }
 }
 
@@ -385,6 +398,68 @@ describe('session-scoped store routing', () => {
         title: 'Ask run',
       }),
     ])
+  })
+
+  it('keeps unrelated workspace session order when another workspace refreshes from SDK', () => {
+    const productSessions = [
+      sdkSession('product-1', '/new-product', 10),
+      sdkSession('product-2', '/new-product', 20),
+      sdkSession('product-3', '/new-product', 30),
+      sdkSession('product-4', '/new-product', 40),
+      sdkSession('product-5', '/new-product', 50),
+    ]
+    const state = [
+      ...productSessions,
+      sdkSession('nextai-1', '/nextai', 1),
+      sdkSession('teacher-1', '/teacher', 1),
+    ]
+
+    const next = sessionListReducer(state, {
+      type: 'REPLACE_SDK',
+      workspacePath: '/nextai',
+      sessions: [
+        sdkSession('product-5', '/new-product', 500),
+        sdkSession('product-4', '/new-product', 400),
+        sdkSession('nextai-1', '/nextai', 100),
+      ],
+    })
+
+    expect(next.filter(s => s.workspacePath === '/new-product').map(s => s.id)).toEqual([
+      'product-1',
+      'product-2',
+      'product-3',
+      'product-4',
+      'product-5',
+    ])
+    expect(next.find(s => s.id === 'product-5')?.lastModified).toBe(50)
+    expect(next.find(s => s.id === 'nextai-1')?.lastModified).toBe(100)
+  })
+
+  it('updates refreshed workspace metadata without shuffling that workspace session order', () => {
+    const state = [
+      sdkSession('product-1', '/new-product', 10),
+      sdkSession('product-2', '/new-product', 20),
+      sdkSession('product-3', '/new-product', 30),
+      sdkSession('nextai-1', '/nextai', 1),
+    ]
+
+    const next = sessionListReducer(state, {
+      type: 'REPLACE_SDK',
+      workspacePath: '/new-product',
+      sessions: [
+        { ...sdkSession('product-3', '/new-product', 300), title: 'updated 3' },
+        { ...sdkSession('product-1', '/new-product', 100), title: 'updated 1' },
+        { ...sdkSession('product-2', '/new-product', 200), title: 'updated 2' },
+      ],
+    })
+
+    expect(next.filter(s => s.workspacePath === '/new-product').map(s => s.id)).toEqual([
+      'product-1',
+      'product-2',
+      'product-3',
+    ])
+    expect(next.find(s => s.id === 'product-2')?.title).toBe('updated 2')
+    expect(next.find(s => s.id === 'nextai-1')?.lastModified).toBe(1)
   })
 
   it('keeps an editor session keyed by client id after SDK materialization', async () => {
