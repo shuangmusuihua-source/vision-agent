@@ -118,7 +118,7 @@ interface SettingsApi {
 }
 
 interface AgentApi {
-  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string) => Promise<{ started: boolean }>
+  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string, clientSessionKey?: string) => Promise<{ started: boolean }>
   respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => Promise<{ success: boolean }>
   respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
@@ -138,7 +138,7 @@ interface AgentApi {
   onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void
 
   // Lifecycle channels
-  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string; workspacePath?: string }) => void) => () => void
+  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string; sdkSessionId?: string; workspacePath?: string; clientSessionKey?: string }) => void) => () => void
   onPermissionRequest: (callback: (data: PermissionRequestIPC) => void) => () => void
   onAskUser: (callback: (data: AskUserRequestIPC) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void

@@ -22,6 +22,8 @@ export type IPCChannelMap = {
       activeFilePath?: string
       skillId?: string
       context?: 'editor' | 'ask'
+      workspacePath?: string
+      clientSessionKey?: string
     }
     response: { started: boolean }
   }
@@ -57,7 +59,7 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'agent:listSdkSessions': {
-    request: void
+    request: string | undefined
     response: SdkSessionInfo[]
   }
   'agent:loadSessionMessages': {
@@ -228,7 +230,13 @@ export type IPCChannelMap = {
 
 export type IPCEventMap = {
   'agent:event': AgentIPCMessage
-  'agent:sessionCreated': { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }
+  'agent:sessionCreated': {
+    context: 'editor' | 'ask'
+    sessionId: string
+    workspacePath?: string
+    clientSessionKey?: string
+    sdkSessionId?: string
+  }
   'agent:permissionRequest': PermissionRequestIPC
   'agent:askUser': AskUserRequestIPC
   'agent:askUserTimeout': { requestId: string; context: string }

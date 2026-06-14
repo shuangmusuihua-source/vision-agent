@@ -22,7 +22,6 @@ import {
   deletePendingAskUser,
   rejectAllPendingPermissions,
   rejectAllPendingAskUser,
-  updatePendingSessionId,
 } from './agent-permissions'
 import { flushTextBatch, scheduleTextBatch, discardTextBatch, discardAllTextBatches, isTextDeltaEvent } from './agent-text-batch'
 import { addCompactionSessionId } from './store'
@@ -199,6 +198,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
         const firstQ = questionItems[0]
         if (!mainWindow.isDestroyed()) {
+          const sdkSessionId = getSessionId?.() || sessionId
           mainWindow.webContents.send('agent:askUser', {
             id: requestId,
             questions: questionItems,
@@ -207,7 +207,9 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
             options: firstQ?.options || [],
             multiSelect: firstQ?.multiSelect || false,
             context,
-            sessionId: getSessionId?.() || sessionId,
+            sessionId: queryKey,
+            clientSessionKey: queryKey,
+            sdkSessionId,
           })
         }
 
@@ -222,19 +224,22 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
             }
           }, 300000)
 
-          registerPendingAskUser(requestId, resolve, input, timeout, context, getSessionId?.() || queryKey)
+          registerPendingAskUser(requestId, resolve, input, timeout, context, queryKey)
         })
       }
 
       // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       if (!mainWindow.isDestroyed()) {
+        const sdkSessionId = getSessionId?.() || sessionId
         mainWindow.webContents.send('agent:permissionRequest', {
           id: requestId,
           toolName,
           input,
           context,
-          sessionId: getSessionId?.() || sessionId,
+          sessionId: queryKey,
+          clientSessionKey: queryKey,
+          sdkSessionId,
           // Forward SDK-provided display metadata for richer permission UI
           title: (options as Record<string, unknown>).title as string | undefined,
           displayName: (options as Record<string, unknown>).displayName as string | undefined,
@@ -275,7 +280,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
           }
         }, 300000)
 
-        registerPendingPermission(requestId, resolve, input, timeout, context, getSessionId?.() || queryKey)
+        registerPendingPermission(requestId, resolve, input, timeout, context, queryKey)
       })
     },
   })
@@ -293,7 +298,7 @@ interface ActiveQuery {
   sessionId?: string
 }
 
-// Guard against concurrent sendMessage calls — per queryKey (sessionId || context)
+// Guard against concurrent sendMessage calls — per app-owned client session key
 const activeQueries = new Map<string, ActiveQuery>()
 const _skillOutputBridge = new SkillOutputBridge()
 
@@ -351,11 +356,12 @@ export async function sendMessage(
   activeFilePath?: string,
   context: AgentContext = 'editor',
   skillId?: string | null,
-  workspacePath?: string
+  workspacePath?: string,
+  clientSessionKey?: string
 ): Promise<void> {
-  // Abort any previous query for the same key (sessionId or context).
+  // Abort any previous query for the same app-owned session key.
   // Different sessions in the same context can now run in parallel.
-  const queryKey = sessionId || context
+  const queryKey = clientSessionKey || sessionId || context
   abortActiveQuery(queryKey)
 
   // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
@@ -391,7 +397,9 @@ export async function sendMessage(
   }
 
   _skillOutputBridge.reset(queryKey, context)
-  const effectiveWorkspaceCwd = workspacePath || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
+  const effectiveWorkspaceCwd = workspacePath
+    || (context === 'ask' ? getAppSkillsCwd() : undefined)
+    || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
   // Ensure workspace-local skills exist (idempotent via sentinel file).
   // Run async to avoid blocking the main thread on file I/O.
   // The sentinel check makes subsequent calls nearly instant (~0.1ms),
@@ -400,6 +408,7 @@ export async function sendMessage(
   let currentSessionId = sessionId
   const getSessionId = () => currentSessionId
   const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, queryKey, getSessionId)
+  const appSessionKey = queryKey
 
   const queryInstanceId = ++_queryInstanceCounter
   try {
@@ -426,8 +435,8 @@ export async function sendMessage(
       if (textDeltaText !== null) {
         // Batch text_delta events: accumulate and flush every ~30ms
         const uuid = message.uuid || ''
-        const sessionId = message.session_id || currentSessionId || ''
-        scheduleTextBatch(queryKey, textDeltaText, uuid, sessionId, context, mainWindow)
+        const sdkSessionId = message.session_id || currentSessionId || ''
+        scheduleTextBatch(queryKey, textDeltaText, uuid, appSessionKey, context, mainWindow, appSessionKey, sdkSessionId)
       } else {
         // Non-text event (tool_use, content_block_start/stop, result, etc.)
         // Flush any pending text batch FIRST to preserve event ordering
@@ -436,30 +445,32 @@ export async function sendMessage(
         const ipcMsg = toAgentIPCMessage(message)
         // Thread sessionId through every event so the renderer can validate
         // and drop stale events after a session switch
-        const sessionId = message.session_id || currentSessionId || ''
+        const sdkSessionId = message.session_id || currentSessionId || ''
 
         if (ipcMsg) {
-          mainWindow.webContents.send('agent:event', { context, sessionId, ...ipcMsg })
+          mainWindow.webContents.send('agent:event', {
+            context,
+            sessionId: appSessionKey,
+            clientSessionKey: appSessionKey,
+            sdkSessionId,
+            ...ipcMsg,
+          })
         }
       }
 
       // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
-        // Migrate tracking from context-based queryKey to the real sessionId
-        // so that abort, permission cleanup, and the finally block operate on
-        // the correct per-session key — not the shared context string.
-        if (queryKey !== currentSessionId) {
-          const queryEntry = activeQueries.get(queryKey)
-          if (queryEntry) {
-            queryEntry.sessionId = currentSessionId
-          }
-          updatePendingSessionId(queryKey, currentSessionId)
+        _skillOutputBridge.setSessionId(queryKey, currentSessionId)
+        const queryEntry = activeQueries.get(queryKey)
+        if (queryEntry) {
+          queryEntry.sessionId = currentSessionId
         }
         registerSession(currentSessionId, effectiveWorkspaceCwd)
         // Persist session→workspace mapping to electron-store so it survives restart
         addSessionRecord({
-          id: currentSessionId,
+          id: appSessionKey,
+          sdkSessionId: currentSessionId,
           workspacePath: effectiveWorkspaceCwd,
           context,
           status: 'active',
@@ -468,7 +479,13 @@ export async function sendMessage(
           messageCount: 0,
           artifactCount: 0,
         })
-        mainWindow.webContents.send('agent:sessionCreated', { context, sessionId: currentSessionId, workspacePath: effectiveWorkspaceCwd })
+        mainWindow.webContents.send('agent:sessionCreated', {
+          context,
+          sessionId: appSessionKey,
+          sdkSessionId: currentSessionId,
+          workspacePath: effectiveWorkspaceCwd,
+          clientSessionKey: appSessionKey,
+        })
       } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {
         // SDK compacted the session — a new session file was created on disk
         // with a different session_id. Track it so session-store filters it
@@ -500,7 +517,9 @@ export async function sendMessage(
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send('agent:event', {
         context,
-        sessionId: currentSessionId || '',
+        sessionId: appSessionKey,
+        clientSessionKey: appSessionKey,
+        sdkSessionId: currentSessionId,
         type: 'result',
         subtype: 'error_during_execution',
         errors: [userMessage],
@@ -514,7 +533,6 @@ export async function sendMessage(
     flushTextBatch(queryKey, mainWindow)
     discardTextBatch(queryKey)
     _skillOutputBridge.cleanup(queryKey)
-    const effectiveKey = currentSessionId || queryKey
     // Only clean up if our query instance is still the active one.
     // When two messages are sent rapidly to the same session, the second
     // sendMessage aborts the first and registers a new query under the same
@@ -524,9 +542,7 @@ export async function sendMessage(
     if (current && current.instanceId === queryInstanceId) {
       activeQueries.delete(queryKey)
     }
-    // Use effectiveKey for permission cleanup — pending entries were updated
-    // to carry the real sessionId after SDK assigned one (via updatePendingSessionId).
-    rejectAllPendingPermissions(effectiveKey)
-    rejectAllPendingAskUser(effectiveKey)
+    rejectAllPendingPermissions(queryKey)
+    rejectAllPendingAskUser(queryKey)
   }
 }

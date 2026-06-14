@@ -4,6 +4,7 @@ import { emptySlot, type AgentStore } from '../store/agent-store'
 import type { AgentContext } from '../../shared/types'
 import type {
   AskUserRequestIPC,
+  ConversationMessage,
   PermissionRequestIPC,
   SkillOutputState,
 } from '../../shared/types'
@@ -18,6 +19,30 @@ function isAgentActive(state: string): state is ActiveAgentState {
   return ACTIVE_STATES.has(state)
 }
 
+function mergeMessages(...groups: ConversationMessage[][]): ConversationMessage[] {
+  const seen = new Set<string>()
+  const merged: ConversationMessage[] = []
+  for (const group of groups) {
+    for (const message of group) {
+      if (seen.has(message.id)) continue
+      seen.add(message.id)
+      merged.push(message)
+    }
+  }
+  return merged
+}
+
+function mergeById<T extends { id: string }>(items: Array<T | null | undefined>): T[] {
+  const seen = new Set<string>()
+  const merged: T[] = []
+  for (const item of items) {
+    if (!item || seen.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
+  }
+  return merged
+}
+
 // ─── Singleton IPC subscription ────────────────────────────────────────
 // MUST be called only once (in AppShell). Subscribes to all IPC channels
 // and routes events to the correct store slot via msg.context.
@@ -29,21 +54,21 @@ export function useIPCSubscriptions() {
 
     const unsubEvent = window.api.agent.onEvent((msg) => {
       store.getState().processIPCMessage(msg, undefined)
-      // Refresh watchdog for the context that received this event
+      // Refresh watchdog for the concrete session that received this event.
       const ctx = msg.context as AgentContext | undefined
-      if (ctx) refreshWatchdogByContext(ctx)
+      if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(msg as Record<string, unknown>))
     })
 
     const unsubPerm = window.api.agent.onPermissionRequest((req) => {
       store.getState().handlePermissionRequest(req as PermissionRequestIPC)
       const ctx = (req as PermissionRequestIPC).context as AgentContext | undefined
-      if (ctx) refreshWatchdogByContext(ctx)
+      if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(req as unknown as Record<string, unknown>))
     })
 
     const unsubAsk = window.api.agent.onAskUser((req) => {
       store.getState().handleAskUserRequest(req as AskUserRequestIPC)
       const ctx = (req as AskUserRequestIPC).context as AgentContext | undefined
-      if (ctx) refreshWatchdogByContext(ctx)
+      if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(req as unknown as Record<string, unknown>))
     })
 
     const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: { requestId: string; context: AgentContext }) => {
@@ -54,102 +79,129 @@ export function useIPCSubscriptions() {
       store.getState().handlePermissionTimeout(data.requestId)
     })
 
-    const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string; workspacePath?: string }) => {
-      // Capture the temp session ID BEFORE migration so we can clean it from sessionList
-      const prevSessionId = store.getState().activeSessionId[data.context]
-      const migratedTempId = prevSessionId?.startsWith('new-') ? prevSessionId : null
-      // Capture the user-chosen title from sessionList before MATERIALIZE transforms the entry
-      const tempTitle = migratedTempId
-        ? store.getState().sessionList.find(s => s.id === migratedTempId)?.title
-        : undefined
-
-      // Only update activeSessionId if the user hasn't switched away to a
-      // different session while this one was being created. Without this guard,
-      // a session created in the background would hijack activeSessionId and
-      // contaminate the editor slot with wrong-session data.
-      //
-      // prevSessionId === null means no session was active — this is the very
-      // first session being created in the current context, so it IS the active
-      // session and must receive the real sessionId.
-      const isStillActiveSession =
-        migratedTempId !== null ||               // temp session was active when send was triggered
-        prevSessionId === data.sessionId ||       // resumed session matches current active
-        prevSessionId === null                    // no active session yet (first session in context)
+    const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string; workspacePath?: string; clientSessionKey?: string; sdkSessionId?: string }) => {
+      // The creating query carries its app-owned session key. Do not infer it
+      // from the currently active session; the user may have switched away
+      // while the SDK was still creating the real session.
+      const clientSessionKey = data.clientSessionKey || data.sessionId
+      const sdkSessionId = data.sdkSessionId || data.sessionId
+      const sessionTitle = store.getState().sessionList.find(s => s.id === clientSessionKey)?.title
 
       store.setState((state) => {
-        // If we have a temp session slot (from "新建对话"), migrate it to real session ID
         const nextSessionSlots = { ...state.sessionSlots }
-        if (prevSessionId && prevSessionId.startsWith('new-') && !nextSessionSlots[data.sessionId]) {
-          nextSessionSlots[data.sessionId] = {
-            ...state.slots[data.context],
-            currentSessionId: data.sessionId,
-          }
-          delete nextSessionSlots[prevSessionId]
+        const currentActiveId = state.activeSessionId[data.context]
+        const clientSlot = nextSessionSlots[clientSessionKey]
+        const sdkSlot = clientSessionKey !== sdkSessionId ? nextSessionSlots[sdkSessionId] : undefined
+        const activeSlotIsClient = currentActiveId === clientSessionKey || currentActiveId === sdkSessionId
+        const sourceSlot = clientSlot || (activeSlotIsClient ? state.slots[data.context] : undefined)
+        const realSlot = sdkSlot
+        const baseSlot = sourceSlot || realSlot || emptySlot()
+        const permissionItems = mergeById<PermissionRequestIPC>([
+          sourceSlot?.permissionRequest,
+          ...(sourceSlot?.permissionQueue || []),
+          realSlot?.permissionRequest,
+          ...(realSlot?.permissionQueue || []),
+        ])
+        const askUserItems = mergeById<AskUserRequestIPC>([
+          sourceSlot?.askUserRequest,
+          ...(sourceSlot?.askUserQueue || []),
+          realSlot?.askUserRequest,
+          ...(realSlot?.askUserQueue || []),
+        ])
+        const materializedSlot = {
+          ...(sourceSlot || {}),
+          ...(realSlot || {}),
+          messages: mergeMessages(sourceSlot?.messages || [], realSlot?.messages || []),
+          isStreaming: Boolean(sourceSlot?.isStreaming || realSlot?.isStreaming),
+          agentState: realSlot?.agentState && realSlot.agentState !== 'idle'
+            ? realSlot.agentState
+            : (sourceSlot?.agentState || baseSlot.agentState),
+          _acc: realSlot?._acc || sourceSlot?._acc || null,
+          _firstContentSeen: Boolean(realSlot?._firstContentSeen || sourceSlot?._firstContentSeen),
+          _processedArtifactIds: new Set([
+            ...(sourceSlot?._processedArtifactIds || []),
+            ...(realSlot?._processedArtifactIds || []),
+          ]),
+          _queryGeneration: Math.max(sourceSlot?._queryGeneration || 0, realSlot?._queryGeneration || 0),
+          _resultGuardGen: Math.max(sourceSlot?._resultGuardGen || 0, realSlot?._resultGuardGen || 0),
+          permissionRequest: permissionItems[0] || null,
+          permissionQueue: permissionItems.slice(1),
+          askUserRequest: askUserItems[0] || null,
+          askUserQueue: askUserItems.slice(1),
+          skillOutput: realSlot?.skillOutput || sourceSlot?.skillOutput || null,
+          activeSkillId: realSlot?.activeSkillId || sourceSlot?.activeSkillId || null,
+          lastEditedFile: realSlot?.lastEditedFile || sourceSlot?.lastEditedFile || null,
+          usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
+          todoList: realSlot?.todoList || sourceSlot?.todoList || null,
+          currentSessionId: clientSessionKey,
+          sdkSessionId,
+          workspacePath: data.workspacePath || sourceSlot?.workspacePath || realSlot?.workspacePath || null,
         }
 
+        nextSessionSlots[clientSessionKey] = materializedSlot
+        if (sdkSessionId !== clientSessionKey) {
+          delete nextSessionSlots[sdkSessionId]
+        }
+
+        const accessOrder = state.sessionAccessOrder
+          .filter((id) => id !== clientSessionKey && id !== sdkSessionId)
+        accessOrder.push(clientSessionKey)
+
+        const isStillActiveSession =
+          currentActiveId === clientSessionKey ||
+          currentActiveId === sdkSessionId ||
+          currentActiveId === null
+
         if (isStillActiveSession) {
-          // Normal path: this session is still what the user is viewing
           return {
-            activeSessionId: { ...state.activeSessionId, [data.context]: data.sessionId },
+            activeSessionId: { ...state.activeSessionId, [data.context]: clientSessionKey },
             sessionSlots: nextSessionSlots,
+            sessionAccessOrder: accessOrder,
             slots: {
               ...state.slots,
-              [data.context]: {
-                ...state.slots[data.context],
-                currentSessionId: data.sessionId,
-                workspacePath: data.workspacePath || state.slots[data.context].workspacePath,
-              },
-            },
-          }
-        } else {
-          // Background session created — update slot cache and set the
-          // context slot's currentSessionId so subsequent messages in this
-          // context can reuse the same SDK session (prevents orphan sessions
-          // and the "thinking" stuck state in AskZuovis).
-          return {
-            sessionSlots: nextSessionSlots,
-            slots: {
-              ...state.slots,
-              [data.context]: {
-                ...state.slots[data.context],
-                currentSessionId: data.sessionId,
-              },
+              [data.context]: materializedSlot,
             },
           }
         }
+        return { sessionSlots: nextSessionSlots, sessionAccessOrder: accessOrder }
       })
-      if (data.workspacePath && !store.getState().activeWorkspacePath) {
+      if (data.context === 'editor' && data.workspacePath && !store.getState().activeWorkspacePath) {
         store.setState({ activeWorkspacePath: data.workspacePath })
       }
-      // Session list: if this is a temp→real migration, replace the temp
-      // entry in-place. Otherwise (existing session got re-confirmed by SDK),
-      // nothing to do — the session is already in the list from loadSessions
-      // or a prior CREATE_TEMP+MATERIALIZE cycle.
-      if (data.context === 'editor' && migratedTempId) {
+      // Session list stores app-owned ids. Materialization attaches the SDK
+      // id but never renames the user-facing session.
+      if (data.context === 'editor') {
         store.getState().dispatchSessionList({
           type: 'MATERIALIZE',
-          tempId: migratedTempId,
-          realId: data.sessionId,
+          tempId: clientSessionKey,
+          realId: sdkSessionId,
+          context: data.context,
+          workspacePath: data.workspacePath,
+          title: sessionTitle,
         })
-        // Rename the newly-materialized session with the user-chosen title.
+        // Rename the newly materialized SDK session with the user-chosen title.
         // Persist to BOTH the SDK (customTitle) and electron-store (survives restarts).
-        if (tempTitle) {
-          window.api.agent.renameSession(data.sessionId, tempTitle).catch(
+        if (sessionTitle) {
+          window.api.agent.renameSession(sdkSessionId, sessionTitle).catch(
             (err) => console.error('[useAgent] renameSession failed:', err)
           )
-          window.api.agent.updateSessionRecord(data.sessionId, { title: tempTitle }).catch(() => {})
+          window.api.agent.updateSessionRecord(clientSessionKey, {
+            title: sessionTitle,
+            sdkSessionId,
+            workspacePath: data.workspacePath,
+            context: data.context,
+            status: 'active',
+            lastModified: Date.now(),
+          }).catch(() => {})
         }
-        // Clean up the temp SessionRecord — the real one will be created
-        // by addSessionRecord in query-runner.ts when the SDK assigns sessionId.
-        window.api.agent.removeSessionRecord(migratedTempId).catch(() => {})
       }
-      refreshWatchdogByContext(data.context)
+      refreshWatchdogAfterState(data.context, clientSessionKey)
     })
 
     const unsubSkillOutput = window.api.agent.onSkillOutput((state: SkillOutputState) => {
       store.getState().handleSkillOutput(state)
       const ctx = state.context as AgentContext | undefined
-      if (ctx) refreshWatchdogByContext(ctx)
+      if (ctx) refreshWatchdogAfterState(ctx, state.sessionId)
     })
 
     return () => {
@@ -166,72 +218,171 @@ export function useIPCSubscriptions() {
 
 // ─── Watchdog registry (shared across hooks) ─────────────────────────────
 
-const watchdogTimers: Record<AgentContext, ReturnType<typeof setTimeout> | null> = { editor: null, ask: null }
-
-function triggerWatchdog(ctx: AgentContext) {
-  console.warn(`[Watchdog] agent stuck for 120s in ${ctx}, forcing abort`)
-  window.api.agent.abort(ctx)
-  useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, ctx)
-  const s = useAgentStore.getState().slots[ctx]
-  useAgentStore.setState((state) => ({
-    slots: {
-      ...state.slots,
-      [ctx]: {
-        ...state.slots[ctx],
-        messages: [...s.messages, {
-          kind: 'status' as const,
-          id: `watchdog-${Date.now()}`,
-          role: 'system',
-          phase: 'complete',
-          textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
-          createdAt: Date.now(),
-        }],
-      },
-    },
-  }))
+type WatchdogEntry = {
+  context: AgentContext
+  sessionId: string | null
+  timer: ReturnType<typeof setTimeout>
 }
 
-function refreshWatchdogByContext(ctx: AgentContext) {
-  const timer = watchdogTimers[ctx]
-  if (!timer) return
-  clearTimeout(timer)
-  watchdogTimers[ctx] = setTimeout(() => triggerWatchdog(ctx), WATCHDOG_TIMEOUT)
+const watchdogTimers = new Map<string, WatchdogEntry>()
+
+function normalizeWatchdogSessionId(sessionId?: string | null): string | null {
+  if (!sessionId || sessionId === 'editor' || sessionId === 'ask') return null
+  return sessionId
+}
+
+function getEventSessionId(data: Record<string, unknown>): string | null {
+  return normalizeWatchdogSessionId(
+    (data.clientSessionKey as string | undefined)
+    || (data.sessionId as string | undefined)
+    || (data.session_id as string | undefined)
+  )
+}
+
+function getWatchdogKey(ctx: AgentContext, sessionId?: string | null): string {
+  return `${ctx}:${normalizeWatchdogSessionId(sessionId) || '__active__'}`
+}
+
+function getWatchdogSlot(ctx: AgentContext, sessionId?: string | null) {
+  const state = useAgentStore.getState()
+  const sid = normalizeWatchdogSessionId(sessionId)
+  if (sid && state.sessionSlots[sid]) return state.sessionSlots[sid]
+  return state.slots[ctx]
+}
+
+function clearWatchdog(ctx: AgentContext, sessionId?: string | null) {
+  const key = getWatchdogKey(ctx, sessionId)
+  const entry = watchdogTimers.get(key)
+  if (!entry) return
+  clearTimeout(entry.timer)
+  watchdogTimers.delete(key)
+}
+
+function appendWatchdogStatus(ctx: AgentContext, sessionId?: string | null) {
+  const sid = normalizeWatchdogSessionId(sessionId)
+  useAgentStore.setState((state) => {
+    const target = sid && state.sessionSlots[sid]
+      ? state.sessionSlots[sid]
+      : state.slots[ctx]
+    const nextSlot = {
+      ...target,
+      messages: [...target.messages, {
+        kind: 'status' as const,
+        id: `watchdog-${Date.now()}`,
+        role: 'system' as const,
+        phase: 'complete' as const,
+        textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+        createdAt: Date.now(),
+      }],
+    }
+    if (sid) {
+      return {
+        sessionSlots: { ...state.sessionSlots, [sid]: nextSlot },
+        ...(state.activeSessionId[ctx] === sid
+          ? { slots: { ...state.slots, [ctx]: nextSlot } }
+          : {}),
+      }
+    }
+    return {
+      slots: { ...state.slots, [ctx]: nextSlot },
+    }
+  })
+}
+
+function triggerWatchdog(ctx: AgentContext, sessionId?: string | null) {
+  const sid = normalizeWatchdogSessionId(sessionId)
+  clearWatchdog(ctx, sid)
+  console.warn(`[Watchdog] agent stuck for 120s in ${ctx}${sid ? ` session ${sid}` : ''}, forcing abort`)
+  window.api.agent.abort(sid || ctx)
+  useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, ctx, sid)
+  appendWatchdogStatus(ctx, sid)
+}
+
+function refreshWatchdog(ctx: AgentContext, sessionId?: string | null) {
+  const sid = normalizeWatchdogSessionId(sessionId)
+  const slot = getWatchdogSlot(ctx, sid)
+  const effectiveSid = sid || normalizeWatchdogSessionId(slot.currentSessionId)
+  const key = getWatchdogKey(ctx, effectiveSid)
+  const existing = watchdogTimers.get(key)
+
+  if (!isAgentActive(slot.agentState)) {
+    if (existing) {
+      clearTimeout(existing.timer)
+      watchdogTimers.delete(key)
+    }
+    return
+  }
+
+  if (existing) clearTimeout(existing.timer)
+  watchdogTimers.set(key, {
+    context: ctx,
+    sessionId: effectiveSid,
+    timer: setTimeout(() => triggerWatchdog(ctx, effectiveSid), WATCHDOG_TIMEOUT),
+  })
+}
+
+function refreshWatchdogAfterState(ctx: AgentContext, sessionId?: string | null) {
+  refreshWatchdog(ctx, sessionId)
+  setTimeout(() => refreshWatchdog(ctx, sessionId), 0)
+}
+
+function findAskUserTarget(
+  state: AgentStore,
+  requestId: string,
+  fallbackContext: AgentContext
+): { context: AgentContext; sessionId: string | null } | null {
+  for (const ctx of ['ask', 'editor'] as AgentContext[]) {
+    const slot = state.slots[ctx]
+    const req = slot.askUserRequest
+    if (req?.id === requestId) {
+      return {
+        context: ctx,
+        sessionId: req.sessionId || slot.currentSessionId || state.activeSessionId[ctx],
+      }
+    }
+    const queued = slot.askUserQueue.find((item) => item.id === requestId)
+    if (queued) {
+      return {
+        context: ctx,
+        sessionId: queued.sessionId || slot.currentSessionId || state.activeSessionId[ctx],
+      }
+    }
+  }
+
+  for (const [sid, slot] of Object.entries(state.sessionSlots)) {
+    const req = slot.askUserRequest
+    if (req?.id === requestId) {
+      return { context: req.context || fallbackContext, sessionId: req.sessionId || sid }
+    }
+    const queued = slot.askUserQueue.find((item) => item.id === requestId)
+    if (queued) {
+      return { context: queued.context || fallbackContext, sessionId: queued.sessionId || sid }
+    }
+  }
+
+  return null
 }
 
 export function useAgent(context: AgentContext = 'editor') {
   const store = useAgentStore
 
-  // ─── Watchdog: start / kill driven by agentState for this context ────────
+  // ─── Watchdog: start / kill driven by agentState for this session ────────
   const agentState = store((s) => s.slots[context].agentState)
+  const currentSessionId = store((s) => s.slots[context].currentSessionId)
 
   useEffect(() => {
-    if (isAgentActive(agentState)) {
-      if (watchdogTimers[context]) clearTimeout(watchdogTimers[context])
-      watchdogTimers[context] = setTimeout(() => triggerWatchdog(context), WATCHDOG_TIMEOUT)
-    } else {
-      if (watchdogTimers[context]) {
-        clearTimeout(watchdogTimers[context])
-        watchdogTimers[context] = null
-      }
-    }
-
-    return () => {
-      if (watchdogTimers[context]) {
-        clearTimeout(watchdogTimers[context])
-        watchdogTimers[context] = null
-      }
-    }
-  }, [agentState, context, store])
+    refreshWatchdog(context, currentSessionId)
+  }, [agentState, currentSessionId, context])
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(async (prompt: string, activeFilePath?: string) => {
     const state = store.getState()
     const slot = state.slots[context]
-    const slotSid = slot.currentSessionId
+    let slotSid = slot.currentSessionId
 
     if (slot.agentState !== 'idle' && slot.agentState !== 'error') {
-      state.dispatchAgentEvent({ type: 'ABORT' }, context)
+      state.dispatchAgentEvent({ type: 'ABORT' }, context, slotSid)
       await window.api.agent.abort(slotSid || context)
     }
 
@@ -241,6 +392,27 @@ export function useAgent(context: AgentContext = 'editor') {
     if (currentState.slots[context].currentSessionId !== slotSid) {
       return
     }
+
+    if (!slotSid) {
+      const tempKey = `new-${context}-${Date.now()}`
+      slotSid = tempKey
+      store.setState((s) => {
+        const preparedSlot = {
+          ...s.slots[context],
+          currentSessionId: tempKey,
+          sdkSessionId: null,
+        }
+        const accessOrder = s.sessionAccessOrder.filter((id) => id !== tempKey)
+        accessOrder.push(tempKey)
+        return {
+          activeSessionId: { ...s.activeSessionId, [context]: tempKey },
+          sessionSlots: { ...s.sessionSlots, [tempKey]: preparedSlot },
+          sessionAccessOrder: accessOrder,
+          slots: { ...s.slots, [context]: preparedSlot },
+        }
+      })
+    }
+    const clientSessionKey = slotSid
 
     // Optimistic write: insert the user message directly into the messages array
     // before the SDK processes it. The SDK will later send back a 'user' IPC event
@@ -275,23 +447,23 @@ export function useAgent(context: AgentContext = 'editor') {
       // points to the editor's session — writing ask data there corrupts the
       // editor's cached slot.
       if (slotSid) {
-        const cached = s.sessionSlots[slotSid]
-        if (cached) {
-          result.sessionSlots = {
-            ...s.sessionSlots,
-            [slotSid]: { ...cached, ...patch },
-          }
+        const cached = s.sessionSlots[slotSid] || s.slots[context]
+        result.sessionSlots = {
+          ...s.sessionSlots,
+          [slotSid]: { ...cached, ...patch, currentSessionId: slotSid },
         }
       }
       return result as Partial<AgentStore>
     })
-    store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context)
+    store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context, slotSid)
+    refreshWatchdog(context, slotSid)
     const skillId = store.getState().slots[context].activeSkillId
     const workspacePath = context === 'ask' ? undefined : (store.getState().activeWorkspacePath || undefined)
     // Don't pass frontend-only temp IDs as SDK sessionId — the SDK doesn't
     // recognize them, would create an untracked duplicate session.
-    const effectiveSid = slotSid?.startsWith('new-') ? undefined : (slotSid || undefined)
-    window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath)
+    const currentSlot = store.getState().sessionSlots[slotSid] || store.getState().slots[context]
+    const effectiveSid = currentSlot.sdkSessionId || (slotSid?.startsWith('new-') ? undefined : (slotSid || undefined))
+    window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath, undefined, clientSessionKey)
   }, [context, store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
@@ -300,20 +472,18 @@ export function useAgent(context: AgentContext = 'editor') {
   }, [store])
 
   const respondAskUser = useCallback((requestId: string, answers: Record<string, string>) => {
+    const target = findAskUserTarget(store.getState(), requestId, context)
     store.getState().handleAskUserResponse(requestId, answers)
-    store.getState().dispatchAgentEvent({ type: 'ASK_USER_RESPONDED' }, context)
+    if (target) {
+      store.getState().dispatchAgentEvent({ type: 'ASK_USER_RESPONDED' }, target.context, target.sessionId)
+      refreshWatchdogAfterState(target.context, target.sessionId)
+    }
     window.api.agent.respondAskUser(requestId, answers)
   }, [context, store])
 
   const newSession = useCallback(() => {
     const state = store.getState()
     const slot = state.slots[context]
-    // Abort running query for this context so the SDK subprocess doesn't
-    // keep writing to a session we're about to detach from.
-    if (slot.isStreaming) {
-      state.dispatchAgentEvent({ type: 'ABORT' }, context)
-      window.api.agent.abort(slot.currentSessionId || context).catch(() => {})
-    }
     // Save current slot to sessionSlots before clearing, so the old
     // session's messages are not lost if the user navigates back.
     // Prefer the context slot's own sessionId.
@@ -338,11 +508,12 @@ export function useAgent(context: AgentContext = 'editor') {
 
   const loadSessions = useCallback(async () => {
     try {
-      const sessions = await window.api.agent.listSdkSessions()
+      const workspacePath = store.getState().activeWorkspacePath || undefined
+      const sessions = await window.api.agent.listSdkSessions(workspacePath)
       store.getState().dispatchSessionList({
         type: 'REPLACE_SDK',
         sessions,
-        workspacePath: undefined,
+        workspacePath,
       })
     } catch (err) {
       console.error('[useAgent] Failed to load sessions:', err)
@@ -352,8 +523,8 @@ export function useAgent(context: AgentContext = 'editor') {
   const resumeSession = useCallback((sessionId: string) => {
     // switchToSession now handles SDK message load internally when _needsSdkLoad
     // is true, including isResumingSession flag management.
-    store.getState().switchToSession(sessionId)
-  }, [store])
+    store.getState().switchToSession(sessionId, context)
+  }, [context, store])
 
   const loadMoreMessages = useCallback(async (sessionId: string) => {
     await store.getState().loadMoreSessionMessages(sessionId)

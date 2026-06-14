@@ -230,7 +230,15 @@ export type AgentIPCMessage =
   | ResultErrorPayload
   | StreamEventPayloadIPC
 
-export type AgentIPCMessageWithContext = AgentIPCMessage & { context: AgentContext; sessionId?: string }
+export type AgentIPCMessageWithContext = AgentIPCMessage & {
+  context: AgentContext
+  /** App-owned stable session key used for renderer routing. */
+  sessionId?: string
+  /** Explicit alias for the app-owned stable session key. */
+  clientSessionKey?: string
+  /** Claude SDK session_id used for resume/history/delete operations. */
+  sdkSessionId?: string
+}
 
 // ─── Usage Info ──────────────────────────────────────────────────────
 
@@ -397,7 +405,11 @@ export type SkillOutputState = {
   isStreaming: boolean
   language: string
   context?: AgentContext
+  /** App-owned stable session key used for renderer routing. */
   sessionId?: string
+  clientSessionKey?: string
+  /** Claude SDK session_id, when already materialized. */
+  sdkSessionId?: string
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────
@@ -428,7 +440,11 @@ export type PermissionRequestIPC = {
   input: Record<string, unknown>
   description?: string
   context?: AgentContext
+  /** App-owned stable session key used for renderer routing. */
   sessionId?: string
+  /** Claude SDK session_id, when already materialized. */
+  sdkSessionId?: string
+  clientSessionKey?: string
   /** SDK-provided display title (e.g. "Claude wants to read foo.txt") */
   title?: string
   /** Short noun phrase for the tool action (e.g. "Read file") */
@@ -463,13 +479,20 @@ export type AskUserRequestIPC = {
   /** Convenience: first question multiSelect */
   multiSelect: boolean
   context?: AgentContext
+  /** App-owned stable session key used for renderer routing. */
   sessionId?: string
+  /** Claude SDK session_id, when already materialized. */
+  sdkSessionId?: string
+  clientSessionKey?: string
 }
 
 // ─── Session Info ────────────────────────────────────────────────────
 
 export type SdkSessionInfo = {
+  /** App-owned stable session key used by the renderer/sidebar. */
   id: string
+  /** Claude SDK session_id used for resume/history/delete operations. */
+  sdkSessionId?: string
   title?: string
   createdAt?: number
   lastModified?: number
@@ -544,10 +567,11 @@ export interface WorkspaceRecord {
 
 // ─── Session Record (app-owned metadata, persisted in electron-store) ──
 
-export type SessionStatus = 'active' | 'idle' | 'archived'
+export type SessionStatus = 'active' | 'idle' | 'archived' | 'empty'
 
 export interface SessionRecord {
-  id: string            // SDK session_id
+  id: string            // App-owned stable session key
+  sdkSessionId?: string // Claude SDK session_id once materialized
   workspacePath: string // FK → WorkspaceRecord.path
   title?: string        // user or auto-generated title
   summary?: string      // first assistant response, truncated

@@ -21,7 +21,10 @@ import type { SessionListAction } from './session-protocol'
 
 export type ContextSlot = {
   messages: ConversationMessage[]
+  /** App-owned stable session key used for renderer routing. */
   currentSessionId: string | null
+  /** Claude SDK session_id used for resume/history/delete operations. */
+  sdkSessionId: string | null
   isStreaming: boolean
   agentState: AgentState
   usageInfo: UsageInfo | null
@@ -51,6 +54,7 @@ function emptySlot(): ContextSlot {
   return {
     messages: [],
     currentSessionId: null,
+    sdkSessionId: null,
     isStreaming: false,
     agentState: 'idle',
     usageInfo: null,
@@ -110,7 +114,7 @@ export type AgentStore = {
 
   // Actions
   dispatchAgentEvent: (event: AgentEvent, context?: AgentContext, eventSid?: string | null) => void
-  processIPCMessage: (msg: AgentIPCMessage & { context?: AgentContext }, options?: { isReplay?: boolean }) => void
+  processIPCMessage: (msg: AgentIPCMessage & { context?: AgentContext; sessionId?: string; clientSessionKey?: string; sdkSessionId?: string }, options?: { isReplay?: boolean }) => void
   handlePermissionRequest: (req: PermissionRequestIPC) => void
   handlePermissionResponse: (requestId: string, behavior: 'allow' | 'deny') => void
   handleAskUserRequest: (req: AskUserRequestIPC) => void
@@ -122,12 +126,12 @@ export type AgentStore = {
   consumePrefill: (context: AgentContext) => void
   setActiveWorkspace: (path: string | null) => void
   setWorkspaceDigest: (digest: WorkspaceDigest | null) => void
-  setActiveSession: (sessionId: string | null) => void
+  setActiveSession: (sessionId: string | null, context?: AgentContext) => void
   setSessionOutputs: (outputs: SessionOutputs | null) => void
   dispatchSessionList: (action: SessionListAction) => void
-  switchToSession: (sessionId: string) => void
+  switchToSession: (sessionId: string, context?: AgentContext) => void
   ensureSessionSlot: (sessionId: string) => void
-  loadInitialSessionMessages: (sessionId: string) => Promise<void>
+  loadInitialSessionMessages: (sessionId: string, context?: AgentContext) => Promise<void>
   loadMoreSessionMessages: (sessionId: string) => Promise<void>
   renameCurrentSession: (title: string) => Promise<void>
 }

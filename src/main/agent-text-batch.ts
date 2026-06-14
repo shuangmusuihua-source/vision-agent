@@ -11,8 +11,8 @@ import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claud
 // Keyed by queryKey (sessionId || context) to support parallel streaming
 // across multiple sessions within the same context.
 
-type TextBatchEntry = { context: string; text: string; uuid: string; sessionId: string; agentContext: string }
-const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string; agentContext: string }>()
+type TextBatchEntry = { context: string; text: string; uuid: string; sessionId: string; agentContext: string; clientSessionKey?: string; sdkSessionId?: string }
+const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string; agentContext: string; clientSessionKey?: string; sdkSessionId?: string }>()
 
 function ensureBatchSlot(key: string, agentContext: string) {
   if (!textBatches.has(key)) {
@@ -33,6 +33,8 @@ export function flushTextBatch(key: string, win: BrowserWindow): void {
   const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
   const lastUuid = slot.entries[slot.entries.length - 1].uuid
   const sessionId = slot.sessionId
+  const clientSessionKey = slot.clientSessionKey || sessionId
+  const sdkSessionId = slot.sdkSessionId
   // Use the agentContext (editor/ask) stored at batch creation, NOT queryKey context.
   // queryKey may be a sessionId; agentContext is always the correct AgentContext.
   const agentContext = slot.agentContext || slot.entries[0]?.context || 'editor'
@@ -44,6 +46,8 @@ export function flushTextBatch(key: string, win: BrowserWindow): void {
   win.webContents.send('agent:event', {
     context: agentContext,
     sessionId,
+    clientSessionKey,
+    sdkSessionId,
     type: 'stream_event',
     uuid: lastUuid,
     event: {
@@ -64,10 +68,21 @@ export function isTextDeltaEvent(rawMessage: SDKMessage): string | null {
   return delta.text || ''
 }
 
-export function scheduleTextBatch(key: string, text: string, uuid: string, sessionId: string, agentContext: string, win: BrowserWindow): void {
+export function scheduleTextBatch(
+  key: string,
+  text: string,
+  uuid: string,
+  sessionId: string,
+  agentContext: string,
+  win: BrowserWindow,
+  clientSessionKey?: string,
+  sdkSessionId?: string
+): void {
   const slot = ensureBatchSlot(key, agentContext)
-  slot.entries.push({ context: key, text, uuid, sessionId, agentContext })
+  slot.entries.push({ context: key, text, uuid, sessionId, agentContext, clientSessionKey, sdkSessionId })
   slot.sessionId = sessionId
+  slot.clientSessionKey = clientSessionKey
+  slot.sdkSessionId = sdkSessionId
 
   if (!slot.timer) {
     slot.timer = setTimeout(() => flushTextBatch(key, win), 30)

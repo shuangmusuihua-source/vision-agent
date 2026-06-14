@@ -2,7 +2,7 @@ import { listSessions, getSessionMessages, renameSession, deleteSession, getSess
 import type { ForkSessionOptions, SessionMutationOptions } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd } from './skill-init'
 import { toAgentIPCMessage } from './message-converter'
-import type { AgentIPCMessage } from '../shared/types'
+import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
 import { getSessionRecords, removeSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -36,21 +36,24 @@ export function addCompactionId(id: string): void {
 
 // ─── SDK session listing ───────────────────────────────────────────────
 
-export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id: string; title?: string; createdAt?: number; lastModified?: number; messageCount?: number; cwd?: string; workspacePath?: string; context?: string }>> {
+export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSessionInfo[]> {
   try {
     // Build session→workspace + context + title maps from electron-store SessionRecords
     const records = getSessionRecords()
     const sessionWorkspaceMap = new Map<string, string>()
     const sessionContextMap = new Map<string, string>()
     const sessionTitleMap = new Map<string, string>()
+    const sessionAppIdMap = new Map<string, string>()
     for (const r of records) {
-      if (r.workspacePath) sessionWorkspaceMap.set(r.id, r.workspacePath)
-      sessionContextMap.set(r.id, r.context)
-      if (r.title) sessionTitleMap.set(r.id, r.title)
+      const sdkId = r.sdkSessionId || r.id
+      if (r.workspacePath) sessionWorkspaceMap.set(sdkId, r.workspacePath)
+      sessionContextMap.set(sdkId, r.context)
+      sessionAppIdMap.set(sdkId, r.id)
+      if (r.title) sessionTitleMap.set(sdkId, r.title)
     }
 
     const globalCwd = getAppSkillsCwd()
-    const results: Array<{ id: string; title?: string; createdAt?: number; lastModified?: number; messageCount?: number; cwd?: string; workspacePath?: string; context?: string }> = []
+    const results: SdkSessionInfo[] = []
     const seenIds = new Set<string>()
 
     try {
@@ -59,8 +62,10 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
         if (!seenIds.has(s.sessionId)) {
           seenIds.add(s.sessionId)
           if (compactionSessionIds.has(s.sessionId)) continue
+          const appId = sessionAppIdMap.get(s.sessionId) || s.sessionId
           results.push({
-            id: s.sessionId,
+            id: appId,
+            sdkSessionId: s.sessionId,
             title: s.customTitle || sessionTitleMap.get(s.sessionId) || s.summary || s.firstPrompt,
             createdAt: s.createdAt,
             lastModified: s.lastModified,
@@ -82,8 +87,10 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
           if (!seenIds.has(s.sessionId)) {
             seenIds.add(s.sessionId)
             if (compactionSessionIds.has(s.sessionId)) continue
+            const appId = sessionAppIdMap.get(s.sessionId) || s.sessionId
             results.push({
-              id: s.sessionId,
+              id: appId,
+              sdkSessionId: s.sessionId,
               title: s.customTitle || sessionTitleMap.get(s.sessionId) || s.summary || s.firstPrompt,
               createdAt: s.createdAt,
               lastModified: s.lastModified,
@@ -101,11 +108,13 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
 
     // Augment with empty named sessions from SessionRecords that were
     // created but never had a message sent — they have no SDK session yet.
+    const seenAppIds = new Set(results.map(r => r.id))
     for (const r of records) {
-      if (!seenIds.has(r.id) && r.id && r.workspacePath) {
-        seenIds.add(r.id)
+      if (!seenAppIds.has(r.id) && r.id && r.workspacePath) {
+        seenAppIds.add(r.id)
         results.push({
           id: r.id,
+          sdkSessionId: r.sdkSessionId,
           title: r.title || r.firstPrompt,
           createdAt: r.createdAt,
           lastModified: r.lastModified,
@@ -117,11 +126,9 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<Array<{ id
       }
     }
 
-    // If workspace filter is requested, filter by workspacePath from SessionRecords
-    // Exclude ask-context sessions — they belong to Ask Zuovis, not the workspace
-    // Exclude ask-context sessions — they belong to Ask Zuovis, not the workspace.
-    // No workspace-path filter — the sidebar groups sessions by workspacePath itself.
-    return results.filter(s => s.context !== 'ask')
+    // Return both entry types. The renderer separates Ask Zuovis sessions
+    // from workspace sessions by context so the two entry points stay isolated.
+    return results
   } catch (err) {
     console.error('[SessionStore] listSessions error:', err)
     return []
@@ -167,7 +174,7 @@ export async function getSdkSessionTotalMessageCount(
 function readSessionJsonlDirect(sessionId: string): Array<Record<string, unknown>> | null {
   try {
     const records = getSessionRecords()
-    const record = records.find(r => r.id === sessionId)
+    const record = records.find(r => r.id === sessionId || r.sdkSessionId === sessionId)
     const wsPath = record?.workspacePath
     if (!wsPath) return null
 

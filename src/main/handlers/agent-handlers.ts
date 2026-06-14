@@ -7,10 +7,10 @@ import type { SessionOutputEntry } from '../../shared/types'
 import type { AgentContext } from '../../shared/types'
 
 export function registerAgentHandlers(): void {
-  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string) => {
+  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, _title?: string, clientSessionKey?: string) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    sendMessage(window, prompt, sessionId, activeFilePath, context || 'editor', skillId || null, workspacePath)
+    sendMessage(window, prompt, sessionId, activeFilePath, context || 'editor', skillId || null, workspacePath, clientSessionKey)
     return { started: true }
   })
 
@@ -64,7 +64,7 @@ export function registerAgentHandlers(): void {
     try {
       // Find session record to get workspacePath
       const records = getSessionRecords()
-      const record = records.find(r => r.id === sessionId)
+      const record = records.find(r => r.id === sessionId || r.sdkSessionId === sessionId)
       const workspacePath = record?.workspacePath
 
       // Load all messages for this session

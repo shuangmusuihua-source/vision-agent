@@ -129,8 +129,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // Load session outputs when active session changes
   useEffect(() => {
     if (activeSessionId) {
+      const sdkSessionId = useAgentStore.getState().sessionSlots[activeSessionId]?.sdkSessionId
+        || useAgentStore.getState().sessionList.find(s => s.id === activeSessionId)?.sdkSessionId
+        || (activeSessionId.startsWith('new-') ? null : activeSessionId)
+      if (!sdkSessionId) {
+        useAgentStore.getState().setSessionOutputs(null)
+        return
+      }
       useAgentStore.setState({ sessionOutputsLoading: true })
-      window.api.agent.getSessionOutputs(activeSessionId).then((outputs) => {
+      window.api.agent.getSessionOutputs(sdkSessionId).then((outputs) => {
         if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
           useAgentStore.getState().setSessionOutputs(outputs)
         }
@@ -188,6 +195,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         ...s.sessionSlots,
         [tempSessionId]: {
           ...(s.sessionSlots[tempSessionId] || s.slots.editor),
+          currentSessionId: tempSessionId,
+          sdkSessionId: null,
         },
       },
     }))
@@ -286,14 +295,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       window.api.agent.abort(sessionId).catch(() => {})
     }
 
-    // Temp sessions (frontend-only): just remove from the protocol-managed list.
-    // Real sessions: delete via SDK first, then update the list.
-    if (sessionId.startsWith('new-')) {
+    const sdkSessionId = slot?.sdkSessionId
+      || useAgentStore.getState().sessionList.find(s => s.id === sessionId)?.sdkSessionId
+      || (sessionId.startsWith('new-') ? null : sessionId)
+
+    if (!sdkSessionId) {
       useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
+      window.api.agent.removeSessionRecord(sessionId).catch(() => {})
     } else {
       try {
-        await window.api.agent.deleteSession(sessionId)
+        await window.api.agent.deleteSession(sdkSessionId)
         useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
+        window.api.agent.removeSessionRecord(sessionId).catch(() => {})
       } catch (err) {
         console.error('[AppShell] deleteSession error:', err)
         modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
@@ -323,6 +336,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const currentSessionId = useCurrentSessionId('editor')
   const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
+  const editorSessionList = sessionList.filter((s) => s.context !== 'ask')
   const agentStatus = useAgentStatus('editor')
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
@@ -350,7 +364,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── View routing helpers ────────────────────────────────────────────
 
   const handleAskZuovisBack = useCallback(() => {
-    if (askIsStreaming) window.api.agent.abort('ask')
+    const askSid = useAgentStore.getState().slots.ask.currentSessionId
+    if (askIsStreaming) {
+      useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'ask', askSid)
+      window.api.agent.abort(askSid || 'ask')
+    }
     useAgentStore.setState((prev) => ({
       slots: { ...prev.slots, ask: emptySlot() },
       activeSessionId: { ...prev.activeSessionId, ask: null },
@@ -431,7 +449,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     // Refresh session outputs so OverviewPanel shows newly produced files
     const sid = useAgentStore.getState().activeSessionId.editor
     if (sid) {
-      window.api.agent.getSessionOutputs(sid).then((outputs) => {
+      const sdkSessionId = useAgentStore.getState().sessionSlots[sid]?.sdkSessionId
+        || useAgentStore.getState().sessionList.find(s => s.id === sid)?.sdkSessionId
+        || (sid.startsWith('new-') ? null : sid)
+      if (!sdkSessionId) return
+      window.api.agent.getSessionOutputs(sdkSessionId).then((outputs) => {
         if (useAgentStore.getState().activeSessionId.editor === sid) {
           useAgentStore.getState().setSessionOutputs(outputs)
         }
@@ -518,7 +540,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         workspacePaths={workspace.workspacePaths}
         fixedWorkspacePaths={workspace.fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
-        sessions={sessionList}
+        sessions={editorSessionList}
         activeSessionId={activeSessionId}
         activeSessionRunning={isStreaming}
         onSessionSelect={handleSessionSelect}
@@ -540,7 +562,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onDaydream={(mode: string) => openDaydream(mode)}
         onAskZuovis={() => {
             useAgentStore.setState({ context: 'ask' })
-            useAgentStore.getState().setActiveSession(null)
             clearTab()
             setView('ask')
           }}
@@ -649,7 +670,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         askUserRequest={editorAskUser}
         onAskUserRespond={editorRespondAskUser}
         onAskUserDrawerRespond={(respond) => { editorAskUserRespondRef.current = respond }}
-        sessionList={sessionList}
+        sessionList={editorSessionList}
         currentSessionId={currentSessionId}
         onSelectSession={resumeSession}
         onNewSession={newSession}
@@ -663,8 +684,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             editorSendMessage(msg, linkedFile || undefined)
           }
         }} onSkillSelect={handleSkillSelect} onStop={() => {
-            useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'editor')
-            window.api.agent.abort('editor')
+            const sid = useAgentStore.getState().slots.editor.currentSessionId
+            useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'editor', sid)
+            window.api.agent.abort(sid || 'editor')
           }} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setLinkedFile(null)}

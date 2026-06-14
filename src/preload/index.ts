@@ -63,8 +63,8 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string) =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string, clientSessionKey?: string) =>
+      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title, clientSessionKey),
     respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior, options),
     respondAskUser: (requestId: string, answers: Record<string, string>) =>
@@ -99,8 +99,8 @@ const api = {
     },
 
     // ── Lifecycle channels (separate for request/response patterns) ──
-    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string; workspacePath?: string }) => callback(data)
+    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string; sdkSessionId?: string; workspacePath?: string; clientSessionKey?: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string; sdkSessionId?: string; workspacePath?: string; clientSessionKey?: string }) => callback(data)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },

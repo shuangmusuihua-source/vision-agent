@@ -9,6 +9,8 @@ interface SkillOutputState {
   language: string
   context?: AgentContext
   sessionId?: string
+  clientSessionKey?: string
+  sdkSessionId?: string
 }
 
 /**
@@ -60,7 +62,7 @@ export class SkillOutputBridge {
     const s = this.sessions.get(queryKey)
     if (s) {
       s.context = context
-      s.state = { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey }
+      s.state = { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey, clientSessionKey: queryKey }
       s.writeAccumulators.clear()
       s.inSkillOutputBlock = false
       s.skillOutputAccumulator = ''
@@ -69,7 +71,7 @@ export class SkillOutputBridge {
     } else {
       this.sessions.set(queryKey, {
         context,
-        state: { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey },
+        state: { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey, clientSessionKey: queryKey },
         writeAccumulators: new Map(),
         inSkillOutputBlock: false,
         skillOutputAccumulator: '',
@@ -77,6 +79,13 @@ export class SkillOutputBridge {
         _lastPushedLen: 0,
       })
     }
+  }
+
+  /** Attach the SDK session id after Claude materializes the app session. */
+  setSessionId(queryKey: string, sessionId: string): void {
+    const s = this.sessions.get(queryKey)
+    if (!s) return
+    s.state = { ...s.state, sdkSessionId: sessionId }
   }
 
   /** Clean up a session's accumulators when its query completes or is aborted. */
@@ -170,7 +179,9 @@ export class SkillOutputBridge {
           isStreaming: true,
           language: s.state.language,
           context: s.context,
-          sessionId: queryKey,
+          sessionId: s.state.sessionId || queryKey,
+          clientSessionKey: s.state.clientSessionKey || s.state.sessionId || queryKey,
+          sdkSessionId: s.state.sdkSessionId,
         })
       } else {
         // Keep tail for potential split fence marker (17 chars)
@@ -190,7 +201,9 @@ export class SkillOutputBridge {
           isStreaming: false,
           language: s.state.language,
           context: s.context,
-          sessionId: queryKey,
+          sessionId: s.state.sessionId || queryKey,
+          clientSessionKey: s.state.clientSessionKey || s.state.sessionId || queryKey,
+          sdkSessionId: s.state.sdkSessionId,
         })
         return
       }
@@ -203,7 +216,9 @@ export class SkillOutputBridge {
         isStreaming: true,
         language: s.state.language,
         context: s.context,
-        sessionId: queryKey,
+        sessionId: s.state.sessionId || queryKey,
+        clientSessionKey: s.state.clientSessionKey || s.state.sessionId || queryKey,
+        sdkSessionId: s.state.sdkSessionId,
       })
     }
   }
@@ -228,7 +243,9 @@ export class SkillOutputBridge {
           isStreaming: true,
           language,
           context: s.context,
-          sessionId: queryKey,
+          sessionId: s.state.sessionId || queryKey,
+          clientSessionKey: s.state.clientSessionKey || s.state.sessionId || queryKey,
+          sdkSessionId: s.state.sdkSessionId,
         })
       }
     }
@@ -246,7 +263,9 @@ export class SkillOutputBridge {
           isStreaming: false,
           language,
           context: s.context,
-          sessionId: queryKey,
+          sessionId: s.state.sessionId || queryKey,
+          clientSessionKey: s.state.clientSessionKey || s.state.sessionId || queryKey,
+          sdkSessionId: s.state.sdkSessionId,
         })
       }
     } catch {

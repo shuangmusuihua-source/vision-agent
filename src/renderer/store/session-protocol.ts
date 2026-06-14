@@ -8,7 +8,8 @@
  * 1. Session list is the **authoritative inventory** of user-facing sessions.
  * 2. Each action type maps to one user intent (create, send-first-message, delete).
  * 3. Invariants are enforced by a pure reducer — no ad-hoc list manipulation.
- * 4. `new-*` IDs represent frontend-only sessions not yet materialized by the SDK.
+ * 4. `id` is app-owned and stable. `sdkSessionId` is the Claude SDK handle.
+ *    Materialization attaches `sdkSessionId`; it must not rename `id`.
  * 5. `messageCount` carries real SDK data (populated by `listSdkSessions` in
  *    agent-manager.ts). It flows through CREATE_TEMP (set to 0), MATERIALIZE
  *    (spread-preserved), and REPLACE_SDK (passed through from SDK sessions)
@@ -28,16 +29,19 @@ export type SessionListAction =
 /** User clicked "new conversation" and typed a name. */
 export interface CreateTemp {
   type: 'CREATE_TEMP'
-  sessionId: string       // "new-{timestamp}" frontend placeholder
+  sessionId: string       // app-owned stable session key
   title: string           // user-chosen session name
   workspacePath: string
 }
 
-/** SDK assigned a real UUID to a previously-created temp session. */
+/** SDK assigned a real UUID to a previously-created app session. */
 export interface Materialize {
   type: 'MATERIALIZE'
-  tempId: string          // the "new-*" ID being replaced
+  tempId: string          // app-owned stable session key
   realId: string          // SDK-assigned UUID
+  context?: SdkSessionInfo['context']
+  workspacePath?: string
+  title?: string
 }
 
 /** User deleted a session (or the SDK confirmed deletion). */
@@ -82,22 +86,31 @@ export function sessionListReducer(
       const next = state.map(s => {
         if (s.id === action.tempId) {
           foundTemp = true
-          return { ...s, id: action.realId, lastModified: Date.now() }
+          return {
+            ...s,
+            sdkSessionId: action.realId,
+            context: action.context ?? s.context,
+            workspacePath: action.workspacePath ?? s.workspacePath,
+            title: action.title ?? s.title,
+            lastModified: Date.now(),
+          }
         }
-        if (s.id === action.realId) {
+        if (s.id === action.realId || s.sdkSessionId === action.realId) {
           return null as unknown as SdkSessionInfo // dedup
         }
         return s
       }).filter(Boolean) as SdkSessionInfo[]
 
-      // Safety net: if the temp entry wasn't in the list (edge case),
-      // ensure the real entry exists so the sidebar doesn't lose selection.
+      // Safety net: if the app session wasn't in the list, keep a stable
+      // app-facing id and attach the SDK id. Do not warn here; Ask Zuovis and
+      // unnamed editor sends can materialize without a sidebar-created entry.
       if (!foundTemp) {
-        console.warn('[SessionProtocol] MATERIALIZE tempId not found in list, adding realId:', action.realId)
         next.unshift({
-          id: action.realId,
-          title: undefined,
-          workspacePath: undefined,
+          id: action.tempId || action.realId,
+          sdkSessionId: action.realId,
+          title: action.title,
+          workspacePath: action.workspacePath,
+          context: action.context,
           createdAt: Date.now(),
           lastModified: Date.now(),
           messageCount: 0,
@@ -115,14 +128,15 @@ export function sessionListReducer(
     case 'REPLACE_SDK': {
       // Preserve temp sessions that:
       // - Belong to the current workspace (or any workspace if none specified)
-      // - Are not also present in the SDK result (defensive dedup)
-      const sdkIds = new Set(action.sessions.map(s => s.id))
+      // - May already be materialized; in that case they suppress the SDK
+      //   duplicate so the app-owned id remains stable.
       const tempSessions = state.filter(s =>
         s.id.startsWith('new-') &&
-        (!action.workspacePath || s.workspacePath === action.workspacePath) &&
-        !sdkIds.has(s.id)
+        (!action.workspacePath || s.workspacePath === action.workspacePath)
       )
-      return [...action.sessions, ...tempSessions]
+      const retainedSdkIds = new Set(tempSessions.map(s => s.sdkSessionId).filter(Boolean) as string[])
+      const sdkSessions = action.sessions.filter(s => !retainedSdkIds.has(s.sdkSessionId || s.id))
+      return [...sdkSessions, ...tempSessions]
     }
   }
 }

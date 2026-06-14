@@ -152,6 +152,9 @@ export function reduceSystemMessage(
   if (msg.subtype === 'init') {
     const initMsg = msg as SystemInitPayload
     const patch: Partial<ContextSlot> = {}
+    if (initMsg.session_id && !slot.sdkSessionId) {
+      patch.sdkSessionId = initMsg.session_id
+    }
     if (initMsg.session_id && !slot.currentSessionId) {
       patch.currentSessionId = initMsg.session_id
     }
