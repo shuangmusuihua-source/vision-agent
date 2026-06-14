@@ -95,6 +95,7 @@ export function addSessionRecord(record: SessionRecord): void {
 export function removeSessionRecord(id: string): void {
   const sessions = store.get('sessions').filter(s => s.id !== id)
   store.set('sessions', sessions)
+  store.set('sessionArtifacts', store.get('sessionArtifacts').filter(a => a.sessionId !== id))
 }
 
 export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): void {

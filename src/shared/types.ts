@@ -585,6 +585,25 @@ export interface SessionRecord {
   artifactCount: number
   legacyMigration?: boolean
 }
+
+// ─── Session Artifact Registry (app-owned durable outputs) ────────────
+
+export interface SessionArtifactRecord {
+  id: string
+  sessionId: string        // App-owned stable session key
+  sdkSessionId?: string    // Claude SDK session_id for traceability only
+  workspacePath: string    // Workspace used to resolve relative tool paths
+  fileName: string
+  filePath: string         // Normalized absolute filesystem path
+  fileType: ArtifactFileType
+  category: 'document' | 'skill_output' | 'other'
+  source: string           // e.g. Write, Edit, history-backfill
+  sourceTool?: string
+  skillId?: string | null
+  size?: number
+  createdAt: number
+  updatedAt: number
+}
 // ─── Session Digest (lightweight, for overview display) ────────────────
 
 export interface SessionDigest {

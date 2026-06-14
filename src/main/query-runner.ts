@@ -8,7 +8,7 @@ import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, AgentContext, AskUserQuestionOption, AskUserQuestionItem } from '../shared/types'
-import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord } from './store'
+import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { registerSession } from './agent-sessions'
@@ -31,7 +31,15 @@ import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput }
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
-function buildHooks(mainWindow: BrowserWindow, sessionId?: string, workspaceCwd?: string): Partial<Record<string, HookCallbackMatcher[]>> {
+type HookSessionContext = {
+  appSessionId?: string
+  sdkSessionId?: string
+  workspaceCwd?: string
+  getSdkSessionId?: () => string | undefined
+  skillId?: string | null
+}
+
+function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext): Partial<Record<string, HookCallbackMatcher[]>> {
   const auditPreToolUse: HookCallback = async (input, _toolUseID, _options) => {
     const { tool_name, tool_input } = input as PreToolUseHookInput
     writeAuditLog({
@@ -43,11 +51,19 @@ function buildHooks(mainWindow: BrowserWindow, sessionId?: string, workspaceCwd?
   }
 
   const auditPostToolUse: HookCallback = async (input, _toolUseID, _options) => {
-    const { tool_name, tool_response } = input as PostToolUseHookInput
+    const { tool_name, tool_input, tool_response } = input as PostToolUseHookInput
     writeAuditLog({
       event: 'PostToolUse',
       tool: tool_name,
       result: JSON.stringify(tool_response).substring(0, 500)
+    })
+    recordSessionArtifactFromTool({
+      sessionId: hookContext.appSessionId,
+      sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.sdkSessionId,
+      workspacePath: hookContext.workspaceCwd,
+      toolName: tool_name,
+      toolInput: tool_input,
+      skillId: hookContext.skillId,
     })
     return {}
   }
@@ -59,8 +75,8 @@ function buildHooks(mainWindow: BrowserWindow, sessionId?: string, workspaceCwd?
         type: notification_type || 'info',
         message: message || '',
         title: title || '',
-        sessionId: sessionId || '',
-        workspaceCwd: workspaceCwd || '',
+        sessionId: hookContext.appSessionId || '',
+        workspaceCwd: hookContext.workspaceCwd || '',
       })
     }
     return {}
@@ -102,7 +118,7 @@ function extractPathFromToolInput(
   return value
 }
 
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, queryKey?: string, getSessionId?: () => string | undefined) {
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, queryKey?: string, getSessionId?: () => string | undefined, skillId?: string | null) {
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = workspaceCwdOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
 
@@ -146,7 +162,13 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
     workspaceCwd,
     skills: getEnabledSkills(),
     systemPromptAppend,
-    hooks: buildHooks(mainWindow, sessionId, workspaceCwd),
+    hooks: buildHooks(mainWindow, {
+      appSessionId: queryKey || sessionId,
+      sdkSessionId: sessionId,
+      workspaceCwd,
+      getSdkSessionId: getSessionId,
+      skillId,
+    }),
     resume: sessionId || undefined,
     canUseTool: async (
       toolName: string,
@@ -362,15 +384,16 @@ export async function sendMessage(
   // Different sessions in the same context can now run in parallel.
   const queryKey = clientSessionKey || sessionId || context
   abortActiveQuery(queryKey)
+  const effectiveWorkspaceCwd = workspacePath
+    || (context === 'ask' ? getAppSkillsCwd() : undefined)
+    || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
 
   // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
   let processedPrompt = prompt
   const convMatch = prompt.match(/<!--FILE_CONVERT:(.+?)-->/)
   if (convMatch) {
     const paths = convMatch[1].split('|').filter(Boolean)
-    const dirs = getAuthorizedDirectories()
-    const workspaceDir = dirs.length > 0 ? dirs[0] : process.cwd()
-    const tmpDir = join(workspaceDir, '.vision', 'tmp')
+    const tmpDir = join(effectiveWorkspaceCwd, '.vision', 'tmp')
     mkdirSync(tmpDir, { recursive: true })
     const refs: string[] = []
 
@@ -396,9 +419,6 @@ export async function sendMessage(
   }
 
   _skillOutputBridge.reset(queryKey, context)
-  const effectiveWorkspaceCwd = workspacePath
-    || (context === 'ask' ? getAppSkillsCwd() : undefined)
-    || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
   // Ensure workspace-local skills exist (idempotent via sentinel file).
   // Run async to avoid blocking the main thread on file I/O.
   // The sentinel check makes subsequent calls nearly instant (~0.1ms),
@@ -406,7 +426,7 @@ export async function sendMessage(
   ensureWorkspaceSkills(effectiveWorkspaceCwd)
   let currentSessionId = sessionId
   const getSessionId = () => currentSessionId
-  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, queryKey, getSessionId)
+  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, queryKey, getSessionId, skillId)
   const appSessionKey = queryKey
 
   const queryInstanceId = ++_queryInstanceCounter

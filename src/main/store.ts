@@ -59,3 +59,11 @@ export {
   addCompactionSessionId,
   deleteCompactionSessionId,
 } from './persistence/settings-store'
+
+export {
+  getSessionArtifacts,
+  getSessionArtifactOutputs,
+  upsertSessionArtifact,
+  recordSessionArtifactFromTool,
+  removeSessionArtifacts,
+} from './persistence/artifact-store'

@@ -1,15 +1,8 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession } from '../agent-manager'
-import { getSessionRecords, updateSessionRecord, removeSessionRecord } from '../store'
-import { access } from 'fs/promises'
-import { basename, extname, isAbsolute, resolve } from 'path'
-import type { SessionOutputEntry } from '../../shared/types'
+import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactFromTool } from '../store'
 import type { AgentContext } from '../../shared/types'
-
-function normalizeOutputPath(filePath: string, workspacePath?: string): string {
-  return isAbsolute(filePath) ? filePath : resolve(workspacePath || process.cwd(), filePath)
-}
 
 export function registerAgentHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, _title?: string, clientSessionKey?: string) => {
@@ -73,11 +66,9 @@ export function registerAgentHandlers(): void {
       const workspacePath = record?.workspacePath
       const appSessionId = record?.id || sessionId
 
-      // Load all messages for this session
+      // Backfill legacy sessions from SDK history, then read the app-owned
+      // artifact registry as the source of truth for overview display.
       const messages = await loadSdkSessionMessages(sessionId)
-      const files: SessionOutputEntry[] = []
-      const seen = new Set<string>()
-
       for (const msg of messages) {
         const content = (msg as Record<string, unknown>).message as Record<string, unknown> | undefined
         const contentBlocks = content?.content as Array<Record<string, unknown>> | undefined
@@ -87,43 +78,17 @@ export function registerAgentHandlers(): void {
           if (block.type !== 'tool_use') continue
           const name = block.name as string
           if (name !== 'Write' && name !== 'Edit') continue
-          const input = block.input as Record<string, unknown> | undefined
-          const filePath = input?.file_path as string | undefined
-          if (!filePath) continue
-          const normalizedPath = normalizeOutputPath(filePath, workspacePath)
-          if (seen.has(normalizedPath)) continue
-
-          // Skip memory files — these are managed by the Memory sidebar section
-          if (normalizedPath.includes('/.vision/memory/')) continue
-
-          // Async file existence check to avoid blocking the main process
-          try {
-            await access(normalizedPath)
-          } catch {
-            continue
-          }
-
-          seen.add(normalizedPath)
-          const fileName = basename(normalizedPath)
-          const ext = extname(fileName).slice(1).toLowerCase()
-          const fileType = (ext === 'html' || ext === 'htm') ? 'html'
-            : ext === 'svg' ? 'svg'
-            : ext === 'json' ? 'json'
-            : ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? 'png'
-            : 'md'
-          const isSkillOutput = fileType === 'html' || fileType === 'svg'
-
-          files.push({
-            fileName,
-            filePath: normalizedPath,
-            fileType: fileType as SessionOutputEntry['fileType'],
-            category: isSkillOutput ? 'skill_output' : 'document',
-            source: name,
-            createdAt: Date.now(),
+          recordSessionArtifactFromTool({
+            sessionId: appSessionId,
+            sdkSessionId: record?.sdkSessionId,
+            workspacePath,
+            toolName: name,
+            toolInput: block.input,
           })
         }
       }
 
+      const files = getSessionArtifactOutputs(appSessionId)
       return { sessionId: appSessionId, workspacePath: workspacePath || '', files }
     } catch (e) {
       console.error('[agent:getSessionOutputs] failed:', e)

@@ -2,7 +2,7 @@ import Store from 'electron-store'
 import { safeStorage } from 'electron'
 import path from 'path'
 import { app } from 'electron'
-import type { ModelProfile, WorkspaceRecord, SessionRecord } from '../../shared/types'
+import type { ModelProfile, WorkspaceRecord, SessionRecord, SessionArtifactRecord } from '../../shared/types'
 
 export const KNOWLEDGE_BASE_NAME = 'Knowledge'
 
@@ -52,6 +52,7 @@ export interface AppSettings {
   fixedDirectories: string[]
   workspaces: WorkspaceRecord[]
   sessions: SessionRecord[]
+  sessionArtifacts: SessionArtifactRecord[]
   storeVersion: number
   theme: 'light' | 'dark' | 'system'
   cronTasks: CronTask[]
@@ -66,6 +67,7 @@ export const store = new Store<AppSettings>({
     fixedDirectories: [],
     workspaces: [],
     sessions: [],
+    sessionArtifacts: [],
     storeVersion: 0,
     theme: 'system',
     cronTasks: [],
