@@ -137,7 +137,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         return
       }
       useAgentStore.setState({ sessionOutputsLoading: true })
-      window.api.agent.getSessionOutputs(sdkSessionId).then((outputs) => {
+      window.api.agent.getSessionOutputs(activeSessionId).then((outputs) => {
         if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
           useAgentStore.getState().setSessionOutputs(outputs)
         }
@@ -453,7 +453,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         || useAgentStore.getState().sessionList.find(s => s.id === sid)?.sdkSessionId
         || (sid.startsWith('new-') ? null : sid)
       if (!sdkSessionId) return
-      window.api.agent.getSessionOutputs(sdkSessionId).then((outputs) => {
+      window.api.agent.getSessionOutputs(sid).then((outputs) => {
         if (useAgentStore.getState().activeSessionId.editor === sid) {
           useAgentStore.getState().setSessionOutputs(outputs)
         }

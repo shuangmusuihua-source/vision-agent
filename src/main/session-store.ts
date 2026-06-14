@@ -57,6 +57,25 @@ function getSessionMutationOptions(sessionId: string): SessionMutationOptions | 
   return dir ? { dir } : undefined
 }
 
+function isSessionNotFoundError(err: unknown): boolean {
+  return err instanceof Error && /not found/i.test(err.message)
+}
+
+async function withSessionDirFallback<T>(
+  sessionId: string,
+  operation: (sdkSessionId: string, options?: SessionMutationOptions) => Promise<T>
+): Promise<T> {
+  const sdkSessionId = getSdkSessionId(sessionId)
+  const options = getSessionMutationOptions(sessionId)
+  if (!options) return operation(sdkSessionId, undefined)
+  try {
+    return await operation(sdkSessionId, options)
+  } catch (err) {
+    if (!isSessionNotFoundError(err)) throw err
+    return await operation(sdkSessionId, undefined)
+  }
+}
+
 // ─── SDK session listing ───────────────────────────────────────────────
 
 export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSessionInfo[]> {
@@ -301,7 +320,7 @@ export async function loadSdkSessionMessagesPaginated(
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
   try {
-    await renameSession(getSdkSessionId(sessionId), title, getSessionMutationOptions(sessionId))
+    await withSessionDirFallback(sessionId, (sdkSessionId, options) => renameSession(sdkSessionId, title, options))
   } catch (err) {
     console.error('[SessionStore] renameSession error:', err)
     throw err
@@ -319,7 +338,7 @@ export async function deleteSdkSession(sessionId: string): Promise<void> {
   // deletion leaves the session intact rather than orphaned.
   const sdkSessionId = getSdkSessionId(sessionId)
   const appSessionId = getAppSessionId(sessionId)
-  await deleteSession(sdkSessionId, getSessionMutationOptions(sessionId))
+  await withSessionDirFallback(sessionId, (_sdkSessionId, options) => deleteSession(sdkSessionId, options))
   compactionSessionIds.delete(sdkSessionId)
   deleteCompactionSessionId(sdkSessionId)
   removeSessionRecord(appSessionId)
@@ -329,7 +348,7 @@ export async function deleteSdkSession(sessionId: string): Promise<void> {
 
 export async function tagSdkSession(sessionId: string, tag: string): Promise<boolean> {
   try {
-    await tagSession(getSdkSessionId(sessionId), tag, getSessionMutationOptions(sessionId))
+    await withSessionDirFallback(sessionId, (sdkSessionId, options) => tagSession(sdkSessionId, tag, options))
     return true
   } catch {
     return false
@@ -338,7 +357,7 @@ export async function tagSdkSession(sessionId: string, tag: string): Promise<boo
 
 export async function getSdkSessionInfo(sessionId: string): Promise<Record<string, unknown> | null> {
   try {
-    const info = await getSessionInfo(getSdkSessionId(sessionId), getSessionMutationOptions(sessionId))
+    const info = await withSessionDirFallback(sessionId, (sdkSessionId, options) => getSessionInfo(sdkSessionId, options))
     return info as Record<string, unknown>
   } catch {
     return null
@@ -348,10 +367,18 @@ export async function getSdkSessionInfo(sessionId: string): Promise<Record<strin
 export async function forkSdkSession(sessionId: string, options?: ForkSessionOptions): Promise<{ sessionId: string } | null> {
   try {
     const dir = getSessionDir(sessionId) || options?.dir
-    const result = await sdkForkSession(getSdkSessionId(sessionId), {
-      ...options,
-      ...(dir ? { dir } : {}),
-    } as ForkSessionOptions)
+    const sdkSessionId = getSdkSessionId(sessionId)
+    const run = (mutationOptions?: ForkSessionOptions) => sdkForkSession(sdkSessionId, mutationOptions)
+    let result
+    try {
+      result = await run({
+        ...options,
+        ...(dir ? { dir } : {}),
+      } as ForkSessionOptions)
+    } catch (err) {
+      if (!dir || !isSessionNotFoundError(err)) throw err
+      result = await run(options)
+    }
     return result as { sessionId: string } | null
   } catch {
     return null

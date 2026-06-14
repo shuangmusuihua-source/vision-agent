@@ -3,8 +3,13 @@ import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession } from '../agent-manager'
 import { getSessionRecords, updateSessionRecord, removeSessionRecord } from '../store'
 import { access } from 'fs/promises'
+import { basename, extname, isAbsolute, resolve } from 'path'
 import type { SessionOutputEntry } from '../../shared/types'
 import type { AgentContext } from '../../shared/types'
+
+function normalizeOutputPath(filePath: string, workspacePath?: string): string {
+  return isAbsolute(filePath) ? filePath : resolve(workspacePath || process.cwd(), filePath)
+}
 
 export function registerAgentHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, _title?: string, clientSessionKey?: string) => {
@@ -66,6 +71,7 @@ export function registerAgentHandlers(): void {
       const records = getSessionRecords()
       const record = records.find(r => r.id === sessionId || r.sdkSessionId === sessionId)
       const workspacePath = record?.workspacePath
+      const appSessionId = record?.id || sessionId
 
       // Load all messages for this session
       const messages = await loadSdkSessionMessages(sessionId)
@@ -83,21 +89,23 @@ export function registerAgentHandlers(): void {
           if (name !== 'Write' && name !== 'Edit') continue
           const input = block.input as Record<string, unknown> | undefined
           const filePath = input?.file_path as string | undefined
-          if (!filePath || seen.has(filePath)) continue
+          if (!filePath) continue
+          const normalizedPath = normalizeOutputPath(filePath, workspacePath)
+          if (seen.has(normalizedPath)) continue
 
           // Skip memory files — these are managed by the Memory sidebar section
-          if (filePath.includes('/.vision/memory/')) continue
+          if (normalizedPath.includes('/.vision/memory/')) continue
 
           // Async file existence check to avoid blocking the main process
           try {
-            await access(filePath)
+            await access(normalizedPath)
           } catch {
             continue
           }
 
-          seen.add(filePath)
-          const fileName = filePath.split('/').pop() || filePath
-          const ext = fileName.split('.').pop()?.toLowerCase()
+          seen.add(normalizedPath)
+          const fileName = basename(normalizedPath)
+          const ext = extname(fileName).slice(1).toLowerCase()
           const fileType = (ext === 'html' || ext === 'htm') ? 'html'
             : ext === 'svg' ? 'svg'
             : ext === 'json' ? 'json'
@@ -107,7 +115,7 @@ export function registerAgentHandlers(): void {
 
           files.push({
             fileName,
-            filePath,
+            filePath: normalizedPath,
             fileType: fileType as SessionOutputEntry['fileType'],
             category: isSkillOutput ? 'skill_output' : 'document',
             source: name,
@@ -116,7 +124,7 @@ export function registerAgentHandlers(): void {
         }
       }
 
-      return { sessionId, workspacePath: workspacePath || '', files }
+      return { sessionId: appSessionId, workspacePath: workspacePath || '', files }
     } catch (e) {
       console.error('[agent:getSessionOutputs] failed:', e)
       return null
