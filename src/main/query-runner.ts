@@ -1,13 +1,12 @@
-import { BrowserWindow } from 'electron'
+import type { BrowserWindow } from 'electron'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join, resolve, basename } from 'path'
 import { execFileSync } from 'child_process'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
-import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
-import type { AgentIPCMessage, AgentContext, AskUserQuestionOption, AskUserQuestionItem } from '../shared/types'
+import type { AgentIPCMessage, AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
@@ -20,21 +19,18 @@ import {
   deletePendingPermission,
   hasPendingAskUser,
   deletePendingAskUser,
-  rejectAllPendingPermissions,
-  rejectAllPendingAskUser,
 } from './agent-permissions'
-import { flushTextBatch, scheduleTextBatch, discardTextBatch, discardAllTextBatches, isTextDeltaEvent } from './agent-text-batch'
+import { scheduleTextBatch, isTextDeltaEvent } from './agent-text-batch'
 import { addCompactionSessionId } from './store'
 import { addCompactionId } from './session-store'
 import { isPathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
+import { createSessionEnvelope, sessionRuntime } from './session-runtime'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
 type HookSessionContext = {
-  appSessionId?: string
-  sdkSessionId?: string
-  workspaceCwd?: string
+  envelope: AgentSessionEnvelope
   getSdkSessionId?: () => string | undefined
   skillId?: string | null
 }
@@ -58,9 +54,9 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       result: JSON.stringify(tool_response).substring(0, 500)
     })
     recordSessionArtifactFromTool({
-      sessionId: hookContext.appSessionId,
-      sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.sdkSessionId,
-      workspacePath: hookContext.workspaceCwd,
+      sessionId: hookContext.envelope.sessionId,
+      sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
+      workspacePath: hookContext.envelope.workspacePath,
       toolName: tool_name,
       toolInput: tool_input,
       skillId: hookContext.skillId,
@@ -70,15 +66,14 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
 
   const notificationHook: HookCallback = async (input, _toolUseID, _options) => {
     const { message, title, notification_type } = input as NotificationHookInput
-    if (!mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('agent:notification', {
-        type: notification_type || 'info',
-        message: message || '',
-        title: title || '',
-        sessionId: hookContext.appSessionId || '',
-        workspaceCwd: hookContext.workspaceCwd || '',
-      })
-    }
+    sessionRuntime.emitNotification(mainWindow, {
+      ...hookContext.envelope,
+      sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
+    }, {
+      type: notification_type || 'info',
+      message: message || '',
+      title: title || '',
+    })
     return {}
   }
 
@@ -118,9 +113,19 @@ function extractPathFromToolInput(
   return value
 }
 
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, queryKey?: string, getSessionId?: () => string | undefined, skillId?: string | null) {
+function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, envelope?: AgentSessionEnvelope, getSessionId?: () => string | undefined, skillId?: string | null) {
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = workspaceCwdOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
+  const sessionEnvelope = envelope || createSessionEnvelope({
+    context,
+    sessionId: sessionId || context,
+    workspacePath: workspaceCwd,
+    sdkSessionId: sessionId,
+  })
+  const currentEnvelope = (): AgentSessionEnvelope => ({
+    ...sessionEnvelope,
+    sdkSessionId: getSessionId?.() || sessionEnvelope.sdkSessionId,
+  })
 
   // Build workspace context for the agent
   const workspaceName = workspaceCwd.split('/').pop() || workspaceCwd
@@ -163,9 +168,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
     skills: getEnabledSkills(),
     systemPromptAppend,
     hooks: buildHooks(mainWindow, {
-      appSessionId: queryKey || sessionId,
-      sdkSessionId: sessionId,
-      workspaceCwd,
+      envelope: sessionEnvelope,
       getSdkSessionId: getSessionId,
       skillId,
     }),
@@ -218,56 +221,40 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         })
 
         const firstQ = questionItems[0]
-        if (!mainWindow.isDestroyed()) {
-          const sdkSessionId = getSessionId?.() || sessionId
-          mainWindow.webContents.send('agent:askUser', {
-            id: requestId,
-            questions: questionItems,
-            question: firstQ?.question || '',
-            header: firstQ?.header || '',
-            options: firstQ?.options || [],
-            multiSelect: firstQ?.multiSelect || false,
-            context,
-            sessionId: queryKey,
-            clientSessionKey: queryKey,
-            sdkSessionId,
-          })
-        }
+        sessionRuntime.emitAskUserRequest(mainWindow, currentEnvelope(), {
+          id: requestId,
+          questions: questionItems,
+          question: firstQ?.question || '',
+          header: firstQ?.header || '',
+          options: firstQ?.options || [],
+          multiSelect: firstQ?.multiSelect || false,
+        })
 
         return new Promise<PermissionResult>((resolve) => {
           const timeout = setTimeout(() => {
             if (hasPendingAskUser(requestId)) {
               deletePendingAskUser(requestId)
-              if (!mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('agent:askUserTimeout', { requestId, context })
-              }
+              sessionRuntime.emitAskUserTimeout(mainWindow, currentEnvelope(), requestId)
               resolve({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
             }
           }, 300000)
 
-          registerPendingAskUser(requestId, resolve, input, timeout, context, queryKey)
+          registerPendingAskUser(requestId, resolve, input, timeout, context, sessionEnvelope.sessionId)
         })
       }
 
       // All other tools (Bash, Write, Edit) require user approval
       const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      if (!mainWindow.isDestroyed()) {
-        const sdkSessionId = getSessionId?.() || sessionId
-        mainWindow.webContents.send('agent:permissionRequest', {
-          id: requestId,
-          toolName,
-          input,
-          context,
-          sessionId: queryKey,
-          clientSessionKey: queryKey,
-          sdkSessionId,
-          // Forward SDK-provided display metadata for richer permission UI
-          title: (options as Record<string, unknown>).title as string | undefined,
-          displayName: (options as Record<string, unknown>).displayName as string | undefined,
-          description: (options as Record<string, unknown>).description as string | undefined,
-          suggestions: (options as Record<string, unknown>).suggestions as unknown[] | undefined,
-        })
-      }
+      sessionRuntime.emitPermissionRequest(mainWindow, currentEnvelope(), {
+        id: requestId,
+        toolName,
+        input,
+        // Forward SDK-provided display metadata for richer permission UI
+        title: (options as Record<string, unknown>).title as string | undefined,
+        displayName: (options as Record<string, unknown>).displayName as string | undefined,
+        description: (options as Record<string, unknown>).description as string | undefined,
+        suggestions: (options as Record<string, unknown>).suggestions as PermissionUpdate[] | undefined,
+      })
       schedulePermissionNotification(requestId, toolName)
 
       return new Promise<PermissionResult>((resolve) => {
@@ -283,9 +270,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         if (options.signal) {
           options.signal.addEventListener('abort', () => {
             cleanup()
-            if (!mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
-            }
+            sessionRuntime.emitPermissionTimeout(mainWindow, currentEnvelope(), requestId)
             resolve({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
           }, { once: true })
         }
@@ -294,14 +279,12 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
           if (hasPendingPermission(requestId)) {
             deletePendingPermission(requestId)
             cancelPermissionNotification(requestId)
-            if (!mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('agent:permissionTimeout', { requestId, context })
-            }
+            sessionRuntime.emitPermissionTimeout(mainWindow, currentEnvelope(), requestId)
             resolve({ behavior: 'deny', message: 'Permission request timed out' })
           }
         }, 300000)
 
-        registerPendingPermission(requestId, resolve, input, timeout, context, queryKey)
+        registerPendingPermission(requestId, resolve, input, timeout, context, sessionEnvelope.sessionId)
       })
     },
   })
@@ -309,63 +292,17 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
 // ─── Query management ──────────────────────────────────────────────────
 
-let _queryInstanceCounter = 0
-
-interface ActiveQuery {
-  query: Query
-  skillId: string | null
-  abortController: AbortController
-  instanceId: number
-  sessionId?: string
-}
-
-// Guard against concurrent sendMessage calls — per app-owned client session key
-const activeQueries = new Map<string, ActiveQuery>()
-const _skillOutputBridge = new SkillOutputBridge()
-
 export function abortActiveQuery(queryKey?: string): void {
-  if (queryKey) {
-    const entry = activeQueries.get(queryKey)
-    if (entry) {
-      entry.abortController.abort()
-      activeQueries.delete(queryKey)
-    } else {
-      // Not found by Map key — try matching by sessionId field.
-      // This handles both context-based lookups (e.g. watchdog passes 'editor')
-      // and sessionId-based lookups (e.g. deleteSession passes the real ID)
-      // after the entry's sessionId has been set mid-stream.
-      for (const [key, e] of activeQueries) {
-        if (e.sessionId === queryKey) {
-          e.abortController.abort()
-          activeQueries.delete(key)
-          break
-        }
-      }
-    }
-    rejectAllPendingPermissions(queryKey)
-    rejectAllPendingAskUser(queryKey)
-    discardTextBatch(queryKey)
-  } else {
-    // Abort all
-    for (const [, entry] of activeQueries) {
-      entry.abortController.abort()
-    }
-    activeQueries.clear()
-    rejectAllPendingPermissions()
-    rejectAllPendingAskUser()
-    discardAllTextBatches()
-  }
+  sessionRuntime.abort(queryKey)
 }
 
 /** Clean up all pending promises when the renderer window is destroyed */
 export function handleWindowDestroy(): void {
-  rejectAllPendingPermissions()
-  rejectAllPendingAskUser()
-  discardAllTextBatches()
+  sessionRuntime.handleWindowDestroy()
 }
 
 export function setSkillOutputWindow(win: BrowserWindow): void {
-  _skillOutputBridge.setWindow(win)
+  sessionRuntime.setSkillOutputWindow(win)
 }
 
 // ─── Main query loop ───────────────────────────────────────────────────
@@ -387,6 +324,12 @@ export async function sendMessage(
   const effectiveWorkspaceCwd = workspacePath
     || (context === 'ask' ? getAppSkillsCwd() : undefined)
     || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
+  let runtimeEnvelope = createSessionEnvelope({
+    context,
+    sessionId: queryKey,
+    workspacePath: effectiveWorkspaceCwd,
+    sdkSessionId: sessionId,
+  })
 
   // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
   let processedPrompt = prompt
@@ -418,7 +361,7 @@ export async function sendMessage(
     }
   }
 
-  _skillOutputBridge.reset(queryKey, context)
+  sessionRuntime.beginSession(runtimeEnvelope)
   // Ensure workspace-local skills exist (idempotent via sentinel file).
   // Run async to avoid blocking the main thread on file I/O.
   // The sentinel check makes subsequent calls nearly instant (~0.1ms),
@@ -426,10 +369,10 @@ export async function sendMessage(
   ensureWorkspaceSkills(effectiveWorkspaceCwd)
   let currentSessionId = sessionId
   const getSessionId = () => currentSessionId
-  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, queryKey, getSessionId, skillId)
+  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, runtimeEnvelope, getSessionId, skillId)
   const appSessionKey = queryKey
 
-  const queryInstanceId = ++_queryInstanceCounter
+  let queryInstanceId = 0
   try {
     const abortController = new AbortController()
     const messageStream = query({
@@ -439,51 +382,48 @@ export async function sendMessage(
         abortController,
       }
     })
-    activeQueries.set(queryKey, { query: messageStream as Query, skillId: skillId ?? null, abortController, instanceId: queryInstanceId })
+    queryInstanceId = sessionRuntime.registerRun({
+      query: messageStream as Query,
+      skillId: skillId ?? null,
+      abortController,
+      envelope: runtimeEnvelope,
+    })
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
 
       // Feed raw SDK event to skill output bridge (before conversion)
-      const activeSkillId = activeQueries.get(queryKey)?.skillId ?? null
-      _skillOutputBridge.processRawEvent(queryKey, message, activeSkillId)
+      sessionRuntime.processSkillRawEvent(queryKey, message)
 
       // P1 optimization: check text_delta FIRST — if it is one, batch it and
       // skip the expensive toAgentIPCMessage conversion (the result is unused).
       const textDeltaText = isTextDeltaEvent(message)
+      const sdkSessionId = message.session_id || currentSessionId || runtimeEnvelope.sdkSessionId || undefined
+      const eventEnvelope = sdkSessionId ? { ...runtimeEnvelope, sdkSessionId } : runtimeEnvelope
       if (textDeltaText !== null) {
         // Batch text_delta events: accumulate and flush every ~30ms
         const uuid = message.uuid || ''
-        const sdkSessionId = message.session_id || currentSessionId || ''
-        scheduleTextBatch(queryKey, textDeltaText, uuid, appSessionKey, context, mainWindow, appSessionKey, sdkSessionId)
+        scheduleTextBatch(queryKey, textDeltaText, uuid, mainWindow, eventEnvelope)
       } else {
         // Non-text event (tool_use, content_block_start/stop, result, etc.)
         // Flush any pending text batch FIRST to preserve event ordering
-        flushTextBatch(queryKey, mainWindow)
+        sessionRuntime.flushText(queryKey, mainWindow)
 
         const ipcMsg = toAgentIPCMessage(message)
         // Thread sessionId through every event so the renderer can validate
         // and drop stale events after a session switch
-        const sdkSessionId = message.session_id || currentSessionId || ''
 
         if (ipcMsg) {
-          mainWindow.webContents.send('agent:event', {
-            context,
-            sessionId: appSessionKey,
-            clientSessionKey: appSessionKey,
-            sdkSessionId,
-            ...ipcMsg,
-          })
+          sessionRuntime.emitAgentEvent(mainWindow, eventEnvelope, ipcMsg)
         }
       }
 
       // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSessionId && message.session_id) {
         currentSessionId = message.session_id
-        _skillOutputBridge.setSessionId(queryKey, currentSessionId)
-        const queryEntry = activeQueries.get(queryKey)
-        if (queryEntry) {
-          queryEntry.sessionId = currentSessionId
+        runtimeEnvelope = sessionRuntime.materializeSdkSession(queryKey, currentSessionId) || {
+          ...runtimeEnvelope,
+          sdkSessionId: currentSessionId,
         }
         registerSession(currentSessionId, effectiveWorkspaceCwd)
         // Persist session→workspace mapping to electron-store so it survives restart
@@ -498,13 +438,7 @@ export async function sendMessage(
           messageCount: 0,
           artifactCount: 0,
         })
-        mainWindow.webContents.send('agent:sessionCreated', {
-          context,
-          sessionId: appSessionKey,
-          sdkSessionId: currentSessionId,
-          workspacePath: effectiveWorkspaceCwd,
-          clientSessionKey: appSessionKey,
-        })
+        sessionRuntime.emitSessionCreated(mainWindow, runtimeEnvelope)
       } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {
         // SDK compacted the session — a new session file was created on disk
         // with a different session_id. Track it so session-store filters it
@@ -515,7 +449,7 @@ export async function sendMessage(
     }
 
     // Flush any remaining batched text deltas after the stream ends
-    flushTextBatch(queryKey, mainWindow)
+    sessionRuntime.flushText(queryKey, mainWindow)
 
     // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
@@ -534,34 +468,21 @@ export async function sendMessage(
       userMessage = '请求频率过高，请稍后重试。'
     }
     if (!mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('agent:event', {
-        context,
-        sessionId: appSessionKey,
-        clientSessionKey: appSessionKey,
-        sdkSessionId: currentSessionId,
+      sessionRuntime.emitAgentEvent(mainWindow, {
+        ...runtimeEnvelope,
+        sdkSessionId: currentSessionId || runtimeEnvelope.sdkSessionId,
+      }, {
         type: 'result',
         subtype: 'error_during_execution',
         errors: [userMessage],
         usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
         total_cost_usd: 0,
         duration_ms: 0,
-      } as AgentIPCMessage & { context: AgentContext })
+      } as AgentIPCMessage)
     }
   } finally {
     // Flush any remaining batched text (if stream errored before for-await finished)
-    flushTextBatch(queryKey, mainWindow)
-    discardTextBatch(queryKey)
-    _skillOutputBridge.cleanup(queryKey)
-    // Only clean up if our query instance is still the active one.
-    // When two messages are sent rapidly to the same session, the second
-    // sendMessage aborts the first and registers a new query under the same
-    // queryKey. Without this instanceId guard, the first query's finally
-    // block would delete the second query's Map entry.
-    const current = activeQueries.get(queryKey)
-    if (current && current.instanceId === queryInstanceId) {
-      activeQueries.delete(queryKey)
-    }
-    rejectAllPendingPermissions(queryKey)
-    rejectAllPendingAskUser(queryKey)
+    sessionRuntime.flushText(queryKey, mainWindow)
+    sessionRuntime.cleanupRun(queryKey, queryInstanceId)
   }
 }

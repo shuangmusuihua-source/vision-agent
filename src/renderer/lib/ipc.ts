@@ -2,6 +2,7 @@ import type {
   AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentContext,
+  AgentSessionEnvelope,
   AskUserRequestIPC,
   PermissionRequestIPC,
   ContentBlock,
@@ -138,12 +139,12 @@ interface AgentApi {
   onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void
 
   // Lifecycle channels
-  onSessionCreated: (callback: (data: { context: AgentContext; sessionId: string; sdkSessionId?: string; workspacePath?: string; clientSessionKey?: string }) => void) => () => void
+  onSessionCreated: (callback: (data: AgentSessionEnvelope) => void) => () => void
   onPermissionRequest: (callback: (data: PermissionRequestIPC) => void) => () => void
   onAskUser: (callback: (data: AskUserRequestIPC) => void) => () => void
-  onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
-  onPermissionTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => () => void
-  onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => () => void
+  onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
+  onPermissionTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
+  onNotification: (callback: (data: { type: string; message: string; title: string } & Partial<AgentSessionEnvelope>) => void) => () => void
   onSkillOutput: (callback: (state: SkillOutputState) => void) => () => void
 }
 

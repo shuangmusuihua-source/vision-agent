@@ -1,17 +1,5 @@
-import { BrowserWindow } from 'electron'
 import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentContext } from '../shared/types'
-
-interface SkillOutputState {
-  skillId: string | null
-  content: string
-  isStreaming: boolean
-  language: string
-  context?: AgentContext
-  sessionId?: string
-  clientSessionKey?: string
-  sdkSessionId?: string
-}
+import type { AgentContext, AgentSessionEnvelope, SkillOutputState } from '../shared/types'
 
 /**
  * SkillOutputBridge — unified output capture layer in main process.
@@ -30,10 +18,10 @@ interface SkillOutputState {
  * accumulators, so sessions A and B in the same context never interfere.
  */
 export class SkillOutputBridge {
-  private win: BrowserWindow | null = null
+  private outputEmitter: ((state: SkillOutputState) => void) | null = null
 
-  setWindow(win: BrowserWindow) {
-    this.win = win
+  setOutputEmitter(emitter: (state: SkillOutputState) => void): void {
+    this.outputEmitter = emitter
   }
 
   // ─── Per-session state (keyed by queryKey = sessionId || context) ──────
@@ -58,11 +46,11 @@ export class SkillOutputBridge {
   }
 
   /** Reset accumulators for a specific session before starting a new query. */
-  reset(queryKey: string, context: AgentContext): void {
+  reset(queryKey: string, envelope: AgentSessionEnvelope): void {
     const s = this.sessions.get(queryKey)
     if (s) {
-      s.context = context
-      s.state = { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey, clientSessionKey: queryKey }
+      s.context = envelope.context
+      s.state = { skillId: null, content: '', isStreaming: false, language: 'html', ...envelope }
       s.writeAccumulators.clear()
       s.inSkillOutputBlock = false
       s.skillOutputAccumulator = ''
@@ -70,8 +58,8 @@ export class SkillOutputBridge {
       s._lastPushedLen = 0
     } else {
       this.sessions.set(queryKey, {
-        context,
-        state: { skillId: null, content: '', isStreaming: false, language: 'html', context, sessionId: queryKey, clientSessionKey: queryKey },
+        context: envelope.context,
+        state: { skillId: null, content: '', isStreaming: false, language: 'html', ...envelope },
         writeAccumulators: new Map(),
         inSkillOutputBlock: false,
         skillOutputAccumulator: '',
@@ -86,6 +74,13 @@ export class SkillOutputBridge {
     const s = this.sessions.get(queryKey)
     if (!s) return
     s.state = { ...s.state, sdkSessionId: sessionId }
+  }
+
+  setSessionEnvelope(queryKey: string, envelope: AgentSessionEnvelope): void {
+    const s = this.sessions.get(queryKey)
+    if (!s) return
+    s.context = envelope.context
+    s.state = { ...s.state, ...envelope }
   }
 
   /** Clean up a session's accumulators when its query completes or is aborted. */
@@ -322,8 +317,7 @@ export class SkillOutputBridge {
 
   private pushOutput(s: PerSessionState, queryKey: string, state: SkillOutputState): void {
     s.state = state
-    if (!this.win || this.win.isDestroyed()) return
-    this.win.webContents.send('skill:output', state)
+    this.outputEmitter?.(state)
   }
 }
 

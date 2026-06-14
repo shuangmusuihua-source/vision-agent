@@ -1,5 +1,6 @@
-import { BrowserWindow } from 'electron'
+import type { BrowserWindow } from 'electron'
 import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { AgentSessionEnvelope } from '../shared/types'
 
 // ─── Text delta batching ──────────────────────────────────────────────
 // Batch text_delta stream events to reduce IPC/re-render frequency.
@@ -11,12 +12,12 @@ import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claud
 // Keyed by queryKey (sessionId || context) to support parallel streaming
 // across multiple sessions within the same context.
 
-type TextBatchEntry = { context: string; text: string; uuid: string; sessionId: string; agentContext: string; clientSessionKey?: string; sdkSessionId?: string }
-const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; sessionId: string; agentContext: string; clientSessionKey?: string; sdkSessionId?: string }>()
+type TextBatchEntry = { text: string; uuid: string }
+const textBatches = new Map<string, { entries: TextBatchEntry[]; timer: ReturnType<typeof setTimeout> | null; envelope: AgentSessionEnvelope }>()
 
-function ensureBatchSlot(key: string, agentContext: string) {
+function ensureBatchSlot(key: string, envelope: AgentSessionEnvelope) {
   if (!textBatches.has(key)) {
-    textBatches.set(key, { entries: [], timer: null, sessionId: '', agentContext })
+    textBatches.set(key, { entries: [], timer: null, envelope })
   }
   return textBatches.get(key)!
 }
@@ -32,22 +33,13 @@ export function flushTextBatch(key: string, win: BrowserWindow): void {
 
   const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
   const lastUuid = slot.entries[slot.entries.length - 1].uuid
-  const sessionId = slot.sessionId
-  const clientSessionKey = slot.clientSessionKey || sessionId
-  const sdkSessionId = slot.sdkSessionId
-  // Use the agentContext (editor/ask) stored at batch creation, NOT queryKey context.
-  // queryKey may be a sessionId; agentContext is always the correct AgentContext.
-  const agentContext = slot.agentContext || slot.entries[0]?.context || 'editor'
+  const envelope = slot.envelope
   slot.entries = []
 
   if (!combinedText || win.isDestroyed()) return
 
   // Emit a single combined stream_event carrying all accumulated text
   win.webContents.send('agent:event', {
-    context: agentContext,
-    sessionId,
-    clientSessionKey,
-    sdkSessionId,
     type: 'stream_event',
     uuid: lastUuid,
     event: {
@@ -55,6 +47,7 @@ export function flushTextBatch(key: string, win: BrowserWindow): void {
       index: 0,
       delta: { type: 'text_delta', text: combinedText },
     },
+    ...envelope,
   })
 }
 
@@ -72,17 +65,12 @@ export function scheduleTextBatch(
   key: string,
   text: string,
   uuid: string,
-  sessionId: string,
-  agentContext: string,
   win: BrowserWindow,
-  clientSessionKey?: string,
-  sdkSessionId?: string
+  envelope: AgentSessionEnvelope
 ): void {
-  const slot = ensureBatchSlot(key, agentContext)
-  slot.entries.push({ context: key, text, uuid, sessionId, agentContext, clientSessionKey, sdkSessionId })
-  slot.sessionId = sessionId
-  slot.clientSessionKey = clientSessionKey
-  slot.sdkSessionId = sdkSessionId
+  const slot = ensureBatchSlot(key, envelope)
+  slot.entries.push({ text, uuid })
+  slot.envelope = envelope
 
   if (!slot.timer) {
     slot.timer = setTimeout(() => flushTextBatch(key, win), 30)

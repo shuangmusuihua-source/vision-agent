@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentIPCMessageWithContext, AgentContext, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile, SkillOutputState } from '../shared/types'
+import type { AgentIPCMessageWithContext, AgentSessionEnvelope, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile, SkillOutputState } from '../shared/types'
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -99,8 +99,8 @@ const api = {
     },
 
     // ── Lifecycle channels (separate for request/response patterns) ──
-    onSessionCreated: (callback: (data: { context: 'editor' | 'ask'; sessionId: string; sdkSessionId?: string; workspacePath?: string; clientSessionKey?: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { context: 'editor' | 'ask'; sessionId: string; sdkSessionId?: string; workspacePath?: string; clientSessionKey?: string }) => callback(data)
+    onSessionCreated: (callback: (data: AgentSessionEnvelope) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: AgentSessionEnvelope) => callback(data)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
@@ -117,14 +117,14 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:askUser', handler) }
     },
 
-    onAskUserTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string; context: AgentContext }) => callback(data)
+    onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string } & AgentSessionEnvelope) => callback(data)
       ipcRenderer.on('agent:askUserTimeout', handler)
       return () => { ipcRenderer.removeListener('agent:askUserTimeout', handler) }
     },
 
-    onPermissionTimeout: (callback: (data: { requestId: string; context: AgentContext }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string; context: AgentContext }) => callback(data)
+    onPermissionTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string } & AgentSessionEnvelope) => callback(data)
       ipcRenderer.on('agent:permissionTimeout', handler)
       return () => { ipcRenderer.removeListener('agent:permissionTimeout', handler) }
     },

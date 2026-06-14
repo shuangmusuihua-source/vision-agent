@@ -230,15 +230,21 @@ export type AgentIPCMessage =
   | ResultErrorPayload
   | StreamEventPayloadIPC
 
-export type AgentIPCMessageWithContext = AgentIPCMessage & {
+export type AgentSessionEnvelope = {
   context: AgentContext
   /** App-owned stable session key used for renderer routing. */
-  sessionId?: string
+  sessionId: string
   /** Explicit alias for the app-owned stable session key. */
-  clientSessionKey?: string
+  clientSessionKey: string
   /** Claude SDK session_id used for resume/history/delete operations. */
   sdkSessionId?: string
+  /** Workspace/app directory that owns this session. */
+  workspacePath: string
 }
+
+export type SessionRoutedPayload<T extends Record<string, unknown>> = T & AgentSessionEnvelope
+
+export type AgentIPCMessageWithContext = AgentIPCMessage & AgentSessionEnvelope
 
 // ─── Usage Info ──────────────────────────────────────────────────────
 
@@ -410,6 +416,7 @@ export type SkillOutputState = {
   clientSessionKey?: string
   /** Claude SDK session_id, when already materialized. */
   sdkSessionId?: string
+  workspacePath?: string
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────
@@ -445,6 +452,7 @@ export type PermissionRequestIPC = {
   /** Claude SDK session_id, when already materialized. */
   sdkSessionId?: string
   clientSessionKey?: string
+  workspacePath?: string
   /** SDK-provided display title (e.g. "Claude wants to read foo.txt") */
   title?: string
   /** Short noun phrase for the tool action (e.g. "Read file") */
@@ -484,6 +492,7 @@ export type AskUserRequestIPC = {
   /** Claude SDK session_id, when already materialized. */
   sdkSessionId?: string
   clientSessionKey?: string
+  workspacePath?: string
 }
 
 // ─── Session Info ────────────────────────────────────────────────────

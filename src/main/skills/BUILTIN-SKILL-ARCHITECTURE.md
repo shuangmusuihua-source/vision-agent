@@ -67,10 +67,11 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
 ### 数据流全景
 
 ```
-SDK Stream ──→ SkillOutputBridge (main) ──→ IPC skill:output ──→ Zustand store ──→ MessageBubble
-     │                                          ↑
-     │         agent-manager.ts                 │
-     └──→ toAgentIPCMessage() ──→ IPC agent:event ──→ store (messages/toolCalls)
+SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──→ IPC skill:output ──→ Zustand store ──→ MessageBubble
+     │                    │
+     │                    └──→ toAgentIPCMessage() ──→ IPC agent:event ──→ store (messages/toolCalls)
+     │
+     └── 所有 IPC payload 都带 AgentSessionEnvelope（context / app session / SDK session / workspace）
 ```
 
 两条 IPC 通道并行：
@@ -140,18 +141,13 @@ outputLanguage: string       // 输出语言（html/svg/text）
 }
 ```
 
-### 3. Agent Manager 集成 — `agent-manager.ts`
+### 3. Session Runtime 集成 — `session-runtime.ts` / `query-runner.ts`
 
 ```ts
-// 模块级变量
-let _activeSkillId: string | null = null
-const _skillOutputBridge = new SkillOutputBridge()
-
-// 设置 bridge 的 BrowserWindow 引用
-export function setSkillOutputWindow(win: BrowserWindow | null) { ... }
-
-// 设置当前活跃 skill id
-export function setActiveSkillId(skillId: string | null) { ... }
+// query-runner.ts 继续负责调用 SDK query()
+// SessionRuntimeController 负责 app session / SDK session / workspace envelope
+sessionRuntime.beginSession(envelope)
+sessionRuntime.registerRun({ query, skillId, abortController, envelope })
 ```
 
 #### 流式处理中的调用顺序（关键）
@@ -159,12 +155,12 @@ export function setActiveSkillId(skillId: string | null) { ... }
 ```ts
 for await (const message of messageStream) {
   // 1. 先喂原始 SDK 事件给 bridge（在转换之前！）
-  _skillOutputBridge.processRawEvent(message as Record<string, unknown>, _activeSkillId)
+  sessionRuntime.processSkillRawEvent(appSessionId, message)
 
-  // 2. 再转换为应用级 IPC 消息
+  // 2. 再转换为应用级 IPC 消息，并由 runtime 附加 AgentSessionEnvelope
   const ipcMsg = toAgentIPCMessage(message)
   if (ipcMsg) {
-    mainWindow.webContents.send('agent:event', ipcMsg)
+    sessionRuntime.emitAgentEvent(mainWindow, envelope, ipcMsg)
   }
 }
 ```
