@@ -832,7 +832,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       })
     },
 
-    switchToSession(sessionId: string, context: AgentContext = 'editor') {
+    switchToSession(sessionId: string, context: AgentContext = 'editor', workspacePath?: string | null) {
       const state = get()
       if (state.activeSessionId[context] === sessionId) return
 
@@ -869,6 +869,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
 
         const existingSlot = nextSessionSlots[sessionId]
+        const targetWorkspacePath = workspacePath
+          || existingSlot?.workspacePath
+          || state.sessionList.find(s => s.id === sessionId)?.workspacePath
+          || state.sessionList.find(s => s.sdkSessionId === sessionId)?.workspacePath
+          || state.slots[context].workspacePath
+          || (context === 'editor' ? state.activeWorkspacePath : null)
         const sdkSessionId = getSdkSessionIdForClient(state, sessionId)
         const canLoadSdkSession = Boolean(sdkSessionId)
         const targetSlot = existingSlot
@@ -881,10 +887,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
               _sdkLoadedCount: existingSlot._sdkLoadedCount ?? existingSlot.messages.length,
               _sdkLoadOffset: existingSlot._sdkLoadOffset ?? existingSlot.messages.length,
               _isLoadingMoreMessages: existingSlot._isLoadingMoreMessages ?? false,
+              workspacePath: targetWorkspacePath,
             }
           : {
               ...emptySlot(),
-              workspacePath: state.slots[context].workspacePath || (context === 'editor' ? state.activeWorkspacePath : null),
+              workspacePath: targetWorkspacePath,
               ...(canLoadSdkSession ? {
                 currentSessionId: sessionId,
                 sdkSessionId,

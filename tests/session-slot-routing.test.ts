@@ -352,6 +352,43 @@ describe('session-scoped store routing', () => {
     expect(state.sessionSlots['editor-a'].isStreaming).toBe(true)
   })
 
+  it('preserves the previous session workspace when switching across workspaces', () => {
+    const sessionA = {
+      ...emptySlot(),
+      currentSessionId: 'session-a',
+      workspacePath: '/workspace-a',
+      messages: [textMessage('a-msg', 'A')],
+    }
+    const sessionB = {
+      ...emptySlot(),
+      currentSessionId: 'session-b',
+      workspacePath: '/workspace-b',
+      messages: [textMessage('b-msg', 'B')],
+    }
+
+    useAgentStore.setState({
+      activeWorkspacePath: '/workspace-a',
+      activeSessionId: { editor: 'session-a', ask: null },
+      slots: { editor: sessionA, ask: emptySlot() },
+      sessionSlots: { 'session-a': sessionA, 'session-b': sessionB },
+      sessionAccessOrder: ['session-a', 'session-b'],
+      sessionList: [
+        { id: 'session-a', context: 'editor', workspacePath: '/workspace-a' },
+        { id: 'session-b', context: 'editor', workspacePath: '/workspace-b' },
+      ],
+    })
+
+    useAgentStore.getState().switchToSession('session-b', 'editor', '/workspace-b')
+    useAgentStore.getState().setActiveWorkspace('/workspace-b')
+
+    const state = useAgentStore.getState()
+    expect(state.sessionSlots['session-a'].workspacePath).toBe('/workspace-a')
+    expect(state.sessionSlots['session-b'].workspacePath).toBe('/workspace-b')
+    expect(state.slots.editor.currentSessionId).toBe('session-b')
+    expect(state.slots.editor.workspacePath).toBe('/workspace-b')
+    expect(state.activeWorkspacePath).toBe('/workspace-b')
+  })
+
   it('routes pre-materialized Ask events by client session key', () => {
     const tempId = 'new-ask-1'
     const editor = { ...emptySlot(), currentSessionId: 'editor-session', messages: [textMessage('editor-msg', 'editor')] }

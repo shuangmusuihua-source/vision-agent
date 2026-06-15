@@ -154,12 +154,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── Session selection / new conversation handlers ─────────────────────
 
   const handleSessionSelect = useCallback((sessionId: string, workspacePath: string) => {
+    // Switch to session-isolated slot (also sets activeSessionId, loading flag,
+    // and kicks off SDK message load when the slot has _needsSdkLoad === true).
+    useAgentStore.getState().switchToSession(sessionId, 'editor', workspacePath || null)
     if (workspacePath && workspacePath !== activeWorkspacePath) {
       useAgentStore.getState().setActiveWorkspace(workspacePath)
     }
-    // Switch to session-isolated slot (also sets activeSessionId, loading flag,
-    // and kicks off SDK message load when the slot has _needsSdkLoad === true).
-    useAgentStore.getState().switchToSession(sessionId)
     // session outputs loaded by useEffect on activeSessionId change
     if (view !== 'editor') {
       useAgentStore.setState({ context: 'editor' })
@@ -184,11 +184,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (!name) return
     if (wsPath !== activeWorkspacePath) {
       skipNextSessionLoad.current = true
-      useAgentStore.getState().setActiveWorkspace(wsPath)
     }
     // Create a new empty editor slot with a placeholder session ID and store the title
     const tempSessionId = `new-${Date.now()}`
-    useAgentStore.getState().switchToSession(tempSessionId)
+    useAgentStore.getState().switchToSession(tempSessionId, 'editor', wsPath)
+    if (wsPath !== activeWorkspacePath) {
+      useAgentStore.getState().setActiveWorkspace(wsPath)
+    }
     // Store the user-chosen title in the session slot so sidebar can show it
     useAgentStore.setState((s) => ({
       sessionSlots: {
