@@ -35,6 +35,7 @@ export type ContextSlot = {
   skillOutput: SkillOutputState | null
   activeSkillId: string | null
   lastEditedFile: string | null
+  linkedFile: string | null
   prefillText: string | null
   ttftMs: number | null
   todoList: TodoTaskList | null
@@ -65,6 +66,7 @@ function emptySlot(): ContextSlot {
     skillOutput: null,
     activeSkillId: null,
     lastEditedFile: null,
+    linkedFile: null,
     prefillText: null,
     ttftMs: null,
     todoList: null,

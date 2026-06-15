@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { SdkSessionInfo } from '../../../shared/types'
+import type { ContextSlot } from '../../store/agent-store'
 
 interface MemoryEntry {
   name: string
@@ -90,6 +91,25 @@ function formatSessionTime(ts?: number): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}天前`
   return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
+function getSessionAttention(slot?: ContextSlot | null): {
+  type: 'permission' | 'askUser'
+  count: number
+  label: string
+} | null {
+  if (!slot) return null
+  const permissionCount = (slot.permissionRequest ? 1 : 0) + slot.permissionQueue.length
+  if (permissionCount > 0) {
+    return { type: 'permission', count: permissionCount, label: '等待权限确认' }
+  }
+
+  const askUserCount = (slot.askUserRequest ? 1 : 0) + slot.askUserQueue.length
+  if (askUserCount > 0) {
+    return { type: 'askUser', count: askUserCount, label: '等待你回答' }
+  }
+
+  return null
 }
 
 function Sidebar({
@@ -324,14 +344,16 @@ function Sidebar({
                             // fall back to sessionSlots for non-active sessions (saved on switch-away)
                             const isActive = activeSessionId === session.id
                             const slot = isActive ? null : sessionSlots[session.id]
+                            const attention = getSessionAttention(slot)
                             const isRunning = isActive
                               ? activeSessionRunning
                               : (slot?.isStreaming || (slot?.agentState && slot.agentState !== 'idle' && slot.agentState !== 'error'))
                             return (
                               <div
                                 key={session.id}
-                                className={`sidebar-entry sidebar-session-entry${activeSessionId === session.id ? ' sidebar-entry-active' : ''}`}
+                                className={`sidebar-entry sidebar-session-entry${isActive ? ' sidebar-entry-active' : ''}${attention ? ' sidebar-session-needs-attention' : ''}`}
                                 onClick={() => onSessionSelect(session.id, wsPath)}
+                                title={attention?.label}
                               >
                                 {renamingId === session.id ? (
                                   <input
@@ -369,9 +391,17 @@ function Sidebar({
                                     {session.title || session.id?.slice(-8) || '未命名会话'}
                                   </span>
                                 )}
-                                {!isRunning && (
+                                {!attention && !isRunning && (
                                   <span className="sidebar-session-time">
                                     {formatSessionTime(session.lastModified || session.createdAt)}
+                                  </span>
+                                )}
+                                {attention && (
+                                  <span className="sidebar-session-attention" title={attention.label} aria-label={attention.label}>
+                                    {attention.type === 'permission'
+                                      ? <ShieldAlert size={12} />
+                                      : <MessageCircleQuestion size={12} />}
+                                    {attention.count > 1 && <span className="sidebar-session-attention-count">{attention.count}</span>}
                                   </span>
                                 )}
                                 <button
@@ -385,7 +415,7 @@ function Sidebar({
                                 >
                                   <Trash2 size={11} />
                                 </button>
-                                {isRunning && <Loader2 size={12} className="sidebar-session-running" />}
+                                {!attention && isRunning && <Loader2 size={12} className="sidebar-session-running" />}
                               </div>
                             )
                           })

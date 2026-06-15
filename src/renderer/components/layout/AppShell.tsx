@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
-import { PanelLeft, FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'lucide-react'
+import { FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -30,6 +30,19 @@ import type { SkillDefinition } from '../../lib/ipc'
 
 interface AppShellProps {
   onOpenSettings: () => void
+}
+
+function SidebarToggleIcon({ collapsed }: { collapsed: boolean }): React.ReactElement {
+  return (
+    <svg
+      className={`sidebar-toggle-icon${collapsed ? ' sidebar-toggle-icon-collapsed' : ''}`}
+      viewBox="0 0 18 18"
+      aria-hidden="true"
+    >
+      <rect className="sidebar-toggle-icon-frame" x="2.5" y="3" width="13" height="12" rx="2.5" />
+      <path className="sidebar-toggle-icon-rail" d="M6.3 4.8v8.4" />
+    </svg>
+  )
 }
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
@@ -84,6 +97,28 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
+  const setEditorLinkedFile = useCallback((path: string | null) => {
+    setLinkedFile(path)
+    useAgentStore.setState((state) => {
+      const sessionId = state.activeSessionId.editor || state.slots.editor.currentSessionId
+      const nextEditorSlot = { ...state.slots.editor, linkedFile: path }
+      if (!sessionId) {
+        return {
+          slots: { ...state.slots, editor: nextEditorSlot },
+        }
+      }
+
+      const existingSlot = state.sessionSlots[sessionId] || nextEditorSlot
+      return {
+        slots: { ...state.slots, editor: nextEditorSlot },
+        sessionSlots: {
+          ...state.sessionSlots,
+          [sessionId]: { ...existingSlot, linkedFile: path },
+        },
+      }
+    })
+  }, [setLinkedFile])
+
   // ── Keyboard shortcuts ──────────────────────────────────────────────
 
   useAppShortcuts({ setShowSearch: () => openSearch(), setIsChatFirst })
@@ -91,8 +126,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── Auto-link active tab → linked file ──────────────────────────────
 
   useEffect(() => {
-    if (activeTab && isFileTab(activeTab)) setLinkedFile(activeTab.path)
-  }, [activeTab])
+    if (activeTab && isFileTab(activeTab)) setEditorLinkedFile(activeTab.path)
+  }, [activeTab, setEditorLinkedFile])
 
   // ── IPC subscriptions (update, menu, graph, main error) ─────────────
 
@@ -157,6 +192,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     // Switch to session-isolated slot (also sets activeSessionId, loading flag,
     // and kicks off SDK message load when the slot has _needsSdkLoad === true).
     useAgentStore.getState().switchToSession(sessionId, 'editor', workspacePath || null)
+    setLinkedFile(useAgentStore.getState().slots.editor.linkedFile || null)
     if (workspacePath && workspacePath !== activeWorkspacePath) {
       useAgentStore.getState().setActiveWorkspace(workspacePath)
     }
@@ -167,7 +203,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
     const overviewTab = openTabs.find(t => t.type === 'fixed')
     if (overviewTab) switchTab(overviewTab)
-  }, [activeWorkspacePath, view, openTabs, switchTab])
+  }, [activeWorkspacePath, view, openTabs, switchTab, setLinkedFile])
 
   const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
   const newSessionInputRef = useRef<HTMLInputElement>(null)
@@ -188,6 +224,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     // Create a new empty editor slot with a placeholder session ID and store the title
     const tempSessionId = `new-${Date.now()}`
     useAgentStore.getState().switchToSession(tempSessionId, 'editor', wsPath)
+    setEditorLinkedFile(null)
     if (wsPath !== activeWorkspacePath) {
       useAgentStore.getState().setActiveWorkspace(wsPath)
     }
@@ -226,7 +263,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       useAgentStore.setState({ context: 'editor' })
       setView('editor')
     }
-  }, [newSessionName, activeWorkspacePath, view])
+  }, [newSessionName, activeWorkspacePath, view, setEditorLinkedFile])
 
   useEffect(() => {
     return window.api.onMainError((error) => {
@@ -323,11 +360,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (wasActive) {
       useAgentStore.getState().switchToSession('')
       useAgentStore.getState().setSessionOutputs(null)
+      setEditorLinkedFile(null)
       if (view !== 'editor') {
         setView('editor')
       }
     }
-  }, [modal, view, loadSessions])
+  }, [modal, view, loadSessions, setEditorLinkedFile])
 
   const isStreaming = useIsStreaming('editor')
   const prevIsStreamingRef = useRef(isStreaming)
@@ -339,6 +377,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
   const editorSessionList = sessionList.filter((s) => s.context !== 'ask')
+  const handleAgentPanelSessionSelect = useCallback((sessionId: string) => {
+    const target = editorSessionList.find((session) => session.id === sessionId)
+    if (target?.workspacePath || target?.cwd) {
+      handleSessionSelect(sessionId, target.workspacePath || target.cwd || activeWorkspacePath || '')
+      return
+    }
+    resumeSession(sessionId)
+    setLinkedFile(useAgentStore.getState().slots.editor.linkedFile || null)
+  }, [activeWorkspacePath, editorSessionList, handleSessionSelect, resumeSession, setLinkedFile])
   const agentStatus = useAgentStatus('editor')
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
@@ -543,7 +590,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         fixedWorkspacePaths={workspace.fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
         sessions={editorSessionList}
-        activeSessionId={activeSessionId}
+        activeSessionId={view === 'ask' ? null : activeSessionId}
         activeSessionRunning={isStreaming}
         onSessionSelect={handleSessionSelect}
         onDeleteSession={handleDeleteSession}
@@ -674,7 +721,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onAskUserDrawerRespond={(respond) => { editorAskUserRespondRef.current = respond }}
         sessionList={editorSessionList}
         currentSessionId={currentSessionId}
-        onSelectSession={resumeSession}
+        onSelectSession={handleAgentPanelSessionSelect}
         onNewSession={newSession}
         onRefreshSessions={loadSessions}
         activeSkillId={activeSkillId}
@@ -691,7 +738,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             window.api.agent.abort(sid || 'editor')
           }} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
-        onUnlinkFile={() => setLinkedFile(null)}
+        onUnlinkFile={() => setEditorLinkedFile(null)}
       >
         <ErrorBoundary>
         <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspace.workspacePaths[0]} />
@@ -764,12 +811,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onMouseLeave={handleToggleMouseLeave}
       >
         <button
-          className={`sidebar-toggle-btn${toggleVisible ? ' sidebar-toggle-btn-visible' : ''}`}
+          className={`sidebar-toggle-btn${toggleVisible ? ' sidebar-toggle-btn-visible' : ''}${sidebarCollapsed ? ' sidebar-toggle-btn-collapsed' : ''}`}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
           aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
         >
-          <PanelLeft size={14} />
+          <SidebarToggleIcon collapsed={sidebarCollapsed} />
         </button>
       </div>
       {/* ── New workspace modal ── */}

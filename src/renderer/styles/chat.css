@@ -959,9 +959,20 @@
 
 .agent-panel-footer .input-drawer {
   position: absolute;
-  bottom: 100%;
+  bottom: calc(100% + 14px);
   left: 10%;
   right: 10%;
+}
+
+.agent-panel-footer .input-drawer--open {
+  padding: 0;
+  margin: 0;
+}
+
+.agent-panel-footer .input-drawer__content {
+  max-height: min(420px, 46vh);
+  overflow-y: auto;
+  margin-bottom: 0;
 }
 
 .input-drawer {

@@ -35,7 +35,7 @@
   color: var(--color-text-primary);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-toggle-btn-visible {
@@ -45,6 +45,43 @@
 
 .sidebar-toggle-btn:hover {
   background: var(--color-bg-tertiary);
+}
+
+.sidebar-toggle-icon {
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  color: currentColor;
+}
+
+.sidebar-toggle-icon-frame,
+.sidebar-toggle-icon-rail {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: transform 0.24s var(--ease-spring), opacity 0.2s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.sidebar-toggle-icon-frame {
+  opacity: 0.9;
+}
+
+.sidebar-toggle-icon-rail {
+  opacity: 0.95;
+}
+
+.sidebar-toggle-icon-collapsed .sidebar-toggle-icon-rail {
+  transform: translateX(5.3px);
+}
+
+.sidebar-toggle-btn:active .sidebar-toggle-icon {
+  transform: scale(0.94);
+  transition: transform 0.12s ease;
 }
 
 .sidebar {
@@ -240,7 +277,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 6px 12px 6px 22px;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-tertiary);
@@ -673,6 +710,45 @@
   background: var(--color-bg-hover);
 }
 
+.sidebar-session-needs-attention {
+  background: color-mix(in srgb, var(--color-bg-hover) 52%, transparent);
+  border-radius: 14px;
+  -electron-corner-smoothing: system-ui;
+  animation: sidebar-session-attention-nudge 2.4s ease-in-out infinite;
+}
+
+.sidebar-session-needs-attention:hover {
+  background: color-mix(in srgb, var(--color-bg-hover) 68%, transparent);
+}
+
+.sidebar-session-attention {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.sidebar-session-attention-count {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+  color: var(--color-bg-primary);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  line-height: 13px;
+}
+
 .sidebar-session-running {
   color: var(--color-action);
   animation: sidebar-spin 1.5s linear infinite;
@@ -681,6 +757,26 @@
 
 @keyframes sidebar-spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes sidebar-session-attention-nudge {
+  0%,
+  18%,
+  100% {
+    transform: translateX(0);
+  }
+  4% {
+    transform: translateX(-1.5px);
+  }
+  8% {
+    transform: translateX(1.5px);
+  }
+  12% {
+    transform: translateX(-1px);
+  }
+  16% {
+    transform: translateX(1px);
+  }
 }
 
 .sidebar-session-title {
@@ -698,8 +794,10 @@
 }
 
 .sidebar-session-delete {
-  display: none;
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--color-text-tertiary);
@@ -707,6 +805,9 @@
   padding: 2px;
   border-radius: 3px;
   line-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, background 0.15s, color 0.15s;
 }
 
 .sidebar-session-delete:hover {
@@ -715,7 +816,8 @@
 }
 
 .sidebar-session-entry:hover .sidebar-session-delete {
-  display: flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sidebar-session-empty {

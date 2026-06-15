@@ -16,10 +16,18 @@ extraResources:
       - '!*/.DS_Store'
 files:
   - '!**/.vscode/*'
+  - '!**/.claude/**'
+  - '!**/.codex/**'
+  - '!**/.agents/**'
+  - '!**/.git/**'
+  - '!dist/**'
+  - '!docs/**'
+  - '!tests/**'
   - '!src/*'
   - '!electron.vite.config.*'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!*.html'
 publish:
   provider: github
   owner: shuangmusuihua-source

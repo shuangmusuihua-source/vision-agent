@@ -389,6 +389,52 @@ describe('session-scoped store routing', () => {
     expect(state.activeWorkspacePath).toBe('/workspace-b')
   })
 
+  it('keeps linked files isolated per editor session', () => {
+    const sessionA = {
+      ...emptySlot(),
+      currentSessionId: 'session-a',
+      workspacePath: '/workspace-a',
+      linkedFile: '/workspace-a/a.md',
+      messages: [textMessage('a-msg', 'A')],
+    }
+    const sessionB = {
+      ...emptySlot(),
+      currentSessionId: 'session-b',
+      workspacePath: '/workspace-b',
+      linkedFile: '/workspace-b/b.md',
+      messages: [textMessage('b-msg', 'B')],
+    }
+
+    useAgentStore.setState({
+      activeWorkspacePath: '/workspace-a',
+      activeSessionId: { editor: 'session-a', ask: null },
+      slots: { editor: sessionA, ask: emptySlot() },
+      sessionSlots: { 'session-a': sessionA, 'session-b': sessionB },
+      sessionAccessOrder: ['session-a', 'session-b'],
+    })
+
+    useAgentStore.getState().switchToSession('session-b', 'editor', '/workspace-b')
+    expect(useAgentStore.getState().slots.editor.linkedFile).toBe('/workspace-b/b.md')
+
+    useAgentStore.setState((state) => ({
+      slots: {
+        ...state.slots,
+        editor: { ...state.slots.editor, linkedFile: '/workspace-b/b-updated.md' },
+      },
+      sessionSlots: {
+        ...state.sessionSlots,
+        'session-b': { ...state.sessionSlots['session-b'], linkedFile: '/workspace-b/b-updated.md' },
+      },
+    }))
+
+    useAgentStore.getState().switchToSession('session-a', 'editor', '/workspace-a')
+
+    const state = useAgentStore.getState()
+    expect(state.slots.editor.linkedFile).toBe('/workspace-a/a.md')
+    expect(state.sessionSlots['session-a'].linkedFile).toBe('/workspace-a/a.md')
+    expect(state.sessionSlots['session-b'].linkedFile).toBe('/workspace-b/b-updated.md')
+  })
+
   it('routes pre-materialized Ask events by client session key', () => {
     const tempId = 'new-ask-1'
     const editor = { ...emptySlot(), currentSessionId: 'editor-session', messages: [textMessage('editor-msg', 'editor')] }

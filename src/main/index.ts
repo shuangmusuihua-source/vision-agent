@@ -58,6 +58,44 @@ process.on('uncaughtException', (error) => {
 })
 
 let mainWindow: BrowserWindow | null = null
+let silentUpdateChecks = 0
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function isMissingUpdateFeedError(error: unknown): boolean {
+  const message = getErrorMessage(error)
+  return message.includes('404') && message.includes('releases.atom')
+}
+
+function sendUpdateError(message: string): void {
+  const win = getMainWindow()
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('update:error', { message })
+  }
+}
+
+async function checkForUpdates(options: { silentMissingFeed?: boolean } = {}): Promise<void> {
+  if (!app.isPackaged) return
+
+  if (options.silentMissingFeed) silentUpdateChecks += 1
+  try {
+    await autoUpdater.checkForUpdates()
+  } catch (error) {
+    if (options.silentMissingFeed && isMissingUpdateFeedError(error)) {
+      console.warn('[AutoUpdater] update feed unavailable; skipping launch check')
+      return
+    }
+    throw error
+  } finally {
+    if (options.silentMissingFeed) {
+      setTimeout(() => {
+        silentUpdateChecks = Math.max(0, silentUpdateChecks - 1)
+      }, 1000)
+    }
+  }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -159,7 +197,10 @@ app.whenReady().then(() => {
   if (app.isPackaged) {
     autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
-    autoUpdater.checkForUpdates()
+    checkForUpdates({ silentMissingFeed: true }).catch((err) => {
+      console.error('[AutoUpdater] launch check failed:', err)
+      Sentry.captureException(err)
+    })
 
     autoUpdater.on('update-available', (info) => {
       const win = getMainWindow()
@@ -176,12 +217,13 @@ app.whenReady().then(() => {
     })
 
     autoUpdater.on('error', (err) => {
+      if (silentUpdateChecks > 0 && isMissingUpdateFeedError(err)) {
+        console.warn('[AutoUpdater] update feed unavailable; skipping launch check')
+        return
+      }
       console.error('[AutoUpdater] error:', err)
       Sentry.captureException(err)
-      const win = getMainWindow()
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('update:error', { message: err.message })
-      }
+      sendUpdateError(err.message)
     })
   }
 
@@ -193,7 +235,15 @@ app.whenReady().then(() => {
 // IPC: update actions from renderer
 ipcMain.handle('update:download', () => autoUpdater.downloadUpdate())
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
-ipcMain.handle('update:checkForUpdates', () => autoUpdater.checkForUpdates())
+ipcMain.handle('update:checkForUpdates', async () => {
+  try {
+    await checkForUpdates()
+  } catch (error) {
+    const message = getErrorMessage(error)
+    sendUpdateError(message)
+    console.error('[AutoUpdater] manual check failed:', error)
+  }
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
