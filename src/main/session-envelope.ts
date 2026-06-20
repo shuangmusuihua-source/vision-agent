@@ -15,7 +15,7 @@ export function createSessionEnvelope(input: {
   }
 }
 
-export function withSessionEnvelope<T extends Record<string, unknown>>(
+export function withSessionEnvelope<T extends object>(
   envelope: AgentSessionEnvelope,
   payload: T
 ): T & AgentSessionEnvelope {

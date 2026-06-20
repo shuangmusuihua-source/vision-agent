@@ -3,8 +3,8 @@ import type {
   AgentIPCMessageWithContext,
   AgentContext,
   AgentSessionEnvelope,
-  AskUserRequestIPC,
-  PermissionRequestIPC,
+  SessionRoutedAskUserRequest,
+  SessionRoutedPermissionRequest,
   ContentBlock,
   SdkSessionInfo,
   UsageInfo,
@@ -140,8 +140,8 @@ interface AgentApi {
 
   // Lifecycle channels
   onSessionCreated: (callback: (data: AgentSessionEnvelope) => void) => () => void
-  onPermissionRequest: (callback: (data: PermissionRequestIPC) => void) => () => void
-  onAskUser: (callback: (data: AskUserRequestIPC) => void) => () => void
+  onPermissionRequest: (callback: (data: SessionRoutedPermissionRequest) => void) => () => void
+  onAskUser: (callback: (data: SessionRoutedAskUserRequest) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
   onPermissionTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
   onNotification: (callback: (data: { type: string; message: string; title: string } & Partial<AgentSessionEnvelope>) => void) => () => void

@@ -244,7 +244,14 @@ export type AgentSessionEnvelope = {
 
 export type SessionRoutedPayload<T extends Record<string, unknown>> = T & AgentSessionEnvelope
 
-export type AgentIPCMessageWithContext = AgentIPCMessage & AgentSessionEnvelope
+export type SessionRoutedAgentIPCMessage = AgentIPCMessage & AgentSessionEnvelope
+export type SessionRoutedPermissionRequest = PermissionRequestIPC & AgentSessionEnvelope
+export type SessionRoutedAskUserRequest = AskUserRequestIPC & AgentSessionEnvelope
+export type SessionRoutedRequestTimeout = { requestId: string } & AgentSessionEnvelope
+export type SessionRoutedNotification = { type: string; message: string; title: string } & AgentSessionEnvelope
+export type SessionRoutedSkillOutputState = SkillOutputState & AgentSessionEnvelope
+
+export type AgentIPCMessageWithContext = SessionRoutedAgentIPCMessage
 
 // ─── Usage Info ──────────────────────────────────────────────────────
 

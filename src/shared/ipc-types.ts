@@ -3,10 +3,13 @@
 
 import type {
   AgentIPCMessage,
-  AskUserRequestIPC,
+  AgentIPCMessageWithContext,
+  AgentSessionEnvelope,
   ModelProfile,
-  PermissionRequestIPC,
   SdkSessionInfo,
+  SessionRoutedAskUserRequest,
+  SessionRoutedPermissionRequest,
+  SessionRoutedRequestTimeout,
   UsageInfo,
   GraphData,
 } from './types'
@@ -229,18 +232,12 @@ export type IPCChannelMap = {
 // ─── Event (Push) Channels ──────────────────────────────────────────
 
 export type IPCEventMap = {
-  'agent:event': AgentIPCMessage
-  'agent:sessionCreated': {
-    context: 'editor' | 'ask'
-    sessionId: string
-    workspacePath?: string
-    clientSessionKey?: string
-    sdkSessionId?: string
-  }
-  'agent:permissionRequest': PermissionRequestIPC
-  'agent:askUser': AskUserRequestIPC
-  'agent:askUserTimeout': { requestId: string; context: string }
-  'agent:permissionTimeout': { requestId: string; context: string }
+  'agent:event': AgentIPCMessageWithContext
+  'agent:sessionCreated': AgentSessionEnvelope
+  'agent:permissionRequest': SessionRoutedPermissionRequest
+  'agent:askUser': SessionRoutedAskUserRequest
+  'agent:askUserTimeout': SessionRoutedRequestTimeout
+  'agent:permissionTimeout': SessionRoutedRequestTimeout
   'agent:notification': { type: string; message: string; title: string }
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[] }

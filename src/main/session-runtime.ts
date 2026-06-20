@@ -6,6 +6,11 @@ import type {
   AgentSessionEnvelope,
   AskUserRequestIPC,
   PermissionRequestIPC,
+  SessionRoutedAgentIPCMessage,
+  SessionRoutedAskUserRequest,
+  SessionRoutedNotification,
+  SessionRoutedPermissionRequest,
+  SessionRoutedRequestTimeout,
 } from '../shared/types'
 import { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 import { SkillOutputBridge } from './skill-output-bridge'
@@ -152,7 +157,8 @@ export class SessionRuntimeController {
     message: AgentIPCMessage
   ): void {
     if (win.isDestroyed()) return
-    win.webContents.send('agent:event', withSessionEnvelope(envelope, message as unknown as Record<string, unknown>))
+    const payload: SessionRoutedAgentIPCMessage = withSessionEnvelope(envelope, message)
+    win.webContents.send('agent:event', payload)
   }
 
   emitExecutionError(win: BrowserWindow, envelope: AgentSessionEnvelope, message: string): void {
@@ -182,7 +188,8 @@ export class SessionRuntimeController {
     request: Omit<PermissionRequestIPC, keyof AgentSessionEnvelope>
   ): void {
     if (win.isDestroyed()) return
-    win.webContents.send('agent:permissionRequest', withSessionEnvelope(envelope, request))
+    const payload: SessionRoutedPermissionRequest = withSessionEnvelope(envelope, request)
+    win.webContents.send('agent:permissionRequest', payload)
   }
 
   emitAskUserRequest(
@@ -191,17 +198,20 @@ export class SessionRuntimeController {
     request: Omit<AskUserRequestIPC, keyof AgentSessionEnvelope>
   ): void {
     if (win.isDestroyed()) return
-    win.webContents.send('agent:askUser', withSessionEnvelope(envelope, request))
+    const payload: SessionRoutedAskUserRequest = withSessionEnvelope(envelope, request)
+    win.webContents.send('agent:askUser', payload)
   }
 
   emitPermissionTimeout(win: BrowserWindow, envelope: AgentSessionEnvelope, requestId: string): void {
     if (win.isDestroyed()) return
-    win.webContents.send('agent:permissionTimeout', withSessionEnvelope(envelope, { requestId }))
+    const payload: SessionRoutedRequestTimeout = withSessionEnvelope(envelope, { requestId })
+    win.webContents.send('agent:permissionTimeout', payload)
   }
 
   emitAskUserTimeout(win: BrowserWindow, envelope: AgentSessionEnvelope, requestId: string): void {
     if (win.isDestroyed()) return
-    win.webContents.send('agent:askUserTimeout', withSessionEnvelope(envelope, { requestId }))
+    const payload: SessionRoutedRequestTimeout = withSessionEnvelope(envelope, { requestId })
+    win.webContents.send('agent:askUserTimeout', payload)
   }
 
   requestAskUserAnswer(
@@ -314,8 +324,12 @@ export class SessionRuntimeController {
     notification: { type: string; message: string; title: string }
   ): void {
     if (win.isDestroyed()) return
-    win.webContents.send('agent:notification', {
+    const payload: SessionRoutedNotification = {
       ...withSessionEnvelope(envelope, notification),
+      workspacePath: envelope.workspacePath,
+    }
+    win.webContents.send('agent:notification', {
+      ...payload,
       workspaceCwd: envelope.workspacePath,
     })
   }

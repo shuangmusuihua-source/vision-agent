@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import { sessionListReducer } from '../src/renderer/store/session-protocol'
-import type { AgentIPCMessage, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SkillOutputState } from '../src/shared/types'
+import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SkillOutputState } from '../src/shared/types'
 
 function resetStore() {
   useAgentStore.setState({
@@ -263,6 +263,100 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.askUserRequest).toBeNull()
     expect(state.sessionSlots['background-session'].askUserRequest?.id).toBe('ask-bg')
     expect(state.sessionSlots['background-session'].agentState).toBe('waitingForUserInput')
+  })
+
+  it('keeps switched editor sessions isolated while background output and prompts arrive', async () => {
+    const editorA = {
+      ...emptySlot(),
+      currentSessionId: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+      agentState: 'running' as const,
+      isStreaming: true,
+      messages: [{
+        kind: 'user' as const,
+        id: 'user-a',
+        role: 'user' as const,
+        textContent: 'question A',
+        createdAt: 1,
+      }],
+    }
+    const editorB = {
+      ...emptySlot(),
+      currentSessionId: 'editor-b',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+      agentState: 'running' as const,
+      isStreaming: true,
+      messages: [{
+        kind: 'user' as const,
+        id: 'user-b',
+        role: 'user' as const,
+        textContent: 'question B',
+        createdAt: 2,
+      }],
+    }
+
+    useAgentStore.setState({
+      activeSessionId: { editor: 'editor-a', ask: null },
+      slots: { editor: editorA, ask: emptySlot() },
+      sessionSlots: { 'editor-b': editorB },
+      sessionAccessOrder: ['editor-b'],
+    })
+
+    useAgentStore.getState().switchToSession('editor-b', 'editor')
+    useAgentStore.getState().handlePermissionRequest({
+      ...permission('perm-b', 'editor-b'),
+      clientSessionKey: 'editor-b',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+    })
+
+    const streamA: AgentIPCMessageWithContext = {
+      type: 'stream_event',
+      context: 'editor',
+      sessionId: 'editor-a',
+      clientSessionKey: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+      uuid: 'a-stream',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'answer A' },
+      },
+    }
+    const resultA: AgentIPCMessageWithContext = {
+      type: 'result',
+      subtype: 'success',
+      context: 'editor',
+      sessionId: 'editor-a',
+      clientSessionKey: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+      session_id: 'sdk-a',
+      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
+      total_cost_usd: 0,
+      duration_ms: 0,
+    }
+
+    useAgentStore.getState().processIPCMessage(streamA)
+    useAgentStore.getState().processIPCMessage(resultA)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const state = useAgentStore.getState()
+    expect(state.activeSessionId.editor).toBe('editor-b')
+    expect(state.slots.editor.currentSessionId).toBe('editor-b')
+    expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['user-b'])
+    expect(state.slots.editor.permissionRequest?.id).toBe('perm-b')
+    expect(state.slots.editor.workspacePath).toBe('/workspace/b')
+
+    const sessionA = state.sessionSlots['editor-a']
+    expect(sessionA.workspacePath).toBe('/workspace/a')
+    expect(sessionA.messages[0].id).toBe('user-a')
+    expect(sessionA.messages.some((m) => m.kind === 'text' && m.textContent === 'answer A')).toBe(true)
+    expect(sessionA.isStreaming).toBe(false)
+    expect(sessionA.agentState).toBe('idle')
   })
 
   it('does not drive the live FSM when replaying historical SDK messages', () => {

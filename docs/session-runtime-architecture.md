@@ -93,6 +93,12 @@ The following main-to-renderer event families must include the envelope:
 If a new event affects a session, it must be emitted through the runtime
 controller or use `withSessionEnvelope()` before crossing IPC.
 
+Live IPC event types use session-routed payload aliases such as
+`AgentIPCMessageWithContext`, `SessionRoutedPermissionRequest`, and
+`SessionRoutedAskUserRequest`. SDK transcript replay remains allowed to carry
+plain `AgentIPCMessage` values because history loading resolves ownership from
+the selected session.
+
 ## Persistence Boundaries
 
 - `workspace-store.ts`: app session metadata, workspace ownership, titles, counts.

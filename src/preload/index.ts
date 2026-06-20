@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentIPCMessageWithContext, AgentSessionEnvelope, AskUserRequestIPC, PermissionRequestIPC, SdkSessionInfo, ModelProfile, SkillOutputState } from '../shared/types'
+import type {
+  AgentIPCMessageWithContext,
+  AgentSessionEnvelope,
+  ModelProfile,
+  SdkSessionInfo,
+  SessionRoutedAskUserRequest,
+  SessionRoutedPermissionRequest,
+  SkillOutputState,
+} from '../shared/types'
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -105,14 +113,14 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
 
-    onPermissionRequest: (callback: (request: PermissionRequestIPC) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, request: PermissionRequestIPC) => callback(request)
+    onPermissionRequest: (callback: (request: SessionRoutedPermissionRequest) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: SessionRoutedPermissionRequest) => callback(request)
       ipcRenderer.on('agent:permissionRequest', handler)
       return () => { ipcRenderer.removeListener('agent:permissionRequest', handler) }
     },
 
-    onAskUser: (callback: (request: AskUserRequestIPC) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, request: AskUserRequestIPC) => callback(request)
+    onAskUser: (callback: (request: SessionRoutedAskUserRequest) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, request: SessionRoutedAskUserRequest) => callback(request)
       ipcRenderer.on('agent:askUser', handler)
       return () => { ipcRenderer.removeListener('agent:askUser', handler) }
     },

@@ -5,6 +5,8 @@ import { sessionListReducer, type SessionListAction } from './session-protocol'
 import type {
   AgentContext,
   AgentIPCMessage,
+  AgentIPCMessageWithContext,
+  AgentSessionEnvelope,
   AgentState,
   AgentEvent,
   ConversationMessage,
@@ -384,12 +386,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     // ─── Core Reducer ───────────────────────────────────────────────────
 
-    processIPCMessage(msg: AgentIPCMessage & { context?: AgentContext; sessionId?: string; clientSessionKey?: string; sdkSessionId?: string }, options?: { isReplay?: boolean }) {
+    processIPCMessage(msg: AgentIPCMessageWithContext | AgentIPCMessage, options?: { isReplay?: boolean }) {
       const isReplay = options?.isReplay ?? false
-      const ctx = msg.context || get().context
-      const rawEventSessionId = ((msg as Record<string, unknown>).clientSessionKey as string)
-        || ((msg as Record<string, unknown>).sessionId as string)
-        || ((msg as Record<string, unknown>).session_id as string)
+      const routed = msg as AgentIPCMessage & Partial<AgentSessionEnvelope> & { session_id?: string }
+      const ctx = routed.context || get().context
+      const rawEventSessionId = routed.clientSessionKey
+        || routed.sessionId
+        || routed.session_id
         || undefined
       const eventSessionId = resolveClientSessionId(get(), rawEventSessionId) || undefined
 
