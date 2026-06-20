@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'path'
+import { configureAppIdentity } from './app-identity'
+configureAppIdentity()
 import { is } from '@electron-toolkit/utils'
 import * as Sentry from '@sentry/electron/main'
 import { autoUpdater } from 'electron-updater'
@@ -14,6 +16,7 @@ import { setSkillOutputWindow, handleWindowDestroy, abortActiveQuery } from './a
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
 import { flushAuditLog } from './agent-audit'
+import { APP_NAME } from '../shared/branding'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -110,7 +113,7 @@ function createWindow(): void {
     backgroundColor: '#00000000',
     vibrancy: 'under-window',
     visualEffectState: 'active',
-    title: 'Vision Agent',
+    title: APP_NAME,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,

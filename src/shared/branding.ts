@@ -1,0 +1,5 @@
+export const APP_NAME = 'sumi'
+export const ASK_ASSISTANT_NAME = 'sumi'
+export const DOCUMENTS_DIR_NAME = 'sumi'
+export const GITHUB_REPO_OWNER = 'shuangmusuihua-source'
+export const GITHUB_REPO_NAME = 'vision-agent'

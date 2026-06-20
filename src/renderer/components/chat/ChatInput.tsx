@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { ArrowUp, Square, Paperclip, X } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
+import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { useAgentStore } from '../../store/agent-store-impl'
 
 interface AttachedFile {
@@ -181,7 +182,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedSkillIdx, showSkillPopup, filteredSkills.length])
 
-  // --- Capsule variant: single-line input (AskZuovis style) ---
+  // --- Capsule variant: single-line input (Ask sumi style) ---
   if (variant === 'capsule') {
     return (
       <div className="ask-zuovis-capsule-wrapper">
@@ -215,7 +216,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             ref={inputRef}
             type="text"
             className="ask-zuovis-input"
-            placeholder={placeholder || '问 Zuovis 任何问题...'}
+            placeholder={placeholder || `问 ${ASK_ASSISTANT_NAME} 任何问题...`}
             value={text}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}

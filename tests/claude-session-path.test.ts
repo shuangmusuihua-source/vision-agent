@@ -7,7 +7,7 @@ import { legacyClaudeProjectDir, resolveClaudeSessionJsonlPath } from '../src/ma
 let tempRoot: string | null = null
 
 function makeProjectsRoot(): string {
-  tempRoot = mkdtempSync(join(tmpdir(), 'vision-agent-claude-projects-'))
+  tempRoot = mkdtempSync(join(tmpdir(), 'sumi-claude-projects-'))
   return tempRoot
 }
 
@@ -19,7 +19,7 @@ afterEach(() => {
 describe('Claude session JSONL path resolution', () => {
   it('finds sessions stored in the legacy slash-replaced project directory', () => {
     const root = makeProjectsRoot()
-    const workspacePath = '/Users/example/Documents/VisionAgent/NEXTAI'
+    const workspacePath = '/Users/example/Documents/sumi/NEXTAI'
     const sessionId = 'sdk-session-nextai'
     const projectDir = join(root, legacyClaudeProjectDir(workspacePath))
     mkdirSync(projectDir, { recursive: true })
@@ -31,9 +31,9 @@ describe('Claude session JSONL path resolution', () => {
 
   it('finds sessions when the SDK project directory uses a non-literal encoded name', () => {
     const root = makeProjectsRoot()
-    const workspacePath = '/Users/example/Documents/VisionAgent/新产品规划'
+    const workspacePath = '/Users/example/Documents/sumi/新产品规划'
     const sessionId = 'sdk-session-product'
-    const projectDir = join(root, '-Users-example-Documents-VisionAgent------')
+    const projectDir = join(root, '-Users-example-Documents-sumi------')
     mkdirSync(projectDir, { recursive: true })
     const jsonlPath = join(projectDir, `${sessionId}.jsonl`)
     writeFileSync(jsonlPath, '{}\n')
@@ -44,7 +44,7 @@ describe('Claude session JSONL path resolution', () => {
   it('finds app-scoped Ask sessions without a workspace path', () => {
     const root = makeProjectsRoot()
     const sessionId = 'sdk-session-ask'
-    const projectDir = join(root, '-Users-example-Library-Application-Support-vision-agent')
+    const projectDir = join(root, '-Users-example-Library-Application-Support-sumi')
     mkdirSync(projectDir, { recursive: true })
     const jsonlPath = join(projectDir, `${sessionId}.jsonl`)
     writeFileSync(jsonlPath, '{}\n')

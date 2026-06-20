@@ -1,9 +1,9 @@
-import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, copyFileSync, statSync } from 'fs'
 import { BUILTIN_SKILLS } from './skills/skills-manifest'
+import { getAppUserDataDir } from './app-identity'
 
-const userData = app.getPath('userData')
+const userData = getAppUserDataDir()
 const appClaudeDir = join(userData, '.claude')
 const appSkillsDir = join(appClaudeDir, 'skills')
 

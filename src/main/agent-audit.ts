@@ -1,8 +1,8 @@
-import { app } from 'electron'
 import { join } from 'path'
 import { appendFile } from 'fs/promises'
+import { getAppUserDataDir } from './app-identity'
 
-const AUDIT_LOG_PATH = join(app.getPath('userData'), 'audit.log')
+const AUDIT_LOG_PATH = join(getAppUserDataDir(), 'audit.log')
 
 const AUDIT_REDACT_PATTERNS = [
   /(?:api[_-]?key|apikey|secret|token|password|auth)\s*[:=]\s*['"]?[^\s'"]+['"]?/gi,

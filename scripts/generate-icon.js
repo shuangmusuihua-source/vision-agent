@@ -1,7 +1,7 @@
 const { execSync, mkdirSync, writeFileSync, existsSync } = require('fs')
 const { join } = require('path')
 
-// Generate SVG icon for Vision Agent
+// Generate SVG icon for sumi
 // Design: rounded square with a stylized eye/vision symbol
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>

@@ -3,11 +3,13 @@ import { safeStorage } from 'electron'
 import path from 'path'
 import { app } from 'electron'
 import type { ModelProfile, WorkspaceRecord, SessionRecord, SessionArtifactRecord } from '../../shared/types'
+import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
+import { getAppUserDataDir } from '../app-identity'
 
 export const KNOWLEDGE_BASE_NAME = 'Knowledge'
 
 export function getKnowledgeBaseDir(): string {
-  return path.join(app.getPath('documents'), 'VisionAgent', KNOWLEDGE_BASE_NAME)
+  return path.join(app.getPath('documents'), DOCUMENTS_DIR_NAME, KNOWLEDGE_BASE_NAME)
 }
 
 export const ENCRYPTION_PREFIX = 'enc:'
@@ -60,6 +62,7 @@ export interface AppSettings {
 }
 
 export const store = new Store<AppSettings>({
+  cwd: getAppUserDataDir(),
   defaults: {
     profiles: [],
     activeProfileId: null,

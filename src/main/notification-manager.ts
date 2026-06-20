@@ -29,12 +29,12 @@ function showNotification(title: string, body: string, onClick?: () => void, gro
 }
 
 export function notifyAgentComplete(sessionId: string): void {
-  showNotification('Agent 任务完成', '点击返回查看结果', undefined, 'com.vision-agent.agent')
+  showNotification('Agent 任务完成', '点击返回查看结果', undefined, 'app.sumi.agent')
 }
 
 export function notifyCronTaskComplete(taskName: string, result: string): void {
   const preview = result.length > 100 ? result.substring(0, 100) + '...' : result
-  showNotification(`定时任务完成: ${taskName}`, preview, undefined, 'com.vision-agent.cron')
+  showNotification(`定时任务完成: ${taskName}`, preview, undefined, 'app.sumi.cron')
 }
 
 export function schedulePermissionNotification(requestId: string, toolName: string): void {
@@ -52,7 +52,7 @@ export function schedulePermissionNotification(requestId: string, toolName: stri
         const window = getMainWindow()
         if (window) window.focus()
       },
-      'com.vision-agent.permission'
+      'app.sumi.permission'
     )
   }, PERMISSION_NOTIFY_THRESHOLD_MS)
 

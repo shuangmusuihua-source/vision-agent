@@ -168,7 +168,7 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
       }
     }
 
-    // Return both entry types. The renderer separates Ask Zuovis sessions
+    // Return both entry types. The renderer separates Ask sumi sessions
     // from workspace sessions by context so the two entry points stay isolated.
     return results
   } catch (err) {

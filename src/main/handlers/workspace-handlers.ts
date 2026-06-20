@@ -11,6 +11,7 @@ import {
 import { fileIndexService } from '../file-index-service'
 import { isPathAuthorized, sanitizeFileName } from '../path-validator'
 import type { WorkspaceDigest } from '../../shared/types'
+import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 
 export function registerWorkspaceHandlers(
   scanDirectory: (dir: string) => Promise<import('../../shared/types').FileEntry[]>,
@@ -92,7 +93,7 @@ export function registerWorkspaceHandlers(
     try {
       const safeName = sanitizeFileName(name.trim())
       if (!safeName || safeName !== name.trim()) return null
-      const docsDir = join(app.getPath('documents'), 'VisionAgent')
+      const docsDir = join(app.getPath('documents'), DOCUMENTS_DIR_NAME)
       if (!existsSync(docsDir)) await mkdir(docsDir, { recursive: true })
       const dirPath = join(docsDir, safeName)
       if (existsSync(dirPath)) return null
@@ -172,7 +173,7 @@ export function registerWorkspaceHandlers(
   ipcMain.handle('workspace:previewArtifact', async (_event, options: { fileName: string; content: string }) => {
     const safeName = sanitizeFileName(options.fileName)
     if (!safeName) return { success: false, error: 'Invalid file name' }
-    const tmpDir = join(app.getPath('temp'), 'vision-agent-preview')
+    const tmpDir = join(app.getPath('temp'), 'sumi-preview')
     await mkdir(tmpDir, { recursive: true })
     const filePath = join(tmpDir, safeName)
     if (!filePath.startsWith(tmpDir)) return { success: false, error: 'Path traversal detected' }

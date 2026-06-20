@@ -2,6 +2,7 @@ import path from 'path'
 import { app } from 'electron'
 import { getAuthorizedDirectories } from './store'
 import { isPathAuthorized as isPathInsideAuthorizedRoots } from './agent-path-utils'
+import { getAppUserDataDir } from './app-identity'
 
 let cachedExtraRoots: string[] = []
 
@@ -14,7 +15,7 @@ export function addAuthorizedRoot(p: string): void {
 
 export function isPathAuthorized(filePath: string): boolean {
   const dirs = getAuthorizedDirectories()
-  const allowedRoots = [...dirs, ...cachedExtraRoots, app.getPath('temp'), app.getPath('userData')]
+  const allowedRoots = [...dirs, ...cachedExtraRoots, app.getPath('temp'), getAppUserDataDir()]
   return isPathInsideAuthorizedRoots(filePath, allowedRoots)
 }
 

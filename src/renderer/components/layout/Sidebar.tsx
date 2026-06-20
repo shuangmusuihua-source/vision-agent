@@ -4,6 +4,7 @@ import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, P
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { ContextSlot } from '../../store/agent-store'
 
@@ -249,7 +250,7 @@ function Sidebar({
       </div>
 
       <div className="sidebar-content">
-        {/* Ask Zuovis */}
+        {/* Ask sumi */}
         <div
           className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`}
           onClick={onAskZuovis}
@@ -257,7 +258,7 @@ function Sidebar({
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
         >
           <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
-          <span className="sidebar-ask-zuovis-label">Ask Zuovis</span>
+          <span className="sidebar-ask-zuovis-label">Ask {ASK_ASSISTANT_NAME}</span>
           {isAskZuovisActive && isAskZuovisInChat && (
             <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
           )}

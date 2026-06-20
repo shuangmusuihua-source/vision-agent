@@ -443,7 +443,7 @@ export function useAgent(context: AgentContext = 'editor') {
       // Mirror to session-scoped cache so the message persists across switches.
       // Use the context's own sessionId (slotSid), NOT activeSessionId because
       // activeSessionId is a global singleton shared by editor + ask contexts.
-      // When the user switches from editor to AskZuovis, activeSessionId still
+      // When the user switches from editor to Ask sumi, activeSessionId still
       // points to the editor's session — writing ask data there corrupts the
       // editor's cached slot.
       if (slotSid) {

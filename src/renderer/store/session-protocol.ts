@@ -129,7 +129,7 @@ export function sessionListReducer(
       }).filter(Boolean) as SdkSessionInfo[]
 
       // Safety net: if the app session wasn't in the list, keep a stable
-      // app-facing id and attach the SDK id. Do not warn here; Ask Zuovis and
+      // app-facing id and attach the SDK id. Do not warn here; Ask sumi and
       // unnamed editor sends can materialize without a sidebar-created entry.
       if (!foundTemp) {
         next.unshift({

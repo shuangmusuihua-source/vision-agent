@@ -10,7 +10,7 @@ import {
 
 describe('session artifact utilities', () => {
   it('normalizes relative artifact paths against the session workspace', () => {
-    const workspacePath = '/Users/example/Documents/VisionAgent/NEXTAI'
+    const workspacePath = '/Users/example/Documents/sumi/NEXTAI'
 
     expect(normalizeArtifactPath('report.md', workspacePath)).toBe(
       join(workspacePath, 'report.md')
@@ -18,7 +18,7 @@ describe('session artifact utilities', () => {
   })
 
   it('preserves absolute artifact paths', () => {
-    const absolutePath = '/Users/example/Documents/VisionAgent/NEXTAI/report.md'
+    const absolutePath = '/Users/example/Documents/sumi/NEXTAI/report.md'
 
     expect(normalizeArtifactPath(absolutePath, '/tmp/other')).toBe(absolutePath)
   })

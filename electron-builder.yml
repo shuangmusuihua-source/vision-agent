@@ -1,5 +1,5 @@
-appId: com.vision-agent.app
-productName: Vision Agent
+appId: app.sumi.desktop
+productName: sumi
 directories:
   buildResources: build
 extraResources:
@@ -49,8 +49,8 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   gatekeeperAssess: false
   extendInfo:
-    NSDocumentsFolderUsageDescription: "Vision Agent needs access to your Documents folder to create workspaces."
-    NSDesktopFolderUsageDescription: "Vision Agent needs access to your Desktop folder to open workspace directories."
+    NSDocumentsFolderUsageDescription: "sumi needs access to your Documents folder to create workspaces."
+    NSDesktopFolderUsageDescription: "sumi needs access to your Desktop folder to open workspace directories."
 # afterSign: scripts/notarize.js  # disabled for unsigned internal testing
 dmg:
   sign: false

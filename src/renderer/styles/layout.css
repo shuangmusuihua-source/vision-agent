@@ -1297,7 +1297,7 @@
   color: var(--color-accent);
 }
 
-/* --- Ask Zuovis Sidebar Entry --- */
+/* --- Ask sumi Sidebar Entry --- */
 
 .sidebar-ask-zuovis {
   display: flex;
@@ -1434,7 +1434,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Ask Zuovis View --- */
+/* --- Ask sumi View --- */
 
 .main-content-ask-zuovis {
   margin-left: 0 !important;
@@ -1485,7 +1485,7 @@
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-/* --- Ask Zuovis Modal Overlay (permission & askUser) --- */
+/* --- Ask sumi Modal Overlay (permission & askUser) --- */
 
 .ask-modal-overlay {
   position: fixed;

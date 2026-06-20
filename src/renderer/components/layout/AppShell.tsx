@@ -24,6 +24,7 @@ import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
 import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
+import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
@@ -836,7 +837,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             }}
           >
             <div className="modal-title">新建工作区</div>
-            <div className="modal-subtitle">将创建在 ~/Documents/VisionAgent/ 下</div>
+            <div className="modal-subtitle">将创建在 ~/Documents/{DOCUMENTS_DIR_NAME}/ 下</div>
             <input
               className="modal-input"
               placeholder="工作区名称"

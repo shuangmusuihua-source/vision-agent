@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { extractToolPathInput, isPathAuthorized, toolRequiresPath } from '../src/main/agent-path-utils'
 
 function makeTempWorkspace() {
-  const root = mkdtempSync(path.join(tmpdir(), 'vision-agent-auth-'))
+  const root = mkdtempSync(path.join(tmpdir(), 'sumi-auth-'))
   const workspace = path.join(root, 'workspace')
   const outside = path.join(root, 'outside')
   mkdirSync(workspace)

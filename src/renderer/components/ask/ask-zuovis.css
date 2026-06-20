@@ -1,4 +1,4 @@
-/* ── Ask Zuovis layout ── */
+/* ── Ask sumi layout ── */
 
 .ask-zuovis {
   display: flex;
@@ -291,14 +291,14 @@
   padding: 16px 15% 24px;
 }
 
-/* ChatView inside AskZuovis — uses CSS Module, target by generic child selector */
+/* ChatView inside Ask sumi — uses CSS Module, target by generic child selector */
 .ask-zuovis-messages-inner > div {
   overflow: visible;
   height: auto;
   flex: none;
 }
 
-/* Ask Zuovis agent bubbles — more vertical breathing room */
+/* Ask sumi agent bubbles — more vertical breathing room */
 .ask-zuovis-messages-inner .message-assistant-text {
   padding-top: 12px;
   padding-bottom: 12px;
