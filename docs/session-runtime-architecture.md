@@ -62,7 +62,8 @@ It owns:
 - SDK-message-to-IPC routing with mandatory session envelope
 - text-delta batching, flush, and cleanup
 - skill-output bridge lifecycle
-- session-scoped abort and pending permission cleanup
+- pending permission / AskUser registration, timeout, SDK-abort cleanup, and routing
+- session-scoped abort and pending request cleanup
 
 It does not own:
 

@@ -7,18 +7,10 @@ import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } 
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord, recordSessionArtifactFromTool } from './store'
-import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
+import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { registerSession } from './agent-sessions'
 import { writeAuditLog } from './agent-audit'
-import {
-  registerPendingPermission,
-  registerPendingAskUser,
-  hasPendingPermission,
-  deletePendingPermission,
-  hasPendingAskUser,
-  deletePendingAskUser,
-} from './agent-permissions'
 import { addCompactionSessionId } from './store'
 import { addCompactionId } from './session-store'
 import { isPathAuthorized } from './agent-path-utils'
@@ -201,7 +193,6 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
       // AskUserQuestion — route to askUser flow instead of permission dialog
       if (toolName === 'AskUserQuestion') {
-        const requestId = `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         // SDK format: { questions: [{ question, header, options: [{ label, description }], multiSelect }] }
         const rawQuestions = input.questions as Array<Record<string, unknown>> | undefined
         const questionItems: AskUserQuestionItem[] = (rawQuestions || []).map((q) => {
@@ -219,32 +210,17 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         })
 
         const firstQ = questionItems[0]
-        sessionRuntime.emitAskUserRequest(mainWindow, currentEnvelope(), {
-          id: requestId,
+        return sessionRuntime.requestAskUserAnswer(mainWindow, currentEnvelope(), {
           questions: questionItems,
           question: firstQ?.question || '',
           header: firstQ?.header || '',
           options: firstQ?.options || [],
           multiSelect: firstQ?.multiSelect || false,
-        })
-
-        return new Promise<PermissionResult>((resolve) => {
-          const timeout = setTimeout(() => {
-            if (hasPendingAskUser(requestId)) {
-              deletePendingAskUser(requestId)
-              sessionRuntime.emitAskUserTimeout(mainWindow, currentEnvelope(), requestId)
-              resolve({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
-            }
-          }, 300000)
-
-          registerPendingAskUser(requestId, resolve, input, timeout, context, sessionEnvelope.sessionId)
-        })
+        }, input)
       }
 
       // All other tools (Bash, Write, Edit) require user approval
-      const requestId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      sessionRuntime.emitPermissionRequest(mainWindow, currentEnvelope(), {
-        id: requestId,
+      return sessionRuntime.requestPermissionApproval(mainWindow, currentEnvelope(), {
         toolName,
         input,
         // Forward SDK-provided display metadata for richer permission UI
@@ -252,38 +228,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         displayName: (options as Record<string, unknown>).displayName as string | undefined,
         description: (options as Record<string, unknown>).description as string | undefined,
         suggestions: (options as Record<string, unknown>).suggestions as PermissionUpdate[] | undefined,
-      })
-      schedulePermissionNotification(requestId, toolName)
-
-      return new Promise<PermissionResult>((resolve) => {
-        const cleanup = () => {
-          if (hasPendingPermission(requestId)) {
-            deletePendingPermission(requestId)
-            cancelPermissionNotification(requestId)
-            clearTimeout(timeout)
-          }
-        }
-
-        // AbortSignal: SDK cancelled this tool use
-        if (options.signal) {
-          options.signal.addEventListener('abort', () => {
-            cleanup()
-            sessionRuntime.emitPermissionTimeout(mainWindow, currentEnvelope(), requestId)
-            resolve({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
-          }, { once: true })
-        }
-
-        const timeout = setTimeout(() => {
-          if (hasPendingPermission(requestId)) {
-            deletePendingPermission(requestId)
-            cancelPermissionNotification(requestId)
-            sessionRuntime.emitPermissionTimeout(mainWindow, currentEnvelope(), requestId)
-            resolve({ behavior: 'deny', message: 'Permission request timed out' })
-          }
-        }, 300000)
-
-        registerPendingPermission(requestId, resolve, input, timeout, context, sessionEnvelope.sessionId)
-      })
+      }, options.signal)
     },
   })
 }

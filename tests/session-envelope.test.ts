@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSessionEnvelope, withSessionEnvelope } from '../src/main/session-envelope'
 import { scheduleTextBatch } from '../src/main/agent-text-batch'
 import { SessionRuntimeController } from '../src/main/session-runtime'
+import { resolveAskUser, resolvePermission } from '../src/main/agent-permissions'
 
 function fakeWindow() {
   const sent: Array<{ channel: string; payload: unknown }> = []
@@ -256,5 +257,87 @@ describe('session runtime event routing', () => {
       },
     })
     expect(runtime.getEnvelope('app-session-finalize')).toBeNull()
+  })
+
+  it('owns AskUser pending request registration and resolution', async () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-ask-user',
+      sdkSessionId: 'sdk-ask-user',
+      workspacePath: '/workspace/ask-user',
+    })
+
+    const pending = runtime.requestAskUserAnswer(win as never, envelope, {
+      questions: [{
+        question: 'Pick one',
+        header: 'Choice',
+        options: [{ label: 'A', description: 'First' }],
+        multiSelect: false,
+      }],
+      question: 'Pick one',
+      header: 'Choice',
+      options: [{ label: 'A', description: 'First' }],
+      multiSelect: false,
+    }, { questions: [] })
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0].channel).toBe('agent:askUser')
+    expect(sent[0].payload).toMatchObject({
+      context: 'editor',
+      sessionId: 'app-session-ask-user',
+      sdkSessionId: 'sdk-ask-user',
+      workspacePath: '/workspace/ask-user',
+      question: 'Pick one',
+    })
+
+    const requestId = (sent[0].payload as { id: string }).id
+    resolveAskUser(requestId, { Choice: 'A' })
+
+    await expect(pending).resolves.toMatchObject({
+      behavior: 'allow',
+      updatedInput: {
+        answers: { Choice: 'A' },
+      },
+    })
+  })
+
+  it('owns permission pending request registration and resolution', async () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-permission',
+      sdkSessionId: 'sdk-permission',
+      workspacePath: '/workspace/permission',
+    })
+    const input = { file_path: '/workspace/permission/file.md' }
+
+    const pending = runtime.requestPermissionApproval(win as never, envelope, {
+      toolName: 'Write',
+      input,
+      title: 'Write file',
+      displayName: 'Write',
+    })
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0].channel).toBe('agent:permissionRequest')
+    expect(sent[0].payload).toMatchObject({
+      context: 'editor',
+      sessionId: 'app-session-permission',
+      sdkSessionId: 'sdk-permission',
+      workspacePath: '/workspace/permission',
+      toolName: 'Write',
+      input,
+    })
+
+    const requestId = (sent[0].payload as { id: string }).id
+    resolvePermission(requestId, 'allow')
+
+    await expect(pending).resolves.toMatchObject({
+      behavior: 'allow',
+      updatedInput: input,
+    })
   })
 })

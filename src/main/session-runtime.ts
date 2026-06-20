@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import type {
   AgentIPCMessage,
   AgentSessionEnvelope,
@@ -10,9 +11,19 @@ import { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
 import {
+  deletePendingAskUser,
+  deletePendingPermission,
+  hasPendingAskUser,
+  hasPendingPermission,
+  registerPendingAskUser,
+  registerPendingPermission,
   rejectAllPendingAskUser,
   rejectAllPendingPermissions,
 } from './agent-permissions'
+import {
+  cancelPermissionNotification,
+  schedulePermissionNotification,
+} from './notification-manager'
 import {
   discardAllTextBatches,
   discardTextBatch,
@@ -35,6 +46,9 @@ export type SessionRuntimeStart = {
   abortController: AbortController
   envelope: AgentSessionEnvelope
 }
+
+type PermissionRequestInput = Omit<PermissionRequestIPC, keyof AgentSessionEnvelope | 'id'>
+type AskUserRequestInput = Omit<AskUserRequestIPC, keyof AgentSessionEnvelope | 'id'>
 
 export { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 
@@ -187,6 +201,98 @@ export class SessionRuntimeController {
     win.webContents.send('agent:askUserTimeout', withSessionEnvelope(envelope, { requestId }))
   }
 
+  requestAskUserAnswer(
+    win: BrowserWindow,
+    envelope: AgentSessionEnvelope,
+    request: AskUserRequestInput,
+    originalInput: Record<string, unknown>
+  ): Promise<PermissionResult> {
+    const requestId = this.createRequestId('ask')
+
+    return new Promise<PermissionResult>((resolve) => {
+      let settled = false
+      const settle = (result: PermissionResult) => {
+        if (settled) return
+        settled = true
+        resolve(result)
+      }
+
+      const timeout = setTimeout(() => {
+        if (!hasPendingAskUser(requestId)) return
+        deletePendingAskUser(requestId)
+        this.emitAskUserTimeout(win, envelope, requestId)
+        settle({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
+      }, 300000)
+
+      registerPendingAskUser(requestId, settle, originalInput, timeout, envelope.context, envelope.sessionId)
+      this.emitAskUserRequest(win, envelope, {
+        id: requestId,
+        ...request,
+      })
+    })
+  }
+
+  requestPermissionApproval(
+    win: BrowserWindow,
+    envelope: AgentSessionEnvelope,
+    request: PermissionRequestInput,
+    signal?: AbortSignal
+  ): Promise<PermissionResult> {
+    const requestId = this.createRequestId('perm')
+
+    return new Promise<PermissionResult>((resolve) => {
+      let settled = false
+      let abortHandler: (() => void) | null = null
+
+      const settle = (result: PermissionResult) => {
+        if (settled) return
+        settled = true
+        if (signal && abortHandler) {
+          signal.removeEventListener('abort', abortHandler)
+        }
+        resolve(result)
+      }
+
+      const cleanup = () => {
+        if (hasPendingPermission(requestId)) {
+          deletePendingPermission(requestId)
+          cancelPermissionNotification(requestId)
+          clearTimeout(timeout)
+        }
+      }
+
+      const timeout = setTimeout(() => {
+        if (!hasPendingPermission(requestId)) return
+        deletePendingPermission(requestId)
+        cancelPermissionNotification(requestId)
+        this.emitPermissionTimeout(win, envelope, requestId)
+        settle({ behavior: 'deny', message: 'Permission request timed out' })
+      }, 300000)
+
+      registerPendingPermission(requestId, settle, request.input, timeout, envelope.context, envelope.sessionId)
+
+      abortHandler = () => {
+        cleanup()
+        this.emitPermissionTimeout(win, envelope, requestId)
+        settle({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
+      }
+
+      if (signal) {
+        if (signal.aborted) {
+          abortHandler()
+          return
+        }
+        signal.addEventListener('abort', abortHandler, { once: true })
+      }
+
+      this.emitPermissionRequest(win, envelope, {
+        id: requestId,
+        ...request,
+      })
+      schedulePermissionNotification(requestId, request.toolName)
+    })
+  }
+
   emitNotification(
     win: BrowserWindow,
     envelope: AgentSessionEnvelope,
@@ -255,6 +361,10 @@ export class SessionRuntimeController {
       if (run.envelope.sdkSessionId === queryKey) return key
     }
     return null
+  }
+
+  private createRequestId(prefix: 'ask' | 'perm'): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   }
 }
 
