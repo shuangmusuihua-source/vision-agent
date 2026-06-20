@@ -8,6 +8,7 @@ import type {
 } from '../shared/types'
 import { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 import { SkillOutputBridge } from './skill-output-bridge'
+import { toAgentIPCMessage } from './message-converter'
 import {
   rejectAllPendingAskUser,
   rejectAllPendingPermissions,
@@ -16,6 +17,8 @@ import {
   discardAllTextBatches,
   discardTextBatch,
   flushTextBatch,
+  isTextDeltaEvent,
+  scheduleTextBatch,
 } from './agent-text-batch'
 
 interface ActiveSessionRun {
@@ -77,6 +80,15 @@ export class SessionRuntimeController {
     return this.activeRuns.get(sessionId)?.envelope ?? null
   }
 
+  resolveEventEnvelope(
+    sessionId: string,
+    fallback: AgentSessionEnvelope,
+    sdkSessionId?: string
+  ): AgentSessionEnvelope {
+    const envelope = this.getEnvelope(sessionId) || fallback
+    return sdkSessionId ? { ...envelope, sdkSessionId } : envelope
+  }
+
   materializeSdkSession(sessionId: string, sdkSessionId: string): AgentSessionEnvelope | null {
     const run = this.activeRuns.get(sessionId)
     if (!run) return null
@@ -91,6 +103,28 @@ export class SessionRuntimeController {
     this.skillOutputBridge.processRawEvent(sessionId, rawMessage, skillId)
   }
 
+  emitSdkMessage(
+    win: BrowserWindow,
+    sessionId: string,
+    envelope: AgentSessionEnvelope,
+    rawMessage: SDKMessage
+  ): void {
+    this.processSkillRawEvent(sessionId, rawMessage)
+
+    const textDeltaText = isTextDeltaEvent(rawMessage)
+    if (textDeltaText !== null) {
+      const uuid = (rawMessage as { uuid?: string }).uuid || ''
+      scheduleTextBatch(sessionId, textDeltaText, uuid, win, envelope)
+      return
+    }
+
+    this.flushText(sessionId, win)
+    const ipcMsg = toAgentIPCMessage(rawMessage)
+    if (ipcMsg) {
+      this.emitAgentEvent(win, envelope, ipcMsg)
+    }
+  }
+
   flushText(sessionId: string, win: BrowserWindow): void {
     flushTextBatch(sessionId, win)
   }
@@ -102,6 +136,22 @@ export class SessionRuntimeController {
   ): void {
     if (win.isDestroyed()) return
     win.webContents.send('agent:event', withSessionEnvelope(envelope, message as unknown as Record<string, unknown>))
+  }
+
+  emitExecutionError(win: BrowserWindow, envelope: AgentSessionEnvelope, message: string): void {
+    this.emitAgentEvent(win, envelope, {
+      type: 'result',
+      subtype: 'error_during_execution',
+      errors: [message],
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_creation_tokens: 0,
+      },
+      total_cost_usd: 0,
+      duration_ms: 0,
+    } as AgentIPCMessage)
   }
 
   emitSessionCreated(win: BrowserWindow, envelope: AgentSessionEnvelope): void {
@@ -192,6 +242,11 @@ export class SessionRuntimeController {
     }
     rejectAllPendingPermissions(sessionId)
     rejectAllPendingAskUser(sessionId)
+  }
+
+  finalizeRun(win: BrowserWindow, sessionId: string, instanceId: number): void {
+    this.flushText(sessionId, win)
+    this.cleanupRun(sessionId, instanceId)
   }
 
   private findRunKey(queryKey: string): string | null {

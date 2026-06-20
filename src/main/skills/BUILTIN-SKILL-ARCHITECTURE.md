@@ -154,14 +154,12 @@ sessionRuntime.registerRun({ query, skillId, abortController, envelope })
 
 ```ts
 for await (const message of messageStream) {
-  // 1. 先喂原始 SDK 事件给 bridge（在转换之前！）
-  sessionRuntime.processSkillRawEvent(appSessionId, message)
-
-  // 2. 再转换为应用级 IPC 消息，并由 runtime 附加 AgentSessionEnvelope
-  const ipcMsg = toAgentIPCMessage(message)
-  if (ipcMsg) {
-    sessionRuntime.emitAgentEvent(mainWindow, envelope, ipcMsg)
-  }
+  // runtime 在同一个入口里完成：
+  // 1. 原始 SDK 事件进入 SkillOutputBridge（转换之前！）
+  // 2. text_delta 批处理，保持顺序
+  // 3. 非文本事件转换为应用级 IPC 消息
+  // 4. 所有跨 IPC payload 附加 AgentSessionEnvelope
+  sessionRuntime.emitSdkMessage(mainWindow, appSessionId, envelope, message)
 }
 ```
 

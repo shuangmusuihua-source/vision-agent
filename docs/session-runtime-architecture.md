@@ -4,7 +4,7 @@
 
 The product has two session entry points:
 
-- Ask Zuovis: one app-level general assistant session.
+- Ask sumi: one app-level general assistant session.
 - Workspace sessions: many sessions under many user-created workspaces.
 
 All sessions must be isolated and may run concurrently. A background session's
@@ -59,18 +59,22 @@ It owns:
 - active SDK query handles keyed by app session id
 - AbortController lifecycle
 - SDK session materialization into the app envelope
-- event emission with mandatory session envelope
-- text batch cleanup
+- SDK-message-to-IPC routing with mandatory session envelope
+- text-delta batching, flush, and cleanup
 - skill-output bridge lifecycle
 - session-scoped abort and pending permission cleanup
 
 It does not own:
 
-- SDK message conversion
 - model/tool option construction
 - renderer UI state
 - persisted session records
 - artifact persistence
+
+The controller intentionally owns SDK message conversion at the routing seam:
+raw SDK events enter once, then the controller fans them out to skill output,
+batched text deltas, and `agent:event`. This keeps ordering and envelope
+attachment in one module.
 
 ### Event Protocol
 

@@ -5,8 +5,7 @@ import { execFileSync } from 'child_process'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
-import { toAgentIPCMessage } from './message-converter'
-import type { AgentIPCMessage, AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
+import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete, schedulePermissionNotification, cancelPermissionNotification } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
@@ -20,7 +19,6 @@ import {
   hasPendingAskUser,
   deletePendingAskUser,
 } from './agent-permissions'
-import { scheduleTextBatch, isTextDeltaEvent } from './agent-text-batch'
 import { addCompactionSessionId } from './store'
 import { addCompactionId } from './session-store'
 import { isPathAuthorized } from './agent-path-utils'
@@ -392,31 +390,9 @@ export async function sendMessage(
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
 
-      // Feed raw SDK event to skill output bridge (before conversion)
-      sessionRuntime.processSkillRawEvent(queryKey, message)
-
-      // P1 optimization: check text_delta FIRST — if it is one, batch it and
-      // skip the expensive toAgentIPCMessage conversion (the result is unused).
-      const textDeltaText = isTextDeltaEvent(message)
       const sdkSessionId = message.session_id || currentSessionId || runtimeEnvelope.sdkSessionId || undefined
-      const eventEnvelope = sdkSessionId ? { ...runtimeEnvelope, sdkSessionId } : runtimeEnvelope
-      if (textDeltaText !== null) {
-        // Batch text_delta events: accumulate and flush every ~30ms
-        const uuid = message.uuid || ''
-        scheduleTextBatch(queryKey, textDeltaText, uuid, mainWindow, eventEnvelope)
-      } else {
-        // Non-text event (tool_use, content_block_start/stop, result, etc.)
-        // Flush any pending text batch FIRST to preserve event ordering
-        sessionRuntime.flushText(queryKey, mainWindow)
-
-        const ipcMsg = toAgentIPCMessage(message)
-        // Thread sessionId through every event so the renderer can validate
-        // and drop stale events after a session switch
-
-        if (ipcMsg) {
-          sessionRuntime.emitAgentEvent(mainWindow, eventEnvelope, ipcMsg)
-        }
-      }
+      const eventEnvelope = sessionRuntime.resolveEventEnvelope(queryKey, runtimeEnvelope, sdkSessionId)
+      sessionRuntime.emitSdkMessage(mainWindow, queryKey, eventEnvelope, message)
 
       // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSessionId && message.session_id) {
@@ -468,21 +444,12 @@ export async function sendMessage(
       userMessage = '请求频率过高，请稍后重试。'
     }
     if (!mainWindow.isDestroyed()) {
-      sessionRuntime.emitAgentEvent(mainWindow, {
+      sessionRuntime.emitExecutionError(mainWindow, {
         ...runtimeEnvelope,
         sdkSessionId: currentSessionId || runtimeEnvelope.sdkSessionId,
-      }, {
-        type: 'result',
-        subtype: 'error_during_execution',
-        errors: [userMessage],
-        usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
-        total_cost_usd: 0,
-        duration_ms: 0,
-      } as AgentIPCMessage)
+      }, userMessage)
     }
   } finally {
-    // Flush any remaining batched text (if stream errored before for-await finished)
-    sessionRuntime.flushText(queryKey, mainWindow)
-    sessionRuntime.cleanupRun(queryKey, queryInstanceId)
+    sessionRuntime.finalizeRun(mainWindow, queryKey, queryInstanceId)
   }
 }
