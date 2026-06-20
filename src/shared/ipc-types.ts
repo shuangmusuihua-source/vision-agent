@@ -35,7 +35,7 @@ export type IPCChannelMap = {
     response: { started: boolean }
   }
   'agent:abort': {
-    request: string | undefined
+    request: { contextOrSessionId?: string }
     response: { success: boolean }
   }
   'agent:selectFolder': {
@@ -66,7 +66,7 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'agent:listSdkSessions': {
-    request: string | undefined
+    request: { workspaceCwd?: string }
     response: SdkSessionInfo[]
   }
   'agent:loadSessionMessages': {

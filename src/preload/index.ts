@@ -14,6 +14,7 @@ import type { IPCChannelMap, IPCRequest, IPCResponse } from '../shared/ipc-types
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
 type AgentRespondAskUserRequest = IPCRequest<'agent:respondAskUser'>
+type AgentListSdkSessionsRequest = IPCRequest<'agent:listSdkSessions'>
 type AgentLoadSessionMessagesRequest = IPCRequest<'agent:loadSessionMessages'>
 type AgentLoadSessionMessagesPaginatedRequest = IPCRequest<'agent:loadSessionMessagesPaginated'>
 type AgentRenameSessionRequest = IPCRequest<'agent:renameSession'>
@@ -23,6 +24,7 @@ type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
+type AgentAbortRequest = IPCRequest<'agent:abort'>
 
 function invoke<K extends keyof IPCChannelMap>(
   channel: K,
@@ -114,7 +116,10 @@ const api = {
       const request: AgentRespondAskUserRequest = { requestId, answers }
       return invoke('agent:respondAskUser', request)
     },
-    listSdkSessions: (workspaceCwd?: string) => invoke('agent:listSdkSessions', workspaceCwd),
+    listSdkSessions: (workspaceCwd?: string) => {
+      const request: AgentListSdkSessionsRequest = { workspaceCwd }
+      return invoke('agent:listSdkSessions', request)
+    },
     loadSessionMessages: (sessionId: string) => {
       const request: AgentLoadSessionMessagesRequest = { sessionId }
       return invoke('agent:loadSessionMessages', request)
@@ -135,7 +140,10 @@ const api = {
       const request: AgentRemoveSessionRecordRequest = { sessionId }
       return invoke('agent:removeSessionRecord', request)
     },
-    abort: (contextOrSessionId?: string) => invoke('agent:abort', contextOrSessionId),
+    abort: (contextOrSessionId?: string) => {
+      const request: AgentAbortRequest = { contextOrSessionId }
+      return invoke('agent:abort', request)
+    },
     setPermissionMode: (context: 'editor' | 'ask', mode: string) => {
       const request: AgentSetPermissionModeRequest = { context, mode }
       return invoke('agent:setPermissionMode', request)

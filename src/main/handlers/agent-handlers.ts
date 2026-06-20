@@ -8,6 +8,7 @@ import type { IPCRequest } from '../../shared/ipc-types'
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
 type AgentRespondAskUserRequest = IPCRequest<'agent:respondAskUser'>
+type AgentListSdkSessionsRequest = IPCRequest<'agent:listSdkSessions'>
 type AgentLoadSessionMessagesRequest = IPCRequest<'agent:loadSessionMessages'>
 type AgentLoadSessionMessagesPaginatedRequest = IPCRequest<'agent:loadSessionMessagesPaginated'>
 type AgentRenameSessionRequest = IPCRequest<'agent:renameSession'>
@@ -17,6 +18,7 @@ type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
+type AgentAbortRequest = IPCRequest<'agent:abort'>
 
 function isObjectRequest<T extends object>(value: T | string | undefined): value is T {
   return typeof value === 'object' && value !== null
@@ -86,7 +88,12 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:listSdkSessions', async (_event, workspaceCwd?: string) => await listSdkSessions(workspaceCwd))
+  ipcMain.handle('agent:listSdkSessions', async (_event, requestOrWorkspace?: AgentListSdkSessionsRequest | string) => {
+    const workspaceCwd = isObjectRequest(requestOrWorkspace)
+      ? requestOrWorkspace.workspaceCwd
+      : requestOrWorkspace
+    return await listSdkSessions(workspaceCwd)
+  })
 
   ipcMain.handle('agent:loadSessionMessages', async (_event, requestOrId: AgentLoadSessionMessagesRequest | string, limit?: number, offset?: number) => {
     const request: AgentLoadSessionMessagesRequest = isObjectRequest(requestOrId)
@@ -130,7 +137,10 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:abort', (_event, contextOrSessionId?: string) => {
+  ipcMain.handle('agent:abort', (_event, requestOrContext?: AgentAbortRequest | string) => {
+    const contextOrSessionId = isObjectRequest(requestOrContext)
+      ? requestOrContext.contextOrSessionId
+      : requestOrContext
     // Supports both AgentContext ('editor'|'ask') and sessionId for parallel streaming
     abortActiveQuery(contextOrSessionId)
     return { success: true }
