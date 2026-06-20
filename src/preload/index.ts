@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AgentIPCMessageWithContext,
+  AgentNotificationEvent,
   AgentSessionEnvelope,
   ModelProfile,
   SdkSessionInfo,
@@ -143,8 +144,8 @@ const api = {
       return () => { ipcRenderer.removeListener('skill:output', handler) }
     },
 
-    onNotification: (callback: (data: { type: string; message: string; title: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { type: string; message: string; title: string }) => callback(data)
+    onNotification: (callback: (data: AgentNotificationEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: AgentNotificationEvent) => callback(data)
       ipcRenderer.on('agent:notification', handler)
       return () => { ipcRenderer.removeListener('agent:notification', handler) }
     },

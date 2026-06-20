@@ -233,6 +233,37 @@ describe('session runtime event routing', () => {
     })
   })
 
+  it('emits agent notifications with the session envelope', () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-notification',
+      sdkSessionId: 'sdk-session-notification',
+      workspacePath: '/workspace/notification',
+    })
+
+    runtime.emitNotification(win as never, envelope, {
+      type: 'info',
+      title: 'Heads up',
+      message: 'Agent needs attention',
+    })
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0].channel).toBe('agent:notification')
+    expect(sent[0].payload).toMatchObject({
+      type: 'info',
+      title: 'Heads up',
+      message: 'Agent needs attention',
+      context: 'editor',
+      sessionId: 'app-session-notification',
+      clientSessionKey: 'app-session-notification',
+      sdkSessionId: 'sdk-session-notification',
+      workspacePath: '/workspace/notification',
+      workspaceCwd: '/workspace/notification',
+    })
+  })
+
   it('resolves event envelopes from the active runtime run', () => {
     const runtime = new SessionRuntimeController()
     const envelope = createSessionEnvelope({

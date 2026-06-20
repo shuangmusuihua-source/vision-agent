@@ -250,6 +250,15 @@ export type SessionRoutedAskUserRequest = AskUserRequestIPC & AgentSessionEnvelo
 export type SessionRoutedRequestTimeout = { requestId: string } & AgentSessionEnvelope
 export type SessionRoutedNotification = { type: string; message: string; title: string } & AgentSessionEnvelope
 export type SessionRoutedSkillOutputState = SkillOutputState & AgentSessionEnvelope
+export type GeneralAgentNotification = {
+  type: string
+  message: string
+  title: string
+  workspaceCwd?: string
+}
+export type AgentNotificationEvent =
+  | GeneralAgentNotification
+  | (SessionRoutedNotification & { workspaceCwd?: string })
 
 export type AgentIPCMessageWithContext = SessionRoutedAgentIPCMessage
 

@@ -99,6 +99,11 @@ Live IPC event types use session-routed payload aliases such as
 transcript replay remains allowed to carry plain `AgentIPCMessage` values
 because history loading resolves ownership from the selected session.
 
+`agent:notification` is a union: SDK hook notifications that affect an agent
+session must use `SessionRoutedNotification`, while app-level notifications
+such as cron failures can use `GeneralAgentNotification` without session
+ownership.
+
 ## Persistence Boundaries
 
 - `workspace-store.ts`: app session metadata, workspace ownership, titles, counts.

@@ -5,6 +5,7 @@ import type {
   AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentSessionEnvelope,
+  AgentNotificationEvent,
   ModelProfile,
   SdkSessionInfo,
   SessionRoutedAskUserRequest,
@@ -239,7 +240,7 @@ export type IPCEventMap = {
   'agent:askUser': SessionRoutedAskUserRequest
   'agent:askUserTimeout': SessionRoutedRequestTimeout
   'agent:permissionTimeout': SessionRoutedRequestTimeout
-  'agent:notification': { type: string; message: string; title: string }
+  'agent:notification': AgentNotificationEvent
   'skill:output': SessionRoutedSkillOutputState
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[] }

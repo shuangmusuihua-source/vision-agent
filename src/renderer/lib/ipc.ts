@@ -2,6 +2,7 @@ import type {
   AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentContext,
+  AgentNotificationEvent,
   AgentSessionEnvelope,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
@@ -144,7 +145,7 @@ interface AgentApi {
   onAskUser: (callback: (data: SessionRoutedAskUserRequest) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
   onPermissionTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
-  onNotification: (callback: (data: { type: string; message: string; title: string } & Partial<AgentSessionEnvelope>) => void) => () => void
+  onNotification: (callback: (data: AgentNotificationEvent) => void) => () => void
   onSkillOutput: (callback: (state: SessionRoutedSkillOutputState) => void) => () => void
 }
 
