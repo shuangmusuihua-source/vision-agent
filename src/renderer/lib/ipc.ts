@@ -126,15 +126,15 @@ interface AgentApi {
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
   loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
   loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }>
-  renameSession: (sessionId: string, title: string) => Promise<void>
-	  updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
+  renameSession: (sessionId: string, title: string) => Promise<{ success: boolean }>
+  updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
   setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean }>
   forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => Promise<{ success: boolean; sessionId?: string; error?: string }>
   selectFolder: () => Promise<Electron.OpenDialogReturnValue>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
-  removeSessionRecord: (sessionId: string) => Promise<void>
+  removeSessionRecord: (sessionId: string) => Promise<{ success: boolean }>
 
   // Unified event channel
   onEvent: (callback: (msg: AgentIPCMessageWithContext) => void) => () => void

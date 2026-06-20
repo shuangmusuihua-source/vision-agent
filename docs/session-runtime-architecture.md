@@ -93,6 +93,11 @@ The following main-to-renderer event families must include the envelope:
 If a new event affects a session, it must be emitted through the runtime
 controller or use `withSessionEnvelope()` before crossing IPC.
 
+Agent request/response IPC should send object payloads matching
+`IPCChannelMap`. Main-process handlers may keep legacy positional-argument
+normalizers only as compatibility shims; new calls should not add new
+positional IPC signatures.
+
 Live IPC event types use session-routed payload aliases such as
 `AgentIPCMessageWithContext`, `SessionRoutedPermissionRequest`, and
 `SessionRoutedAskUserRequest`, and `SessionRoutedSkillOutputState`. SDK

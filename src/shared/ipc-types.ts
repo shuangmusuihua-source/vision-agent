@@ -8,6 +8,7 @@ import type {
   AgentNotificationEvent,
   ModelProfile,
   SdkSessionInfo,
+  SessionOutputs,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   SessionRoutedRequestTimeout,
@@ -69,8 +70,32 @@ export type IPCChannelMap = {
     response: SdkSessionInfo[]
   }
   'agent:loadSessionMessages': {
-    request: { sessionId: string }
+    request: { sessionId: string; limit?: number; offset?: number }
     response: AgentIPCMessage[]
+  }
+  'agent:loadSessionMessagesPaginated': {
+    request: { sessionId: string; limit: number; offset: number }
+    response: { messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }
+  }
+  'agent:renameSession': {
+    request: { sessionId: string; title: string }
+    response: { success: boolean }
+  }
+  'agent:updateSessionRecord': {
+    request: { sessionId: string; patch: Record<string, unknown> }
+    response: { success: boolean }
+  }
+  'agent:removeSessionRecord': {
+    request: { sessionId: string }
+    response: { success: boolean }
+  }
+  'agent:deleteSession': {
+    request: { sessionId: string }
+    response: { success: boolean }
+  }
+  'agent:getSessionOutputs': {
+    request: { sessionId: string }
+    response: SessionOutputs | null
   }
 
   // Workspace
