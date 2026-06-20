@@ -9,6 +9,9 @@ import type {
   SessionRoutedPermissionRequest,
   SessionRoutedSkillOutputState,
 } from '../shared/types'
+import type { IPCRequest } from '../shared/ipc-types'
+
+type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -72,8 +75,19 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string, clientSessionKey?: string) =>
-      ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId, context, workspacePath, title, clientSessionKey),
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string, clientSessionKey?: string) => {
+      const request: AgentSendMessageRequest = {
+        prompt,
+        sessionId,
+        activeFilePath,
+        skillId,
+        context,
+        workspacePath,
+        title,
+        clientSessionKey,
+      }
+      return ipcRenderer.invoke('agent:sendMessage', request)
+    },
     respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) =>
       ipcRenderer.invoke('agent:permissionResponse', requestId, behavior, options),
     respondAskUser: (requestId: string, answers: Record<string, string>) =>

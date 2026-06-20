@@ -28,6 +28,7 @@ export type IPCChannelMap = {
       skillId?: string
       context?: 'editor' | 'ask'
       workspacePath?: string
+      title?: string
       clientSessionKey?: string
     }
     response: { started: boolean }

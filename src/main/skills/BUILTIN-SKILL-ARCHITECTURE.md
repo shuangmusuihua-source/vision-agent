@@ -182,7 +182,7 @@ onSkillOutput: (callback: (state: SessionRoutedSkillOutputState) => void) => {
 
 // sendMessage 增加 skillId 参数
 sendMessage: (prompt, sessionId?, activeFilePath?, skillId?) =>
-  ipcRenderer.invoke('agent:sendMessage', prompt, sessionId, activeFilePath, skillId),
+  ipcRenderer.invoke('agent:sendMessage', { prompt, sessionId, activeFilePath, skillId }),
 ```
 
 ### 5. Renderer Store — Zustand

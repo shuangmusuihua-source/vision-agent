@@ -3,12 +3,50 @@ import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession } from '../agent-manager'
 import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactFromTool } from '../store'
 import type { AgentContext } from '../../shared/types'
+import type { IPCRequest } from '../../shared/ipc-types'
+
+type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
+
+function normalizeSendMessageRequest(
+  requestOrPrompt: AgentSendMessageRequest | string,
+  sessionId?: string,
+  activeFilePath?: string,
+  skillId?: string,
+  context?: AgentContext,
+  workspacePath?: string,
+  title?: string,
+  clientSessionKey?: string
+): AgentSendMessageRequest {
+  if (typeof requestOrPrompt === 'object' && requestOrPrompt !== null) {
+    return requestOrPrompt
+  }
+  return {
+    prompt: requestOrPrompt,
+    sessionId,
+    activeFilePath,
+    skillId,
+    context,
+    workspacePath,
+    title,
+    clientSessionKey,
+  }
+}
 
 export function registerAgentHandlers(): void {
-  ipcMain.handle('agent:sendMessage', async (_event, prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, _title?: string, clientSessionKey?: string) => {
+  ipcMain.handle('agent:sendMessage', async (_event, requestOrPrompt: AgentSendMessageRequest | string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string, clientSessionKey?: string) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    sendMessage(window, prompt, sessionId, activeFilePath, context || 'editor', skillId || null, workspacePath, clientSessionKey)
+    const request = normalizeSendMessageRequest(
+      requestOrPrompt,
+      sessionId,
+      activeFilePath,
+      skillId,
+      context,
+      workspacePath,
+      title,
+      clientSessionKey
+    )
+    sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey)
     return { started: true }
   })
 
