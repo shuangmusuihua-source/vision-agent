@@ -19,6 +19,8 @@ import {
   registerPendingPermission,
   rejectAllPendingAskUser,
   rejectAllPendingPermissions,
+  resolveAskUser as resolvePendingAskUser,
+  resolvePermission as resolvePendingPermission,
 } from './agent-permissions'
 import {
   cancelPermissionNotification,
@@ -49,6 +51,7 @@ export type SessionRuntimeStart = {
 
 type PermissionRequestInput = Omit<PermissionRequestIPC, keyof AgentSessionEnvelope | 'id'>
 type AskUserRequestInput = Omit<AskUserRequestIPC, keyof AgentSessionEnvelope | 'id'>
+type PermissionResponseOptions = Parameters<typeof resolvePendingPermission>[2]
 
 export { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 
@@ -293,6 +296,18 @@ export class SessionRuntimeController {
     })
   }
 
+  resolvePermission(
+    requestId: string,
+    behavior: 'allow' | 'deny',
+    options?: PermissionResponseOptions
+  ): void {
+    resolvePendingPermission(requestId, behavior, options)
+  }
+
+  resolveAskUser(requestId: string, answers: Record<string, string>): void {
+    resolvePendingAskUser(requestId, answers)
+  }
+
   emitNotification(
     win: BrowserWindow,
     envelope: AgentSessionEnvelope,
@@ -369,3 +384,15 @@ export class SessionRuntimeController {
 }
 
 export const sessionRuntime = new SessionRuntimeController()
+
+export function resolvePermission(
+  requestId: string,
+  behavior: 'allow' | 'deny',
+  options?: PermissionResponseOptions
+): void {
+  sessionRuntime.resolvePermission(requestId, behavior, options)
+}
+
+export function resolveAskUser(requestId: string, answers: Record<string, string>): void {
+  sessionRuntime.resolveAskUser(requestId, answers)
+}

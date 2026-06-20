@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { createSessionEnvelope, withSessionEnvelope } from '../src/main/session-envelope'
 import { scheduleTextBatch } from '../src/main/agent-text-batch'
 import { SessionRuntimeController } from '../src/main/session-runtime'
-import { resolveAskUser, resolvePermission } from '../src/main/agent-permissions'
 
 function fakeWindow() {
   const sent: Array<{ channel: string; payload: unknown }> = []
@@ -293,7 +292,7 @@ describe('session runtime event routing', () => {
     })
 
     const requestId = (sent[0].payload as { id: string }).id
-    resolveAskUser(requestId, { Choice: 'A' })
+    runtime.resolveAskUser(requestId, { Choice: 'A' })
 
     await expect(pending).resolves.toMatchObject({
       behavior: 'allow',
@@ -333,11 +332,105 @@ describe('session runtime event routing', () => {
     })
 
     const requestId = (sent[0].payload as { id: string }).id
-    resolvePermission(requestId, 'allow')
+    runtime.resolvePermission(requestId, 'allow')
 
     await expect(pending).resolves.toMatchObject({
       behavior: 'allow',
       updatedInput: input,
+    })
+  })
+
+  it('keeps parallel session messages and prompts routed to their own envelopes', async () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelopeA = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'workspace-a-session',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+    })
+    const envelopeB = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'workspace-b-session',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+    })
+    const instanceA = runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: new AbortController(),
+      envelope: envelopeA,
+    })
+    runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: new AbortController(),
+      envelope: envelopeB,
+    })
+
+    runtime.emitSdkMessage(win as never, 'workspace-a-session', envelopeA, {
+      type: 'stream_event',
+      uuid: 'a-delta',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'answer for A' },
+      },
+    } as never)
+
+    const permission = runtime.requestPermissionApproval(win as never, envelopeB, {
+      toolName: 'Write',
+      input: { file_path: '/workspace/b/result.md' },
+    })
+
+    const permissionEvent = sent.find((event) => event.channel === 'agent:permissionRequest')
+    expect(permissionEvent?.payload).toMatchObject({
+      sessionId: 'workspace-b-session',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+      toolName: 'Write',
+    })
+
+    runtime.emitSdkMessage(win as never, 'workspace-b-session', envelopeB, {
+      type: 'assistant',
+      uuid: 'b-assistant',
+      message: {
+        content: [{ type: 'text', text: 'answer for B' }],
+      },
+    } as never)
+
+    runtime.finalizeRun(win as never, 'workspace-a-session', instanceA)
+
+    const bMessage = sent.find((event) => (
+      event.channel === 'agent:event'
+      && (event.payload as { uuid?: string }).uuid === 'b-assistant'
+    ))
+    const aMessage = sent.find((event) => (
+      event.channel === 'agent:event'
+      && (event.payload as { uuid?: string }).uuid === 'a-delta'
+    ))
+
+    expect(bMessage?.payload).toMatchObject({
+      sessionId: 'workspace-b-session',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+      type: 'assistant',
+    })
+    expect(aMessage?.payload).toMatchObject({
+      sessionId: 'workspace-a-session',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+      type: 'stream_event',
+      event: {
+        delta: { text: 'answer for A' },
+      },
+    })
+
+    const requestId = (permissionEvent?.payload as { id: string }).id
+    runtime.resolvePermission(requestId, 'allow')
+    await expect(permission).resolves.toMatchObject({
+      behavior: 'allow',
+      updatedInput: { file_path: '/workspace/b/result.md' },
     })
   })
 })

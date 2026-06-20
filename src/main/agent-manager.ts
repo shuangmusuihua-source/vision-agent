@@ -32,4 +32,4 @@ export {
 // These are still owned by their original modules; re-exported for compatibility
 export { getSessionInfo, type SessionInfo } from './agent-sessions'
 export { registerSession } from './agent-sessions'
-export { resolvePermission, resolveAskUser } from './agent-permissions'
+export { resolvePermission, resolveAskUser } from './session-runtime'
