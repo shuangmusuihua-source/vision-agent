@@ -36,7 +36,7 @@ export type IPCChannelMap = {
   }
   'agent:abort': {
     request: string | undefined
-    response: void
+    response: { success: boolean }
   }
   'agent:selectFolder': {
     request: void

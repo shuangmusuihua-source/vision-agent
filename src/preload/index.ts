@@ -9,7 +9,7 @@ import type {
   SessionRoutedPermissionRequest,
   SessionRoutedSkillOutputState,
 } from '../shared/types'
-import type { IPCRequest } from '../shared/ipc-types'
+import type { IPCChannelMap, IPCRequest, IPCResponse } from '../shared/ipc-types'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -23,6 +23,13 @@ type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
+
+function invoke<K extends keyof IPCChannelMap>(
+  channel: K,
+  request: IPCRequest<K>
+): Promise<IPCResponse<K>> {
+  return ipcRenderer.invoke(channel, request) as Promise<IPCResponse<K>>
+}
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
@@ -97,54 +104,54 @@ const api = {
         title,
         clientSessionKey,
       }
-      return ipcRenderer.invoke('agent:sendMessage', request)
+      return invoke('agent:sendMessage', request)
     },
     respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
       const request: AgentPermissionResponseRequest = { requestId, behavior, options }
-      return ipcRenderer.invoke('agent:permissionResponse', request)
+      return invoke('agent:permissionResponse', request)
     },
     respondAskUser: (requestId: string, answers: Record<string, string>) => {
       const request: AgentRespondAskUserRequest = { requestId, answers }
-      return ipcRenderer.invoke('agent:respondAskUser', request)
+      return invoke('agent:respondAskUser', request)
     },
-    listSdkSessions: (workspaceCwd?: string) => ipcRenderer.invoke('agent:listSdkSessions', workspaceCwd),
+    listSdkSessions: (workspaceCwd?: string) => invoke('agent:listSdkSessions', workspaceCwd),
     loadSessionMessages: (sessionId: string) => {
       const request: AgentLoadSessionMessagesRequest = { sessionId }
-      return ipcRenderer.invoke('agent:loadSessionMessages', request)
+      return invoke('agent:loadSessionMessages', request)
     },
     loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => {
       const request: AgentLoadSessionMessagesPaginatedRequest = { sessionId, limit, offset }
-      return ipcRenderer.invoke('agent:loadSessionMessagesPaginated', request)
+      return invoke('agent:loadSessionMessagesPaginated', request)
     },
     renameSession: (sessionId: string, title: string) => {
       const request: AgentRenameSessionRequest = { sessionId, title }
-      return ipcRenderer.invoke('agent:renameSession', request)
+      return invoke('agent:renameSession', request)
     },
     updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => {
       const request: AgentUpdateSessionRecordRequest = { sessionId, patch }
-      return ipcRenderer.invoke('agent:updateSessionRecord', request)
+      return invoke('agent:updateSessionRecord', request)
     },
     removeSessionRecord: (sessionId: string) => {
       const request: AgentRemoveSessionRecordRequest = { sessionId }
-      return ipcRenderer.invoke('agent:removeSessionRecord', request)
+      return invoke('agent:removeSessionRecord', request)
     },
-    abort: (contextOrSessionId?: string) => ipcRenderer.invoke('agent:abort', contextOrSessionId),
+    abort: (contextOrSessionId?: string) => invoke('agent:abort', contextOrSessionId),
     setPermissionMode: (context: 'editor' | 'ask', mode: string) => {
       const request: AgentSetPermissionModeRequest = { context, mode }
-      return ipcRenderer.invoke('agent:setPermissionMode', request)
+      return invoke('agent:setPermissionMode', request)
     },
     forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => {
       const request: AgentForkSessionRequest = { sessionId, options }
-      return ipcRenderer.invoke('agent:forkSession', request)
+      return invoke('agent:forkSession', request)
     },
-    selectFolder: () => ipcRenderer.invoke('agent:selectFolder'),
+    selectFolder: () => invoke('agent:selectFolder', undefined),
     getSessionOutputs: (sessionId: string) => {
       const request: AgentGetSessionOutputsRequest = { sessionId }
-      return ipcRenderer.invoke('agent:getSessionOutputs', request)
+      return invoke('agent:getSessionOutputs', request)
     },
     deleteSession: (sessionId: string) => {
       const request: AgentDeleteSessionRequest = { sessionId }
-      return ipcRenderer.invoke('agent:deleteSession', request)
+      return invoke('agent:deleteSession', request)
     },
 
     // ── Unified event channel ────────────────────────────────────────
