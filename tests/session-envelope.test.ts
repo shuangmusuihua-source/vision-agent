@@ -166,6 +166,49 @@ describe('session runtime event routing', () => {
     })
   })
 
+  it('emits skill output with the session envelope', () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-skill-output',
+      sdkSessionId: 'sdk-session-skill-output',
+      workspacePath: '/workspace/skill-output',
+    })
+    const instanceId = runtime.registerRun({
+      query: {} as never,
+      skillId: 'slides',
+      abortController: new AbortController(),
+      envelope,
+    })
+
+    runtime.setSkillOutputWindow(win as never)
+    runtime.beginSession(envelope)
+    runtime.emitSdkMessage(win as never, 'app-session-skill-output', envelope, {
+      type: 'stream_event',
+      uuid: 'skill-delta-1',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: '```skill-output\n<html>' },
+      },
+    } as never)
+    runtime.cleanupRun('app-session-skill-output', instanceId)
+
+    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
+    expect(skillOutput?.payload).toMatchObject({
+      skillId: 'slides',
+      content: '<html>',
+      isStreaming: true,
+      language: 'html',
+      context: 'editor',
+      sessionId: 'app-session-skill-output',
+      clientSessionKey: 'app-session-skill-output',
+      sdkSessionId: 'sdk-session-skill-output',
+      workspacePath: '/workspace/skill-output',
+    })
+  })
+
   it('emits execution errors with the session envelope', () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()

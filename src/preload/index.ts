@@ -6,7 +6,7 @@ import type {
   SdkSessionInfo,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
-  SkillOutputState,
+  SessionRoutedSkillOutputState,
 } from '../shared/types'
 
 const api = {
@@ -137,8 +137,8 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:permissionTimeout', handler) }
     },
 
-    onSkillOutput: (callback: (state: SkillOutputState) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, state: SkillOutputState) => callback(state)
+    onSkillOutput: (callback: (state: SessionRoutedSkillOutputState) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: SessionRoutedSkillOutputState) => callback(state)
       ipcRenderer.on('skill:output', handler)
       return () => { ipcRenderer.removeListener('skill:output', handler) }
     },

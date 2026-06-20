@@ -10,6 +10,7 @@ import type {
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   SessionRoutedRequestTimeout,
+  SessionRoutedSkillOutputState,
   UsageInfo,
   GraphData,
 } from './types'
@@ -239,6 +240,7 @@ export type IPCEventMap = {
   'agent:askUserTimeout': SessionRoutedRequestTimeout
   'agent:permissionTimeout': SessionRoutedRequestTimeout
   'agent:notification': { type: string; message: string; title: string }
+  'skill:output': SessionRoutedSkillOutputState
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[] }
   'cron:taskCompleted': unknown

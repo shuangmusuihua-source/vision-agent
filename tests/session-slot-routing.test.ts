@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import { sessionListReducer } from '../src/renderer/store/session-protocol'
-import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SkillOutputState } from '../src/shared/types'
+import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SessionRoutedSkillOutputState } from '../src/shared/types'
 
 function resetStore() {
   useAgentStore.setState({
@@ -143,13 +143,15 @@ describe('session-scoped store routing', () => {
   it('routes skill output by session id instead of always writing to the visible context slot', () => {
     const active = { ...emptySlot(), currentSessionId: 'active-session' }
     const background = { ...emptySlot(), currentSessionId: 'background-session' }
-    const output: SkillOutputState = {
+    const output: SessionRoutedSkillOutputState = {
       skillId: 'skill-1',
       content: '<html></html>',
       isStreaming: true,
       language: 'html',
       context: 'editor',
       sessionId: 'background-session',
+      clientSessionKey: 'background-session',
+      workspacePath: '/workspace/background',
     }
 
     useAgentStore.setState({

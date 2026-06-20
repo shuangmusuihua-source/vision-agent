@@ -95,9 +95,9 @@ controller or use `withSessionEnvelope()` before crossing IPC.
 
 Live IPC event types use session-routed payload aliases such as
 `AgentIPCMessageWithContext`, `SessionRoutedPermissionRequest`, and
-`SessionRoutedAskUserRequest`. SDK transcript replay remains allowed to carry
-plain `AgentIPCMessage` values because history loading resolves ownership from
-the selected session.
+`SessionRoutedAskUserRequest`, and `SessionRoutedSkillOutputState`. SDK
+transcript replay remains allowed to carry plain `AgentIPCMessage` values
+because history loading resolves ownership from the selected session.
 
 ## Persistence Boundaries
 
@@ -105,8 +105,11 @@ the selected session.
 - `session-store.ts`: SDK transcript listing/history/mutation, always dir-scoped
   when the owning workspace is known.
 - `artifact-store.ts`: app-owned session artifact registry keyed by app session id.
+- `session-persistence-adapter.ts`: the only bridge that persists SDK
+  materialization and SDK compaction IDs from the live runtime into the session
+  stores.
 - `query-runner.ts`: builds SDK options and runs `query()`, but does not own live
-  session routing state.
+  session routing state or persistence mapping side effects.
 
 ## Invariants
 

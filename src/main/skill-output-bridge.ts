@@ -1,5 +1,10 @@
 import type { SDKMessage, SDKPartialAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentContext, AgentSessionEnvelope, SkillOutputState } from '../shared/types'
+import type {
+  AgentContext,
+  AgentSessionEnvelope,
+  SessionRoutedSkillOutputState,
+  SkillOutputState,
+} from '../shared/types'
 
 /**
  * SkillOutputBridge — unified output capture layer in main process.
@@ -18,9 +23,9 @@ import type { AgentContext, AgentSessionEnvelope, SkillOutputState } from '../sh
  * accumulators, so sessions A and B in the same context never interfere.
  */
 export class SkillOutputBridge {
-  private outputEmitter: ((state: SkillOutputState) => void) | null = null
+  private outputEmitter: ((state: SessionRoutedSkillOutputState) => void) | null = null
 
-  setOutputEmitter(emitter: (state: SkillOutputState) => void): void {
+  setOutputEmitter(emitter: (state: SessionRoutedSkillOutputState) => void): void {
     this.outputEmitter = emitter
   }
 
@@ -316,8 +321,18 @@ export class SkillOutputBridge {
   }
 
   private pushOutput(s: PerSessionState, queryKey: string, state: SkillOutputState): void {
-    s.state = state
-    this.outputEmitter?.(state)
+    const sessionId = state.sessionId || s.state.sessionId || queryKey
+    const routedState: SessionRoutedSkillOutputState = {
+      ...s.state,
+      ...state,
+      context: state.context || s.context,
+      sessionId,
+      clientSessionKey: state.clientSessionKey || s.state.clientSessionKey || sessionId,
+      sdkSessionId: state.sdkSessionId || s.state.sdkSessionId,
+      workspacePath: state.workspacePath || s.state.workspacePath || '',
+    }
+    s.state = routedState
+    this.outputEmitter?.(routedState)
   }
 }
 

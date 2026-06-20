@@ -6,16 +6,14 @@ import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
-import { getApiKey, getAuthorizedDirectories, getEnabledSkills, addSessionRecord, recordSessionArtifactFromTool } from './store'
+import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
-import { registerSession } from './agent-sessions'
 import { writeAuditLog } from './agent-audit'
-import { addCompactionSessionId } from './store'
-import { addCompactionId } from './session-store'
 import { isPathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
 import { createSessionEnvelope, sessionRuntime } from './session-runtime'
+import { persistMaterializedSession, recordCompactionSessionId } from './session-persistence-adapter'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -346,26 +344,18 @@ export async function sendMessage(
           ...runtimeEnvelope,
           sdkSessionId: currentSessionId,
         }
-        registerSession(currentSessionId, effectiveWorkspaceCwd)
-        // Persist session→workspace mapping to electron-store so it survives restart
-        addSessionRecord({
-          id: appSessionKey,
+        persistMaterializedSession({
+          appSessionId: appSessionKey,
           sdkSessionId: currentSessionId,
           workspacePath: effectiveWorkspaceCwd,
           context,
-          status: 'active',
-          createdAt: Date.now(),
-          lastModified: Date.now(),
-          messageCount: 0,
-          artifactCount: 0,
         })
         sessionRuntime.emitSessionCreated(mainWindow, runtimeEnvelope)
       } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {
         // SDK compacted the session — a new session file was created on disk
         // with a different session_id. Track it so session-store filters it
         // out (it should not appear as a separate user-facing session).
-        addCompactionSessionId(message.session_id as string)
-        addCompactionId(message.session_id as string)
+        recordCompactionSessionId(message.session_id as string)
       }
     }
 
