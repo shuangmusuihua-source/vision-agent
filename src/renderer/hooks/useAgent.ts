@@ -1,12 +1,14 @@
 import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
 import { emptySlot, type AgentStore } from '../store/agent-store'
-import type { AgentContext } from '../../shared/types'
 import type {
+  AgentContext,
+  AgentSessionEnvelope,
   AskUserRequestIPC,
   ConversationMessage,
   PermissionRequestIPC,
-  SkillOutputState,
+  SessionRoutedRequestTimeout,
+  SessionRoutedSkillOutputState,
 } from '../../shared/types'
 
 const WATCHDOG_TIMEOUT = 120_000 // 2 minutes
@@ -71,15 +73,15 @@ export function useIPCSubscriptions() {
       if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(req as unknown as Record<string, unknown>))
     })
 
-    const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: { requestId: string; context: AgentContext }) => {
+    const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: SessionRoutedRequestTimeout) => {
       store.getState().handleAskUserTimeout(data.requestId)
     })
 
-    const unsubPermTimeout = window.api.agent.onPermissionTimeout((data: { requestId: string; context: AgentContext }) => {
+    const unsubPermTimeout = window.api.agent.onPermissionTimeout((data: SessionRoutedRequestTimeout) => {
       store.getState().handlePermissionTimeout(data.requestId)
     })
 
-    const unsubSession = window.api.agent.onSessionCreated((data: { context: AgentContext; sessionId: string; workspacePath?: string; clientSessionKey?: string; sdkSessionId?: string }) => {
+    const unsubSession = window.api.agent.onSessionCreated((data: AgentSessionEnvelope) => {
       // The creating query carries its app-owned session key. Do not infer it
       // from the currently active session; the user may have switched away
       // while the SDK was still creating the real session.
@@ -198,7 +200,7 @@ export function useIPCSubscriptions() {
       refreshWatchdogAfterState(data.context, clientSessionKey)
     })
 
-    const unsubSkillOutput = window.api.agent.onSkillOutput((state: SkillOutputState) => {
+    const unsubSkillOutput = window.api.agent.onSkillOutput((state: SessionRoutedSkillOutputState) => {
       store.getState().handleSkillOutput(state)
       const ctx = state.context as AgentContext | undefined
       if (ctx) refreshWatchdogAfterState(ctx, state.sessionId)
