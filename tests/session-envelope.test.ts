@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createSessionEnvelope, withSessionEnvelope } from '../src/main/session-envelope'
 import { scheduleTextBatch } from '../src/main/agent-text-batch'
 import { SessionRuntimeController } from '../src/main/session-runtime'
@@ -17,6 +17,10 @@ function fakeWindow() {
     },
   }
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('session event envelope', () => {
   it('creates an app-owned routing envelope separate from the SDK session id', () => {
@@ -209,6 +213,49 @@ describe('session runtime event routing', () => {
     })
   })
 
+  it('keeps skill output on the app session after the SDK session materializes', () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-late-sdk',
+      workspacePath: '/workspace/late-sdk',
+    })
+    const instanceId = runtime.registerRun({
+      query: {} as never,
+      skillId: 'slides',
+      abortController: new AbortController(),
+      envelope,
+    })
+
+    runtime.setSkillOutputWindow(win as never)
+    runtime.beginSession(envelope)
+    runtime.materializeSdkSession('app-session-late-sdk', 'sdk-session-late')
+    runtime.emitSdkMessage(win as never, 'app-session-late-sdk', envelope, {
+      type: 'stream_event',
+      uuid: 'skill-delta-late-sdk',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: '```skill-output\n<html>late sdk</html>' },
+      },
+    } as never)
+    runtime.cleanupRun('app-session-late-sdk', instanceId)
+
+    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
+    expect(skillOutput?.payload).toMatchObject({
+      skillId: 'slides',
+      content: '<html>late sdk</html>',
+      isStreaming: true,
+      language: 'html',
+      context: 'editor',
+      sessionId: 'app-session-late-sdk',
+      clientSessionKey: 'app-session-late-sdk',
+      sdkSessionId: 'sdk-session-late',
+      workspacePath: '/workspace/late-sdk',
+    })
+  })
+
   it('emits execution errors with the session envelope', () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
@@ -376,6 +423,49 @@ describe('session runtime event routing', () => {
     })
   })
 
+  it('emits AskUser timeout with the owning session envelope', async () => {
+    vi.useFakeTimers()
+
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-ask-timeout',
+      sdkSessionId: 'sdk-ask-timeout',
+      workspacePath: '/workspace/ask-timeout',
+    })
+
+    const pending = runtime.requestAskUserAnswer(win as never, envelope, {
+      questions: [{
+        question: 'Continue?',
+        options: [{ label: 'Yes' }],
+        multiSelect: false,
+      }],
+      question: 'Continue?',
+      options: [{ label: 'Yes' }],
+      multiSelect: false,
+    }, { questions: [] })
+
+    const askEvent = sent.find((event) => event.channel === 'agent:askUser')
+    const requestId = (askEvent?.payload as { id: string }).id
+    vi.advanceTimersByTime(300000)
+
+    await expect(pending).resolves.toMatchObject({
+      behavior: 'deny',
+      message: 'AskUserQuestion timed out — user did not respond',
+    })
+
+    const timeoutEvent = sent.find((event) => event.channel === 'agent:askUserTimeout')
+    expect(timeoutEvent?.payload).toMatchObject({
+      requestId,
+      context: 'editor',
+      sessionId: 'app-session-ask-timeout',
+      clientSessionKey: 'app-session-ask-timeout',
+      sdkSessionId: 'sdk-ask-timeout',
+      workspacePath: '/workspace/ask-timeout',
+    })
+  })
+
   it('owns permission pending request registration and resolution', async () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
@@ -411,6 +501,38 @@ describe('session runtime event routing', () => {
     await expect(pending).resolves.toMatchObject({
       behavior: 'allow',
       updatedInput: input,
+    })
+  })
+
+  it('emits permission cancellation with the owning session envelope when the SDK aborts', async () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-permission-abort',
+      sdkSessionId: 'sdk-permission-abort',
+      workspacePath: '/workspace/permission-abort',
+    })
+    const abortController = new AbortController()
+    abortController.abort()
+
+    const pending = runtime.requestPermissionApproval(win as never, envelope, {
+      toolName: 'Write',
+      input: { file_path: '/workspace/permission-abort/file.md' },
+    }, abortController.signal)
+
+    await expect(pending).resolves.toMatchObject({
+      behavior: 'deny',
+      message: 'Tool use cancelled by SDK',
+    })
+    expect(sent).toHaveLength(1)
+    expect(sent[0].channel).toBe('agent:permissionTimeout')
+    expect(sent[0].payload).toMatchObject({
+      context: 'editor',
+      sessionId: 'app-session-permission-abort',
+      clientSessionKey: 'app-session-permission-abort',
+      sdkSessionId: 'sdk-permission-abort',
+      workspacePath: '/workspace/permission-abort',
     })
   })
 
@@ -505,6 +627,66 @@ describe('session runtime event routing', () => {
     await expect(permission).resolves.toMatchObject({
       behavior: 'allow',
       updatedInput: { file_path: '/workspace/b/result.md' },
+    })
+  })
+
+  it('aborts by SDK session id without rejecting prompts from other sessions', async () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelopeA = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'workspace-a-session',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+    })
+    const envelopeB = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'workspace-b-session',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+    })
+    const abortA = new AbortController()
+    const abortB = new AbortController()
+    runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: abortA,
+      envelope: envelopeA,
+    })
+    runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: abortB,
+      envelope: envelopeB,
+    })
+
+    const permissionA = runtime.requestPermissionApproval(win as never, envelopeA, {
+      toolName: 'Write',
+      input: { file_path: '/workspace/a/result.md' },
+    })
+    const permissionB = runtime.requestPermissionApproval(win as never, envelopeB, {
+      toolName: 'Write',
+      input: { file_path: '/workspace/b/result.md' },
+    })
+    const permissionAEvent = sent.find((event) => (
+      event.channel === 'agent:permissionRequest'
+      && (event.payload as { sessionId?: string }).sessionId === 'workspace-a-session'
+    ))
+
+    runtime.abort('sdk-b')
+
+    expect(abortA.signal.aborted).toBe(false)
+    expect(abortB.signal.aborted).toBe(true)
+    await expect(permissionB).resolves.toMatchObject({
+      behavior: 'deny',
+      message: 'Query aborted',
+    })
+
+    const requestAId = (permissionAEvent?.payload as { id: string }).id
+    runtime.resolvePermission(requestAId, 'allow')
+    await expect(permissionA).resolves.toMatchObject({
+      behavior: 'allow',
+      updatedInput: { file_path: '/workspace/a/result.md' },
     })
   })
 })
