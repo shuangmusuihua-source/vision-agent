@@ -68,7 +68,7 @@ export function registerAgentHandlers(): void {
       title,
       clientSessionKey
     )
-    sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey)
+    sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey, request.title)
     return { started: true }
   })
 

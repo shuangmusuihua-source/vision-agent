@@ -465,7 +465,10 @@ export function useAgent(context: AgentContext = 'editor') {
     // recognize them, would create an untracked duplicate session.
     const currentSlot = store.getState().sessionSlots[slotSid] || store.getState().slots[context]
     const effectiveSid = currentSlot.sdkSessionId || (slotSid?.startsWith('new-') ? undefined : (slotSid || undefined))
-    window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath, undefined, clientSessionKey)
+    const sessionTitle = slotSid
+      ? store.getState().sessionList.find((session) => session.id === slotSid)?.title
+      : undefined
+    window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath, sessionTitle, clientSessionKey)
   }, [context, store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {

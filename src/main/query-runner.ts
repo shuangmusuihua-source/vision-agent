@@ -256,7 +256,8 @@ export async function sendMessage(
   context: AgentContext = 'editor',
   skillId?: string | null,
   workspacePath?: string,
-  clientSessionKey?: string
+  clientSessionKey?: string,
+  title?: string
 ): Promise<void> {
   // Abort any previous query for the same app-owned session key.
   // Different sessions in the same context can now run in parallel.
@@ -349,6 +350,7 @@ export async function sendMessage(
           sdkSessionId: currentSessionId,
           workspacePath: effectiveWorkspaceCwd,
           context,
+          title,
         })
         sessionRuntime.emitSessionCreated(mainWindow, runtimeEnvelope)
       } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {

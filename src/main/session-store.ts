@@ -3,7 +3,7 @@ import type { ForkSessionOptions, SessionMutationOptions } from '@anthropic-ai/c
 import { getAppSkillsCwd } from './skill-init'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
-import { getSessionRecords, removeSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
+import { getSessionRecords, removeSessionRecord, updateSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { readFileSync, existsSync } from 'fs'
 import { resolveClaudeSessionJsonlPath } from './claude-session-path'
 
@@ -319,9 +319,19 @@ export async function loadSdkSessionMessagesPaginated(
 }
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
+  const appSessionId = getAppSessionId(sessionId)
+  updateSessionRecord(appSessionId, { title, lastModified: Date.now() })
+
   try {
     await withSessionDirFallback(sessionId, (sdkSessionId, options) => renameSession(sdkSessionId, title, options))
   } catch (err) {
+    if (isSessionNotFoundError(err)) {
+      console.warn('[SessionStore] renameSession skipped; SDK session not found:', {
+        sessionId: appSessionId,
+        sdkSessionId: getSdkSessionId(sessionId),
+      })
+      return
+    }
     console.error('[SessionStore] renameSession error:', err)
     throw err
   }
