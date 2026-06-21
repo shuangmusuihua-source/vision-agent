@@ -67,7 +67,7 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
 ### 数据流全景
 
 ```
-SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──→ IPC skill:output ──→ Zustand store ──→ MessageBubble
+SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──→ IPC skill:output ──→ Zustand store ──→ ChatView
      │                    │
      │                    └──→ toAgentIPCMessage() ──→ IPC agent:event ──→ store (messages/toolCalls)
      │
@@ -104,20 +104,22 @@ processRawEvent(rawMessage: Record<string, unknown>, activeSkillId: string | nul
 | 通道 | SDK 事件 | 触发条件 | 提取方式 |
 |------|----------|----------|----------|
 | Channel 1: skill-output 代码块 | `content_block_delta` + `text_delta` | 文本流中出现 ` ```skill-output ` 围栏 | 文本缓冲区检测围栏标记，提取围栏内内容 |
-| Channel 2: Write/Edit 工具 | `content_block_start` + `tool_use` + `input_json_delta` | tool_name 为 Write 或 Edit | 累积 `input_json_delta`，解析 partial JSON 提取 content 字段 |
+| Channel 2: 写入型工具 | `content_block_start` + `tool_use` + `input_json_delta` | tool_name 为 Write / Edit / MultiEdit / Bash | 累积 `input_json_delta`，按工具语义提取可预览内容：Write.content、Edit.new_string、MultiEdit.edits[].new_string、Bash heredoc HTML/MD |
 
 #### Partial JSON 提取
 
-Write 工具的 input 是流式 JSON，`input_json_delta` 逐片到达。在 `content_block_stop` 之前 JSON 不完整：
+写入型工具的 input 是流式 JSON，`input_json_delta` 逐片到达。在 `content_block_stop` 之前 JSON 不完整：
 
 ```ts
-extractContentFromPartialJson(json: string): string | null
+extractPreviewContentFromPartialJson(toolName: string, json: string): string | null
 // 输入: '{"content": "<!DOCTYPE html><html>...'
+// 输入: '{"new_string": "<section class=\"slide\">...'
+// 输入: '{"command": "cat > deck.html <<'EOF'\n<!DOCTYPE html>...'
 // 输入: '{"content": "<!DOCTYPE html><html><head>...'   (仍在流式中)
 // 输出: '<!DOCTYPE html><html>...' 或 '<!DOCTYPE html><html><head>...'
 ```
 
-原理：找到 `"content":` 键，从其后的 `"` 开始截取到当前末尾。即使 JSON 未闭合也能提取已到达的内容。
+原理：按工具名选择字段并从 partial JSON 中提取已到达的字符串内容；即使 JSON 未闭合也能提取当前内容。Bash 只预览看起来像 HTML/MD/SVG 产物写入的 heredoc，避免把普通 shell 脚本当成产物内容。
 
 #### 节流推送
 
@@ -213,17 +215,16 @@ const unsubSkillOutput = window.api.agent.onSkillOutput((state) => {
 })
 
 // 导出 selector
-export const useSkillOutput = () => useAgentStore((s) => s.skillOutput)
+export const useSkillOutput = (context) => useAgentStore((s) => s.slots[context].skillOutput)
 ```
 
-### 7. UI 渲染 — `MessageBubble.tsx`
+### 7. UI 渲染 — `ChatView.tsx`
 
 ```tsx
-const skillOutput = useAgentStore((s) => s.skillOutput)
-const isLastMessage = useAgentStore((s) => s.messages[s.messages.length - 1]?.id === message.id)
-const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutput.content.length > 0
+const skillOutput = useSkillOutput(context)
+const showLiveSkillOutput = isStreaming && !!skillOutput?.content
 
-{showSkillOutput && (
+{showLiveSkillOutput && (
   <SkillOutputCard
     content={skillOutput.content}
     isStreaming={skillOutput.isStreaming}
@@ -232,7 +233,7 @@ const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutp
 )}
 ```
 
-条件：仅在**最后一条消息**且**正在流式输出**时显示 SkillOutputCard。流式结束后 `skillOutput` 被 store 重置为 null，卡片消失，由 artifact 卡片接管。
+条件：当前会话正在流式输出且该会话有 `skillOutput.content` 时显示 SkillOutputCard。它是会话级实时预览，不依赖最后一条消息是否为 assistant 文本，因此 tool-only / skill-only 的生成流程也能展示。流式结束后 `skillOutput` 被 store 重置为 null，卡片消失，由 artifact 卡片接管。
 
 ### 8. 类型定义 — `shared/types.ts`
 
@@ -264,5 +265,5 @@ export type SkillOutputState = {
 | `src/renderer/store/agent-store-impl.ts` | handleSkillOutput 实现 |
 | `src/renderer/hooks/useAgent.ts` | skill:output 订阅 + useSkillOutput selector |
 | `src/renderer/lib/ipc.ts` | AgentApi 类型定义（onSkillOutput、sendMessage 签名） |
-| `src/renderer/components/chat/MessageBubble.tsx` | SkillOutputCard 渲染逻辑 |
+| `src/renderer/components/chat/ChatView.tsx` | SkillOutputCard 会话级渲染逻辑 |
 | `src/renderer/components/chat/SkillOutputCard.tsx` | 实时预览卡片组件 |

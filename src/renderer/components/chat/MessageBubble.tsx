@@ -12,7 +12,6 @@ import type { ConversationMessage, TextMessage, ArtifactData } from '../../../sh
 import type { BundledTheme } from 'shiki'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
-import SkillOutputCard from './SkillOutputCard'
 import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -61,7 +60,6 @@ interface MessageBubbleProps {
   onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
   context: 'editor' | 'ask'
-  isLastMessage: boolean
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────
@@ -230,16 +228,13 @@ function UserBubble({ text, onSelectText, context }: {
   )
 }
 
-function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSelectText, context }: {
+function AssistantBubble({ message, codeTheme, onSelectText, context }: {
   message: TextMessage
-  isLastMessage: boolean
-  skillOutput: { skillId: string | null; content: string; isStreaming: boolean; language: string } | null
   codeTheme: [BundledTheme, BundledTheme]
   onSelectText?: (text: string, context?: string) => void
   context: string
 }) {
   const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
-  const showSkillOutput = isStreaming && isLastMessage && skillOutput && skillOutput.content.length > 0
 
   // Extract json-render blocks from the message text
   const { blocks: jsonRenderBlocks, cleanText } = !isStreaming
@@ -291,9 +286,6 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
             ))}
           </div>
         )}
-        {showSkillOutput && (
-          <SkillOutputCard content={skillOutput.content} isStreaming={skillOutput.isStreaming} language={skillOutput.language} />
-        )}
         {cleanText && (
           <div className="message-assistant-text">
             <div className="message-markdown">
@@ -328,9 +320,8 @@ function AssistantBubble({ message, isLastMessage, skillOutput, codeTheme, onSel
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context, isLastMessage }: MessageBubbleProps): React.ReactElement {
+const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context }: MessageBubbleProps): React.ReactElement {
   const codeTheme = useCodeTheme()
-  const skillOutput = useAgentStore((s) => s.slots[context].skillOutput)
 
   switch (message.kind) {
     case 'stopped':
@@ -370,7 +361,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
 
     case 'text':
       return (
-        <AssistantBubble message={message} isLastMessage={isLastMessage} skillOutput={skillOutput} codeTheme={codeTheme} onSelectText={onSelectText} context={context} />
+        <AssistantBubble message={message} codeTheme={codeTheme} onSelectText={onSelectText} context={context} />
       )
   }
 }, (prev, next) => {
@@ -378,7 +369,6 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
   const a = prev.message, b = next.message
   if (a.id !== b.id) return false
   if (a.kind !== b.kind) return false
-  if (prev.isLastMessage !== next.isLastMessage) return false
   // For text messages during streaming, compare the fields that affect rendering
   if (a.kind === 'text' && b.kind === 'text') {
     return a.textContent === b.textContent

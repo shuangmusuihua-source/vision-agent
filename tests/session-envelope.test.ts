@@ -256,6 +256,168 @@ describe('session runtime event routing', () => {
     })
   })
 
+  it('emits skill output from Edit new_string deltas', () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-edit-output',
+      sdkSessionId: 'sdk-session-edit-output',
+      workspacePath: '/workspace/edit-output',
+    })
+    const instanceId = runtime.registerRun({
+      query: {} as never,
+      skillId: 'frontend-slides',
+      abortController: new AbortController(),
+      envelope,
+    })
+
+    runtime.setSkillOutputWindow(win as never)
+    runtime.beginSession(envelope)
+    runtime.emitSdkMessage(win as never, 'app-session-edit-output', envelope, {
+      type: 'stream_event',
+      uuid: 'edit-start',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool-edit-1', name: 'Edit' },
+      },
+    } as never)
+    runtime.emitSdkMessage(win as never, 'app-session-edit-output', envelope, {
+      type: 'stream_event',
+      uuid: 'edit-delta',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: {
+          type: 'input_json_delta',
+          partial_json: JSON.stringify({
+            file_path: '/workspace/edit-output/deck.html',
+            old_string: '<!-- SLIDES_HERE -->',
+            new_string: '<section class="slide"><h1>Slide A</h1></section>',
+          }),
+        },
+      },
+    } as never)
+    runtime.cleanupRun('app-session-edit-output', instanceId)
+
+    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
+    expect(skillOutput?.payload).toMatchObject({
+      skillId: 'frontend-slides',
+      content: '<section class="slide"><h1>Slide A</h1></section>',
+      isStreaming: true,
+      language: 'html',
+      context: 'editor',
+      sessionId: 'app-session-edit-output',
+      clientSessionKey: 'app-session-edit-output',
+      sdkSessionId: 'sdk-session-edit-output',
+      workspacePath: '/workspace/edit-output',
+    })
+  })
+
+  it('emits skill output from Bash heredoc artifact writes', () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-bash-output',
+      sdkSessionId: 'sdk-session-bash-output',
+      workspacePath: '/workspace/bash-output',
+    })
+    const instanceId = runtime.registerRun({
+      query: {} as never,
+      skillId: 'guizang-ppt-skill',
+      abortController: new AbortController(),
+      envelope,
+    })
+
+    runtime.setSkillOutputWindow(win as never)
+    runtime.beginSession(envelope)
+    runtime.emitSdkMessage(win as never, 'app-session-bash-output', envelope, {
+      type: 'stream_event',
+      uuid: 'bash-start',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool-bash-1', name: 'Bash' },
+      },
+    } as never)
+    runtime.emitSdkMessage(win as never, 'app-session-bash-output', envelope, {
+      type: 'stream_event',
+      uuid: 'bash-delta',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: {
+          type: 'input_json_delta',
+          partial_json: JSON.stringify({
+            command: "cat > deck.html <<'EOF'\n<!DOCTYPE html>\n<html><body>Deck</body></html>\nEOF",
+          }),
+        },
+      },
+    } as never)
+    runtime.cleanupRun('app-session-bash-output', instanceId)
+
+    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
+    expect(skillOutput?.payload).toMatchObject({
+      skillId: 'guizang-ppt-skill',
+      content: '<!DOCTYPE html>\n<html><body>Deck</body></html>',
+      isStreaming: true,
+      language: 'html',
+      context: 'editor',
+      sessionId: 'app-session-bash-output',
+      clientSessionKey: 'app-session-bash-output',
+      sdkSessionId: 'sdk-session-bash-output',
+      workspacePath: '/workspace/bash-output',
+    })
+  })
+
+  it('does not treat ordinary Bash heredoc scripts as skill output', () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-bash-script',
+      sdkSessionId: 'sdk-session-bash-script',
+      workspacePath: '/workspace/bash-script',
+    })
+    const instanceId = runtime.registerRun({
+      query: {} as never,
+      skillId: 'frontend-slides',
+      abortController: new AbortController(),
+      envelope,
+    })
+
+    runtime.setSkillOutputWindow(win as never)
+    runtime.beginSession(envelope)
+    runtime.emitSdkMessage(win as never, 'app-session-bash-script', envelope, {
+      type: 'stream_event',
+      uuid: 'bash-script-start',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool-bash-script', name: 'Bash' },
+      },
+    } as never)
+    runtime.emitSdkMessage(win as never, 'app-session-bash-script', envelope, {
+      type: 'stream_event',
+      uuid: 'bash-script-delta',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: {
+          type: 'input_json_delta',
+          partial_json: JSON.stringify({
+            command: "python <<'PY'\nprint('preparing deck.html')\nPY",
+          }),
+        },
+      },
+    } as never)
+    runtime.cleanupRun('app-session-bash-script', instanceId)
+
+    expect(sent.some((entry) => entry.channel === 'skill:output')).toBe(false)
+  })
+
   it('emits execution errors with the session envelope', () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()

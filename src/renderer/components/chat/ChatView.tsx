@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
-import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useSkillOutput } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
 import MessageBubble from './MessageBubble'
+import SkillOutputCard from './SkillOutputCard'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
 
@@ -25,6 +26,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const isResuming = useIsResumingSession()
   const agentState = useAgentStatus(context)
   const ttftMs = useTtftMs(context)
+  const skillOutput = useSkillOutput(context)
   const bottomRef = useRef<HTMLDivElement>(null)
   const internalContainerRef = useRef<HTMLDivElement>(null)
   const containerRef = externalScrollRef || internalContainerRef
@@ -41,6 +43,8 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   }, [messages, visibleCount])
 
   const hasMore = messages.length > visibleCount
+  const showLiveSkillOutput = isStreaming && !!skillOutput?.content
+  const skillOutputContentLength = skillOutput?.content.length ?? 0
 
   const handleLoadMore = useCallback(async () => {
     if (hasMoreSdkMessages) {
@@ -101,7 +105,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
       })
     }
     prevScrollHeightRef.current = newHeight
-  }, [messages, isStreaming, containerRef])
+  }, [messages, isStreaming, skillOutputContentLength, containerRef])
 
   // Reset visibleCount and scroll height ref when messages are cleared (new session)
   useEffect(() => {
@@ -155,7 +159,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
             : `加载更早消息 (${messages.length - visibleCount} 条)`}
         </button>
       )}
-      {visibleMessages.items.map((msg, idx) => (
+      {visibleMessages.items.map((msg) => (
         <MessageBubble
           key={msg.id}
           message={msg}
@@ -163,9 +167,19 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
           onOpenFile={onOpenFile}
           onSelectText={onSelectText}
           workspacePath={workspacePath}
-          isLastMessage={idx === visibleMessages.items.length - 1}
         />
       ))}
+      {showLiveSkillOutput && (
+        <div className="message-bubble message-assistant">
+          <div className="message-assistant-content">
+            <SkillOutputCard
+              content={skillOutput.content}
+              isStreaming={skillOutput.isStreaming}
+              language={skillOutput.language}
+            />
+          </div>
+        </div>
+      )}
       {isStreaming && (() => {
         // "思考中" — thinking phase, before any content arrives
         // "整理思路中" — running/compacting, but no visible text in the last reply yet.

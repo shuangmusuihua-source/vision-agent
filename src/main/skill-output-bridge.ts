@@ -11,7 +11,7 @@ import type {
  *
  * Monitors raw SDK stream events and detects output from any channel:
  *   Channel 1: skill-output code blocks in text deltas
- *   Channel 2: Write/Edit tool content in input_json_delta events
+ *   Channel 2: artifact-writing tool content in input_json_delta events
  *
  * Normalizes all output into a single IPC event (skill:output) pushed to the renderer.
  * The renderer never needs to know which channel produced the output.
@@ -123,18 +123,19 @@ export class SkillOutputBridge {
 
       case 'content_block_start': {
         const block = (event as { content_block?: unknown }).content_block as { type?: string; name?: string; id?: string } | undefined
-        if (block && block.type === 'tool_use') {
+          if (block && block.type === 'tool_use') {
           const name = block.name || ''
-          if (name === 'Write' || name === 'Edit') {
+          if (this.shouldCaptureTool(name)) {
             const id = block.id || `tu-${Date.now()}`
             s.writeAccumulators.set(id, { toolName: name, json: '' })
+            s._lastPushedLen = 0
           }
         }
         return
       }
 
       case 'content_block_stop': {
-        // Finalize the oldest unfinalized Write/Edit accumulator
+        // Finalize the oldest unfinalized artifact-writing accumulator
         if (s.writeAccumulators.size > 0) {
           const firstEntry = s.writeAccumulators.entries().next()
           if (!firstEntry.done) {
@@ -231,7 +232,7 @@ export class SkillOutputBridge {
 
     acc.json += partialJson
 
-    const content = this.extractContentFromPartialJson(acc.json)
+    const content = this.extractPreviewContentFromPartialJson(acc.toolName, acc.json)
     if (content !== null && content.length > 0) {
       const lastPushedLen = s._lastPushedLen
       if (content.length - lastPushedLen > 500 || !s.state.isStreaming) {
@@ -254,7 +255,7 @@ export class SkillOutputBridge {
   private finalizeWriteTool(s: PerSessionState, queryKey: string, id: string, acc: { toolName: string; json: string }, activeSkillId: string | null): void {
     try {
       const parsed = JSON.parse(acc.json)
-      const content = parsed.content as string | undefined
+      const content = this.extractPreviewContentFromToolInput(acc.toolName, parsed)
       if (content) {
         const language = this.guessLanguageFromContent(content)
         this.pushOutput(s, queryKey, {
@@ -275,11 +276,65 @@ export class SkillOutputBridge {
     s._lastPushedLen = 0
   }
 
-  private extractContentFromPartialJson(json: string): string | null {
-    const contentStart = json.indexOf('"content"')
+  private shouldCaptureTool(toolName: string): boolean {
+    return toolName === 'Write' || toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Bash'
+  }
+
+  private extractPreviewContentFromPartialJson(toolName: string, json: string): string | null {
+    if (toolName === 'Write') {
+      return this.extractStringFieldFromPartialJson(json, 'content')
+    }
+
+    if (toolName === 'Edit' || toolName === 'MultiEdit') {
+      return this.extractStringFieldFromPartialJson(json, 'new_string')
+    }
+
+    if (toolName === 'Bash') {
+      const command = this.extractStringFieldFromPartialJson(json, 'command')
+      return command ? this.extractPreviewContentFromBashCommand(command) : null
+    }
+
+    return null
+  }
+
+  private extractPreviewContentFromToolInput(toolName: string, input: Record<string, unknown>): string | null {
+    if (toolName === 'Write') {
+      const content = input.content
+      return typeof content === 'string' && content.length > 0 ? content : null
+    }
+
+    if (toolName === 'Edit') {
+      const newString = input.new_string
+      return typeof newString === 'string' && newString.length > 0 ? newString : null
+    }
+
+    if (toolName === 'MultiEdit') {
+      const edits = input.edits
+      if (!Array.isArray(edits)) return null
+      const chunks = edits
+        .map((edit) => {
+          if (!edit || typeof edit !== 'object') return ''
+          const newString = (edit as { new_string?: unknown }).new_string
+          return typeof newString === 'string' ? newString : ''
+        })
+        .filter(Boolean)
+      return chunks.length > 0 ? chunks.join('\n\n') : null
+    }
+
+    if (toolName === 'Bash') {
+      const command = input.command
+      return typeof command === 'string' ? this.extractPreviewContentFromBashCommand(command) : null
+    }
+
+    return null
+  }
+
+  private extractStringFieldFromPartialJson(json: string, fieldName: string): string | null {
+    const fieldPattern = `"${fieldName}"`
+    const contentStart = json.indexOf(fieldPattern)
     if (contentStart === -1) return null
 
-    const colonIdx = json.indexOf(':', contentStart + 9)
+    const colonIdx = json.indexOf(':', contentStart + fieldPattern.length)
     if (colonIdx === -1) return null
 
     const quoteIdx = json.indexOf('"', colonIdx + 1)
@@ -312,9 +367,42 @@ export class SkillOutputBridge {
     return result || null
   }
 
+  private extractPreviewContentFromBashCommand(command: string): string | null {
+    const marker = command.match(/<<-?\s*['"]?([A-Za-z0-9_.-]+)['"]?/)
+    if (!marker || marker.index == null) return null
+
+    const delimiter = marker[1]
+    const firstNewline = command.indexOf('\n', marker.index + marker[0].length)
+    if (firstNewline === -1) return null
+
+    const bodyStart = firstNewline + 1
+    const body = command.slice(bodyStart)
+    const closePattern = new RegExp(`(^|\\n)${this.escapeRegExp(delimiter)}(?:\\n|$)`)
+    const closeMatch = body.match(closePattern)
+    const content = closeMatch && closeMatch.index != null
+      ? body.slice(0, closeMatch.index + (closeMatch[1] === '\n' ? 0 : closeMatch[1].length))
+      : body
+    const trimmed = content.trim()
+    if (!trimmed) return null
+
+    const firstLine = command.slice(0, firstNewline)
+    const writesLikelyArtifact = /\bcat\b[\s\S]*(?:>\s*["']?[^"'\s]+\.(?:html?|md|markdown|svg)\b|<<-?\s*['"]?[A-Za-z0-9_.-]+['"]?\s*>\s*["']?[^"'\s]+\.(?:html?|md|markdown|svg)\b)/i.test(firstLine)
+      || /\btee\s+["']?[^"'\s]+\.(?:html?|md|markdown|svg)\b/i.test(firstLine)
+    const contentLooksLikeArtifact = this.guessLanguageFromContent(trimmed) !== 'text'
+      || /<(html|head|body|section|style|script)\b/i.test(trimmed)
+    return writesLikelyArtifact || contentLooksLikeArtifact ? trimmed : null
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
   private guessLanguageFromContent(content: string): string {
     const trimmed = content.trimStart()
-    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) return 'html'
+    if (
+      trimmed.startsWith('<!DOCTYPE')
+      || /^<(html|head|body|main|section|article|div|style|script)\b/i.test(trimmed)
+    ) return 'html'
     if (trimmed.startsWith('<svg')) return 'svg'
     if (trimmed.startsWith('#') || trimmed.startsWith('---')) return 'markdown'
     return 'text'
