@@ -34,6 +34,16 @@ function textMessage(id: string, text: string): ConversationMessage {
   }
 }
 
+function userMessage(id: string, text: string): ConversationMessage {
+  return {
+    kind: 'user',
+    id,
+    role: 'user',
+    textContent: text,
+    createdAt: 1,
+  }
+}
+
 function permission(id: string, sessionId: string): PermissionRequestIPC {
   return {
     id,
@@ -446,6 +456,157 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.messages.at(-1)?.id).toBe('editor-b-new-msg')
     expect(state.sessionSlots['editor-a'].agentState).toBe('running')
     expect(state.sessionSlots['editor-a'].isStreaming).toBe(true)
+  })
+
+  it('keeps Ask and multi-workspace editor sessions isolated while concurrent background events arrive', async () => {
+    const ask = {
+      ...emptySlot(),
+      currentSessionId: 'ask-session',
+      sdkSessionId: 'sdk-ask',
+      workspacePath: '/app/ask',
+      agentState: 'running' as const,
+      isStreaming: true,
+      messages: [userMessage('ask-user', 'Ask sumi question')],
+    }
+    const editorA = {
+      ...emptySlot(),
+      currentSessionId: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+      agentState: 'running' as const,
+      isStreaming: true,
+      messages: [userMessage('user-a', 'question A')],
+    }
+    const editorB = {
+      ...emptySlot(),
+      currentSessionId: 'editor-b',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+      agentState: 'running' as const,
+      isStreaming: true,
+      messages: [userMessage('user-b', 'question B')],
+    }
+
+    useAgentStore.setState({
+      activeWorkspacePath: '/workspace/a',
+      activeSessionId: { editor: 'editor-a', ask: 'ask-session' },
+      slots: { editor: editorA, ask },
+      sessionSlots: {
+        'editor-a': editorA,
+        'editor-b': editorB,
+        'ask-session': ask,
+      },
+      sessionAccessOrder: ['editor-a', 'editor-b', 'ask-session'],
+      sessionList: [
+        { id: 'editor-a', sdkSessionId: 'sdk-a', context: 'editor', workspacePath: '/workspace/a' },
+        { id: 'editor-b', sdkSessionId: 'sdk-b', context: 'editor', workspacePath: '/workspace/b' },
+        { id: 'ask-session', sdkSessionId: 'sdk-ask', context: 'ask', workspacePath: '/app/ask' },
+      ],
+    })
+
+    useAgentStore.getState().switchToSession('editor-b', 'editor', '/workspace/b')
+    useAgentStore.getState().setActiveWorkspace('/workspace/b')
+
+    useAgentStore.getState().handlePermissionRequest({
+      ...permission('perm-a', 'editor-a'),
+      clientSessionKey: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+    })
+    useAgentStore.getState().handleAskUserRequest({
+      ...askUser('ask-user-a', 'editor-a'),
+      clientSessionKey: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+    })
+    useAgentStore.getState().handleSkillOutput({
+      skillId: 'slides',
+      content: '<html>workspace A slides</html>',
+      isStreaming: false,
+      language: 'html',
+      context: 'editor',
+      sessionId: 'editor-a',
+      clientSessionKey: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+    })
+
+    const editorAAnswer: AgentIPCMessageWithContext = {
+      type: 'assistant',
+      context: 'editor',
+      sessionId: 'editor-a',
+      clientSessionKey: 'editor-a',
+      sdkSessionId: 'sdk-a',
+      workspacePath: '/workspace/a',
+      uuid: 'assistant-a',
+      message: { content: [{ type: 'text', text: 'answer A' }] },
+    }
+    const editorBAnswer: AgentIPCMessageWithContext = {
+      type: 'assistant',
+      context: 'editor',
+      sessionId: 'editor-b',
+      clientSessionKey: 'editor-b',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+      uuid: 'assistant-b',
+      message: { content: [{ type: 'text', text: 'answer B' }] },
+    }
+    const askAnswer: AgentIPCMessageWithContext = {
+      type: 'assistant',
+      context: 'ask',
+      sessionId: 'ask-session',
+      clientSessionKey: 'ask-session',
+      sdkSessionId: 'sdk-ask',
+      workspacePath: '/app/ask',
+      uuid: 'assistant-ask',
+      message: { content: [{ type: 'text', text: 'ask answer' }] },
+    }
+    const editorBResult: AgentIPCMessageWithContext = {
+      type: 'result',
+      subtype: 'success',
+      context: 'editor',
+      sessionId: 'editor-b',
+      clientSessionKey: 'editor-b',
+      sdkSessionId: 'sdk-b',
+      workspacePath: '/workspace/b',
+      session_id: 'sdk-b',
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_tokens: 0, cache_creation_tokens: 0 },
+      total_cost_usd: 0,
+      duration_ms: 1,
+    }
+
+    useAgentStore.getState().processIPCMessage(editorAAnswer)
+    useAgentStore.getState().processIPCMessage(editorBAnswer)
+    useAgentStore.getState().processIPCMessage(askAnswer)
+    useAgentStore.getState().processIPCMessage(editorBResult)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const state = useAgentStore.getState()
+    expect(state.activeSessionId.editor).toBe('editor-b')
+    expect(state.activeWorkspacePath).toBe('/workspace/b')
+    expect(state.slots.editor.currentSessionId).toBe('editor-b')
+    expect(state.slots.editor.workspacePath).toBe('/workspace/b')
+    expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['user-b', 'assistant-b'])
+    expect(state.slots.editor.permissionRequest).toBeNull()
+    expect(state.slots.editor.askUserRequest).toBeNull()
+    expect(state.slots.editor.skillOutput).toBeNull()
+    expect(state.slots.editor.agentState).toBe('idle')
+    expect(state.slots.editor.isStreaming).toBe(false)
+
+    const sessionA = state.sessionSlots['editor-a']
+    expect(sessionA.workspacePath).toBe('/workspace/a')
+    expect(sessionA.messages.map((m) => m.id)).toEqual(['user-a', 'assistant-a'])
+    expect(sessionA.permissionRequest?.id).toBe('perm-a')
+    expect(sessionA.askUserRequest?.id).toBe('ask-user-a')
+    expect(sessionA.skillOutput?.content).toBe('<html>workspace A slides</html>')
+    expect(sessionA.agentState).toBe('waitingForUserInput')
+    expect(sessionA.isStreaming).toBe(true)
+
+    expect(state.activeSessionId.ask).toBe('ask-session')
+    expect(state.slots.ask.workspacePath).toBe('/app/ask')
+    expect(state.slots.ask.messages.map((m) => m.id)).toEqual(['ask-user', 'assistant-ask'])
+    expect(state.slots.ask.agentState).toBe('running')
+    expect(state.sessionSlots['ask-session'].messages.map((m) => m.id)).toEqual(['ask-user', 'assistant-ask'])
   })
 
   it('preserves the previous session workspace when switching across workspaces', () => {
