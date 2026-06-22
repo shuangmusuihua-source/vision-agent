@@ -1,8 +1,16 @@
 /* ─── Overview Panel ──────────────────────────────────────────────── */
 
 .overview-panel {
-  padding: 24px 32px;
-  max-width: 900px;
+  --overview-title-size: var(--font-size-2xl);
+  --overview-title-count-size: var(--font-size-md);
+  --overview-section-title-size: var(--font-size-lg);
+  --overview-file-name-size: var(--font-size-md);
+  --overview-card-radius: var(--radius-md);
+  --overview-card-shadow: none;
+  --overview-card-shadow-hover: var(--shadow-xs);
+
+  padding: var(--space-xl) clamp(var(--space-xl), 2.5vw, var(--space-2xl)) var(--space-3xl);
+  max-width: 680px;
   margin: 0 auto;
   height: 100%;
   overflow-y: auto;
@@ -99,11 +107,12 @@
 
 .overview-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--color-border-soft);
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .overview-header-info {
@@ -115,11 +124,20 @@
 .overview-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 20px;
-  font-weight: 700;
+  gap: var(--space-sm);
+  font-size: var(--overview-title-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
   color: var(--color-text-primary);
   margin: 0;
+}
+
+.overview-file-count {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--overview-title-count-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
 }
 
 .overview-stats {
@@ -198,14 +216,22 @@
 /* ─── Sections ────────────────────────────────────────────────────── */
 
 .overview-section {
-  margin-bottom: 28px;
+  margin-bottom: var(--space-lg);
 }
 
 .overview-section-title {
-  font-size: 15px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--overview-section-title-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
   color: var(--color-text-primary);
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.overview-section-title svg {
+  flex-shrink: 0;
 }
 
 /* ─── Session Cards ───────────────────────────────────────────────── */
@@ -284,44 +310,126 @@
 }
 
 .overview-file-chip {
-  display: inline-flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 10px;
-  background: var(--color-bg-secondary);
+  column-gap: var(--space-sm);
+  row-gap: 0;
+  min-height: 48px;
+  padding: var(--space-sm) 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--overview-card-radius);
+  background: var(--color-bg-elevated);
   color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: 500;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  transition: all 0.2s ease;
+  box-shadow: var(--overview-card-shadow);
+  text-align: left;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default),
+    box-shadow var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
 }
 
 .overview-file-chip:hover {
-  background: var(--color-bg-primary);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  transform: translateY(-1px);
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  box-shadow: var(--overview-card-shadow-hover);
 }
 
-.overview-file-chip--skill {
-  background: var(--color-bg-primary);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+.overview-file-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
-.overview-file-chip--skill:hover {
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+.overview-file-chip--active {
+  background: var(--color-action-bg);
+  border-color: var(--color-action);
+  box-shadow: var(--overview-card-shadow);
+}
+
+.overview-file-chip--active::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: -1px;
+  width: var(--space-3xs);
+  border-radius: var(--overview-card-radius) 0 0 var(--overview-card-radius);
+  background: var(--color-action);
+}
+
+.overview-file-chip-icon {
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  grid-row: 1;
+  width: 22px;
+  height: 22px;
+  color: var(--color-action);
+}
+
+.overview-file-chip--slides .overview-file-chip-icon {
+  color: var(--color-text-primary);
+}
+
+.overview-file-chip--active .overview-file-chip-icon {
+  color: var(--color-action);
+}
+
+.overview-file-chip-content {
+  min-width: 0;
+  display: contents;
+}
+
+.overview-file-chip-name {
+  display: block;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  width: 100%;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--overview-file-name-size);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.overview-file-chip-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  align-self: center;
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 18px;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.overview-file-chip-badge--md {
+  background: var(--color-action-bg);
+  color: var(--color-action);
+}
+
+.overview-file-chip-badge--slides {
+  background: var(--color-bg-primary);
+  color: var(--color-warning);
 }
 
 .overview-file-chip-arrow {
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  color: var(--color-text-tertiary);
-}
-
-.overview-file-chip:hover .overview-file-chip-arrow {
-  opacity: 1;
+  display: none;
 }
 
 .overview-file-more {
@@ -359,9 +467,118 @@
 /* ─── File List ───────────────────────────────────────────────────── */
 
 .overview-file-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  gap: var(--space-sm);
+  justify-content: start;
+  align-items: stretch;
+}
+
+.overview-file-list--md {
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 300px));
+  width: 100%;
+}
+
+.overview-file-list--skill {
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+  width: 100%;
+}
+
+.overview-file-chip--md {
+  min-height: 44px;
+  padding: var(--space-sm) 10px;
+}
+
+.overview-file-chip--md .overview-file-chip-icon {
+  grid-row: 1;
+  align-self: center;
+}
+
+.overview-file-chip--md .overview-file-chip-name {
+  white-space: nowrap;
+}
+
+.overview-file-chip--md .overview-file-chip-badge {
+  grid-row: 1;
+  align-self: center;
+}
+
+.overview-file-chip--skill {
+  grid-template-rows: auto;
+  align-items: center;
+  min-height: 52px;
+}
+
+.overview-file-chip--skill .overview-file-chip-icon {
+  grid-row: 1;
+  align-self: center;
+}
+
+.overview-file-chip--skill .overview-file-chip-name {
+  align-self: center;
+  padding-right: 0;
+}
+
+.overview-file-chip--skill .overview-file-chip-badge {
+  grid-row: 1;
+  align-self: center;
+}
+
+.overview-file-chip--slides .overview-file-chip-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+.overview-slides-icon {
+  display: block;
+}
+
+.overview-slides-icon-line,
+.overview-slides-icon-screen {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.overview-slides-icon-accent {
+  stroke: var(--color-warning);
+  stroke-width: 1.8;
+}
+
+@media (max-width: 1040px) {
+  .overview-panel {
+    padding-inline: var(--space-xl);
+  }
+
+  .overview-file-list--skill {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .overview-panel {
+    --overview-title-size: var(--font-size-2xl);
+    --overview-title-count-size: var(--font-size-md);
+    --overview-section-title-size: var(--font-size-lg);
+    --overview-file-name-size: var(--font-size-md);
+    padding: var(--space-2xl) var(--space-lg) 40px;
+  }
+
+  .overview-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-2xl);
+    padding-bottom: var(--space-lg);
+  }
+
+  .overview-file-list,
+  .overview-file-list--md,
+  .overview-file-list--skill {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ─── Session Overview Cards ─────────────────────────────────────── */

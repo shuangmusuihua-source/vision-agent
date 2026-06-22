@@ -1,13 +1,16 @@
-import { FileText, Box, ArrowUpRight } from 'lucide-react'
+import { FileText, Box, ArrowUpRight, type LucideIcon } from 'lucide-react'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { SessionOutputEntry } from '../../../shared/types'
 
 interface OverviewPanelProps {
   sessionId: string | null
+  activeFilePath?: string
   onOpenFile: (path: string) => void
 }
 
-function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.ReactElement {
+type OverviewFileIcon = LucideIcon | ((props: { size?: number; strokeWidth?: number }) => React.ReactElement)
+
+function OverviewPanel({ sessionId, activeFilePath, onOpenFile }: OverviewPanelProps): React.ReactElement {
   const sessionOutputs = useAgentStore((s) => s.sessionOutputs)
 
   // No session selected
@@ -43,20 +46,60 @@ function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.Rea
   const skillOutputs = sessionOutputs.files.filter(f => f.category === 'skill_output')
   const others = sessionOutputs.files.filter(f => f.category === 'other')
 
+  function SlidesIcon({ size = 20 }: { size?: number; strokeWidth?: number }): React.ReactElement {
+    return (
+      <svg className="overview-slides-icon" width={size} height={size} viewBox="0 0 42 42" fill="none" aria-hidden="true">
+        <path className="overview-slides-icon-line" d="M8 8.5h26" />
+        <rect className="overview-slides-icon-screen" x="10.5" y="11.5" width="21" height="18" rx="1.5" />
+        <rect className="overview-slides-icon-accent" x="16.5" y="17" width="9" height="6" rx="0.5" />
+        <path className="overview-slides-icon-line" d="M21 29.5v5" />
+        <path className="overview-slides-icon-line" d="m15.5 37 5.5-5.5L26.5 37" />
+      </svg>
+    )
+  }
+
+  const getFileMeta = (fileName: string, variant: 'md' | 'skill'): {
+    badge: string
+    icon: OverviewFileIcon
+    kind: 'slides' | 'md' | 'file'
+  } => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || ''
+    const isHtmlSlides = ext === 'html' || ext === 'htm'
+    const isMarkdown = ext === 'md' || variant === 'md'
+
+    return {
+      badge: isHtmlSlides ? 'HTML' : isMarkdown ? 'MD' : ext.toUpperCase() || 'FILE',
+      icon: isHtmlSlides ? SlidesIcon : FileText,
+      kind: isHtmlSlides ? 'slides' : isMarkdown ? 'md' : 'file',
+    }
+  }
+
   const renderFileList = (files: SessionOutputEntry[], variant: 'md' | 'skill' = 'md') => (
-    <div className="overview-file-list">
-      {files.map((f) => (
-        <button
-          key={f.filePath}
-          className={`overview-file-chip overview-file-chip--${variant}`}
-          onClick={() => onOpenFile(f.filePath)}
-          title={f.filePath}
-        >
-          <FileText size={14} />
-          <span className="overview-file-chip-name">{f.fileName}</span>
-          <ArrowUpRight size={12} className="overview-file-chip-arrow" />
-        </button>
-      ))}
+    <div className={`overview-file-list overview-file-list--${variant}`}>
+      {files.map((f) => {
+        const meta = getFileMeta(f.fileName, variant)
+        const FileIcon = meta.icon
+        const isActive = activeFilePath === f.filePath
+
+        return (
+          <button
+            key={f.filePath}
+            className={`overview-file-chip overview-file-chip--${variant} overview-file-chip--${meta.kind}${isActive ? ' overview-file-chip--active' : ''}`}
+            onClick={() => onOpenFile(f.filePath)}
+            title={f.filePath}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            <span className="overview-file-chip-icon" aria-hidden="true">
+              <FileIcon size={20} strokeWidth={1.9} />
+            </span>
+            <span className="overview-file-chip-content">
+              <span className="overview-file-chip-name">{f.fileName}</span>
+              <span className={`overview-file-chip-badge overview-file-chip-badge--${meta.kind}`}>{meta.badge}</span>
+            </span>
+            <ArrowUpRight size={12} className="overview-file-chip-arrow" aria-hidden="true" />
+          </button>
+        )
+      })}
     </div>
   )
 
@@ -77,7 +120,7 @@ function OverviewPanel({ sessionId, onOpenFile }: OverviewPanelProps): React.Rea
       {skillOutputs.length > 0 && (
         <div className="overview-section">
           <h3 className="overview-section-title">
-            <Box size={14} /> Skill 产物
+            <Box size={14} strokeWidth={2} /> Skill 产物
           </h3>
           {renderFileList(skillOutputs, 'skill')}
         </div>

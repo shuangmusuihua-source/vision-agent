@@ -664,6 +664,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <ErrorBoundary onReset={() => {}}>
           <OverviewPanel
             sessionId={activeSessionId}
+            activeFilePath={linkedFile || activeFilePath}
             onOpenFile={handleFileSelect}
           />
           </ErrorBoundary>

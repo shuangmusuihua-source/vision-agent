@@ -566,8 +566,8 @@
 /* --- Fixed Tab (Overview) --- */
 
 .editor-tab-fixed {
-  padding-right: 14px;
-  gap: 6px;
+  padding-right: 10px;
+  gap: 4px;
 }
 
 .editor-tab-fixed .editor-tab-fixed-icon {
@@ -576,16 +576,16 @@
 }
 
 .editor-tab-fixed.editor-tab-active {
-  background: var(--color-bg-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.06);
-  transform: translateY(-1px);
+  background: var(--color-bg-secondary);
+  box-shadow: var(--shadow-sm);
+  transform: none;
   position: relative;
   z-index: 1;
 }
 
 [data-theme="dark"] .editor-tab-fixed.editor-tab-active {
   background: var(--color-bg-elevated);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .editor-tab-fixed .editor-tab-close {
