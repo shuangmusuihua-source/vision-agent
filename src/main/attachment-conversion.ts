@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process'
 import { createHash } from 'crypto'
 import { mkdirSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
+import { ATTACHMENT_CONVERSION_CONTEXT_TAG } from '../shared/file-attachments'
 
 export interface AttachmentConversionRef {
   sourcePath: string
@@ -119,5 +120,10 @@ export function appendAttachmentConversionSummary(
   }
 
   if (lines.length === 0) return prompt
-  return `${prompt}\n\n---\n${lines.join('\n')}`.trim()
+  return [
+    prompt,
+    `<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+    lines.join('\n'),
+    `</${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+  ].join('\n\n').trim()
 }

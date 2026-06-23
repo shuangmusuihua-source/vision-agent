@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ATTACHMENT_CONVERSION_CONTEXT_TAG,
   encodeFileConvertPath,
   fileExtension,
   formatAttachmentPromptLine,
   isConvertibleAttachmentPath,
+  stripInternalAttachmentContext,
 } from '../src/shared/file-attachments'
 import {
   appendAttachmentConversionSummary,
@@ -21,7 +23,10 @@ describe('file attachment prompt references', () => {
     })
 
     expect(line).toContain('notes.md')
+    expect(line).toContain('附件：notes.md')
+    expect(line).toContain('类型：MD文档')
     expect(line).toContain('路径：/Users/me/work/a/notes.md')
+    expect(line).not.toMatch(/[📄📕🖼️]/u)
   })
 
   it('marks convertible attachments as original paths', () => {
@@ -32,7 +37,9 @@ describe('file attachment prompt references', () => {
     })
 
     expect(line).toContain('report.pdf')
+    expect(line).toContain('类型：PDF文档')
     expect(line).toContain('原始路径：/Users/me/Documents/report.pdf')
+    expect(line).not.toMatch(/[📄📕🖼️]/u)
   })
 
   it('detects convertible file extensions case-insensitively', () => {
@@ -45,18 +52,18 @@ describe('file attachment prompt references', () => {
 describe('file conversion markers', () => {
   it('parses encoded paths without losing delimiter characters', () => {
     const sourcePath = '/Users/me/Documents/a|b/report 2026.pdf'
-    const prompt = `<!--FILE_CONVERT:${encodeFileConvertPath(sourcePath)}-->\n📕 PDF文档：report 2026.pdf`
+    const prompt = `<!--FILE_CONVERT:${encodeFileConvertPath(sourcePath)}-->\n附件：report 2026.pdf | 类型：PDF文档 | 原始路径：${sourcePath}`
 
     expect(parseFileConvertPaths(prompt)).toEqual([sourcePath])
   })
 
   it('strips conversion markers while preserving user-visible attachment lines', () => {
-    const prompt = '<!--FILE_CONVERT:/tmp/a.pdf-->\n📕 PDF文档：a.pdf | 原始路径：/tmp/a.pdf'
+    const prompt = '<!--FILE_CONVERT:/tmp/a.pdf-->\n附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf'
 
-    expect(stripFileConvertMarker(prompt)).toBe('📕 PDF文档：a.pdf | 原始路径：/tmp/a.pdf')
+    expect(stripFileConvertMarker(prompt)).toBe('附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf')
   })
 
-  it('builds a conversion summary with concrete Markdown paths', () => {
+  it('builds an internal conversion context with concrete Markdown paths', () => {
     const prompt = '请总结附件'
     const result = appendAttachmentConversionSummary(prompt, {
       converted: [{
@@ -66,8 +73,43 @@ describe('file conversion markers', () => {
       failed: [],
     })
 
+    expect(result).toContain(`<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`)
+    expect(result).toContain(`</${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`)
     expect(result).toContain('Markdown路径: /Users/me/work/.vision/attachments/session/report-a1b2c3d4e5.md')
     expect(result).toContain('请优先使用 Read 工具读取 Markdown 路径')
+  })
+
+  it('strips internal conversion context from user-visible text', () => {
+    const prompt = [
+      '<!--FILE_CONVERT:/tmp/a.pdf-->',
+      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf',
+      '',
+      `<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+      '附件转换结果：',
+      '- 源文件: /tmp/a.pdf',
+      '  Markdown路径: /tmp/work/.vision/attachments/a.md',
+      `</${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+    ].join('\n')
+
+    expect(stripInternalAttachmentContext(prompt)).toBe(
+      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf'
+    )
+  })
+
+  it('strips legacy visible conversion summaries from replayed messages', () => {
+    const prompt = [
+      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf',
+      '',
+      '---',
+      '附件转换结果：',
+      '以下文件已转换为 Markdown。请优先使用 Read 工具读取 Markdown 路径，而不是直接读取原始文件：',
+      '- 源文件: /tmp/a.pdf',
+      '  Markdown路径: /tmp/work/.vision/attachments/a.md',
+    ].join('\n')
+
+    expect(stripInternalAttachmentContext(prompt)).toBe(
+      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf'
+    )
   })
 
   it('sanitizes session path segments', () => {

@@ -974,6 +974,22 @@
   margin-left: calc(-1 * var(--sidebar-width));
 }
 
+.agent-panel-shell {
+  margin-left: 0;
+  position: relative;
+  z-index: 1;
+  transition: margin-left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.agent-panel-shell-cover-sidebar {
+  margin-left: calc(-1 * var(--sidebar-width));
+  z-index: 2;
+}
+
+.agent-panel-shell-cover-sidebar .agent-panel-header {
+  display: none;
+}
+
 .main-content-scroll {
   flex: 1;
   overflow-y: auto;

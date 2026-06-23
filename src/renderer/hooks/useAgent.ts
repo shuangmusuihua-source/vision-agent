@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
+import { stripInternalAttachmentContext } from '../../shared/file-attachments'
 import { emptySlot, type AgentStore } from '../store/agent-store'
 import type {
   AgentContext,
@@ -431,7 +432,7 @@ export function useAgent(context: AgentContext = 'editor') {
           kind: 'user' as const,
           id: `user-${Date.now()}`,
           role: 'user',
-          textContent: prompt.replace(/<!--FILE_CONVERT:[\s\S]*?-->\n?/, ''),
+          textContent: stripInternalAttachmentContext(prompt),
           createdAt: Date.now(),
         }],
         isStreaming: true,

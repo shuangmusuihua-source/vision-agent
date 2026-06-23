@@ -7,12 +7,18 @@ import { code } from '@streamdown/code'
 import { math } from '@streamdown/math'
 import mermaid from 'mermaid'
 import remarkGfm from 'remark-gfm'
-import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop } from 'lucide-react'
+import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon } from 'lucide-react'
 import type { ConversationMessage, TextMessage, ArtifactData } from '../../../shared/types'
 import type { BundledTheme } from 'shiki'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
+import {
+  fileExtension,
+  isConvertibleAttachmentPath,
+  stripInternalAttachmentContext,
+  type AttachmentKind,
+} from '../../../shared/file-attachments'
 
 const REMARK_PLUGINS = [remarkGfm]
 
@@ -140,10 +146,20 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
   )
 }
 
-const ATTACH_REGEX = /^(📄|🖼️|📕)\s+(.+?)[：:]\s*(.+)$/
+const LEGACY_ATTACH_REGEX = /^(📄|🖼️|📕)\s+(.+?)[：:]\s*(.+)$/
+const ATTACHMENT_LINE_REGEX = /^附件[：:]\s*(.+?)\s+\|\s+类型[：:]\s*(.+?)\s+\|\s+(?:路径|原始路径)[：:]\s*(.+)$/
 const ATTACH_PATH_SUFFIX_REGEX = /\s+\|\s+(?:路径|原始路径)[：:]\s*(.+)$/
+const IMAGE_ATTACHMENT_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'])
 
-function parseAttachmentDisplay(value: string): { name: string; path?: string } {
+interface ParsedAttachment {
+  name: string
+  path?: string
+  label?: string
+  type: AttachmentKind
+  convertible: boolean
+}
+
+function parseLegacyAttachmentDisplay(value: string): { name: string; path?: string } {
   const pathMatch = value.match(ATTACH_PATH_SUFFIX_REGEX)
   if (!pathMatch || pathMatch.index === undefined) return { name: value }
   return {
@@ -152,13 +168,52 @@ function parseAttachmentDisplay(value: string): { name: string; path?: string } 
   }
 }
 
-function parseAttachments(text: string): { attachments: string[]; body: string } {
+function attachmentTypeFor(name: string, path?: string, label?: string, legacyIcon?: string): AttachmentKind {
+  const ext = fileExtension(path || name)
+  if (legacyIcon === '🖼️' || label?.includes('图片') || IMAGE_ATTACHMENT_EXTENSIONS.has(ext)) return 'image'
+  if (legacyIcon === '📕' || label?.toLowerCase().includes('pdf') || ext === 'pdf') return 'pdf'
+  return 'text'
+}
+
+function parseAttachmentLine(line: string): ParsedAttachment | null {
+  const structuredMatch = line.match(ATTACHMENT_LINE_REGEX)
+  if (structuredMatch) {
+    const name = structuredMatch[1].trim()
+    const label = structuredMatch[2].trim()
+    const path = structuredMatch[3].trim()
+
+    const type = attachmentTypeFor(name, path, label)
+    return {
+      name,
+      path,
+      label,
+      type,
+      convertible: isConvertibleAttachmentPath(path || name),
+    }
+  }
+
+  const legacyMatch = line.match(LEGACY_ATTACH_REGEX)
+  if (!legacyMatch) return null
+
+  const display = parseLegacyAttachmentDisplay(legacyMatch[3])
+  const type = attachmentTypeFor(display.name, display.path, legacyMatch[2], legacyMatch[1])
+  return {
+    name: display.name,
+    path: display.path,
+    label: legacyMatch[2],
+    type,
+    convertible: isConvertibleAttachmentPath(display.path || display.name),
+  }
+}
+
+function parseAttachments(text: string): { attachments: ParsedAttachment[]; body: string } {
   const lines = text.split('\n')
-  const attachments: string[] = []
+  const attachments: ParsedAttachment[] = []
   let bodyStart = 0
   for (let i = 0; i < lines.length; i++) {
-    if (ATTACH_REGEX.test(lines[i])) {
-      attachments.push(lines[i])
+    const attachment = parseAttachmentLine(lines[i])
+    if (attachment) {
+      attachments.push(attachment)
       bodyStart = i + 1
     } else {
       break
@@ -167,15 +222,22 @@ function parseAttachments(text: string): { attachments: string[]; body: string }
   return { attachments, body: lines.slice(bodyStart).join('\n').trimStart() }
 }
 
-function UserBubble({ text, onSelectText, context }: {
+function UserBubble({ text, messageId, onSelectText, context }: {
   text: string
+  messageId: string
   onSelectText?: (text: string, context?: string) => void
-  context: string
+  context: 'editor' | 'ask'
 }) {
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
-  const { attachments, body } = parseAttachments(text)
+  const visibleText = stripInternalAttachmentContext(text)
+  const { attachments, body } = parseAttachments(visibleText)
+  const isLatestStreamingUserMessage = useAgentStore((s) => {
+    const slot = s.slots[context]
+    const latestUser = [...slot.messages].reverse().find((msg) => msg.kind === 'user')
+    return slot.isStreaming && latestUser?.id === messageId
+  })
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()
@@ -207,17 +269,28 @@ function UserBubble({ text, onSelectText, context }: {
       <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
         {attachments.length > 0 ? (
           <>
-            <div className="message-attach-chips">
-              {attachments.map((att, i) => {
-                const match = att.match(ATTACH_REGEX)
-                const icon = match?.[1] || '📄'
-                const label = match?.[2] || ''
-                const display = parseAttachmentDisplay(match?.[3] || att)
+            <div className={`message-attach-chips${body ? ' message-attach-chips--with-body' : ''}`}>
+              {attachments.map((attachment, i) => {
+                const isUnderstanding = isLatestStreamingUserMessage && attachment.convertible
+                const Icon = attachment.type === 'image' ? ImageIcon : FileText
                 return (
-                  <span key={i} className="message-attach-chip" title={display.path}>
-                    <span className="message-attach-chip-icon">{icon}</span>
-                    <span className="message-attach-chip-label">{label}</span>
-                    <span className="message-attach-chip-name">{display.name}</span>
+                  <span
+                    key={i}
+                    className={`message-attach-chip${isUnderstanding ? ' message-attach-chip--understanding' : ''}`}
+                    title={attachment.path}
+                  >
+                    <span className="message-attach-chip-main">
+                      <span className="message-attach-chip-icon"><Icon size={14} /></span>
+                      <span className="message-attach-chip-name">{attachment.name}</span>
+                    </span>
+                    {isUnderstanding && (
+                      <span className="message-attach-chip-status">
+                        理解文档中
+                        <span className="message-attach-chip-dots" aria-hidden="true">
+                          <span>.</span><span>.</span><span>.</span>
+                        </span>
+                      </span>
+                    )}
                   </span>
                 )
               })}
@@ -225,7 +298,7 @@ function UserBubble({ text, onSelectText, context }: {
             {body && <div className="message-user-text">{body}</div>}
           </>
         ) : (
-          text
+          visibleText
         )}
       </div>
       {selectionBtn && onSelectText && (
@@ -367,7 +440,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
       return <ArtifactBubble artifact={message.artifact} messageId={message.id} onOpenFile={onOpenFile} workspacePath={workspacePath} context={context} />
 
     case 'user':
-      return <UserBubble text={message.textContent} onSelectText={onSelectText} context={context} />
+      return <UserBubble text={message.textContent} messageId={message.id} onSelectText={onSelectText} context={context} />
 
     case 'text':
       return (

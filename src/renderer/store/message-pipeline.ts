@@ -29,6 +29,7 @@ import type {
 } from '../../shared/types'
 import { ContextSlot } from './agent-store'
 import { isTextBlock, isToolUseBlock, isToolResultBlock } from '../../shared/types'
+import { stripInternalAttachmentContext } from '../../shared/file-attachments'
 
 // ─── Accumulator helpers ──────────────────────────────────────────────
 
@@ -643,7 +644,7 @@ export function reduceUserMessage(
   }
 
   if (isReplay && textBlocks.length > 0) {
-    const text = textBlocks.map((b) => b.text).join('')
+    const text = stripInternalAttachmentContext(textBlocks.map((b) => b.text).join(''))
     if (text && !msgs.some((m) => m.kind === 'user' && m.textContent === text)) {
       msgs.push({ kind: 'user', id: msg.uuid || `user-${Date.now()}`, role: 'user', textContent: text, createdAt: Date.now() })
       changed = true
@@ -815,7 +816,7 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
       }
 
       if (textBlocks.length > 0) {
-        const text = textBlocks.map(b => b.text).join('')
+        const text = stripInternalAttachmentContext(textBlocks.map(b => b.text).join(''))
         if (text && !messages.some(m => m.kind === 'user' && m.textContent === text)) {
           messages.push({
             kind: 'user',

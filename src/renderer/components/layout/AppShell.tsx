@@ -711,7 +711,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         )}
       </div>
 
-      <aside style={{ display: agentCollapsed ? 'none' : 'flex', height: '100%', order: isChatFirst ? 0 : 2 }}>
+      <aside
+        className={`agent-panel-shell${isChatFirst && sidebarCollapsed ? ' agent-panel-shell-cover-sidebar' : ''}`}
+        style={{ display: agentCollapsed ? 'none' : 'flex', height: '100%', order: isChatFirst ? 0 : 2 }}
+      >
       <AgentPanel
         width={agentWidth}
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}

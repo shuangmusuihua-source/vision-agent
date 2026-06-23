@@ -1945,13 +1945,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 0;
+}
+
+.message-attach-chips--with-body {
   margin-bottom: 6px;
 }
 
 .message-attach-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 4px 10px;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1962,14 +1966,32 @@
   -webkit-backdrop-filter: blur(6px);
 }
 
+.message-attach-chip--understanding {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.message-attach-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .message-attach-chip-icon {
-  font-size: var(--font-size-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 
-.message-attach-chip-label {
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 500;
+.message-attach-chip-icon svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
 }
 
 .message-attach-chip-name {
@@ -1978,6 +2000,46 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.message-attach-chip-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding-left: 20px;
+  color: rgba(255, 255, 255, 0.56);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.message-attach-chip-dots {
+  display: inline-flex;
+  width: 12px;
+}
+
+.message-attach-chip-dots span {
+  animation: message-attach-dot 1.2s ease-in-out infinite;
+  opacity: 0.35;
+  transform: translateY(0);
+}
+
+.message-attach-chip-dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.message-attach-chip-dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes message-attach-dot {
+  0%, 80%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
 }
 
 .message-user-text {
