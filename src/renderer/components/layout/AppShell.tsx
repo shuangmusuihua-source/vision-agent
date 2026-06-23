@@ -25,6 +25,7 @@ import { emptySlot } from '../../store/agent-store'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
 import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
+import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
@@ -401,13 +402,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const settings = useSettings()
   useEffect(() => {
     if (!settings) return
-    workspace.syncFromSettings(settings.authorizedDirectories)
+    const userDirectories = filterUserWorkspacePaths(settings.authorizedDirectories, settings.fixedDirectories)
+    workspace.syncFromSettings(settings.authorizedDirectories, settings.fixedDirectories)
     // Set initial active workspace if not yet set
-    if (!useAgentStore.getState().activeWorkspacePath && settings.authorizedDirectories.length > 0) {
-      // Find first non-fixed workspace, or fall back to first directory
-      const nonFixed = settings.authorizedDirectories.filter(d => !settings.fixedDirectories?.includes(d))
-      const firstWs = nonFixed[0] || settings.authorizedDirectories[0]
-      if (firstWs) useAgentStore.getState().setActiveWorkspace(firstWs)
+    const currentActiveWorkspace = useAgentStore.getState().activeWorkspacePath
+    if ((!currentActiveWorkspace || !userDirectories.includes(currentActiveWorkspace)) && userDirectories.length > 0) {
+      useAgentStore.getState().setActiveWorkspace(userDirectories[0])
+    } else if (currentActiveWorkspace && userDirectories.length === 0) {
+      useAgentStore.getState().setActiveWorkspace(null)
     }
   }, [settings])
 

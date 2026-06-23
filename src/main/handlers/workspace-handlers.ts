@@ -12,6 +12,7 @@ import { fileIndexService } from '../file-index-service'
 import { isPathAuthorized, sanitizeFileName } from '../path-validator'
 import type { WorkspaceDigest } from '../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
+import { KNOWLEDGE_BASE_NAME, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 
 export function registerWorkspaceHandlers(
   scanDirectory: (dir: string) => Promise<import('../../shared/types').FileEntry[]>,
@@ -93,6 +94,7 @@ export function registerWorkspaceHandlers(
     try {
       const safeName = sanitizeFileName(name.trim())
       if (!safeName || safeName !== name.trim()) return null
+      if (safeName === KNOWLEDGE_BASE_NAME) return null
       const docsDir = join(app.getPath('documents'), DOCUMENTS_DIR_NAME)
       if (!existsSync(docsDir)) await mkdir(docsDir, { recursive: true })
       const dirPath = join(docsDir, safeName)
@@ -104,6 +106,9 @@ export function registerWorkspaceHandlers(
 
   ipcMain.handle('workspace:deleteWorkspace', async (_event, dirPath: string) => {
     if (!isPathAuthorized(dirPath)) return { success: false, error: 'Path not authorized' }
+    if (isReservedKnowledgeWorkspacePath(dirPath, [getKnowledgeBaseDir()])) {
+      return { success: false, error: 'Cannot delete system workspace' }
+    }
     try {
       await rm(dirPath, { recursive: true, force: true })
       removeAuthorizedDirectory(dirPath)

@@ -5,6 +5,7 @@ import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
+import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { ContextSlot } from '../../store/agent-store'
 
@@ -153,6 +154,7 @@ function Sidebar({
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const [memoryExpanded, setMemoryExpanded] = useState(true)
   const [memoryFiles, setMemoryFiles] = useState<MemoryEntry[]>([])
+  const userWorkspacePaths = filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)
   // Subscribe reactively to sessionSlots so non-active session state (running indicator, title)
   // triggers re-renders when slots are saved/restored on session switch.
   const sessionSlots = useAgentStore((s) => s.sessionSlots)
@@ -182,17 +184,18 @@ function Sidebar({
   }, [])
 
   const handleCollapseAll = useCallback(() => {
-    setCollapsedWorkspaces(new Set(workspacePaths))
-  }, [workspacePaths])
+    setCollapsedWorkspaces(new Set(filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)))
+  }, [workspacePaths, fixedWorkspacePaths])
 
   const handlePinToTop = useCallback((wsPath: string) => {
-    const idx = workspacePaths.indexOf(wsPath)
+    const userPaths = filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)
+    const idx = userPaths.indexOf(wsPath)
     if (idx <= 0) return
-    const reordered = [...workspacePaths]
+    const reordered = [...userPaths]
     reordered.splice(idx, 1)
     reordered.unshift(wsPath)
     onReorderWorkspaces(reordered)
-  }, [workspacePaths, onReorderWorkspaces])
+  }, [workspacePaths, fixedWorkspacePaths, onReorderWorkspaces])
 
   const workspaceName = (path: string) => path.split('/').pop() || path
 
@@ -265,7 +268,7 @@ function Sidebar({
         </div>
 
         {/* Workspaces with sessions */}
-        {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length > 0 && (
+        {userWorkspacePaths.length > 0 && (
           <div className="sidebar-workspace-module-header">
             <span className="sidebar-workspace-module-title">工作区</span>
             <div className="sidebar-workspace-module-actions">
@@ -278,7 +281,7 @@ function Sidebar({
             </div>
           </div>
         )}
-        {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).length === 0 ? (
+        {userWorkspacePaths.length === 0 ? (
           <div className="sidebar-empty-workspace">
             <button className="sidebar-new-dir-btn" onClick={onNewWorkspace}>
               新建工作区
@@ -286,11 +289,11 @@ function Sidebar({
           </div>
         ) : (
           <Flipper
-            flipKey={workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).join(',')}
+            flipKey={userWorkspacePaths.join(',')}
             spring={{ stiffness: 200, damping: 28 } as any}
             className="sidebar-workspace-list"
           >
-            {workspacePaths.filter(p => !fixedWorkspacePaths.includes(p)).map((wsPath, idx) => {
+            {userWorkspacePaths.map((wsPath, idx) => {
               const isCollapsed = collapsedWorkspaces.has(wsPath)
               const wsSessions = [...(sessionsByWorkspace[wsPath] || [])]
                 .sort((a, b) => (b.lastModified || b.createdAt || 0) - (a.lastModified || a.createdAt || 0))

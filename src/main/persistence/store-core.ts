@@ -4,9 +4,8 @@ import path from 'path'
 import { app } from 'electron'
 import type { ModelProfile, WorkspaceRecord, SessionRecord, SessionArtifactRecord } from '../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
+import { KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
 import { getAppUserDataDir } from '../app-identity'
-
-export const KNOWLEDGE_BASE_NAME = 'Knowledge'
 
 export function getKnowledgeBaseDir(): string {
   return path.join(app.getPath('documents'), DOCUMENTS_DIR_NAME, KNOWLEDGE_BASE_NAME)

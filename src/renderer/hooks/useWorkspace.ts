@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { FileEntry } from '../lib/ipc'
+import { filterUserWorkspacePaths, isReservedKnowledgeWorkspacePath, KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
 
 interface UseWorkspaceOptions {
   /** Called after file operations that change the files list. */
@@ -22,6 +23,16 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
   useEffect(() => {
     window.api.workspace.knowledgeDir().then(dir => {
       setFixedWorkspacePaths([dir])
+      setWorkspacePaths((prev) => filterUserWorkspacePaths(prev, [dir]))
+      setFiles((prev) => {
+        const next: Record<string, FileEntry[]> = {}
+        for (const [path, entries] of Object.entries(prev)) {
+          if (!isReservedKnowledgeWorkspacePath(path, [dir])) {
+            next[path] = entries
+          }
+        }
+        return next
+      })
     })
   }, [])
 
@@ -30,14 +41,15 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
   const prevAuthDirsRef = useRef<string>('')
 
   /** Pull workspace dirs + file listings from cached settings on change. */
-  function syncFromSettings(dirs: string[]): void {
-    const key = dirs.join(',')
+  function syncFromSettings(dirs: string[], fixedDirs: string[] = fixedWorkspacePaths): void {
+    const userDirs = filterUserWorkspacePaths(dirs, fixedDirs)
+    const key = `${userDirs.join(',')}::${fixedDirs.join(',')}`
     if (key === prevAuthDirsRef.current) return
     prevAuthDirsRef.current = key
-    setWorkspacePaths(dirs)
+    setWorkspacePaths(userDirs)
     const fileEntries: Record<string, FileEntry[]> = {}
     Promise.all(
-      dirs.map(async (dir) => {
+      userDirs.map(async (dir) => {
         fileEntries[dir] = await window.api.workspace.listFiles(dir)
       })
     ).then(() => setFiles(fileEntries))
@@ -62,9 +74,10 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
   }, [])
 
   const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
-    setWorkspacePaths(paths)
-    await window.api.settings.reorderDirectories(paths)
-  }, [])
+    const userPaths = filterUserWorkspacePaths(paths, fixedWorkspacePaths)
+    setWorkspacePaths(userPaths)
+    await window.api.settings.reorderDirectories(userPaths)
+  }, [fixedWorkspacePaths])
 
   const handleRemoveWorkspace = useCallback((path: string) => {
     setDeleteWsPath(path)
@@ -100,6 +113,10 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
     const name = newWorkspaceName.trim()
     if (!name) {
       setNewWorkspaceError('请输入工作区名称')
+      return
+    }
+    if (name === KNOWLEDGE_BASE_NAME) {
+      setNewWorkspaceError('Knowledge 是系统保留工作区名称')
       return
     }
     if (/[/\\]/.test(name) || name.includes('..')) {

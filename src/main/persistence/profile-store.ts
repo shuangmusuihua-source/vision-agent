@@ -1,5 +1,6 @@
 import type { ModelProfile } from '../../shared/types'
 import { store, encryptValue, decryptValue, maskApiKey, type AppSettings } from './store-core'
+import { filterUserWorkspacePaths } from '../../shared/workspace-paths'
 
 let migrationDone = false
 function migrateApiKeys(): void {
@@ -20,8 +21,10 @@ function migrateApiKeys(): void {
 export function getSettings(): AppSettings {
   migrateApiKeys()
   const settings = store.store
+  const authorizedDirectories = filterUserWorkspacePaths(settings.authorizedDirectories, settings.fixedDirectories)
   return {
     ...settings,
+    authorizedDirectories,
     profiles: settings.profiles.map((p) => ({
       ...p,
       apiKey: maskApiKey(decryptValue(p.apiKey)),

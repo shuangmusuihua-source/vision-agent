@@ -2,15 +2,17 @@ import { mkdirSync } from 'fs'
 import path from 'path'
 import type { WorkspaceRecord, SessionRecord } from '../../shared/types'
 import { store, getKnowledgeBaseDir } from './store-core'
+import { filterUserWorkspacePaths, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 
 // ─── Authorized directories ────────────────────────────────────────────
 
 export function getAuthorizedDirectories(): string[] {
-  return store.get('authorizedDirectories')
+  return filterUserWorkspacePaths(store.get('authorizedDirectories'), store.get('fixedDirectories'))
 }
 
 export function addAuthorizedDirectory(dir: string): void {
-  const dirs = store.get('authorizedDirectories')
+  if (isReservedKnowledgeWorkspacePath(dir, store.get('fixedDirectories'))) return
+  const dirs = getAuthorizedDirectories()
   if (!dirs.includes(dir)) {
     store.set('authorizedDirectories', [dir, ...dirs])
   }
@@ -18,19 +20,21 @@ export function addAuthorizedDirectory(dir: string): void {
 
 export function removeAuthorizedDirectory(dir: string): void {
   const fixed = store.get('fixedDirectories')
-  if (fixed.includes(dir)) return
   const dirs = store.get('authorizedDirectories')
+  if (fixed.includes(dir) || isReservedKnowledgeWorkspacePath(dir, fixed)) {
+    store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
+    return
+  }
   store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
 }
 
 export function reorderAuthorizedDirectories(paths: string[]): void {
   const fixed = store.get('fixedDirectories')
-  const current = store.get('authorizedDirectories')
-  if (paths.length !== current.length) return
-  if (!paths.every((p) => current.includes(p))) return
-  const fixedInPaths = fixed.filter(f => paths.includes(f))
-  const nonFixed = paths.filter(p => !fixed.includes(p))
-  store.set('authorizedDirectories', [...fixedInPaths, ...nonFixed])
+  const current = getAuthorizedDirectories()
+  const nextPaths = filterUserWorkspacePaths(paths, fixed)
+  if (nextPaths.length !== current.length) return
+  if (!nextPaths.every((p) => current.includes(p))) return
+  store.set('authorizedDirectories', nextPaths)
 }
 
 export function getFixedDirectories(): string[] {
@@ -115,15 +119,15 @@ export function ensureKnowledgeBase(): string {
   mkdirSync(path.join(kbDir, '.vision'), { recursive: true })
 
   const fixed = store.get('fixedDirectories')
-  if (!fixed.includes(kbDir)) {
-    store.set('fixedDirectories', [kbDir, ...fixed])
+  const nextFixed = [kbDir, ...fixed.filter((dir) => !isReservedKnowledgeWorkspacePath(dir, [kbDir]))]
+  if (nextFixed.length !== fixed.length || nextFixed.some((dir, index) => dir !== fixed[index])) {
+    store.set('fixedDirectories', nextFixed)
   }
 
   const dirs = store.get('authorizedDirectories')
-  if (!dirs.includes(kbDir)) {
-    store.set('authorizedDirectories', [kbDir, ...dirs])
-  } else if (dirs[0] !== kbDir) {
-    store.set('authorizedDirectories', [kbDir, ...dirs.filter((d) => d !== kbDir)])
+  const userDirs = filterUserWorkspacePaths(dirs, nextFixed)
+  if (userDirs.length !== dirs.length || userDirs.some((dir, index) => dir !== dirs[index])) {
+    store.set('authorizedDirectories', userDirs)
   }
 
   return kbDir
