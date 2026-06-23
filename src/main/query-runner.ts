@@ -1,7 +1,5 @@
 import type { BrowserWindow } from 'electron'
-import { mkdirSync, writeFileSync } from 'fs'
-import { join, resolve, basename } from 'path'
-import { execFileSync } from 'child_process'
+import { resolve } from 'path'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
@@ -14,6 +12,12 @@ import { isPathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
 import { createSessionEnvelope, sessionRuntime } from './session-runtime'
 import { persistMaterializedSession, recordCompactionSessionId } from './session-persistence-adapter'
+import {
+  appendAttachmentConversionSummary,
+  convertAttachmentsToMarkdown,
+  parseFileConvertPaths,
+  stripFileConvertMarker,
+} from './attachment-conversion'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -275,32 +279,10 @@ export async function sendMessage(
 
   // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
   let processedPrompt = prompt
-  const convMatch = prompt.match(/<!--FILE_CONVERT:(.+?)-->/)
-  if (convMatch) {
-    const paths = convMatch[1].split('|').filter(Boolean)
-    const tmpDir = join(effectiveWorkspaceCwd, '.vision', 'tmp')
-    mkdirSync(tmpDir, { recursive: true })
-    const refs: string[] = []
-
-    for (const filePath of paths) {
-      try {
-        const outName = basename(filePath).replace(/\.[^.]+$/, '.md')
-        const outPath = join(tmpDir, outName)
-        const result = execFileSync('python3', ['-m', 'markitdown', filePath], {
-          encoding: 'utf-8',
-          timeout: 30000,
-        })
-        writeFileSync(outPath, result, 'utf-8')
-        refs.push(`${outName} (已从 ${basename(filePath)} 转换)`)
-      } catch (err) {
-        console.error(`[FileConvert] ${filePath}:`, (err as Error).message)
-      }
-    }
-
-    processedPrompt = prompt.replace(/<!--FILE_CONVERT:.+?-->\n?/, '').trim()
-    if (refs.length > 0) {
-      processedPrompt += '\n\n---\n已转换文件：\n' + refs.map(r => `- ${r}`).join('\n')
-    }
+  const convertPaths = parseFileConvertPaths(prompt)
+  if (convertPaths.length > 0) {
+    const conversion = convertAttachmentsToMarkdown(effectiveWorkspaceCwd, queryKey, convertPaths)
+    processedPrompt = appendAttachmentConversionSummary(stripFileConvertMarker(prompt), conversion)
   }
 
   sessionRuntime.beginSession(runtimeEnvelope)

@@ -1,0 +1,123 @@
+import { execFileSync } from 'child_process'
+import { createHash } from 'crypto'
+import { mkdirSync, writeFileSync } from 'fs'
+import { basename, join } from 'path'
+
+export interface AttachmentConversionRef {
+  sourcePath: string
+  markdownPath: string
+}
+
+export interface AttachmentConversionFailure {
+  sourcePath: string
+  error: string
+}
+
+export interface AttachmentConversionResult {
+  converted: AttachmentConversionRef[]
+  failed: AttachmentConversionFailure[]
+}
+
+const FILE_CONVERT_MARKER_REGEX = /<!--FILE_CONVERT:([\s\S]*?)-->\n?/
+
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+export function parseFileConvertPaths(prompt: string): string[] {
+  const match = prompt.match(FILE_CONVERT_MARKER_REGEX)
+  if (!match) return []
+
+  return match[1]
+    .split('|')
+    .map(token => safeDecodeURIComponent(token.trim()))
+    .filter(Boolean)
+}
+
+export function stripFileConvertMarker(prompt: string): string {
+  return prompt.replace(FILE_CONVERT_MARKER_REGEX, '').trim()
+}
+
+export function safeAttachmentSegment(value: string | undefined, fallback = 'session'): string {
+  const cleaned = (value || fallback)
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 96)
+
+  return cleaned || fallback
+}
+
+function hashPath(filePath: string): string {
+  return createHash('sha256').update(filePath).digest('hex').slice(0, 10)
+}
+
+function convertedMarkdownPath(workspaceCwd: string, sessionKey: string, filePath: string): string {
+  const baseName = basename(filePath).replace(/\.[^.]+$/, '')
+  const safeBaseName = safeAttachmentSegment(baseName, 'attachment')
+  const outName = `${safeBaseName}-${hashPath(filePath)}.md`
+
+  return join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey), outName)
+}
+
+export function convertAttachmentsToMarkdown(
+  workspaceCwd: string,
+  sessionKey: string,
+  filePaths: string[]
+): AttachmentConversionResult {
+  const result: AttachmentConversionResult = { converted: [], failed: [] }
+  const outDir = join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey))
+  mkdirSync(outDir, { recursive: true })
+
+  for (const filePath of filePaths) {
+    try {
+      const markdownPath = convertedMarkdownPath(workspaceCwd, sessionKey, filePath)
+      const markdown = execFileSync('python3', ['-m', 'markitdown', filePath], {
+        encoding: 'utf-8',
+        timeout: 30000,
+      })
+      writeFileSync(markdownPath, markdown, 'utf-8')
+      result.converted.push({ sourcePath: filePath, markdownPath })
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err)
+      console.error(`[FileConvert] ${filePath}:`, error)
+      result.failed.push({ sourcePath: filePath, error })
+    }
+  }
+
+  return result
+}
+
+export function appendAttachmentConversionSummary(
+  prompt: string,
+  conversion: AttachmentConversionResult
+): string {
+  const lines: string[] = []
+
+  if (conversion.converted.length > 0) {
+    lines.push(
+      '附件转换结果：',
+      '以下文件已转换为 Markdown。请优先使用 Read 工具读取 Markdown 路径，而不是直接读取原始文件：'
+    )
+    for (const ref of conversion.converted) {
+      lines.push(`- 源文件: ${ref.sourcePath}`, `  Markdown路径: ${ref.markdownPath}`)
+    }
+  }
+
+  if (conversion.failed.length > 0) {
+    if (lines.length > 0) lines.push('')
+    lines.push(
+      '附件转换失败：',
+      '这些文件暂时无法转换，请告知用户重新选择文件或检查文件是否仍存在：'
+    )
+    for (const failure of conversion.failed) {
+      lines.push(`- 源文件: ${failure.sourcePath}`, `  错误: ${failure.error}`)
+    }
+  }
+
+  if (lines.length === 0) return prompt
+  return `${prompt}\n\n---\n${lines.join('\n')}`.trim()
+}

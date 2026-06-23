@@ -141,6 +141,16 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
 }
 
 const ATTACH_REGEX = /^(📄|🖼️|📕)\s+(.+?)[：:]\s*(.+)$/
+const ATTACH_PATH_SUFFIX_REGEX = /\s+\|\s+(?:路径|原始路径)[：:]\s*(.+)$/
+
+function parseAttachmentDisplay(value: string): { name: string; path?: string } {
+  const pathMatch = value.match(ATTACH_PATH_SUFFIX_REGEX)
+  if (!pathMatch || pathMatch.index === undefined) return { name: value }
+  return {
+    name: value.slice(0, pathMatch.index).trim(),
+    path: pathMatch[1],
+  }
+}
 
 function parseAttachments(text: string): { attachments: string[]; body: string } {
   const lines = text.split('\n')
@@ -202,12 +212,12 @@ function UserBubble({ text, onSelectText, context }: {
                 const match = att.match(ATTACH_REGEX)
                 const icon = match?.[1] || '📄'
                 const label = match?.[2] || ''
-                const name = match?.[3] || att
+                const display = parseAttachmentDisplay(match?.[3] || att)
                 return (
-                  <span key={i} className="message-attach-chip">
+                  <span key={i} className="message-attach-chip" title={display.path}>
                     <span className="message-attach-chip-icon">{icon}</span>
                     <span className="message-attach-chip-label">{label}</span>
-                    <span className="message-attach-chip-name">{name}</span>
+                    <span className="message-attach-chip-name">{display.name}</span>
                   </span>
                 )
               })}

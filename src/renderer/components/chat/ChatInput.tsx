@@ -4,11 +4,18 @@ import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { useAgentStore } from '../../store/agent-store-impl'
+import {
+  encodeFileConvertPath,
+  fileExtension,
+  formatAttachmentPromptLine,
+  isConvertibleAttachmentPath,
+  type AttachmentKind,
+} from '../../../shared/file-attachments'
 
 interface AttachedFile {
   name: string
   path: string
-  type: 'text' | 'image' | 'pdf'
+  type: AttachmentKind
   base64?: string
   mimeType?: string
   size?: number
@@ -93,7 +100,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     const files: AttachedFile[] = []
     for (const filePath of result.filePaths) {
       const name = filePath.split('/').pop() || filePath
-      const ext = name.split('.').pop()?.toLowerCase() || ''
+      const ext = fileExtension(name)
       const type = ext === 'pdf' ? 'pdf' :
         imageExts.includes(ext) ? 'image' : 'text'
       files.push({ name, path: filePath, type })
@@ -112,13 +119,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       if (attachedFiles.length > 0) {
         // Hidden marker for main process to convert non-text files (pptx/xlsx/docx/pdf)
         const convPaths = attachedFiles
-          .filter(f => /\.(pptx|xlsx|docx|pdf)$/i.test(f.name))
-          .map(f => f.path)
-        const fileParts = attachedFiles.map((f) => {
-          const icon = f.type === 'image' ? '🖼️' : f.type === 'pdf' ? '📕' : '📄'
-          const label = f.type === 'image' ? '图片' : f.type === 'pdf' ? 'PDF文档' : '文件'
-          return `${icon} ${label}：${f.name}`
-        })
+          .filter(f => isConvertibleAttachmentPath(f.path || f.name))
+          .map(f => encodeFileConvertPath(f.path))
+        const fileParts = attachedFiles.map(formatAttachmentPromptLine)
         const prefix = convPaths.length > 0 ? '<!--FILE_CONVERT:' + convPaths.join('|') + '-->\n' : ''
         prompt = prefix + fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
       }
@@ -327,9 +330,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           </button>
         ) : (
           <button
-            className={`chat-send-btn ${text.trim() && !disabled ? 'chat-send-btn-active' : ''}`}
+            className={`chat-send-btn ${(text.trim() || attachedFiles.length > 0) && !disabled ? 'chat-send-btn-active' : ''}`}
             onClick={doSend}
-            disabled={!text.trim() || disabled}
+            disabled={(!text.trim() && attachedFiles.length === 0) || disabled}
             type="button"
           >
             <ArrowUp size={16} />
