@@ -78,12 +78,20 @@
   height: 38px;
   flex: 0 0 auto;
   border-radius: 12px;
-  background: var(--color-action);
-  color: var(--color-action-text);
-  font-size: 16px;
-  font-weight: 760;
-  letter-spacing: 0;
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-action) 22%, transparent);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  box-shadow:
+    0 10px 26px color-mix(in srgb, var(--color-text-primary) 10%, transparent),
+    0 1px 0 color-mix(in srgb, var(--color-bg-primary) 65%, transparent) inset;
+}
+
+.settings-brand-mark img,
+.about-logo-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .settings-brand-copy {
@@ -900,7 +908,6 @@
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  font-size: 22px;
 }
 
 .about-logo {

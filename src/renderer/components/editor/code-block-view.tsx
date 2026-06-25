@@ -3,24 +3,7 @@ import { createPortal } from 'react-dom'
 import { useCallback, useState, useRef, useEffect } from 'react'
 import { Copy, ChartBar, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-
-// Lazy-loaded mermaid — only imported when a mermaid code block is encountered
-let mermaidModule: typeof import('mermaid').default | null = null
-let mermaidLoadPromise: Promise<typeof import('mermaid').default> | null = null
-
-async function loadMermaid() {
-  if (mermaidModule) return mermaidModule
-  if (mermaidLoadPromise) return mermaidLoadPromise
-  mermaidLoadPromise = import('mermaid').then((m) => {
-    mermaidModule = m.default
-    return mermaidModule
-  })
-  return mermaidLoadPromise
-}
-
-function getMermaidTheme(): 'dark' | 'default' {
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
-}
+import { getMermaidTheme, renderMermaid } from '../../lib/mermaid-renderer'
 
 function MermaidOverlay({ svg, onClose }: { svg: string; onClose: () => void }): React.ReactElement {
   const stableOnClose = useCallback(onClose, [])
@@ -114,15 +97,10 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
 
     let cancelled = false
 
-    loadMermaid()
-      .then((mermaid) => {
-        if (cancelled) return
-        mermaid.initialize({
+    renderMermaid(id, code.trim(), {
           startOnLoad: false,
           theme: getMermaidTheme(),
           securityLevel: 'strict'
-        })
-        return mermaid.render(id, code.trim())
       })
       .then((result) => {
         if (cancelled || !result) return

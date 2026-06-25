@@ -6,7 +6,7 @@ import { getMainWindow } from './ipc-sender'
 import { getAuthorizedDirectories, getCronTasks, saveCronTasks, type CronTask } from './store'
 import { buildAgentOptions, resolveClaudeCodeExecutable } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
-import { extractToolPathInput, isPathAuthorized, toolRequiresPath } from './agent-path-utils'
+import { extractToolPathInput, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
 const runningTasks = new Set<string>()
@@ -88,7 +88,7 @@ export async function executeTask(task: CronTask): Promise<void> {
       if (!filePath && toolRequiresPath(toolName)) {
         return { behavior: 'deny' as const, message: 'Missing path for cron task tool use' }
       }
-      if (filePath && !isPathAuthorized(filePath, authorizedRoots, { cwd })) {
+      if (!isToolUsePathAuthorized(toolName, toolInput, authorizedRoots, { cwd })) {
         return { behavior: 'deny' as const, message: 'Path not authorized for cron task' }
       }
       return { behavior: 'allow' as const }

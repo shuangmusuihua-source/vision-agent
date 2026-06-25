@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useSkillOutput } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
-import MessageBubble from './MessageBubble'
 import SkillOutputCard from './SkillOutputCard'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
+
+const MessageBubble = lazy(() => import('./MessageBubble'))
 
 const RENDER_BATCH = 100
 const SCROLL_NEAR_BOTTOM = 80 // px threshold for "user is at bottom"
@@ -159,16 +160,20 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
             : `加载更早消息 (${messages.length - visibleCount} 条)`}
         </button>
       )}
-      {visibleMessages.items.map((msg) => (
-        <MessageBubble
-          key={msg.id}
-          message={msg}
-          context={context}
-          onOpenFile={onOpenFile}
-          onSelectText={onSelectText}
-          workspacePath={workspacePath}
-        />
-      ))}
+      {visibleMessages.items.length > 0 && (
+        <Suspense fallback={<div className={styles.chatLoading}><Loader2 size={18} className="spin" /> 加载消息...</div>}>
+          {visibleMessages.items.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              context={context}
+              onOpenFile={onOpenFile}
+              onSelectText={onSelectText}
+              workspacePath={workspacePath}
+            />
+          ))}
+        </Suspense>
+      )}
       {showLiveSkillOutput && (
         <div className="message-bubble message-assistant">
           <div className="message-assistant-content">

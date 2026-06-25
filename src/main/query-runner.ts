@@ -1,14 +1,13 @@
 import type { BrowserWindow } from 'electron'
-import { resolve } from 'path'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
-import type { PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { writeAuditLog } from './agent-audit'
-import { isPathAuthorized } from './agent-path-utils'
+import { extractToolPathInput, isToolUsePathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
 import { createSessionEnvelope, sessionRuntime } from './session-runtime'
 import { persistMaterializedSession, recordCompactionSessionId } from './session-persistence-adapter'
@@ -78,36 +77,10 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
 
 // ─── Options builder ───────────────────────────────────────────────────
 
-function extractPathFromToolInput(
-  toolName: string,
-  input: Record<string, unknown>
-): string | null {
-  const pathFields: Record<string, string[]> = {
-    Read: ['file_path'],
-    Edit: ['file_path'],
-    Write: ['file_path'],
-    Glob: ['path'],
-    Grep: ['path'],
-    Bash: ['command']
-  }
-
-  const fields = pathFields[toolName]
-  if (!fields) return null
-
-  const value = String(input[fields[0]] ?? '')
-  if (!value) return null
-
-  if (toolName === 'Bash') {
-    const pathMatch = value.match(/(?:\/[\w.-]+)+/)
-    return pathMatch ? pathMatch[0] : null
-  }
-
-  return value
-}
-
 function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, envelope?: AgentSessionEnvelope, getSessionId?: () => string | undefined, skillId?: string | null) {
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = workspaceCwdOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
+  const allowedReadRoots = [...dirs, getAppSkillsCwd()]
   const sessionEnvelope = envelope || createSessionEnvelope({
     context,
     sessionId: sessionId || context,
@@ -175,21 +148,25 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         return { behavior: 'deny', message: 'Tool use cancelled by SDK' }
       }
 
-      // Auto-allow safe read-only tools
-      if (toolName === 'WebSearch' || toolName === 'WebFetch' || toolName === 'Glob' || toolName === 'Grep') {
+      // Auto-allow network read-only tools.
+      if (toolName === 'WebSearch' || toolName === 'WebFetch') {
         return { behavior: 'allow', updatedInput: input }
       }
 
-      // Auto-allow Read within authorized directories and app skills directory
+      // Auto-allow file-discovery tools only inside authorized roots. Glob/Grep
+      // default to the SDK cwd when no path is supplied, so authorize ".".
+      if (toolName === 'Glob' || toolName === 'Grep') {
+        if (isToolUsePathAuthorized(toolName, input, allowedReadRoots, { cwd: workspaceCwd })) {
+          return { behavior: 'allow', updatedInput: input }
+        }
+        return { behavior: 'deny', message: 'Path not authorized for file search' }
+      }
+
+      // Auto-allow Read within authorized directories and app skills directory.
       if (toolName === 'Read') {
-        const rawPath = extractPathFromToolInput(toolName, input)
-        if (rawPath) {
-          const pathToCheck = resolve(workspaceCwd, rawPath)
-          const isAuth = isPathAuthorized(pathToCheck, dirs)
-          const isAppSkill = pathToCheck.startsWith(resolve(getAppSkillsCwd()))
-          if (isAuth || isAppSkill) {
-            return { behavior: 'allow', updatedInput: input }
-          }
+        const rawPath = extractToolPathInput(toolName, input)
+        if (rawPath && isToolUsePathAuthorized(toolName, input, allowedReadRoots, { cwd: workspaceCwd })) {
+          return { behavior: 'allow', updatedInput: input }
         }
       }
 
@@ -239,6 +216,10 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
 export function abortActiveQuery(queryKey?: string): void {
   sessionRuntime.abort(queryKey)
+}
+
+export async function setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {
+  return sessionRuntime.setPermissionMode(queryKey, mode)
 }
 
 /** Clean up all pending promises when the renderer window is destroyed */

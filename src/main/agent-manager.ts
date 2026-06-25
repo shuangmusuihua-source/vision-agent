@@ -13,6 +13,7 @@ export {
   sendMessage,
   abortActiveQuery,
   handleWindowDestroy,
+  setPermissionMode,
   setSkillOutputWindow,
 } from './query-runner'
 

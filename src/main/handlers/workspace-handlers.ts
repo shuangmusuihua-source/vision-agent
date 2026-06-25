@@ -10,6 +10,7 @@ import {
 } from '../store'
 import { fileIndexService } from '../file-index-service'
 import { isPathAuthorized, sanitizeFileName } from '../path-validator'
+import { atomicWriteTextFile } from '../atomic-write'
 import type { WorkspaceDigest } from '../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 import { KNOWLEDGE_BASE_NAME, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
@@ -34,7 +35,7 @@ export function registerWorkspaceHandlers(
 
   ipcMain.handle('workspace:writeFile', async (_event, filePath: string, content: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
-    try { await writeFile(filePath, content, 'utf-8'); return { success: true } }
+    try { await atomicWriteTextFile(filePath, content); return { success: true } }
     catch (err) { return { success: false, error: (err as Error).message } }
   })
 
@@ -114,7 +115,7 @@ export function registerWorkspaceHandlers(
       removeAuthorizedDirectory(dirPath)
       const dirs = getAuthorizedDirectories()
       if (dirs.length > 0) await fileIndexService.init(dirs[0])
-      else fileIndexService.destroy()
+      else fileIndexService.destroyWorkspaceIndex()
       pushSettingsToRenderer()
       return { success: true }
     } catch (err) { return { success: false, error: (err as Error).message } }
@@ -182,7 +183,7 @@ export function registerWorkspaceHandlers(
     await mkdir(tmpDir, { recursive: true })
     const filePath = join(tmpDir, safeName)
     if (!filePath.startsWith(tmpDir)) return { success: false, error: 'Path traversal detected' }
-    await writeFile(filePath, options.content, 'utf-8')
+    await atomicWriteTextFile(filePath, options.content)
     await shell.openPath(filePath)
     return { success: true, filePath }
   })
@@ -195,7 +196,7 @@ export function registerWorkspaceHandlers(
       filters: [{ name: 'HTML', extensions: ['html'] }],
     })
     if (canceled || !filePath) return { success: false }
-    await writeFile(filePath, options.content, 'utf-8')
+    await atomicWriteTextFile(filePath, options.content)
     return { success: true, filePath }
   })
 

@@ -1,9 +1,10 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
-import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession } from '../agent-manager'
+import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession, setPermissionMode } from '../agent-manager'
 import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactFromTool } from '../store'
 import type { AgentContext } from '../../shared/types'
 import type { IPCRequest } from '../../shared/ipc-types'
+import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -27,6 +28,14 @@ function isObjectRequest<T extends object>(value: T | string | undefined): value
 function requireArg<T>(value: T | undefined, name: string): T {
   if (value === undefined) throw new Error(`Missing IPC argument: ${name}`)
   return value
+}
+
+function isPermissionMode(value: string): value is PermissionMode {
+  return value === 'default' ||
+    value === 'acceptEdits' ||
+    value === 'plan' ||
+    value === 'dontAsk' ||
+    value === 'auto'
 }
 
 function normalizeSendMessageRequest(
@@ -203,10 +212,20 @@ export function registerAgentHandlers(): void {
     const request: AgentSetPermissionModeRequest = isObjectRequest(requestOrContext)
       ? requestOrContext
       : { context: requestOrContext, mode: requireArg(mode, 'mode') }
-    // setPermissionMode requires access to the active Query object
-    // This is a placeholder — full implementation needs query-runner integration
-    console.warn('[AgentHandlers] setPermissionMode: not yet fully integrated', request)
-    return { success: true }
+
+    if (!isPermissionMode(request.mode)) {
+      return { success: false, error: `Unsupported permission mode: ${request.mode}` }
+    }
+
+    try {
+      const applied = await setPermissionMode(request.context, request.mode)
+      if (!applied) {
+        return { success: false, error: `No active agent run for context: ${request.context}` }
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
   })
 
   ipcMain.handle('agent:forkSession', async (_event, requestOrId: AgentForkSessionRequest | string, options?: AgentForkSessionRequest['options']) => {

@@ -351,17 +351,6 @@
   box-shadow: var(--overview-card-shadow);
 }
 
-.overview-file-chip--active::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  bottom: -1px;
-  left: -1px;
-  width: var(--space-3xs);
-  border-radius: var(--overview-card-radius) 0 0 var(--overview-card-radius);
-  background: var(--color-action);
-}
-
 .overview-file-chip-icon {
   display: grid;
   place-items: center;

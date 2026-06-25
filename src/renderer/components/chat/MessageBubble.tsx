@@ -1,15 +1,6 @@
-import { useState, useCallback, useEffect, useRef, memo, useSyncExternalStore } from 'react'
-import { Streamdown } from 'streamdown'
-import type { DiagramPlugin } from 'streamdown'
-import 'streamdown/styles.css'
-import 'katex/dist/katex.min.css'
-import { code } from '@streamdown/code'
-import { math } from '@streamdown/math'
-import mermaid from 'mermaid'
-import remarkGfm from 'remark-gfm'
+import { lazy, Suspense, useState, useCallback, useEffect, useRef, memo } from 'react'
 import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon } from 'lucide-react'
 import type { ConversationMessage, TextMessage, ArtifactData } from '../../../shared/types'
-import type { BundledTheme } from 'shiki'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
@@ -19,46 +10,9 @@ import {
   stripInternalAttachmentContext,
   type AttachmentKind,
 } from '../../../shared/file-attachments'
+import { stripSkillOutputBlock } from './message-text-utils'
 
-const REMARK_PLUGINS = [remarkGfm]
-
-const mermaidPlugin: DiagramPlugin = {
-  name: 'mermaid',
-  type: 'diagram',
-  language: 'mermaid',
-  getMermaid(config) {
-    if (config) mermaid.initialize(config)
-    return {
-      initialize(cfg) { mermaid.initialize({ ...cfg, startOnLoad: false }) },
-      async render(id, source) {
-        const { svg } = await mermaid.render(id, source)
-        return { svg }
-      },
-    }
-  },
-}
-
-const STREAMDOWN_PLUGINS = { code, math, mermaid: mermaidPlugin }
-
-function useCodeTheme(): [BundledTheme, BundledTheme] {
-  const theme = useSyncExternalStore(
-    (cb) => {
-      const obs = new MutationObserver(cb)
-      obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-      return () => obs.disconnect()
-    },
-    () => document.documentElement.getAttribute('data-theme') as string | null
-  )
-  return theme === 'light'
-    ? ['github-light', 'github-dark']
-    : ['github-dark', 'github-light']
-}
-
-function stripSkillOutputBlock(content: string): string {
-  let result = content.replace(/```skill-output\n[\s\S]*?```/g, '')
-  result = result.replace(/```skill-output\n[\s\S]*$/g, '')
-  return result.trim()
-}
+const AssistantMarkdown = lazy(() => import('./AssistantMarkdown'))
 
 interface MessageBubbleProps {
   message: ConversationMessage
@@ -311,9 +265,8 @@ function UserBubble({ text, messageId, onSelectText, context }: {
   )
 }
 
-function AssistantBubble({ message, codeTheme, onSelectText, context }: {
+function AssistantBubble({ message, onSelectText, context }: {
   message: TextMessage
-  codeTheme: [BundledTheme, BundledTheme]
   onSelectText?: (text: string, context?: string) => void
   context: string
 }) {
@@ -372,21 +325,9 @@ function AssistantBubble({ message, codeTheme, onSelectText, context }: {
         {cleanText && (
           <div className="message-assistant-text">
             <div className="message-markdown">
-              <Streamdown
-                plugins={STREAMDOWN_PLUGINS}
-                remarkPlugins={REMARK_PLUGINS}
-                shikiTheme={codeTheme}
-                mode={isStreaming ? 'streaming' : 'static'}
-                isAnimating={isStreaming}
-                animated={isStreaming ? { animation: 'slideUp', sep: 'word', stagger: 30, duration: 200 } : undefined}
-                parseIncompleteMarkdown={isStreaming}
-                caret="block"
-                mermaid={{ config: { startOnLoad: false, securityLevel: 'strict' } }}
-                lineNumbers={false}
-                controls={false}
-              >
-                {stripSkillOutputBlock(cleanText)}
-              </Streamdown>
+              <Suspense fallback={<span>{stripSkillOutputBlock(cleanText)}</span>}>
+                <AssistantMarkdown text={cleanText} isStreaming={isStreaming} />
+              </Suspense>
             </div>
           </div>
         )}
@@ -404,8 +345,6 @@ function AssistantBubble({ message, codeTheme, onSelectText, context }: {
 // ─── Main ─────────────────────────────────────────────────────────────────
 
 const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context }: MessageBubbleProps): React.ReactElement {
-  const codeTheme = useCodeTheme()
-
   switch (message.kind) {
     case 'stopped':
       return (
@@ -444,7 +383,7 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
 
     case 'text':
       return (
-        <AssistantBubble message={message} codeTheme={codeTheme} onSelectText={onSelectText} context={context} />
+        <AssistantBubble message={message} onSelectText={onSelectText} context={context} />
       )
   }
 }, (prev, next) => {

@@ -24,6 +24,20 @@ export function toolRequiresPath(toolName: string): boolean {
   return toolName === 'Read' || toolName === 'Write' || toolName === 'Edit'
 }
 
+export function isToolUsePathAuthorized(
+  toolName: string,
+  input: Record<string, unknown>,
+  authorizedDirs: string[],
+  options: PathAuthorizationOptions = {}
+): boolean {
+  const filePath = extractToolPathInput(toolName, input)
+  if (!filePath) {
+    if (toolRequiresPath(toolName)) return false
+    return isPathAuthorized('.', authorizedDirs, options)
+  }
+  return isPathAuthorized(filePath, authorizedDirs, options)
+}
+
 function resolveAgainstCwd(filePath: string, cwd?: string): string {
   if (isAbsolute(filePath)) return resolve(filePath)
   return resolve(cwd || process.cwd(), filePath)

@@ -213,6 +213,32 @@ describe('session runtime event routing', () => {
     })
   })
 
+  it('applies permission mode to the active query by app session, SDK session, or context', async () => {
+    const runtime = new SessionRuntimeController()
+    const setPermissionMode = vi.fn().mockResolvedValue(undefined)
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-permission-mode',
+      sdkSessionId: 'sdk-session-permission-mode',
+      workspacePath: '/workspace/permission-mode',
+    })
+    runtime.registerRun({
+      query: { setPermissionMode } as never,
+      skillId: null,
+      abortController: new AbortController(),
+      envelope,
+    })
+
+    await expect(runtime.setPermissionMode('app-session-permission-mode', 'acceptEdits')).resolves.toBe(true)
+    await expect(runtime.setPermissionMode('sdk-session-permission-mode', 'plan')).resolves.toBe(true)
+    await expect(runtime.setPermissionMode('editor', 'dontAsk')).resolves.toBe(true)
+    await expect(runtime.setPermissionMode('missing-session', 'default')).resolves.toBe(false)
+
+    expect(setPermissionMode).toHaveBeenNthCalledWith(1, 'acceptEdits')
+    expect(setPermissionMode).toHaveBeenNthCalledWith(2, 'plan')
+    expect(setPermissionMode).toHaveBeenNthCalledWith(3, 'dontAsk')
+  })
+
   it('keeps skill output on the app session after the SDK session materializes', () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()

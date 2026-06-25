@@ -52,7 +52,7 @@ export type IPCChannelMap = {
   }
   'agent:setPermissionMode': {
     request: { context: 'editor' | 'ask'; mode: string }
-    response: { success: boolean }
+    response: { success: boolean; error?: string }
   }
   'agent:forkSession': {
     request: { sessionId: string; options?: { upToMessageId?: string; title?: string } }

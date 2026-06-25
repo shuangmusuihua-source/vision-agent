@@ -34,7 +34,7 @@ class FileIndexService {
   async init(workspaceDir: string): Promise<void> {
     if (this.workspaceDir === workspaceDir && this.ready) return
 
-    this.destroy()
+    this.destroyWorkspaceIndex()
     this.workspaceDir = workspaceDir
     this.ready = false
 
@@ -208,10 +208,7 @@ class FileIndexService {
 
   /** Initialize knowledge base watcher and index (separate from main workspace) */
   async initKnowledgeIndex(knowledgeDir: string): Promise<void> {
-    if (this.knowledgeWatcher) {
-      await this.knowledgeWatcher.close()
-      this.knowledgeWatcher = null
-    }
+    await this.destroyKnowledgeIndex()
     this.knowledgeBaseDir = knowledgeDir
 
     // Build initial knowledge base index
@@ -363,25 +360,34 @@ class FileIndexService {
   }
 
   /** Clean up */
-  destroy(): void {
+  destroyWorkspaceIndex(): void {
     if (this.watcher) {
       this.watcher.close()
       this.watcher = null
     }
-    if (this.knowledgeWatcher) {
-      this.knowledgeWatcher.close()
-      this.knowledgeWatcher = null
-    }
     this.index.clear()
-    this.knowledgeIndex.clear()
     this.workspaceDir = null
-    this.knowledgeBaseDir = null
     this.readyCallbacks.forEach((cb) => cb())
-    this.knowledgeReadyCallbacks.forEach((cb) => cb())
     this.ready = false
     this.readyCallbacks = []
+  }
+
+  async destroyKnowledgeIndex(): Promise<void> {
+    if (this.knowledgeWatcher) {
+      await this.knowledgeWatcher.close()
+      this.knowledgeWatcher = null
+    }
+    this.knowledgeIndex.clear()
+    this.knowledgeBaseDir = null
+    this.knowledgeReadyCallbacks.forEach((cb) => cb())
     this.knowledgeReady = false
     this.knowledgeReadyCallbacks = []
+  }
+
+  /** Clean up all indexes and watchers. */
+  async destroy(): Promise<void> {
+    this.destroyWorkspaceIndex()
+    await this.destroyKnowledgeIndex()
     this.changedFiles.clear()
   }
 }

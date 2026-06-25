@@ -541,7 +541,11 @@ export function useAgent(context: AgentContext = 'editor') {
   const isLoadingMoreMessages = store((s) => s.slots[context]._isLoadingMoreMessages)
 
   const setPermissionMode = useCallback(async (mode: string) => {
-    await window.api.agent.setPermissionMode(context, mode)
+    const result = await window.api.agent.setPermissionMode(context, mode)
+    if (!result.success) {
+      console.warn('[useAgent] Failed to set permission mode:', result.error)
+    }
+    return result
   }, [context])
 
   return {

@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import path from 'path'
 import { describe, expect, it } from 'vitest'
-import { extractToolPathInput, isPathAuthorized, toolRequiresPath } from '../src/main/agent-path-utils'
+import { extractToolPathInput, isPathAuthorized, isToolUsePathAuthorized, toolRequiresPath } from '../src/main/agent-path-utils'
 
 function makeTempWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), 'sumi-auth-'))
@@ -45,5 +45,22 @@ describe('agent path authorization', () => {
     expect(toolRequiresPath('Edit')).toBe(true)
     expect(toolRequiresPath('Glob')).toBe(false)
     expect(toolRequiresPath('Grep')).toBe(false)
+  })
+
+  it('authorizes Glob and Grep paths through the same root check', () => {
+    const { workspace, outside } = makeTempWorkspace()
+    writeFileSync(path.join(workspace, 'note.md'), 'inside')
+    writeFileSync(path.join(outside, 'secret.md'), 'outside')
+
+    expect(isToolUsePathAuthorized('Glob', { path: '.' }, [workspace], { cwd: workspace })).toBe(true)
+    expect(isToolUsePathAuthorized('Grep', { path: '../outside' }, [workspace], { cwd: workspace })).toBe(false)
+    expect(isToolUsePathAuthorized('Grep', { path: outside }, [workspace], { cwd: workspace })).toBe(false)
+  })
+
+  it('checks cwd when Glob or Grep omit an explicit path', () => {
+    const { workspace, outside } = makeTempWorkspace()
+
+    expect(isToolUsePathAuthorized('Glob', {}, [workspace], { cwd: workspace })).toBe(true)
+    expect(isToolUsePathAuthorized('Grep', {}, [workspace], { cwd: outside })).toBe(false)
   })
 })

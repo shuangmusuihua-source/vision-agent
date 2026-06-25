@@ -4,14 +4,11 @@ import { FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'l
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
-import MarkdownEditor from '../editor/MarkdownEditor'
-import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
 import AskZuovis from '../ask/AskZuovis'
 import { ErrorBoundary } from '../common/ErrorBoundary'
-const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 import DaydreamOverlay from './DaydreamOverlay'
 import OverviewPanel from './OverviewPanel'
 import './OverviewPanel.css'
@@ -19,7 +16,7 @@ import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissi
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useWorkspace } from '../../hooks/useWorkspace'
-import { useTabs } from '../../hooks/useTabs'
+import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
@@ -29,6 +26,10 @@ import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
+
+const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
+const ChatView = lazy(() => import('../chat/ChatView'))
+const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -56,9 +57,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const {
     openTabs, activeTab, activeContent, activeFilePath,
     openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
-    saveFile, refreshActiveContent, hasFileTab,
+    saveFile, retryPendingSave, refreshActiveContent, hasFileTab,
+    activeSaveError, activeHasPendingSave,
   } = useTabs()
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+  const [isRetryingSave, setIsRetryingSave] = useState(false)
+  const activeFilePathRef = useRef(activeFilePath)
+  activeFilePathRef.current = activeFilePath
 
   // Stable refs for workspace values used in useCallback/useEffect deps
   // (the workspace object changes every render — avoid putting it in dep arrays)
@@ -98,6 +103,24 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const changedFileCount = useChangedFileCount()
 
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
+
+  const handleSaveFile = useCallback(async (filePath: string, content: string): Promise<SaveFileResult> => {
+    return saveFile(filePath, content)
+  }, [saveFile])
+
+  useEffect(() => {
+    setIsRetryingSave(false)
+  }, [activeFilePath])
+
+  const handleRetrySave = useCallback(async () => {
+    if (isRetryingSave) return
+    setIsRetryingSave(true)
+    try {
+      await retryPendingSave(activeFilePathRef.current)
+    } finally {
+      setIsRetryingSave(false)
+    }
+  }, [isRetryingSave, retryPendingSave])
 
   const setEditorLinkedFile = useCallback((path: string | null) => {
     setLinkedFile(path)
@@ -650,17 +673,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         <div className="main-content-scroll">
         {activeTab && isFileTab(activeTab) ? (
           <ErrorBoundary onReset={() => {}}>
-          <MarkdownEditor
-            content={activeContent}
-            filePath={activeFilePath}
-            workspacePath={workspace.workspacePaths[0] || ''}
-            sourceMode={sourceMode}
-            focusMode={focusMode}
-            onOpenFile={handleFileSelect}
-            onSave={saveFile}
-            onAskAgent={handleAskAgent}
-            onStatsUpdate={handleStatsUpdate}
-          />
+          <Suspense fallback={<div className="editor-loading">Loading editor...</div>}>
+            <MarkdownEditor
+              content={activeContent}
+              filePath={activeFilePath}
+              workspacePath={workspace.workspacePaths[0] || ''}
+              sourceMode={sourceMode}
+              focusMode={focusMode}
+              onOpenFile={handleFileSelect}
+              onSave={handleSaveFile}
+              onAskAgent={handleAskAgent}
+              onStatsUpdate={handleStatsUpdate}
+            />
+          </Suspense>
           </ErrorBoundary>
         ) : activeWorkspacePath ? (
           <ErrorBoundary onReset={() => {}}>
@@ -683,6 +708,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <span>{editorStats.chars} characters</span>
             {sourceMode && <span>Source</span>}
             {focusMode && <span>Focus</span>}
+            {activeHasPendingSave && (
+              <span className="editor-save-status editor-save-status-error" title={activeSaveError || '保存失败'}>
+                <span>未保存：{activeSaveError || '保存失败'}</span>
+                <button
+                  className="editor-save-retry-btn"
+                  onClick={handleRetrySave}
+                  disabled={isRetryingSave}
+                  title="重试保存"
+                >
+                  {isRetryingSave ? '保存中' : '重试'}
+                </button>
+              </span>
+            )}
           </div>
         )}
         </>
@@ -748,7 +786,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onUnlinkFile={() => setEditorLinkedFile(null)}
       >
         <ErrorBoundary>
-        <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspace.workspacePaths[0]} />
+        <Suspense fallback={<div className="chat-loading">加载对话...</div>}>
+          <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspace.workspacePaths[0]} />
+        </Suspense>
         </ErrorBoundary>
       </AgentPanel>
       </aside>

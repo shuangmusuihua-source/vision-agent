@@ -22,6 +22,7 @@ import { ImagePaste } from './extensions/image-paste'
 import { Frontmatter } from './extensions/frontmatter'
 import { MathInline } from './extensions/math-inline'
 import { MathBlock } from './extensions/math-block'
+import { SourceSaveController } from './source-save-controller'
 import Image from '@tiptap/extension-image'
 import { Extension } from '@tiptap/core'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
@@ -69,7 +70,7 @@ interface MarkdownEditorProps {
   sourceMode: boolean
   focusMode: boolean
   onOpenFile: (filePath: string) => void
-  onSave: (filePath: string, content: string) => void
+  onSave: (filePath: string, content: string) => void | Promise<unknown>
   onAskAgent: (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => void
   onStatsUpdate: (wordCount: number, charCount: number) => void
 }
@@ -106,9 +107,35 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   const [sourceText, setSourceText] = useState('')
   const frontmatterRef = useRef('')
   const isLocalChange = useRef(false)
+  const sourceSaveControllerRef = useRef<SourceSaveController | null>(null)
+  const sourceFilePathRef = useRef(filePath)
+  const isMemoryFile = filePath.includes('.vision/memory/')
+
+  if (!sourceSaveControllerRef.current) {
+    sourceSaveControllerRef.current = new SourceSaveController(onSave)
+  }
+  const sourceSaveController = sourceSaveControllerRef.current
+
+  useEffect(() => {
+    sourceSaveController.setSaveHandler(onSave)
+  }, [onSave, sourceSaveController])
 
   // Normalize markdown for comparison: strip trailing whitespace
   const normalizeMd = (md: string) => md.replace(/\n+$/, '')
+
+  const clearScheduledSourceSave = useCallback(() => {
+    sourceSaveController.clearScheduledSave()
+  }, [sourceSaveController])
+
+  const flushSourceSave = useCallback(() => {
+    sourceSaveController.flush()
+  }, [sourceSaveController])
+
+  const handleSourceTextChange = useCallback((nextText: string) => {
+    setSourceText(nextText)
+    if (!filePath || isMemoryFile) return
+    sourceSaveController.schedule(filePath, nextText)
+  }, [filePath, isMemoryFile, sourceSaveController])
 
   useEffect(() => {
     if (!workspacePath) {
@@ -124,8 +151,6 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       filesRef.current = []
     })
   }, [workspacePath])
-
-  const isMemoryFile = filePath.includes('.vision/memory/')
 
   const editor = useEditor({
     editable: !isMemoryFile,
@@ -305,8 +330,10 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       if (!editor) return
       if (sourceMode) {
         // Entering source mode: save current full markdown to sourceText
+        sourceFilePathRef.current = filePath
         setSourceText(getFullMarkdown(editor))
       } else {
+        flushSourceSave()
         // Leaving source mode: apply sourceText back to editor
         const { frontmatter, body } = extractFrontmatter(sourceText)
         editor.commands.setContent(body || '\n\n', { contentType: 'markdown', emitUpdate: false })
@@ -318,7 +345,33 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       }
       setInternalSourceMode(sourceMode)
     }
-  }, [sourceMode, internalSourceMode, editor, sourceText])
+  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, filePath])
+
+  useEffect(() => {
+    if (!internalSourceMode) {
+      sourceFilePathRef.current = filePath
+      return
+    }
+
+    if (sourceFilePathRef.current !== filePath) {
+      flushSourceSave()
+      sourceFilePathRef.current = filePath
+      sourceSaveController.discard()
+      setSourceText(content)
+      return
+    }
+
+    if (!sourceSaveController.hasPendingSave()) {
+      setSourceText(content)
+    }
+  }, [content, filePath, flushSourceSave, internalSourceMode, sourceSaveController])
+
+  useEffect(() => {
+    return () => {
+      flushSourceSave()
+      clearScheduledSourceSave()
+    }
+  }, [clearScheduledSourceSave, flushSourceSave])
 
   useEffect(() => {
     if (!editor) return
@@ -435,7 +488,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       <textarea
         className="editor-source-textarea"
         value={sourceText}
-        onChange={(e) => setSourceText(e.target.value)}
+        onChange={(e) => handleSourceTextChange(e.target.value)}
         spellCheck={false}
       />
     )

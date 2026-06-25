@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react'
 import { Monitor, FolderOpen, Trash2, Gauge } from 'lucide-react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
-import ChatView from '../chat/ChatView'
 import ChatInput from '../chat/ChatInput'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
@@ -9,6 +8,8 @@ import { useAgentStore } from '../../store/agent-store-impl'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import bullLogo from '../../assets/zuovis-logo.svg'
 import './ask-zuovis.css'
+
+const ChatView = lazy(() => import('../chat/ChatView'))
 
 interface FeatureCard {
   id: string
@@ -164,7 +165,9 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
           </div>
         ) : (
           <div className="ask-zuovis-messages-inner">
-            <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} scrollContainerRef={scrollRef} />
+            <Suspense fallback={<div className="ask-zuovis-resuming">加载对话...</div>}>
+              <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} scrollContainerRef={scrollRef} />
+            </Suspense>
           </div>
         )}
       </div>

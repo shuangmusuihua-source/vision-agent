@@ -2,14 +2,20 @@ import { useState, useCallback, useRef } from 'react'
 import type { TabDescriptor, FileTab, FixedTab } from '../../shared/types'
 import { isFileTab } from '../../shared/types'
 import { useAgentStore } from '../store/agent-store-impl'
+import {
+  createWorkspaceTabState,
+  pendingSaveFor,
+  visibleFileContent,
+  withPendingSave,
+  withSavedFile,
+  withoutFilePrefixState,
+  withoutFileState,
+  type WorkspaceTabState,
+} from './tab-save-state'
 
 export type { TabDescriptor, FileTab, FixedTab }
 
-type WorkspaceTabState = {
-  tabs: TabDescriptor[]
-  activeTab: TabDescriptor | null
-  tabContents: Record<string, string>
-}
+export type SaveFileResult = { success: boolean; error?: string; pending?: boolean }
 
 // Composite key from workspace path + session ID
 function compositeKey(ws: string, sid: string | null): string {
@@ -34,6 +40,9 @@ export function useTabs() {
   const openTabs = currentState?.tabs ?? []
   const activeTab = currentState?.activeTab ?? null
   const tabContents = currentState?.tabContents ?? {}
+  const pendingSaves = currentState?.pendingSaves ?? {}
+  const activeFilePath = activeTab && isFileTab(activeTab) ? activeTab.path : ''
+  const activePendingSave = activeFilePath ? pendingSaveFor(currentState, activeFilePath) : null
 
   // Helper to get the composite key from store at call time
   const getCurrentKey = useCallback((): string | null => {
@@ -53,7 +62,7 @@ export function useTabs() {
       const key = getCurrentKey()
       if (!key) return
       setWorkspaceStates(prev => {
-        const current = prev[key] ?? { tabs: [], activeTab: null, tabContents: {} }
+        const current = prev[key] ?? createWorkspaceTabState()
         return { ...prev, [key]: updater(current) }
       })
     },
@@ -68,7 +77,7 @@ export function useTabs() {
     // Dedup check inside the updater to prevent race-condition duplicates
     let alreadyOpen = false
     setWorkspaceStates(prev => {
-      const current = prev[key] ?? { tabs: [], activeTab: null, tabContents: {} }
+      const current = prev[key] ?? createWorkspaceTabState()
       if (current.tabs.some(t => isFileTab(t) && t.path === filePath)) {
         alreadyOpen = true
         return { ...prev, [key]: { ...current, activeTab: { type: 'file', path: filePath } } }
@@ -80,7 +89,7 @@ export function useTabs() {
     const result = await window.api.workspace.readFile(filePath)
     if (result.success && result.content !== undefined) {
       setWorkspaceStates(prev => {
-        const current = prev[key] ?? { tabs: [], activeTab: null, tabContents: {} }
+        const current = prev[key] ?? createWorkspaceTabState()
         // Re-check dedup after async read
         if (current.tabs.some(t => isFileTab(t) && t.path === filePath)) {
           return { ...prev, [key]: { ...current, activeTab: { type: 'file', path: filePath } } }
@@ -91,6 +100,7 @@ export function useTabs() {
             tabs: [...current.tabs, { type: 'file', path: filePath }],
             activeTab: { type: 'file', path: filePath },
             tabContents: { ...current.tabContents, [filePath]: result.content! },
+            pendingSaves: current.pendingSaves ?? {},
           },
         }
       })
@@ -121,9 +131,7 @@ export function useTabs() {
       if (prev.activeTab && isFileTab(prev.activeTab) && prev.activeTab.path === filePath) {
         nextActive = nextTabs.length > 0 ? nextTabs[Math.min(closedIdx, nextTabs.length - 1)] : null
       }
-      const nextContents = { ...prev.tabContents }
-      delete nextContents[filePath]
-      return { tabs: nextTabs, activeTab: nextActive, tabContents: nextContents }
+      return withoutFileState({ ...prev, tabs: nextTabs, activeTab: nextActive }, filePath)
     })
   }, [setCurrentWsState])
 
@@ -143,23 +151,52 @@ export function useTabs() {
         if (newTabs.length === state.tabs.length) continue
         const newActive = (state.activeTab && isFileTab(state.activeTab) && state.activeTab.path.startsWith(prefix))
           ? null : state.activeTab
-        const newContents = { ...state.tabContents }
-        for (const key of Object.keys(newContents)) {
-          if (key.startsWith(prefix)) delete newContents[key]
-        }
-        next[ws] = { tabs: newTabs, activeTab: newActive, tabContents: newContents }
+        next[ws] = withoutFilePrefixState({ ...state, tabs: newTabs, activeTab: newActive }, prefix)
       }
       return next
     })
   }, [])
 
-  const saveFile = useCallback(async (filePath: string, content: string) => {
-    await window.api.workspace.writeFile(filePath, content)
-    setCurrentWsState(prev => ({
-      ...prev,
-      tabContents: { ...prev.tabContents, [filePath]: content },
-    }))
-  }, [setCurrentWsState])
+  const saveFile = useCallback(async (filePath: string, content: string): Promise<SaveFileResult> => {
+    const key = getCurrentKey()
+    if (!key) return { success: false, error: 'No active workspace', pending: false }
+
+    let result: SaveFileResult
+    try {
+      result = await window.api.workspace.writeFile(filePath, content)
+    } catch (err) {
+      result = { success: false, error: (err as Error).message }
+    }
+
+    if (!result.success) {
+      console.error('[useTabs] saveFile failed:', result.error || 'unknown error')
+      const error = result.error || '保存失败'
+      setWorkspaceStates(prev => {
+        const current = prev[key] ?? createWorkspaceTabState()
+        return { ...prev, [key]: withPendingSave(current, filePath, content, error) }
+      })
+      return { ...result, error, pending: true }
+    }
+    setWorkspaceStates(prev => {
+      const current = prev[key] ?? createWorkspaceTabState()
+      return { ...prev, [key]: withSavedFile(current, filePath, content) }
+    })
+    return result
+  }, [getCurrentKey])
+
+  const retryPendingSave = useCallback(async (filePath?: string): Promise<SaveFileResult> => {
+    const key = getCurrentKey()
+    if (!key) return { success: false, error: 'No active workspace', pending: false }
+
+    const state = workspaceStatesRef.current[key]
+    const targetPath = filePath || (state?.activeTab && isFileTab(state.activeTab) ? state.activeTab.path : '')
+    if (!targetPath) return { success: false, error: 'No active file', pending: false }
+
+    const pending = pendingSaveFor(state, targetPath)
+    if (!pending) return { success: true }
+
+    return saveFile(targetPath, pending.content)
+  }, [getCurrentKey, saveFile])
 
   const refreshActiveContent = useCallback(async () => {
     if (!activeTab || !isFileTab(activeTab)) return
@@ -167,19 +204,21 @@ export function useTabs() {
     const result = await window.api.workspace.readFile(path)
     if (result.success && result.content !== undefined) {
       setCurrentWsState(prev => {
+        if (prev.pendingSaves?.[path]) {
+          return prev
+        }
         if (prev.tabContents[path] !== result.content) {
-          return { ...prev, tabContents: { ...prev.tabContents, [path]: result.content! } }
+          return withSavedFile(prev, path, result.content!)
         }
         return prev
       })
     }
   }, [activeTab, setCurrentWsState])
 
-  const activeContent = (activeTab && isFileTab(activeTab))
-    ? (tabContents[activeTab.path] || '')
+  const activeContent = activeFilePath
+    ? visibleFileContent(currentState, activeFilePath)
     : ''
 
-  const activeFilePath = activeTab && isFileTab(activeTab) ? activeTab.path : ''
   const hasFileTab = useCallback((path: string) =>
     openTabs.some(t => isFileTab(t) && t.path === path),
     [openTabs])
@@ -188,8 +227,11 @@ export function useTabs() {
     openTabs,
     activeTab,
     tabContents,
+    pendingSaves,
     activeContent,
     activeFilePath,
+    activeSaveError: activePendingSave?.error ?? null,
+    activeHasPendingSave: Boolean(activePendingSave),
     openFile,
     openFixedTab,
     closeTab,
@@ -197,6 +239,7 @@ export function useTabs() {
     clearTab,
     closeTabsByPrefix,
     saveFile,
+    retryPendingSave,
     refreshActiveContent,
     hasFileTab,
   }

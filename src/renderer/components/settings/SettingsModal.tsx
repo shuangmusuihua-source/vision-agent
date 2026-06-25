@@ -22,6 +22,7 @@ import {
 import { useSettings, useSettingsStore } from '../../store/settings-cache'
 import type { ModelProfile } from '../../lib/ipc'
 import { APP_NAME } from '../../../shared/branding'
+import appIcon from '../../../../build/icon_preview.png'
 
 interface SettingsModalProps {
   onClose: () => void
@@ -257,7 +258,9 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       <div className="settings-window" role="dialog" aria-modal="true" aria-label="设置" onClick={(e) => e.stopPropagation()}>
         <aside className="settings-sidebar" aria-label="设置分类">
           <div className="settings-brand">
-            <div className="settings-brand-mark">墨</div>
+            <div className="settings-brand-mark" aria-hidden="true">
+              <img src={appIcon} alt="" />
+            </div>
             <div className="settings-brand-copy">
               <div className="settings-brand-title">{APP_NAME}</div>
               <div className="settings-brand-subtitle">设置中心</div>
@@ -604,7 +607,9 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
           {activePage === 'about' && (
             <div className="settings-page">
               <section className="about-section">
-                <div className="about-logo-mark">墨</div>
+                <div className="about-logo-mark" aria-hidden="true">
+                  <img src={appIcon} alt="" />
+                </div>
                 <div className="about-logo">{APP_NAME}</div>
                 <div className="about-version">Version 1.0.0</div>
                 <div className="about-desc">

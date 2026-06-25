@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron'
 import { join, extname, dirname } from 'path'
-import { readFile, writeFile, mkdir, unlink, readdir } from 'fs/promises'
+import { readFile, mkdir, unlink, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { resolve, sep } from 'path'
 import { getAuthorizedDirectories } from '../store'
 import { isPathAuthorized } from '../path-validator'
+import { atomicWriteTextFile } from '../atomic-write'
 
 function isMemoryPathAuthorized(filePath: string): boolean {
   const dirs = getAuthorizedDirectories()
@@ -50,7 +51,7 @@ export function registerMemoryHandlers(): void {
     try {
       const dir = dirname(filePath)
       if (!existsSync(dir)) await mkdir(dir, { recursive: true })
-      await writeFile(filePath, content, 'utf-8')
+      await atomicWriteTextFile(filePath, content)
       return { success: true }
     } catch (err) { return { success: false, error: (err as Error).message } }
   })

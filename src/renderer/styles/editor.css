@@ -652,6 +652,47 @@
   flex-shrink: 0;
 }
 
+.editor-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-width: 0;
+  max-width: min(48vw, 520px);
+}
+
+.editor-save-status-error {
+  color: var(--color-error);
+  font-weight: var(--font-weight-medium);
+}
+
+.editor-save-status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-save-retry-btn {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--color-error) 36%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.editor-save-retry-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-error) 14%, transparent);
+}
+
+.editor-save-retry-btn:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+
 /* --- Source mode --- */
 
 .editor-source-textarea {

@@ -48,7 +48,7 @@ export function registerSettingsHandlers(pushSettingsToRenderer: () => void): vo
     removeAuthorizedDirectory(dir)
     const dirs = getAuthorizedDirectories()
     if (dirs.length > 0) await fileIndexService.init(dirs[0])
-    else fileIndexService.destroy()
+    else fileIndexService.destroyWorkspaceIndex()
     pushSettingsToRenderer()
     return { success: true }
   })

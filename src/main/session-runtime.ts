@@ -1,5 +1,5 @@
 import type { BrowserWindow } from 'electron'
-import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { PermissionMode, Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import type {
   AgentIPCMessage,
@@ -359,6 +359,17 @@ export class SessionRuntimeController {
     discardAllTextBatches()
   }
 
+  async setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {
+    const matchedKey = queryKey ? this.findRunKey(queryKey) : this.findSingleActiveRunKey()
+    if (!matchedKey) return false
+
+    const run = this.activeRuns.get(matchedKey)
+    if (!run) return false
+
+    await run.query.setPermissionMode(mode)
+    return true
+  }
+
   handleWindowDestroy(): void {
     rejectAllPendingPermissions()
     rejectAllPendingAskUser()
@@ -383,10 +394,17 @@ export class SessionRuntimeController {
 
   private findRunKey(queryKey: string): string | null {
     if (this.activeRuns.has(queryKey)) return queryKey
+    let contextMatch: string | null = null
     for (const [key, run] of this.activeRuns) {
       if (run.envelope.sdkSessionId === queryKey) return key
+      if (run.envelope.context === queryKey) contextMatch = key
     }
-    return null
+    return contextMatch
+  }
+
+  private findSingleActiveRunKey(): string | null {
+    if (this.activeRuns.size !== 1) return null
+    return this.activeRuns.keys().next().value ?? null
   }
 
   private createRequestId(prefix: 'ask' | 'perm'): string {

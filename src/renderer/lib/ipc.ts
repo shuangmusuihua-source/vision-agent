@@ -129,7 +129,7 @@ interface AgentApi {
   renameSession: (sessionId: string, title: string) => Promise<{ success: boolean }>
   updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
-  setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean }>
+  setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean; error?: string }>
   forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => Promise<{ success: boolean; sessionId?: string; error?: string }>
   selectFolder: () => Promise<Electron.OpenDialogReturnValue>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
