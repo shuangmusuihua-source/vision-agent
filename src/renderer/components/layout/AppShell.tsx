@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
-import { FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft } from 'lucide-react'
+import { FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -168,6 +168,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
   const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
+  const sessionLoadError = useAgentStore((s) => s.sessionLoadError)
+  const retrySessionLoad = useAgentStore((s) => s.retrySessionLoad)
+  const clearSessionLoadError = useAgentStore((s) => s.clearSessionLoadError)
 
   // Load sessions when workspace changes
   const skipNextSessionLoad = useRef(false)
@@ -819,6 +822,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <Download size={14} /> 重试
           </button>
           <button className="update-banner-dismiss" onClick={() => setUpdateError(null)}>✕</button>
+        </div>
+      )}
+      {sessionLoadError && (
+        <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+          <span>会话加载失败: {sessionLoadError.message.slice(0, 60)}{sessionLoadError.message.length > 60 ? '...' : ''}</span>
+          <button className="update-banner-btn" onClick={() => { void retrySessionLoad() }}>
+            <RefreshCw size={14} /> 重试
+          </button>
+          <button className="update-banner-dismiss" onClick={clearSessionLoadError}>✕</button>
         </div>
       )}
       {mainError && (

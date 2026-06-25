@@ -221,6 +221,10 @@ function mergeLoadedMessages(
   return merged
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 // ─── State Machine ─────────────────────────────────────────────────────
 
 export function transition(current: AgentState, event: AgentEvent): AgentState {
@@ -265,6 +269,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     activeSessionId: { editor: null, ask: null },
     sessionOutputs: null,
     sessionOutputsLoading: false,
+    sessionLoadError: null,
 
     // ─── State Machine ──────────────────────────────────────────────────
 
@@ -848,6 +853,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           return {
             activeSessionId: { ...state.activeSessionId, [context]: null },
             ...(context === 'editor' ? { sessionOutputs: null, sessionOutputsLoading: false } : {}),
+            sessionLoadError: null,
             slots: { ...state.slots, [context]: cleanSlot },
           }
         })
@@ -945,13 +951,14 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           sessionSlots: nextSessionSlots,
           sessionAccessOrder: accessOrder,
           ...(context === 'editor' ? { sessionOutputs: null, sessionOutputsLoading: true } : {}),
+          sessionLoadError: null,
           slots: { ...state.slots, [context]: targetSlot },
         }
       })
 
       const targetSlot = get().slots[context]
       if (targetSlot._needsSdkLoad && targetSlot.currentSessionId === sessionId) {
-        set({ isResumingSession: true })
+        set({ isResumingSession: true, sessionLoadError: null })
         get().loadInitialSessionMessages(sessionId, context).finally(() => {
           if (get().activeSessionId[context] === sessionId) {
             set({ isResumingSession: false })
@@ -973,6 +980,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           ...state.sessionSlots,
           [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: true },
         },
+        sessionLoadError: state.sessionLoadError?.sessionId === sessionId ? null : state.sessionLoadError,
         ...(state.activeSessionId[context] === sessionId ? {
           slots: {
             ...state.slots,
@@ -1006,15 +1014,23 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           }
           return {
             sessionSlots: { ...state.sessionSlots, [sessionId]: finalSlot },
+            sessionLoadError: state.sessionLoadError?.sessionId === sessionId ? null : state.sessionLoadError,
             ...(isActive ? { slots: { ...state.slots, [context]: finalSlot } } : {}),
           }
         })
       } catch (err) {
         console.error('[AgentStore] loadInitialSessionMessages failed:', err)
+        const message = getErrorMessage(err)
         set((state) => ({
           sessionSlots: {
             ...state.sessionSlots,
             [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: false },
+          },
+          sessionLoadError: {
+            sessionId,
+            context,
+            phase: 'initial',
+            message,
           },
           ...(state.slots[context]._isLoadingMoreMessages ? {
             slots: { ...state.slots, [context]: { ...state.slots[context], _isLoadingMoreMessages: false } },
@@ -1043,6 +1059,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           ...state.sessionSlots,
           [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: true },
         },
+        sessionLoadError: state.sessionLoadError?.sessionId === sessionId ? null : state.sessionLoadError,
         ...(owningContext ? {
           slots: { ...state.slots, [owningContext]: { ...state.slots[owningContext], _isLoadingMoreMessages: true } },
         } : {}),
@@ -1081,6 +1098,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
                 ...state.sessionSlots,
                 [sessionId]: updatedSlot,
               },
+              sessionLoadError: state.sessionLoadError?.sessionId === sessionId ? null : state.sessionLoadError,
             }
           }
 
@@ -1098,24 +1116,49 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           return {
             slots: { ...state.slots, [activeContext]: updatedSlot },
             sessionSlots: { ...state.sessionSlots, [sessionId]: updatedSlot },
+            sessionLoadError: state.sessionLoadError?.sessionId === sessionId ? null : state.sessionLoadError,
           }
         })
       } catch (err) {
         console.error('[AgentStore] loadMoreSessionMessages failed:', err)
+        const message = getErrorMessage(err)
         const stateErr = get()
         const activeCtxErr: AgentContext | null =
           stateErr.activeSessionId.editor === sessionId ? 'editor' :
           stateErr.activeSessionId.ask === sessionId ? 'ask' :
           null
+        const context = activeCtxErr || owningContext || 'editor'
         set((state) => ({
           sessionSlots: {
             ...state.sessionSlots,
             [sessionId]: { ...state.sessionSlots[sessionId], _isLoadingMoreMessages: false },
           },
+          sessionLoadError: {
+            sessionId,
+            context,
+            phase: 'more',
+            message,
+          },
           ...(activeCtxErr ? {
             slots: { ...state.slots, [activeCtxErr]: { ...state.slots[activeCtxErr], _isLoadingMoreMessages: false } },
           } : {}),
         }))
+      }
+    },
+
+    clearSessionLoadError() {
+      set({ sessionLoadError: null })
+    },
+
+    async retrySessionLoad() {
+      const error = get().sessionLoadError
+      if (!error) return
+
+      set({ sessionLoadError: null })
+      if (error.phase === 'more') {
+        await get().loadMoreSessionMessages(error.sessionId)
+      } else {
+        await get().loadInitialSessionMessages(error.sessionId, error.context)
       }
     },
 

@@ -86,6 +86,13 @@ function emptySlot(): ContextSlot {
 
 export { emptySlot }
 
+export type SessionLoadError = {
+  sessionId: string
+  context: AgentContext
+  phase: 'initial' | 'more'
+  message: string
+}
+
 // ─── Agent Store Interface ─────────────────────────────────────────────
 
 export type AgentStore = {
@@ -114,6 +121,7 @@ export type AgentStore = {
   activeSessionId: { editor: string | null; ask: string | null }
   sessionOutputs: SessionOutputs | null
   sessionOutputsLoading: boolean
+  sessionLoadError: SessionLoadError | null
 
   // Actions
   dispatchAgentEvent: (event: AgentEvent, context?: AgentContext, eventSid?: string | null) => void
@@ -136,6 +144,8 @@ export type AgentStore = {
   ensureSessionSlot: (sessionId: string) => void
   loadInitialSessionMessages: (sessionId: string, context?: AgentContext) => Promise<void>
   loadMoreSessionMessages: (sessionId: string) => Promise<void>
+  clearSessionLoadError: () => void
+  retrySessionLoad: () => Promise<void>
   renameCurrentSession: (title: string) => Promise<void>
 }
 
