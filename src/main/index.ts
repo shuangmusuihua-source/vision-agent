@@ -111,7 +111,7 @@ function createWindow(): void {
     trafficLightPosition: { x: 8, y: 8 },
     transparent: true,
     backgroundColor: '#00000000',
-    vibrancy: 'under-window',
+    vibrancy: 'sidebar',
     visualEffectState: 'active',
     title: APP_NAME,
     webPreferences: {
