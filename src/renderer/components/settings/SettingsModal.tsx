@@ -290,7 +290,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
             <div className="settings-summary-value">{activeProfile?.name || '未选择'}</div>
             <div className="settings-summary-meta">{themeLabel}</div>
           </div>
-          <div className="settings-sidebar-version">Version 1.0.0</div>
+          <div className="settings-sidebar-version">Version 1.1.0</div>
         </aside>
 
         <section className="settings-content">
@@ -611,7 +611,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                   <img src={appIcon} alt="" />
                 </div>
                 <div className="about-logo">{APP_NAME}</div>
-                <div className="about-version">Version 1.0.0</div>
+                <div className="about-version">Version 1.1.0</div>
                 <div className="about-desc">
                   基于 Claude Agent SDK 的智能编程助手。集成文件编辑、代码审查、定时任务与多会话工作流。
                 </div>
