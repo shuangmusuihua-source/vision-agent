@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef, memo } from 'react'
-import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon } from 'lucide-react'
+import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon, Check, ChevronDown } from 'lucide-react'
 import type { ConversationMessage, TextMessage, ArtifactData } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
@@ -176,6 +176,23 @@ function parseAttachments(text: string): { attachments: ParsedAttachment[]; body
   return { attachments, body: lines.slice(bodyStart).join('\n').trimStart() }
 }
 
+function attachmentMeta(attachment: ParsedAttachment): string {
+  if (attachment.type === 'image') return attachment.label || '图片'
+  if (attachment.label) return attachment.label.replace(/文档$/, '')
+  const ext = fileExtension(attachment.path || attachment.name)
+  return ext ? ext.toUpperCase() : '文件'
+}
+
+function attachmentDisplayName(name: string): string {
+  return name.replace(/\.[^.]+$/, '') || name
+}
+
+function attachmentStatusTitle(attachments: ParsedAttachment[], isProcessing: boolean): string {
+  const action = isProcessing ? '正在理解' : '已读取'
+  if (attachments.length === 1) return `${action}《${attachmentDisplayName(attachments[0].name)}》`
+  return `${action} ${attachments.length} 个附件`
+}
+
 function UserBubble({ text, messageId, onSelectText, context }: {
   text: string
   messageId: string
@@ -218,43 +235,72 @@ function UserBubble({ text, messageId, onSelectText, context }: {
     return () => document.removeEventListener('mousedown', handler)
   }, [selectionBtn])
 
+  const readableAttachments = attachments.filter((attachment) => attachment.convertible)
+  const isReadingAttachments = isLatestStreamingUserMessage && readableAttachments.length > 0
+
   return (
-    <div className="message-bubble message-user">
-      <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
-        {attachments.length > 0 ? (
-          <>
-            <div className={`message-attach-chips${body ? ' message-attach-chips--with-body' : ''}`}>
-              {attachments.map((attachment, i) => {
-                const isUnderstanding = isLatestStreamingUserMessage && attachment.convertible
-                const Icon = attachment.type === 'image' ? ImageIcon : FileText
-                return (
-                  <span
-                    key={i}
-                    className={`message-attach-chip${isUnderstanding ? ' message-attach-chip--understanding' : ''}`}
-                    title={attachment.path}
-                  >
-                    <span className="message-attach-chip-main">
-                      <span className="message-attach-chip-icon"><Icon size={14} /></span>
-                      <span className="message-attach-chip-name">{attachment.name}</span>
-                    </span>
-                    {isUnderstanding && (
-                      <span className="message-attach-chip-status">
-                        理解文档中
-                        <span className="message-attach-chip-dots" aria-hidden="true">
-                          <span>.</span><span>.</span><span>.</span>
-                        </span>
-                      </span>
-                    )}
+    <div className={`message-bubble message-user${attachments.length > 0 ? ' message-user-with-attachments' : ''}`}>
+      {attachments.length > 0 && (
+        <div className="message-attach-stack">
+          <div className="message-attach-cards">
+            {attachments.map((attachment, i) => {
+              const isUnderstanding = isLatestStreamingUserMessage && attachment.convertible
+              const Icon = attachment.type === 'image' ? ImageIcon : FileText
+              return (
+                <div
+                  key={i}
+                  className={`message-attach-card${isUnderstanding ? ' message-attach-card--understanding' : ''}`}
+                  title={attachment.path}
+                >
+                  <span className={`message-attach-card-icon message-attach-card-icon--${attachment.type}`}>
+                    <Icon size={18} />
                   </span>
-                )
-              })}
+                  <span className="message-attach-card-copy">
+                    <span className="message-attach-card-name">{attachment.name}</span>
+                    <span className="message-attach-card-meta">
+                      {attachmentMeta(attachment)}
+                      {' · '}
+                      {isUnderstanding ? '正在理解' : '已上传'}
+                    </span>
+                  </span>
+                  {isUnderstanding ? (
+                    <span className="message-attach-card-progress" aria-label="正在理解附件" />
+                  ) : (
+                    <span className="message-attach-card-check" aria-label="附件已上传">
+                      <Check size={16} />
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {readableAttachments.length > 0 && (
+            <div className={`message-attach-status${isReadingAttachments ? ' message-attach-status--processing' : ' message-attach-status--done'}`}>
+              <span className="message-attach-status-icon" aria-hidden="true">
+                {isReadingAttachments ? (
+                  <span className="message-attach-status-dot"></span>
+                ) : (
+                  <Check size={14} />
+                )}
+              </span>
+              <span className="message-attach-status-copy">
+                <span className="message-attach-status-title">
+                  {attachmentStatusTitle(readableAttachments, isReadingAttachments)}
+                </span>
+                <span className="message-attach-status-subtitle">
+                  {isReadingAttachments ? '正在提取文本，完成后会继续回答' : '提取文本成功'}
+                </span>
+              </span>
+              <ChevronDown size={16} className="message-attach-status-chevron" />
             </div>
-            {body && <div className="message-user-text">{body}</div>}
-          </>
-        ) : (
-          visibleText
-        )}
-      </div>
+          )}
+        </div>
+      )}
+      {(body || attachments.length === 0) && (
+        <div className="message-user-content" ref={contentRef} onMouseUp={handleMouseUp}>
+          {attachments.length > 0 ? <div className="message-user-text">{body}</div> : visibleText}
+        </div>
+      )}
       {selectionBtn && onSelectText && (
         <div className="selection-action-btn" style={{ left: selectionBtn.x, top: selectionBtn.y }} onClick={handleClickAddToChat}>
           <MessageSquareText size={12} />
