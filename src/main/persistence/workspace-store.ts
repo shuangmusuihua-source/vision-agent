@@ -4,6 +4,18 @@ import type { WorkspaceRecord, SessionRecord } from '../../shared/types'
 import { store, getKnowledgeBaseDir } from './store-core'
 import { filterUserWorkspacePaths, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 
+function isSessionContext(value: unknown): value is SessionRecord['context'] {
+  return value === 'editor' || value === 'ask'
+}
+
+function isSessionStatus(value: unknown): value is SessionRecord['status'] {
+  return value === 'active' || value === 'idle' || value === 'archived' || value === 'empty'
+}
+
+function numberOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
 // ─── Authorized directories ────────────────────────────────────────────
 
 export function getAuthorizedDirectories(): string[] {
@@ -108,7 +120,33 @@ export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): 
   if (idx >= 0) {
     sessions[idx] = { ...sessions[idx], ...patch }
     store.set('sessions', sessions)
+    return
   }
+
+  if (typeof patch.workspacePath !== 'string' || !isSessionContext(patch.context)) {
+    return
+  }
+
+  const now = Date.now()
+  const record: SessionRecord = {
+    id,
+    workspacePath: patch.workspacePath,
+    context: patch.context,
+    status: isSessionStatus(patch.status) ? patch.status : 'empty',
+    createdAt: numberOrDefault(patch.createdAt, now),
+    lastModified: numberOrDefault(patch.lastModified, now),
+    messageCount: numberOrDefault(patch.messageCount, 0),
+    artifactCount: numberOrDefault(patch.artifactCount, 0),
+  }
+
+  if (typeof patch.sdkSessionId === 'string') record.sdkSessionId = patch.sdkSessionId
+  if (typeof patch.title === 'string') record.title = patch.title
+  if (typeof patch.summary === 'string') record.summary = patch.summary
+  if (typeof patch.firstPrompt === 'string') record.firstPrompt = patch.firstPrompt
+  if (Array.isArray(patch.tags)) record.tags = patch.tags.filter((tag): tag is string => typeof tag === 'string')
+  if (typeof patch.legacyMigration === 'boolean') record.legacyMigration = patch.legacyMigration
+
+  store.set('sessions', [...sessions, record])
 }
 
 // ─── Knowledge base ────────────────────────────────────────────────────

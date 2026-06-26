@@ -153,6 +153,8 @@
   --shadow-sidebar: -2px 0 12px rgba(0, 0, 0, 0.06);
   --color-overlay: rgba(0, 0, 0, 0.3);
   --color-overlay-heavy: rgba(0, 0, 0, 0.5);
+  --modal-backdrop-bg: rgba(255, 255, 255, 0.08);
+  --modal-backdrop-filter: blur(64px) saturate(1.08);
 
   /* ── Motion ────────────────────────────────────────────────── */
 
@@ -238,8 +240,17 @@
   --shadow-sidebar: -2px 0 12px rgba(0, 0, 0, 0.15);
   --color-overlay: rgba(0, 0, 0, 0.5);
   --color-overlay-heavy: rgba(0, 0, 0, 0.7);
+  --modal-backdrop-bg: rgba(0, 0, 0, 0.18);
+  --modal-backdrop-filter: blur(64px) saturate(1.04);
 
   --sidebar-glass-border: var(--color-border-soft);
+}
+
+/* Unified backdrop for app window modals. Tune modal dim/blur here only. */
+:is(.modal-overlay.modal-overlay-visible, .settings-overlay, .ask-modal-overlay, .search-overlay) {
+  background: var(--modal-backdrop-bg);
+  backdrop-filter: var(--modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--modal-backdrop-filter);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -293,7 +304,7 @@ button {
 }
 
 button:hover {
-  color: var(--color-action);
+  color: inherit;
 }
 
 input, textarea, select {

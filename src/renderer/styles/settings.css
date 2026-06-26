@@ -8,17 +8,6 @@
   justify-content: center;
   z-index: var(--z-modal);
   padding: 28px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(14, 21, 58, 0.08), transparent 34%),
-    rgba(20, 18, 16, 0.22);
-  backdrop-filter: blur(18px) saturate(1.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
-}
-
-[data-theme="dark"] .settings-overlay {
-  background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.07), transparent 32%),
-    rgba(0, 0, 0, 0.58);
 }
 
 .settings-window {
@@ -965,11 +954,13 @@
 .about-update-btn:hover:not(:disabled) {
   background: var(--color-action-hover);
   border-color: var(--color-action-hover);
+  color: var(--color-action-text);
 }
 
 .about-update-btn:disabled {
   cursor: default;
   opacity: 0.76;
+  color: var(--color-action-text);
 }
 
 .about-update-btn-checking svg {

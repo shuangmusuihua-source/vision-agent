@@ -295,8 +295,7 @@ function Sidebar({
           >
             {userWorkspacePaths.map((wsPath, idx) => {
               const isCollapsed = collapsedWorkspaces.has(wsPath)
-              const wsSessions = [...(sessionsByWorkspace[wsPath] || [])]
-                .sort((a, b) => (b.lastModified || b.createdAt || 0) - (a.lastModified || a.createdAt || 0))
+              const wsSessions = sessionsByWorkspace[wsPath] || []
 
               return (
                 <Flipped key={wsPath} flipId={wsPath}>
@@ -349,6 +348,7 @@ function Sidebar({
                             const isActive = activeSessionId === session.id
                             const slot = isActive ? null : sessionSlots[session.id]
                             const attention = getSessionAttention(slot)
+                            const isRenaming = renamingId === session.id
                             const isRunning = isActive
                               ? activeSessionRunning
                               : (slot?.isStreaming || (slot?.agentState && slot.agentState !== 'idle' && slot.agentState !== 'error'))
@@ -359,11 +359,10 @@ function Sidebar({
                                 onClick={() => onSessionSelect(session.id, wsPath)}
                                 title={attention?.label}
                               >
-                                {renamingId === session.id ? (
+                                {isRenaming ? (
                                   <input
                                     ref={renameInputRef}
-                                    className="sidebar-new-file-field"
-                                    style={{ flex: 1, fontSize: 13 }}
+                                    className="sidebar-new-file-field sidebar-session-rename-field"
                                     value={renameText}
                                     onChange={(e) => setRenameText(e.target.value)}
                                     onKeyDown={(e) => {
@@ -395,7 +394,7 @@ function Sidebar({
                                     {session.title || session.id?.slice(-8) || '未命名会话'}
                                   </span>
                                 )}
-                                {!attention && !isRunning && (
+                                {!isRenaming && !attention && !isRunning && (
                                   <span className="sidebar-session-time">
                                     {formatSessionTime(session.lastModified || session.createdAt)}
                                   </span>
