@@ -62,6 +62,15 @@ process.on('uncaughtException', (error) => {
 
 let mainWindow: BrowserWindow | null = null
 let silentUpdateChecks = 0
+let lastSilentUpdateCheckAt = 0
+
+const FOREGROUND_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+type UpdateCheckResponse =
+  | { status: 'available'; version?: string }
+  | { status: 'not-available'; version?: string }
+  | { status: 'skipped'; message: string }
+  | { status: 'error'; message: string }
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -79,16 +88,23 @@ function sendUpdateError(message: string): void {
   }
 }
 
-async function checkForUpdates(options: { silentMissingFeed?: boolean } = {}): Promise<void> {
-  if (!app.isPackaged) return
+async function checkForUpdates(options: { silentMissingFeed?: boolean } = {}): Promise<UpdateCheckResponse> {
+  if (!app.isPackaged) return { status: 'skipped', message: '开发模式不检查更新' }
 
   if (options.silentMissingFeed) silentUpdateChecks += 1
   try {
-    await autoUpdater.checkForUpdates()
+    const result = await autoUpdater.checkForUpdates()
+    if (!result) {
+      return { status: 'skipped', message: '检查已在进行中' }
+    }
+    const version = result.updateInfo?.version
+    return result.isUpdateAvailable
+      ? { status: 'available', version }
+      : { status: 'not-available', version }
   } catch (error) {
     if (options.silentMissingFeed && isMissingUpdateFeedError(error)) {
       console.warn('[AutoUpdater] update feed unavailable; skipping launch check')
-      return
+      return { status: 'skipped', message: '更新源暂不可用' }
     }
     throw error
   } finally {
@@ -98,6 +114,19 @@ async function checkForUpdates(options: { silentMissingFeed?: boolean } = {}): P
       }, 1000)
     }
   }
+}
+
+function checkForUpdatesSilently(reason: 'launch' | 'foreground'): void {
+  if (!app.isPackaged) return
+
+  const now = Date.now()
+  if (reason === 'foreground' && now - lastSilentUpdateCheckAt < FOREGROUND_UPDATE_CHECK_INTERVAL_MS) return
+  lastSilentUpdateCheckAt = now
+
+  checkForUpdates({ silentMissingFeed: true }).catch((err) => {
+    console.error(`[AutoUpdater] ${reason} check failed:`, err)
+    Sentry.captureException(err)
+  })
 }
 
 function createWindow(): void {
@@ -200,10 +229,6 @@ app.whenReady().then(() => {
   if (app.isPackaged) {
     autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
-    checkForUpdates({ silentMissingFeed: true }).catch((err) => {
-      console.error('[AutoUpdater] launch check failed:', err)
-      Sentry.captureException(err)
-    })
 
     autoUpdater.on('update-available', (info) => {
       const win = getMainWindow()
@@ -228,10 +253,17 @@ app.whenReady().then(() => {
       Sentry.captureException(err)
       sendUpdateError(err.message)
     })
+
+    checkForUpdatesSilently('launch')
   }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    checkForUpdatesSilently('foreground')
+  })
+
+  app.on('browser-window-focus', () => {
+    checkForUpdatesSilently('foreground')
   })
 })
 
@@ -240,11 +272,12 @@ ipcMain.handle('update:download', () => autoUpdater.downloadUpdate())
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
 ipcMain.handle('update:checkForUpdates', async () => {
   try {
-    await checkForUpdates()
+    return await checkForUpdates()
   } catch (error) {
     const message = getErrorMessage(error)
     sendUpdateError(message)
     console.error('[AutoUpdater] manual check failed:', error)
+    return { status: 'error', message }
   }
 })
 

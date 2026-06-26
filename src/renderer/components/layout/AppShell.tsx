@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
-import { FileText, Download, ExternalLink, ArrowLeftRight, ChevronLeft, RefreshCw } from 'lucide-react'
+import { FileText, Download, ArrowLeftRight, ChevronLeft, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -101,6 +101,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const focusModeRef = useRef(focusMode)
   focusModeRef.current = focusMode
   const changedFileCount = useChangedFileCount()
+  const [updateActionState, setUpdateActionState] = useState<'idle' | 'downloading' | 'installing'>('idle')
 
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
@@ -159,12 +160,68 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   useEffect(() => {
     const a = window.api.update.onAvailable((info) => {
       setUpdateAvailable(info)
+      setUpdateDownloaded(false)
       setUpdateError(null)
+      setUpdateActionState('idle')
     })
-    const b = window.api.update.onDownloaded(() => setUpdateDownloaded(true))
-    const c = window.api.update.onError((error) => setUpdateError(error.message))
+    const b = window.api.update.onDownloaded(() => {
+      setUpdateDownloaded(true)
+      setUpdateError(null)
+      setUpdateActionState('idle')
+    })
+    const c = window.api.update.onError((error) => {
+      setUpdateError(error.message)
+      setUpdateActionState('idle')
+    })
     return () => { a(); b(); c() }
   }, [])
+
+  const handleUpdateAction = useCallback(async () => {
+    if (updateActionState !== 'idle') return
+
+    if (updateDownloaded) {
+      setUpdateActionState('installing')
+      try {
+        await window.api.update.install()
+      } catch (error) {
+        setUpdateActionState('idle')
+        setUpdateError(error instanceof Error ? error.message : String(error))
+      }
+      return
+    }
+
+    if (!updateAvailable) return
+    setUpdateActionState('downloading')
+    setUpdateError(null)
+    try {
+      await window.api.update.download()
+      setUpdateDownloaded(true)
+      setUpdateError(null)
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setUpdateActionState('idle')
+    }
+  }, [setUpdateDownloaded, setUpdateError, updateActionState, updateAvailable, updateDownloaded])
+
+  const handleRetryUpdateCheck = useCallback(async () => {
+    setUpdateError(null)
+    setUpdateActionState('idle')
+    try {
+      const result = await window.api.update.checkForUpdates()
+      if (result.status === 'available') {
+        setUpdateAvailable({ version: result.version || '未知版本' })
+        setUpdateDownloaded(false)
+      } else if (result.status === 'not-available') {
+        setUpdateAvailable(null)
+        setUpdateDownloaded(false)
+      } else if (result.status === 'error') {
+        setUpdateError(result.message)
+      }
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : String(error))
+    }
+  }, [setUpdateAvailable, setUpdateDownloaded, setUpdateError])
 
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
   const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
@@ -798,27 +855,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       </>
       )}
       {/* ── Banners ── */}
-      {updateAvailable && !updateDownloaded && !updateError && (
-        <div className="update-banner">
-          <span>新版本 v{updateAvailable.version} 可用</span>
-          <button className="update-banner-btn" onClick={() => window.api.update.download()}>
-            <Download size={14} /> 下载
-          </button>
-          <button className="update-banner-dismiss" onClick={() => setUpdateAvailable(null)}>✕</button>
-        </div>
-      )}
-      {updateDownloaded && (
-        <div className="update-banner update-banner-ready">
-          <span>更新已就绪</span>
-          <button className="update-banner-btn" onClick={() => window.api.update.install()}>
-            <ExternalLink size={14} /> 重启安装
-          </button>
-        </div>
-      )}
       {updateError && (
         <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
           <span>更新失败: {updateError.slice(0, 60)}{updateError.length > 60 ? '...' : ''}</span>
-          <button className="update-banner-btn" onClick={() => window.api.update.checkForUpdates()}>
+          <button className="update-banner-btn" onClick={() => { void handleRetryUpdateCheck() }}>
             <Download size={14} /> 重试
           </button>
           <button className="update-banner-dismiss" onClick={() => setUpdateError(null)}>✕</button>
@@ -863,6 +903,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           }}
         />
         </Suspense>
+      )}
+      {!updateError && (updateAvailable || updateDownloaded) && (
+        <div className="update-action-area">
+          <button
+            className={`update-action-btn${updateDownloaded ? ' update-action-btn-ready' : ''}${updateActionState !== 'idle' ? ' update-action-btn-working' : ''}`}
+            onClick={() => { void handleUpdateAction() }}
+            disabled={updateActionState !== 'idle'}
+            title={updateDownloaded ? '安装更新并重启' : updateActionState === 'downloading' ? '正在下载更新' : `下载更新 v${updateAvailable?.version || ''}`}
+            aria-label={updateDownloaded ? '安装更新并重启' : updateActionState === 'downloading' ? '正在下载更新' : `下载更新 v${updateAvailable?.version || ''}`}
+          >
+            {updateActionState !== 'idle' || updateDownloaded ? <RefreshCw size={15} /> : <Download size={15} />}
+          </button>
+        </div>
       )}
       <div
         className="sidebar-toggle-area"

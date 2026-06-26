@@ -84,6 +84,69 @@
   transition: transform 0.12s ease;
 }
 
+.update-action-area {
+  position: fixed;
+  top: 0;
+  left: 104px;
+  width: 36px;
+  height: 32px;
+  z-index: 101;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+}
+
+.update-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 4px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-action);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.update-action-btn:hover:not(:disabled) {
+  background: var(--color-action-bg);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.update-action-btn-ready {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-color: var(--button-primary-bg);
+}
+
+.update-action-btn-ready:hover:not(:disabled) {
+  background: var(--button-primary-hover);
+  border-color: var(--button-primary-hover);
+}
+
+.update-action-btn-working {
+  cursor: default;
+}
+
+.update-action-btn-working svg {
+  animation: update-action-spin 0.8s linear infinite;
+}
+
+.update-action-btn:disabled {
+  opacity: 0.85;
+}
+
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
@@ -1269,6 +1332,7 @@
 }
 
 .sidebar-toggle-btn:focus-visible,
+.update-action-btn:focus-visible,
 .sidebar-icon-btn:focus-visible,
 .sidebar-settings-btn:focus-visible,
 .sidebar-open-dir-btn:focus-visible,
@@ -1281,6 +1345,7 @@
 }
 
 .sidebar-toggle-btn:active,
+.update-action-btn:active,
 .sidebar-icon-btn:active,
 .sidebar-settings-btn:active,
 .sidebar-open-dir-btn:active,
@@ -1291,6 +1356,11 @@
 .divider-swap-btn:active,
 .divider-expand-btn:active {
   opacity: 0.7;
+}
+
+@keyframes update-action-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .sidebar-section-divider {
@@ -1740,6 +1810,9 @@
   .sidebar-toggle-area {
     left: 48px;
   }
+  .update-action-area {
+    left: 84px;
+  }
   .main-content-cover-sidebar {
     margin-left: -48px;
   }
@@ -1775,6 +1848,10 @@
   .sidebar-toggle-area {
     left: 8px;
     z-index: 301;
+  }
+  .update-action-area {
+    left: 44px;
+    z-index: 302;
   }
   .main-content {
     margin-left: 0;

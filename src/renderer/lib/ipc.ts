@@ -180,10 +180,16 @@ interface NotificationApi {
   getHistory: () => Promise<NotificationHistoryItem[]>
 }
 
+export type UpdateCheckResult =
+  | { status: 'available'; version?: string }
+  | { status: 'not-available'; version?: string }
+  | { status: 'skipped'; message: string }
+  | { status: 'error'; message: string }
+
 interface UpdateApi {
   download: () => Promise<void>
   install: () => Promise<void>
-  checkForUpdates: () => Promise<void>
+  checkForUpdates: () => Promise<UpdateCheckResult>
   onAvailable: (callback: (info: { version: string }) => void) => () => void
   onDownloaded: (callback: () => void) => () => void
   onError: (callback: (error: { message: string }) => void) => () => void

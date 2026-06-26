@@ -11,6 +11,7 @@ import {
   Palette,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   Server,
   Sun,
@@ -66,6 +67,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [isNewProfile, setIsNewProfile] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
   const [connectionTest, setConnectionTest] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message?: string }>({ status: 'idle' })
+  const [updateCheck, setUpdateCheck] = useState<{ status: 'idle' | 'checking' | 'latest' | 'available' | 'skipped' | 'error'; message?: string }>({ status: 'idle' })
   const nameInputRef = useRef<HTMLInputElement>(null)
   const baseUrlInputRef = useRef<HTMLInputElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
@@ -210,6 +212,30 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       setConnectionTest({ status: 'error', message: (err as Error).message })
     }
   }, [editForm.baseUrl, editForm.apiKey, editForm.model])
+
+  const handleCheckUpdates = useCallback(async () => {
+    setUpdateCheck({ status: 'checking', message: '正在检查更新...' })
+    try {
+      const result = await window.api.update.checkForUpdates()
+      if (result.status === 'available') {
+        setUpdateCheck({
+          status: 'available',
+          message: result.version ? `发现新版本 v${result.version}` : '发现新版本',
+        })
+      } else if (result.status === 'not-available') {
+        setUpdateCheck({
+          status: 'latest',
+          message: result.version ? `已是最新版本 v${result.version}` : '已是最新版本',
+        })
+      } else if (result.status === 'skipped') {
+        setUpdateCheck({ status: 'skipped', message: result.message })
+      } else {
+        setUpdateCheck({ status: 'error', message: result.message })
+      }
+    } catch (err) {
+      setUpdateCheck({ status: 'error', message: (err as Error).message })
+    }
+  }, [])
 
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -614,6 +640,21 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 <div className="about-version">Version 1.1.0</div>
                 <div className="about-desc">
                   基于 Claude Agent SDK 的智能编程助手。集成文件编辑、代码审查、定时任务与多会话工作流。
+                </div>
+                <div className="about-update-actions">
+                  <button
+                    className={`about-update-btn ${updateCheck.status === 'checking' ? 'about-update-btn-checking' : ''}`}
+                    onClick={handleCheckUpdates}
+                    disabled={updateCheck.status === 'checking'}
+                  >
+                    <RefreshCw size={15} />
+                    {updateCheck.status === 'checking' ? '检查中' : '检查更新'}
+                  </button>
+                  {updateCheck.status !== 'idle' && updateCheck.message && (
+                    <div className={`about-update-status about-update-status-${updateCheck.status}`} role="status">
+                      {updateCheck.message}
+                    </div>
+                  )}
                 </div>
                 <div className="about-facts">
                   <div className="about-fact">
