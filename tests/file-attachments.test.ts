@@ -5,6 +5,7 @@ import {
   fileExtension,
   formatAttachmentPromptLine,
   isConvertibleAttachmentPath,
+  parseAttachmentConversionStatuses,
   stripInternalAttachmentContext,
 } from '../src/shared/file-attachments'
 import {
@@ -94,6 +95,35 @@ describe('file conversion markers', () => {
     expect(stripInternalAttachmentContext(prompt)).toBe(
       '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf'
     )
+  })
+
+  it('parses conversion statuses from internal context', () => {
+    const prompt = [
+      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf',
+      '',
+      `<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+      '附件转换结果：',
+      '- 源文件: /tmp/a.pdf',
+      '  Markdown路径: /tmp/work/.vision/attachments/a.md',
+      '',
+      '附件转换失败：',
+      '- 源文件: /tmp/b.pdf',
+      '  错误: markitdown failed',
+      `</${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+    ].join('\n')
+
+    expect(parseAttachmentConversionStatuses(prompt)).toEqual([
+      {
+        sourcePath: '/tmp/a.pdf',
+        status: 'converted',
+        markdownPath: '/tmp/work/.vision/attachments/a.md',
+      },
+      {
+        sourcePath: '/tmp/b.pdf',
+        status: 'failed',
+        error: 'markitdown failed',
+      },
+    ])
   })
 
   it('strips legacy visible conversion summaries from replayed messages', () => {

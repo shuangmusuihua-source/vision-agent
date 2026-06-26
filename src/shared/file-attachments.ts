@@ -6,6 +6,13 @@ export interface PromptAttachment {
   type: AttachmentKind
 }
 
+export type AttachmentConversionDisplayStatus = {
+  sourcePath: string
+  status: 'converted' | 'failed'
+  markdownPath?: string
+  error?: string
+}
+
 export const CONVERTIBLE_ATTACHMENT_EXTENSIONS = ['pptx', 'xlsx', 'docx', 'pdf'] as const
 export const ATTACHMENT_CONVERSION_CONTEXT_TAG = 'attachment_conversion_context'
 
@@ -44,6 +51,68 @@ export function formatAttachmentPromptLine(file: PromptAttachment): string {
   const pathLabel = isConvertibleAttachmentPath(file.path || file.name) ? '原始路径' : '路径'
 
   return `附件：${file.name} | 类型：${label} | ${pathLabel}：${sanitizePromptPath(file.path)}`
+}
+
+function extractConversionContextBlocks(text: string): string[] {
+  const blocks: string[] = []
+  const tagRegex = new RegExp(
+    `<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>([\\s\\S]*?)<\\/${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
+    'g'
+  )
+
+  for (const match of text.matchAll(tagRegex)) {
+    blocks.push(match[1])
+  }
+
+  const legacyMatch = text.match(/(?:\n{0,2})---\n(附件转换(?:结果|失败)：[\s\S]*)$/)
+  if (legacyMatch) blocks.push(legacyMatch[1])
+
+  return blocks
+}
+
+export function parseAttachmentConversionStatuses(text: string): AttachmentConversionDisplayStatus[] {
+  const statuses: AttachmentConversionDisplayStatus[] = []
+
+  for (const block of extractConversionContextBlocks(text)) {
+    let section: AttachmentConversionDisplayStatus['status'] | null = null
+    let current: AttachmentConversionDisplayStatus | null = null
+
+    for (const rawLine of block.split('\n')) {
+      const line = rawLine.trim()
+      if (line.startsWith('附件转换结果')) {
+        section = 'converted'
+        current = null
+        continue
+      }
+      if (line.startsWith('附件转换失败')) {
+        section = 'failed'
+        current = null
+        continue
+      }
+
+      const sourceMatch = line.match(/^- 源文件:\s*(.+)$/)
+      if (sourceMatch && section) {
+        current = { sourcePath: sourceMatch[1], status: section }
+        statuses.push(current)
+        continue
+      }
+
+      if (!current) continue
+
+      const markdownMatch = line.match(/^Markdown路径:\s*(.+)$/)
+      if (markdownMatch && current.status === 'converted') {
+        current.markdownPath = markdownMatch[1]
+        continue
+      }
+
+      const errorMatch = line.match(/^错误:\s*(.+)$/)
+      if (errorMatch && current.status === 'failed') {
+        current.error = errorMatch[1]
+      }
+    }
+  }
+
+  return statuses
 }
 
 export function stripInternalAttachmentContext(text: string): string {

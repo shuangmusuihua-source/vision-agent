@@ -639,7 +639,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 <div className="about-logo">{APP_NAME}</div>
                 <div className="about-version">Version 1.1.0</div>
                 <div className="about-desc">
-                  基于 Claude Agent SDK 的智能编程助手。集成文件编辑、代码审查、定时任务与多会话工作流。
+                  我是 sumi，你的本地智能工作台。你可以按事务建立工作区，在任务会话里和我一起阅读资料、整理思路、沉淀文档，并把成熟内容转成知识和交付物。
                 </div>
                 <div className="about-update-actions">
                   <button

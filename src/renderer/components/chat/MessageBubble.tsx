@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef, memo } from 'react'
-import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon, Check, ChevronDown } from 'lucide-react'
-import type { ConversationMessage, TextMessage, ArtifactData } from '../../../shared/types'
+import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon, Check, ChevronDown, CircleAlert } from 'lucide-react'
+import type { ConversationMessage, TextMessage, ArtifactData, UserMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import ToolCallDisplay from './ToolCallDisplay'
 import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
@@ -187,15 +187,24 @@ function attachmentDisplayName(name: string): string {
   return name.replace(/\.[^.]+$/, '') || name
 }
 
-function attachmentStatusTitle(attachments: ParsedAttachment[], isProcessing: boolean): string {
-  const action = isProcessing ? '正在理解' : '已读取'
+type AttachmentReadMode = 'processing' | 'done' | 'failed'
+
+function attachmentStatusTitle(attachments: ParsedAttachment[], mode: AttachmentReadMode): string {
+  const action = mode === 'processing' ? '正在理解' : mode === 'failed' ? '读取失败' : '已读取'
   if (attachments.length === 1) return `${action}《${attachmentDisplayName(attachments[0].name)}》`
-  return `${action} ${attachments.length} 个附件`
+  return mode === 'failed' ? `${attachments.length} 个附件读取失败` : `${action} ${attachments.length} 个附件`
 }
 
-function UserBubble({ text, messageId, onSelectText, context }: {
+function attachmentStatusSubtitle(mode: AttachmentReadMode): string {
+  if (mode === 'processing') return '正在提取文本，完成后会继续回答'
+  if (mode === 'failed') return '提取文本失败，请重新上传或检查文件'
+  return '提取文本成功'
+}
+
+function UserBubble({ text, messageId, attachmentConversions, onSelectText, context }: {
   text: string
   messageId: string
+  attachmentConversions?: UserMessage['attachmentConversions']
   onSelectText?: (text: string, context?: string) => void
   context: 'editor' | 'ask'
 }) {
@@ -236,7 +245,19 @@ function UserBubble({ text, messageId, onSelectText, context }: {
   }, [selectionBtn])
 
   const readableAttachments = attachments.filter((attachment) => attachment.convertible)
-  const isReadingAttachments = isLatestStreamingUserMessage && readableAttachments.length > 0
+  const failedAttachmentPaths = new Set((attachmentConversions || [])
+    .filter((item) => item.status === 'failed')
+    .map((item) => item.sourcePath))
+  const failedAttachments = readableAttachments.filter((attachment) => (
+    attachment.path ? failedAttachmentPaths.has(attachment.path) : false
+  ))
+  const hasConversionResults = Boolean(attachmentConversions?.length)
+  const isReadingAttachments = isLatestStreamingUserMessage && readableAttachments.length > 0 && !hasConversionResults
+  const attachmentReadMode: AttachmentReadMode = isReadingAttachments
+    ? 'processing'
+    : failedAttachments.length > 0
+      ? 'failed'
+      : 'done'
 
   return (
     <div className={`message-bubble message-user${attachments.length > 0 ? ' message-user-with-attachments' : ''}`}>
@@ -244,13 +265,22 @@ function UserBubble({ text, messageId, onSelectText, context }: {
         <div className="message-attach-stack">
           <div className="message-attach-cards">
             {attachments.map((attachment, i) => {
-              const isUnderstanding = isLatestStreamingUserMessage && attachment.convertible
+              const conversion = attachmentConversions?.find((item) => item.sourcePath === attachment.path)
+              const isUnderstanding = isLatestStreamingUserMessage && attachment.convertible && !conversion
+              const isFailed = conversion?.status === 'failed'
+              const statusLabel = isUnderstanding
+                ? '正在理解'
+                : isFailed
+                  ? '读取失败'
+                  : conversion?.status === 'converted'
+                    ? '已读取'
+                    : '已上传'
               const Icon = attachment.type === 'image' ? ImageIcon : FileText
               return (
                 <div
                   key={i}
-                  className={`message-attach-card${isUnderstanding ? ' message-attach-card--understanding' : ''}`}
-                  title={attachment.path}
+                  className={`message-attach-card${isUnderstanding ? ' message-attach-card--understanding' : ''}${isFailed ? ' message-attach-card--failed' : ''}`}
+                  title={conversion?.error || attachment.path}
                 >
                   <span className={`message-attach-card-icon message-attach-card-icon--${attachment.type}`}>
                     <Icon size={18} />
@@ -260,13 +290,17 @@ function UserBubble({ text, messageId, onSelectText, context }: {
                     <span className="message-attach-card-meta">
                       {attachmentMeta(attachment)}
                       {' · '}
-                      {isUnderstanding ? '正在理解' : '已上传'}
+                      {statusLabel}
                     </span>
                   </span>
                   {isUnderstanding ? (
                     <span className="message-attach-card-progress" aria-label="正在理解附件" />
+                  ) : isFailed ? (
+                    <span className="message-attach-card-error" aria-label="附件读取失败">
+                      <CircleAlert size={16} />
+                    </span>
                   ) : (
-                    <span className="message-attach-card-check" aria-label="附件已上传">
+                    <span className="message-attach-card-check" aria-label={conversion?.status === 'converted' ? '附件已读取' : '附件已上传'}>
                       <Check size={16} />
                     </span>
                   )}
@@ -275,20 +309,28 @@ function UserBubble({ text, messageId, onSelectText, context }: {
             })}
           </div>
           {readableAttachments.length > 0 && (
-            <div className={`message-attach-status${isReadingAttachments ? ' message-attach-status--processing' : ' message-attach-status--done'}`}>
+            <div
+              className={`message-attach-status message-attach-status--${attachmentReadMode}`}
+              title={attachmentConversions?.find((item) => item.status === 'failed')?.error}
+            >
               <span className="message-attach-status-icon" aria-hidden="true">
                 {isReadingAttachments ? (
                   <span className="message-attach-status-dot"></span>
+                ) : attachmentReadMode === 'failed' ? (
+                  <CircleAlert size={14} />
                 ) : (
                   <Check size={14} />
                 )}
               </span>
               <span className="message-attach-status-copy">
                 <span className="message-attach-status-title">
-                  {attachmentStatusTitle(readableAttachments, isReadingAttachments)}
+                  {attachmentStatusTitle(
+                    attachmentReadMode === 'failed' ? failedAttachments : readableAttachments,
+                    attachmentReadMode
+                  )}
                 </span>
                 <span className="message-attach-status-subtitle">
-                  {isReadingAttachments ? '正在提取文本，完成后会继续回答' : '提取文本成功'}
+                  {attachmentStatusSubtitle(attachmentReadMode)}
                 </span>
               </span>
               <ChevronDown size={16} className="message-attach-status-chevron" />
@@ -425,7 +467,15 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
       return <ArtifactBubble artifact={message.artifact} messageId={message.id} onOpenFile={onOpenFile} workspacePath={workspacePath} context={context} />
 
     case 'user':
-      return <UserBubble text={message.textContent} messageId={message.id} onSelectText={onSelectText} context={context} />
+      return (
+        <UserBubble
+          text={message.textContent}
+          messageId={message.id}
+          attachmentConversions={message.attachmentConversions}
+          onSelectText={onSelectText}
+          context={context}
+        />
+      )
 
     case 'text':
       return (

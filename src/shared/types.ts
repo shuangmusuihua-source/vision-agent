@@ -1,6 +1,8 @@
 // Shared types for Agent Panel — used by Main, Preload, and Renderer
 // All discriminated unions defined here; no `Record<string, unknown>` downstream.
 
+import type { AttachmentConversionDisplayStatus } from './file-attachments'
+
 // ─── Agent Context ────────────────────────────────────────────────────
 
 export type AgentContext = 'editor' | 'ask'
@@ -367,6 +369,7 @@ export interface UserMessage extends MessageBase {
   kind: 'user'
   role: 'user'
   textContent: string
+  attachmentConversions?: AttachmentConversionDisplayStatus[]
   skillMeta?: SkillMeta
 }
 

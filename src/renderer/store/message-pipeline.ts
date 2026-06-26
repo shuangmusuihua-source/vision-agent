@@ -29,7 +29,7 @@ import type {
 } from '../../shared/types'
 import { ContextSlot } from './agent-store'
 import { isTextBlock, isToolUseBlock, isToolResultBlock } from '../../shared/types'
-import { stripInternalAttachmentContext } from '../../shared/file-attachments'
+import { parseAttachmentConversionStatuses, stripInternalAttachmentContext } from '../../shared/file-attachments'
 
 // ─── Accumulator helpers ──────────────────────────────────────────────
 
@@ -579,6 +579,14 @@ function isCompactionContinuation(content: unknown): content is string {
   return typeof content === 'string'
 }
 
+function findLastUserMessageIndex(messages: ConversationMessage[], textContent: string): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.kind === 'user' && message.textContent === textContent) return i
+  }
+  return -1
+}
+
 export function reduceUserMessage(
   slot: ContextSlot,
   msg: UserPayload,
@@ -643,10 +651,30 @@ export function reduceUserMessage(
     }
   }
 
-  if (isReplay && textBlocks.length > 0) {
-    const text = stripInternalAttachmentContext(textBlocks.map((b) => b.text).join(''))
-    if (text && !msgs.some((m) => m.kind === 'user' && m.textContent === text)) {
-      msgs.push({ kind: 'user', id: msg.uuid || `user-${Date.now()}`, role: 'user', textContent: text, createdAt: Date.now() })
+  if (textBlocks.length > 0) {
+    const rawText = textBlocks.map((b) => b.text).join('')
+    const text = stripInternalAttachmentContext(rawText)
+    const attachmentConversions = parseAttachmentConversionStatuses(rawText)
+    const attachmentPatch = attachmentConversions.length > 0 ? { attachmentConversions } : {}
+    const existingUserIndex = text ? findLastUserMessageIndex(msgs, text) : -1
+
+    if (existingUserIndex >= 0 && attachmentConversions.length > 0) {
+      const existing = msgs[existingUserIndex]
+      if (existing.kind === 'user') {
+        msgs[existingUserIndex] = { ...existing, attachmentConversions }
+        changed = true
+      }
+    }
+
+    if (isReplay && text && !msgs.some((m) => m.kind === 'user' && m.textContent === text)) {
+      msgs.push({
+        kind: 'user',
+        id: msg.uuid || `user-${Date.now()}`,
+        role: 'user',
+        textContent: text,
+        createdAt: Date.now(),
+        ...attachmentPatch,
+      })
       changed = true
     }
   }
@@ -816,7 +844,16 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
       }
 
       if (textBlocks.length > 0) {
-        const text = stripInternalAttachmentContext(textBlocks.map(b => b.text).join(''))
+        const rawText = textBlocks.map(b => b.text).join('')
+        const text = stripInternalAttachmentContext(rawText)
+        const attachmentConversions = parseAttachmentConversionStatuses(rawText)
+        const existingUserIndex = text ? findLastUserMessageIndex(messages, text) : -1
+        if (existingUserIndex >= 0 && attachmentConversions.length > 0) {
+          const existing = messages[existingUserIndex]
+          if (existing.kind === 'user') {
+            messages[existingUserIndex] = { ...existing, attachmentConversions }
+          }
+        }
         if (text && !messages.some(m => m.kind === 'user' && m.textContent === text)) {
           messages.push({
             kind: 'user',
@@ -824,6 +861,7 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
             role: 'user',
             textContent: text,
             createdAt: Date.now(),
+            ...(attachmentConversions.length > 0 ? { attachmentConversions } : {}),
           })
         }
       }

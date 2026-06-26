@@ -2038,6 +2038,13 @@
   color: var(--color-success);
 }
 
+.message-attach-card-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-error);
+}
+
 .message-attach-card-progress {
   justify-self: center;
   width: 8px;
@@ -2050,6 +2057,10 @@
 
 .message-attach-card--understanding .message-attach-card-meta {
   color: var(--color-text-secondary);
+}
+
+.message-attach-card--failed .message-attach-card-meta {
+  color: var(--color-error);
 }
 
 .message-attach-status {
@@ -2087,6 +2098,15 @@
 .message-attach-status--done .message-attach-status-icon {
   background: color-mix(in srgb, var(--color-success) 14%, transparent);
   color: var(--color-success);
+}
+
+.message-attach-status--failed .message-attach-status-icon {
+  background: color-mix(in srgb, var(--color-error) 14%, transparent);
+  color: var(--color-error);
+}
+
+.message-attach-status--failed .message-attach-status-subtitle {
+  color: var(--color-error);
 }
 
 .message-attach-status-dot {

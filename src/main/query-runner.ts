@@ -6,6 +6,7 @@ import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUser
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
+import { buildSumiIdentityPrompt } from './agent-identity'
 import { writeAuditLog } from './agent-audit'
 import { extractToolPathInput, isToolUsePathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
@@ -103,6 +104,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
   ].join('\n')
 
   const systemPromptAppend = [
+    buildSumiIdentityPrompt(context),
     '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
     workspaceContextLines,
     `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
