@@ -316,7 +316,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
             <div className="settings-summary-value">{activeProfile?.name || '未选择'}</div>
             <div className="settings-summary-meta">{themeLabel}</div>
           </div>
-          <div className="settings-sidebar-version">Version 1.1.0</div>
+          <div className="settings-sidebar-version">Version 1.3.0</div>
         </aside>
 
         <section className="settings-content">
@@ -637,7 +637,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                   <img src={appIcon} alt="" />
                 </div>
                 <div className="about-logo">{APP_NAME}</div>
-                <div className="about-version">Version 1.1.0</div>
+                <div className="about-version">Version 1.3.0</div>
                 <div className="about-desc">
                   我是 sumi，你的本地智能工作台。你可以按事务建立工作区，在任务会话里和我一起阅读资料、整理思路、沉淀文档，并把成熟内容转成知识和交付物。
                 </div>
