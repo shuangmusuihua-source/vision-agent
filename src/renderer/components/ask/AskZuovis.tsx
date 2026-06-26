@@ -141,11 +141,11 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
                     className={`ask-zuovis-card ${feature.colorClass}`}
                     onClick={() => handleCardClick(feature)}
                   >
-                    <span className="ask-zuovis-card-title">
-                      <Icon size={16} />
-                      {feature.title}
+                    <span className="ask-zuovis-card-icon">
+                      <Icon size={18} />
                     </span>
-                    <div className="ask-zuovis-card-glass">
+                    <div className="ask-zuovis-card-copy">
+                      <span className="ask-zuovis-card-title">{feature.title}</span>
                       <span className="ask-zuovis-card-desc">
                         {feature.descBold
                           ? feature.desc.split(new RegExp(`(${feature.descBold.join('|')})`, 'g')).map((part, i) =>
