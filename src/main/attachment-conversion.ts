@@ -1,6 +1,6 @@
-import { execFileSync } from 'child_process'
+import { execFile } from 'child_process'
 import { createHash } from 'crypto'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdir, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import { ATTACHMENT_CONVERSION_CONTEXT_TAG } from '../shared/file-attachments'
 
@@ -20,6 +20,8 @@ export interface AttachmentConversionResult {
 }
 
 const FILE_CONVERT_MARKER_REGEX = /<!--FILE_CONVERT:([\s\S]*?)-->\n?/
+const MARKITDOWN_TIMEOUT_MS = 30000
+const MARKITDOWN_MAX_BUFFER_BYTES = 50 * 1024 * 1024
 
 function safeDecodeURIComponent(value: string): string {
   try {
@@ -64,23 +66,40 @@ function convertedMarkdownPath(workspaceCwd: string, sessionKey: string, filePat
   return join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey), outName)
 }
 
-export function convertAttachmentsToMarkdown(
+function runMarkitdown(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile('python3', ['-m', 'markitdown', filePath], {
+      encoding: 'utf-8',
+      timeout: MARKITDOWN_TIMEOUT_MS,
+      maxBuffer: MARKITDOWN_MAX_BUFFER_BYTES,
+    }, (err, stdout, stderr) => {
+      if (err) {
+        if (stderr) {
+          err.message = `${err.message}\n${stderr}`
+        }
+        reject(err)
+        return
+      }
+
+      resolve(stdout)
+    })
+  })
+}
+
+export async function convertAttachmentsToMarkdown(
   workspaceCwd: string,
   sessionKey: string,
   filePaths: string[]
-): AttachmentConversionResult {
+): Promise<AttachmentConversionResult> {
   const result: AttachmentConversionResult = { converted: [], failed: [] }
   const outDir = join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey))
-  mkdirSync(outDir, { recursive: true })
+  await mkdir(outDir, { recursive: true })
 
   for (const filePath of filePaths) {
     try {
       const markdownPath = convertedMarkdownPath(workspaceCwd, sessionKey, filePath)
-      const markdown = execFileSync('python3', ['-m', 'markitdown', filePath], {
-        encoding: 'utf-8',
-        timeout: 30000,
-      })
-      writeFileSync(markdownPath, markdown, 'utf-8')
+      const markdown = await runMarkitdown(filePath)
+      await writeFile(markdownPath, markdown, 'utf-8')
       result.converted.push({ sourcePath: filePath, markdownPath })
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)

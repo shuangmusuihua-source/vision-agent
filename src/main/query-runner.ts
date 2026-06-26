@@ -262,7 +262,7 @@ export async function sendMessage(
   let processedPrompt = prompt
   const convertPaths = parseFileConvertPaths(prompt)
   if (convertPaths.length > 0) {
-    const conversion = convertAttachmentsToMarkdown(effectiveWorkspaceCwd, queryKey, convertPaths)
+    const conversion = await convertAttachmentsToMarkdown(effectiveWorkspaceCwd, queryKey, convertPaths)
     processedPrompt = appendAttachmentConversionSummary(stripFileConvertMarker(prompt), conversion)
   }
 
