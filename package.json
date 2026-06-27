@@ -10,8 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "electron-builder install-app-deps",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "pack": "electron-builder --dir && npm run verify:packaged-skills",
+    "dist": "electron-builder && npm run verify:packaged-skills",
+    "verify:packaged-skills": "node scripts/verify-packaged-skills.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.141",

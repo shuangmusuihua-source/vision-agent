@@ -178,7 +178,7 @@ function createWindow(): void {
 // getMainWindow is now provided by ipc-sender module (re-exported below)
 export { getMainWindow }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   setupMenu()
 
   // Set Dock icon in dev mode (production uses the bundled .icns)
@@ -196,7 +196,15 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
-  initAppSkills()
+  try {
+    const skillInstall = await initAppSkills()
+    if (skillInstall.installed.length > 0 || skillInstall.removed.length > 0) {
+      console.info('[SkillInit] synchronized built-in skills', skillInstall)
+    }
+  } catch (error) {
+    console.error('[SkillInit] failed to initialize built-in skills:', error)
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)))
+  }
 
   const savedTheme = getSettings().theme
   if (savedTheme !== 'system') {

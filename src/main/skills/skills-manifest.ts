@@ -1,15 +1,10 @@
+import manifest from './skills-manifest.json'
+
 export interface BuiltinSkillManifest {
   id: string
   hasResources: boolean
+  contentVersion: number
+  requiredPaths: string[]
 }
 
-export const BUILTIN_SKILLS: BuiltinSkillManifest[] = [
-  { id: 'kami', hasResources: true },
-  { id: 'guizang-ppt-skill', hasResources: true },
-  { id: 'frontend-slides', hasResources: true },
-  { id: 'huashu-design', hasResources: true },
-  { id: 'system-cleanup', hasResources: true },
-  { id: 'organize-desktop', hasResources: true },
-  { id: 'organize-folder', hasResources: true },
-  { id: 'perf-optimize', hasResources: true },
-]
+export const BUILTIN_SKILLS: BuiltinSkillManifest[] = manifest

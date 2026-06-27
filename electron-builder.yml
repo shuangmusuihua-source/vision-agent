@@ -6,14 +6,11 @@ extraResources:
   - from: src/main/skills
     to: skills
     filter:
-      - '*/SKILL.md'
-      - '*/scan.sh'
-      - '*/references/*'
-      - '*/.claude-plugin/*'
-      - '*/.claude/*'
-      - '*/plugins/**/*'
-      - '*/bold-template-pack/*'
-      - '!*/.DS_Store'
+      - '*/**/*'
+      - '*/.claude-plugin/**/*'
+      - '*/.claude/**/*'
+      - '!**/.DS_Store'
+      - '!**/.git/**'
 files:
   - '!**/.vscode/*'
   - '!**/.claude/**'

@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
-import { getAppSkillsCwd, ensureWorkspaceSkills } from './skill-init'
+import { ensureWorkspaceSkills, getAppSkillsCwd } from './skill-init'
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactFromTool } from './store'
 import { notifyAgentComplete } from './notification-manager'
@@ -108,7 +108,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
     workspaceContextLines,
     `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
-    activeFilePath ? `用户当前正在查看的文件: ${activeFilePath.replace(/[\n\r]/g, '')}\n如果需要了解文件内容，请使用 Read 工具读取该文件。` : '',
+    activeFilePath ? `用户已将以下文件关联到当前对话: ${activeFilePath.replace(/[\n\r]/g, '')}\n回答问题或执行 Skill 前，必须先使用 Read 工具读取该文件的完整内容，并以文件内容作为主要上下文。` : '',
     workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : '',
 
     `你可使用 \`\`\`json-render 代码块输出富交互 UI。支持的组件及属性：
@@ -269,11 +269,14 @@ export async function sendMessage(
   }
 
   sessionRuntime.beginSession(runtimeEnvelope)
-  // Ensure workspace-local skills exist (idempotent via sentinel file).
-  // Run async to avoid blocking the main thread on file I/O.
-  // The sentinel check makes subsequent calls nearly instant (~0.1ms),
-  // so the synchronous call is safe after the first run.
-  ensureWorkspaceSkills(effectiveWorkspaceCwd)
+  try {
+    await ensureWorkspaceSkills(effectiveWorkspaceCwd)
+  } catch (error) {
+    const message = `Skill 初始化失败: ${(error as Error).message}`
+    sessionRuntime.emitExecutionError(mainWindow, runtimeEnvelope, message)
+    sessionRuntime.finalizeRun(mainWindow, queryKey, 0)
+    return
+  }
   let currentSessionId = sessionId
   const getSessionId = () => currentSessionId
   const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, runtimeEnvelope, getSessionId, skillId)

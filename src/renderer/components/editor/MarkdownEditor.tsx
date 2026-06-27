@@ -327,7 +327,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   // Sync source mode from parent
   useEffect(() => {
     if (sourceMode !== internalSourceMode) {
-      if (!editor) return
+      if (!editor || editor.isDestroyed) return
       if (sourceMode) {
         // Entering source mode: save current full markdown to sourceText
         sourceFilePathRef.current = filePath
@@ -374,7 +374,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   }, [clearScheduledSourceSave, flushSourceSave])
 
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
     if (isLocalChange.current) {
       isLocalChange.current = false
       return
@@ -392,17 +392,18 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
 
   // Sync editable state when filePath changes (memory files are read-only)
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
     editor.setEditable(!isMemoryFile)
   }, [isMemoryFile, editor])
 
   // Auto-save with debounce
   useEffect(() => {
-    if (!editor || !filePath || isMemoryFile) return
+    if (!editor || editor.isDestroyed || !filePath || isMemoryFile) return
 
     const handleUpdate = () => {
       isLocalChange.current = true
       const saveTimer = setTimeout(() => {
+        if (editor.isDestroyed) return
         const md = getFullMarkdown(editor)
         onSave(filePath, md)
       }, 1500)
@@ -423,8 +424,9 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   }, [editor, filePath, onSave])
 
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
     const updateCounts = () => {
+      if (editor.isDestroyed) return
       const text = editor.getText()
       const words = text.trim().split(/\s+/).filter(Boolean).length
       onStatsUpdate(text.trim() ? words : 0, text.length)
@@ -436,7 +438,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      if (!editor) return
+      if (!editor || editor.isDestroyed) return
       const { from, to } = editor.state.selection
       if (from === to) return
 
@@ -479,7 +481,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
     [editor, filePath, onAskAgent]
   )
 
-  if (!editor) {
+  if (!editor || editor.isDestroyed) {
     return <div className="editor-loading">Loading editor...</div>
   }
 

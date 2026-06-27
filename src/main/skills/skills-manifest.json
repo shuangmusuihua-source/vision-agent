@@ -1,0 +1,50 @@
+[
+  {
+    "id": "kami",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md", "scripts/build.py", "assets/templates"]
+  },
+  {
+    "id": "guizang-ppt-skill",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md", "assets/template.html", "scripts/validate-swiss-deck.mjs"]
+  },
+  {
+    "id": "frontend-slides",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md", "scripts/extract-pptx.py", "scripts/export-pdf.sh"]
+  },
+  {
+    "id": "huashu-design",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md", "assets/animations.jsx", "scripts/verify.py"]
+  },
+  {
+    "id": "system-cleanup",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md", "scan.sh"]
+  },
+  {
+    "id": "organize-desktop",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md"]
+  },
+  {
+    "id": "organize-folder",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md"]
+  },
+  {
+    "id": "perf-optimize",
+    "hasResources": true,
+    "contentVersion": 1,
+    "requiredPaths": ["SKILL.md", "profile.sh"]
+  }
+]

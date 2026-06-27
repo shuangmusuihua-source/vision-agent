@@ -3,7 +3,7 @@
 ## 设计原则
 
 1. **Skill 文件零修改** — 原封不动拷入 `src/main/skills/{id}/`，SKILL.md、模板、脚本、references 全部保留原始相对路径，SDK 自然发现
-2. **Manifest 驱动** — `skills-manifest.ts` 声明式注册，不硬编码
+2. **Manifest 驱动** — `skills-manifest.json` 声明内容版本和必需资源，不硬编码
 3. **SkillDefinition 统一接口** — `builtin.ts` 定义 id/name/description/icon/promptTemplate/outputMode
 4. **SkillOutputBridge 统一捕获** — main 进程拦截原始 SDK 流事件，无论 Write 工具还是 skill-output 代码块，归一为 `skill:output` IPC 事件
 5. **Renderer 统一消费** — Zustand store 存 skillOutput，MessageBubble 只看 store 不关心通道来源
@@ -22,10 +22,15 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
 
 ### Step 2: 注册到 manifest
 
-编辑 `src/main/skills/skills-manifest.ts`，在 `BUILTIN_SKILLS` 数组加一行：
+编辑 `src/main/skills/skills-manifest.json`，增加一项：
 
-```ts
-{ id: '{skill-id}', hasResources: true },
+```json
+{
+  "id": "{skill-id}",
+  "hasResources": true,
+  "contentVersion": 1,
+  "requiredPaths": ["SKILL.md"]
+}
 ```
 
 ### Step 3: 添加 SkillDefinition
@@ -80,14 +85,16 @@ SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──
 
 ### 1. Skill 文件初始化 — `skill-init.ts`
 
-应用启动时，`skill-init.ts` 读取 `BUILTIN_SKILLS` manifest，将每个 skill 从 `src/main/skills/{id}/` 递归拷贝到 `{userData}/.claude/skills/{id}/`。
+应用启动时，`skill-init.ts` 读取 manifest，通过 `builtin-skill-installer.ts` 将每个 Skill 从应用资源目录同步到 `{userData}/.claude/skills/{id}/`。所有工作区共享这一份运行时安装；工作区仅创建指向全局安装的目录链接，不再复制资源。
 
 关键逻辑：
-- **源**: `src/main/skills/{id}/`（打包进 asar）
+- **源**: 开发环境为 `src/main/skills/{id}/`，正式环境为 `resources/skills/{id}/`
 - **目标**: `{userData}/.claude/skills/{id}/`
 - **递归拷贝**: 保留 SKILL.md、assets/、references/、scripts/、templates/ 等完整目录结构
-- **幂等**: 已存在且未变更则跳过（避免每次启动都覆盖）
-- SDK 在 `buildOptions()` 中设置 `skills: 'all'`，自动扫描 `{userData}/.claude/skills/` 下所有 SKILL.md
+- **幂等**: 按每个 Skill 的 `contentVersion` 和已安装文件清单判断；版本变化或资源缺失时原子替换
+- **完整性**: `pack` / `dist` 完成后比较源目录与 `.app` 中的全部 Skill 文件，缺失即让发布命令失败
+- **发现**: SDK 保持原会话存储配置，使用 `settingSources: ['project']` 从工作区轻量链接发现 Skill；Ask sumi 直接从应用数据目录发现
+- **升级**: 修改内置 Skill 内容时必须递增对应 `contentVersion`
 
 ### 2. SkillOutputBridge — `skill-output-bridge.ts`
 
@@ -252,10 +259,12 @@ export type SkillOutputState = {
 
 | 文件 | 职责 |
 |------|------|
-| `src/main/skills/skills-manifest.ts` | 内置 skill manifest，声明式注册 |
+| `src/main/skills/skills-manifest.json` | 内置 Skill manifest，声明内容版本和必需资源 |
+| `src/main/builtin-skill-installer.ts` | 全局安装、完整性检查和原子版本升级 |
+| `src/main/workspace-skill-links.ts` | 将工作区 Skill 入口链接到全局安装 |
 | `src/main/skills/builtin.ts` | SkillDefinition 接口 + 定义数组 |
 | `src/main/skills/{id}/` | 各 skill 完整文件（SKILL.md + 资源） |
-| `src/main/skill-init.ts` | 应用启动时拷贝 skill 到 userData |
+| `src/main/skill-init.ts` | 解析应用路径并初始化全局 Skill |
 | `src/main/skill-output-bridge.ts` | 统一输出捕获层（main 进程） |
 | `src/main/agent-manager.ts` | Bridge 集成 + activeSkillId 管理 |
 | `src/main/ipc-handlers.ts` | sendMessage 传递 skillId |

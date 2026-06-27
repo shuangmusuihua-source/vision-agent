@@ -648,8 +648,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [])
 
   const handleSkillSelect = useCallback((skill: SkillDefinition) => {
-    const fileName = linkedFile ? linkedFile.split('/').pop() || linkedFile : ''
-    const fileRef = fileName ? ` · ${fileName}` : ''
+    const selectedFile = linkedFile || activeFilePath || null
+    const fileRef = selectedFile
+      ? `\n\n输入文档：${selectedFile}\n开始执行 Skill 前，必须先使用 Read 工具读取该 Markdown 文件的完整内容，并以文档内容作为主要输入。`
+      : ''
     const prompt = skill.promptTemplate.replace('{activeFile}', fileRef)
     useAgentStore.setState((s) => ({
       slots: {
@@ -668,8 +670,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         },
       },
     }))
-    editorSendMessage(prompt, linkedFile || undefined)
-  }, [editorSendMessage, linkedFile])
+    editorSendMessage(prompt, selectedFile || undefined)
+  }, [activeFilePath, editorSendMessage, linkedFile])
 
   // ── Render ──────────────────────────────────────────────────────────
 
