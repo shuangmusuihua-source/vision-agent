@@ -156,8 +156,13 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
             >
               <FileText size={14} className="search-result-icon" />
               <div className="search-result-info">
-                <span className="search-result-file">{result.fileName}</span>
-                <span className="search-result-line">:{result.line}</span>
+                <div>
+                  <span className="search-result-file">{result.fileName}</span>
+                  <span className="search-result-line">:{result.line}</span>
+                </div>
+                {result.workspaceName && (
+                  <span className="search-result-workspace">{result.workspaceName}</span>
+                )}
               </div>
               <div className="search-result-content">
                 {highlightKeyword(result.content)}

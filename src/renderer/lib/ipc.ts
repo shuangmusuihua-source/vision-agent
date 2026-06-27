@@ -52,6 +52,7 @@ interface SkillDefinition {
 interface SearchResult {
   filePath: string
   fileName: string
+  workspaceName: string
   line: number
   content: string
 }

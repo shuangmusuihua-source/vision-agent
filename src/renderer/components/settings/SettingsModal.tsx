@@ -639,7 +639,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 <div className="about-logo">{APP_NAME}</div>
                 <div className="about-version">Version 1.3.0</div>
                 <div className="about-desc">
-                  我是 sumi，你的本地智能工作台。你可以按事务建立工作区，在任务会话里和我一起阅读资料、整理思路、沉淀文档，并把成熟内容转成知识和交付物。
+                  我是 sumi，一个围绕具体事务展开协作的智能工作台。你可以按事务建立工作区、按任务创建会话，和我一起消化资料、厘清问题、形成可编辑文档，再通过 Skill 生成交付物，把有价值的成果沉淀为自己的知识。
                 </div>
                 <div className="about-update-actions">
                   <button

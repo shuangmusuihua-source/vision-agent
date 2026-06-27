@@ -203,14 +203,12 @@ app.whenReady().then(() => {
     nativeTheme.themeSource = savedTheme
   }
 
-  // Initialize file index for saved workspace
+  // Initialize one search index across all saved workspaces.
   const dirs = getAuthorizedDirectories()
-  if (dirs.length > 0) {
-    fileIndexService.init(dirs[0]).catch((err) => {
-      console.error('[Init] fileIndexService failed:', err)
-      Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
-    })
-  }
+  fileIndexService.init(dirs).catch((err) => {
+    console.error('[Init] fileIndexService failed:', err)
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
+  })
 
   // Initialize knowledge base file index for semantic graph
   fileIndexService.initKnowledgeIndex(knowledgeDir).catch((err) => {

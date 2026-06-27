@@ -32,10 +32,9 @@ const FEATURES: FeatureCard[] = [
 interface AskZuovisProps {
   onOpenFile?: (path: string) => void
   onSelectText?: (text: string, context?: string) => void
-  workspacePath?: string
 }
 
-function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps): React.ReactElement {
+function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactElement {
   const { sendMessage, respondPermission, respondAskUser } = useAgent('ask')
   const messages = useMessages('ask')
   const isStreaming = useIsStreaming('ask')
@@ -166,7 +165,7 @@ function AskZuovis({ onOpenFile, onSelectText, workspacePath }: AskZuovisProps):
         ) : (
           <div className="ask-zuovis-messages-inner">
             <Suspense fallback={<div className="ask-zuovis-resuming">加载对话...</div>}>
-              <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} workspacePath={workspacePath} scrollContainerRef={scrollRef} />
+              <ChatView context="ask" onOpenFile={onOpenFile} onSelectText={onSelectText} scrollContainerRef={scrollRef} />
             </Suspense>
           </div>
         )}

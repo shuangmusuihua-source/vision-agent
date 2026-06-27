@@ -17,11 +17,11 @@ interface KnowledgeEntry {
   mtimeMs: number
 }
 
-class FileIndexService {
+export class FileIndexService {
   private index = new Map<string, IndexedFile>()
   private knowledgeIndex = new Map<string, KnowledgeEntry>()
   private watcher: FSWatcher | null = null
-  private workspaceDir: string | null = null
+  private workspaceDirs: string[] = []
   private knowledgeBaseDir: string | null = null
   private ready = false
   private readyCallbacks: Array<() => void> = []
@@ -30,12 +30,15 @@ class FileIndexService {
   private changedFiles = new Set<string>()
   private knowledgeWatcher: FSWatcher | null = null
 
-  /** Initialize index for a workspace directory */
-  async init(workspaceDir: string): Promise<void> {
-    if (this.workspaceDir === workspaceDir && this.ready) return
+  /** Initialize one searchable index across all authorized workspaces. */
+  async init(workspaceDirs: string[]): Promise<void> {
+    const nextWorkspaceDirs = [...new Set(workspaceDirs.filter(Boolean).map((dir) => path.resolve(dir)))]
+    const unchanged = nextWorkspaceDirs.length === this.workspaceDirs.length
+      && nextWorkspaceDirs.every((dir, index) => dir === this.workspaceDirs[index])
+    if (unchanged && this.ready) return
 
-    this.destroyWorkspaceIndex()
-    this.workspaceDir = workspaceDir
+    await this.destroyWorkspaceIndex()
+    this.workspaceDirs = nextWorkspaceDirs
     this.ready = false
 
     // Build initial index
@@ -51,7 +54,7 @@ class FileIndexService {
 
   /** Wait until index is ready */
   onReady(): Promise<void> {
-    if (this.ready || !this.workspaceDir) return Promise.resolve()
+    if (this.ready || this.workspaceDirs.length === 0) return Promise.resolve()
     return new Promise((resolve) => {
       this.readyCallbacks.push(resolve)
     })
@@ -67,10 +70,11 @@ class FileIndexService {
 
   /** Full scan of workspace */
   private async buildFullIndex(): Promise<void> {
-    if (!this.workspaceDir) return
     this.index.clear()
 
-    const mdFiles = await this.discoverMarkdownFiles(this.workspaceDir)
+    const mdFiles = (await Promise.all(
+      this.workspaceDirs.map((workspaceDir) => this.discoverMarkdownFiles(workspaceDir))
+    )).flat()
     const batchSize = 20
     for (let i = 0; i < mdFiles.length; i += batchSize) {
       const batch = mdFiles.slice(i, i + batchSize)
@@ -145,9 +149,9 @@ class FileIndexService {
 
   /** Start chokidar for incremental updates */
   private startWatching(): void {
-    if (!this.workspaceDir) return
+    if (this.workspaceDirs.length === 0) return
 
-    this.watcher = chokidar.watch(this.workspaceDir, {
+    this.watcher = chokidar.watch(this.workspaceDirs, {
       ignored: /(^|[\/\\])\.(git|vision|claude)|node_modules|out|dist/,
       persistent: true,
       ignoreInitial: true,
@@ -360,13 +364,13 @@ class FileIndexService {
   }
 
   /** Clean up */
-  destroyWorkspaceIndex(): void {
+  async destroyWorkspaceIndex(): Promise<void> {
     if (this.watcher) {
-      this.watcher.close()
+      await this.watcher.close()
       this.watcher = null
     }
     this.index.clear()
-    this.workspaceDir = null
+    this.workspaceDirs = []
     this.readyCallbacks.forEach((cb) => cb())
     this.ready = false
     this.readyCallbacks = []
@@ -386,7 +390,7 @@ class FileIndexService {
 
   /** Clean up all indexes and watchers. */
   async destroy(): Promise<void> {
-    this.destroyWorkspaceIndex()
+    await this.destroyWorkspaceIndex()
     await this.destroyKnowledgeIndex()
     this.changedFiles.clear()
   }

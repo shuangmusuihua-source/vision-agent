@@ -8,6 +8,10 @@ function trimTrailingSeparators(value: string): string {
   return value.trim().replace(/[\\/]+$/, '')
 }
 
+function normalizeSeparators(value: string): string {
+  return trimTrailingSeparators(value).replace(/\\/g, '/')
+}
+
 function basename(value: string): string {
   const normalized = trimTrailingSeparators(value)
   const index = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'))
@@ -34,4 +38,25 @@ export function isReservedKnowledgeWorkspacePath(path: string, fixedPaths: strin
 
 export function filterUserWorkspacePaths(paths: string[], fixedPaths: string[] = []): string[] {
   return paths.filter((path) => !isReservedKnowledgeWorkspacePath(path, fixedPaths))
+}
+
+export function findContainingWorkspacePath(
+  filePath: string | null | undefined,
+  workspacePaths: string[],
+): string | null {
+  const normalizedFilePath = filePath ? normalizeSeparators(filePath) : ''
+  if (!normalizedFilePath) return null
+
+  let bestMatch: { path: string; length: number } | null = null
+  for (const workspacePath of workspacePaths) {
+    const normalizedWorkspacePath = normalizeSeparators(workspacePath)
+    if (!normalizedWorkspacePath) continue
+    const containsFile = normalizedFilePath === normalizedWorkspacePath
+      || normalizedFilePath.startsWith(`${normalizedWorkspacePath}/`)
+    if (containsFile && (!bestMatch || normalizedWorkspacePath.length > bestMatch.length)) {
+      bestMatch = { path: workspacePath, length: normalizedWorkspacePath.length }
+    }
+  }
+
+  return bestMatch?.path ?? null
 }

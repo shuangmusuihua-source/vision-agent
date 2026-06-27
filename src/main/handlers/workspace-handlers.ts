@@ -113,9 +113,7 @@ export function registerWorkspaceHandlers(
     try {
       await rm(dirPath, { recursive: true, force: true })
       removeAuthorizedDirectory(dirPath)
-      const dirs = getAuthorizedDirectories()
-      if (dirs.length > 0) await fileIndexService.init(dirs[0])
-      else fileIndexService.destroyWorkspaceIndex()
+      await fileIndexService.init(getAuthorizedDirectories())
       pushSettingsToRenderer()
       return { success: true }
     } catch (err) { return { success: false, error: (err as Error).message } }

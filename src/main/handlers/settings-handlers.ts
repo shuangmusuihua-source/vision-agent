@@ -39,22 +39,21 @@ export function registerSettingsHandlers(pushSettingsToRenderer: () => void): vo
 
   ipcMain.handle('settings:addDirectory', async (_event, dir: string) => {
     addAuthorizedDirectory(dir)
-    await fileIndexService.init(dir)
+    await fileIndexService.init(getAuthorizedDirectories())
     pushSettingsToRenderer()
     return { success: true }
   })
 
   ipcMain.handle('settings:removeDirectory', async (_event, dir: string) => {
     removeAuthorizedDirectory(dir)
-    const dirs = getAuthorizedDirectories()
-    if (dirs.length > 0) await fileIndexService.init(dirs[0])
-    else fileIndexService.destroyWorkspaceIndex()
+    await fileIndexService.init(getAuthorizedDirectories())
     pushSettingsToRenderer()
     return { success: true }
   })
 
-  ipcMain.handle('settings:reorderDirectories', (_event, paths: string[]) => {
+  ipcMain.handle('settings:reorderDirectories', async (_event, paths: string[]) => {
     reorderAuthorizedDirectories(paths)
+    await fileIndexService.init(getAuthorizedDirectories())
     pushSettingsToRenderer()
     return { success: true }
   })

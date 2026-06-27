@@ -3,14 +3,12 @@ import { readdir } from 'fs/promises'
 import { join, extname } from 'path'
 import { getMainWindow } from './ipc-sender'
 import { getSettings, getSessionsByWorkspace } from './store'
-// deliverable-service used via ./handlers/deliverable-handlers
 import type { FileEntry, WorkspaceDigest } from '../shared/types'
 import { registerWorkspaceHandlers } from './handlers/workspace-handlers'
 import { registerSettingsHandlers } from './handlers/settings-handlers'
 import { registerAgentHandlers } from './handlers/agent-handlers'
 import { registerSystemHandlers } from './handlers/system-handlers'
 import { registerSessionHandlers } from './handlers/session-handlers'
-import { registerDeliverableHandlers } from './handlers/deliverable-handlers'
 
 // ─── Shared helpers ──────────────────────────────────────────────
 
@@ -70,7 +68,6 @@ export function registerIpcHandlers(): void {
   registerAgentHandlers()
   registerSystemHandlers()
   registerSessionHandlers()
-  registerDeliverableHandlers()
 }
 
 // ─── Session Overview (Phase 0 stub, Phase 2 full implementation) ──

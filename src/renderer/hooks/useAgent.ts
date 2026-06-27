@@ -461,10 +461,12 @@ export function useAgent(context: AgentContext = 'editor') {
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context, slotSid)
     refreshWatchdog(context, slotSid)
     const skillId = store.getState().slots[context].activeSkillId
-    const workspacePath = context === 'ask' ? undefined : (store.getState().activeWorkspacePath || undefined)
     // Don't pass frontend-only temp IDs as SDK sessionId — the SDK doesn't
     // recognize them, would create an untracked duplicate session.
     const currentSlot = store.getState().sessionSlots[slotSid] || store.getState().slots[context]
+    const workspacePath = context === 'ask'
+      ? undefined
+      : (currentSlot.workspacePath || store.getState().activeWorkspacePath || undefined)
     const effectiveSid = currentSlot.sdkSessionId || (slotSid?.startsWith('new-') ? undefined : (slotSid || undefined))
     const sessionTitle = slotSid
       ? store.getState().sessionList.find((session) => session.id === slotSid)?.title

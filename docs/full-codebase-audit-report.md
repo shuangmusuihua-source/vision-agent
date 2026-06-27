@@ -47,7 +47,6 @@
 | `src/main/file-index-service.ts:21-31` | 多个 `Map`/`Set` 字段 | 类实例字段 | FileIndexService 单例的内部索引，有 destroy() 清理 |
 | `src/main/cron-manager.ts:11-12` | `tasks` / `runningTasks` | `Map` / `Set` | 定时任务注册表，显式持久化 |
 | `src/main/notification-manager.ts:6` | `pendingPermissionTimers` | `Map` | 权限通知定时器，按 requestId 键 |
-| `src/main/deliverable-service.ts:39` | `writeLocks` | `Map<string, Promise<void>>` | 按 workspace 序列化写入 |
 | `src/main/artifact-service.ts:8` | `writeLocks` | `Map<string, Promise<void>>` | 同上 |
 | `src/main/session-store.ts:17` | `compactionSessionIds` | `Set<string>` | 压缩会话 ID 集合，从持久化加载，带上限 |
 | `src/main/path-validator.ts:5` | `cachedExtraRoots` | `string[]` | 额外授权根目录缓存 |
@@ -265,4 +264,3 @@ const sourceSlot = resolveSlot(state, ctx, eventSessionId)
 2. **逐文件人工审查**：对匹配到的每个变量/模式进行上下文分析，评估其生命周期、键隔离机制、清理路径和闭包捕获场景。
 3. **跨文件依赖追踪**：追踪每个模块级变量的所有引用点，确认不存在意外的跨模块状态共享。
 4. **对抗性复核**：对每个评估为"无问题"的模式进行反向验证——思考在何种条件下会出错，验证现有防护是否充分。
-

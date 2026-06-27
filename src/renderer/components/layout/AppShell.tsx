@@ -22,7 +22,7 @@ import { emptySlot } from '../../store/agent-store'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
 import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
-import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
+import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
@@ -224,10 +224,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [setUpdateAvailable, setUpdateDownloaded, setUpdateError])
 
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
+  const editorWorkspacePath = useAgentStore((s) => s.slots.editor.workspacePath || s.activeWorkspacePath)
   const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
   const sessionLoadError = useAgentStore((s) => s.sessionLoadError)
   const retrySessionLoad = useAgentStore((s) => s.retrySessionLoad)
   const clearSessionLoadError = useAgentStore((s) => s.clearSessionLoadError)
+  const activeFileWorkspacePath = findContainingWorkspacePath(
+    activeFilePath,
+    [...workspace.workspacePaths, ...workspace.fixedWorkspacePaths],
+  )
 
   // Load sessions when workspace changes
   const skipNextSessionLoad = useRef(false)
@@ -523,7 +528,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       useAgentStore.setState({ context: 'editor' })
       setView('editor')
     }
-    const wsPath = workspace.workspacePaths.find(ws => path.startsWith(ws + '/') || path.startsWith(ws))
+    const wsPath = findContainingWorkspacePath(path, workspace.workspacePaths)
     if (wsPath) {
       useAgentStore.getState().setActiveWorkspace(wsPath)
     }
@@ -716,7 +721,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
-            workspacePath={workspace.workspacePaths[0]}
           />
         ) : (
         <>
@@ -737,7 +741,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             <MarkdownEditor
               content={activeContent}
               filePath={activeFilePath}
-              workspacePath={workspace.workspacePaths[0] || ''}
+              workspacePath={activeFileWorkspacePath || editorWorkspacePath || ''}
               sourceMode={sourceMode}
               focusMode={focusMode}
               onOpenFile={handleFileSelect}
@@ -816,7 +820,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <AgentPanel
         width={agentWidth}
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
-        workspacePath={activeWorkspacePath || undefined}
+        workspacePath={editorWorkspacePath || undefined}
         usageInfo={usageInfo}
         permissionRequest={editorPermission}
         permissionQueueLength={editorPermissionQueueLen}
@@ -847,7 +851,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       >
         <ErrorBoundary>
         <Suspense fallback={<div className="chat-loading">加载对话...</div>}>
-          <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={workspace.workspacePaths[0]} />
+          <ChatView context="editor" onOpenFile={handleFileSelect} onSelectText={handleSelectText} workspacePath={editorWorkspacePath || undefined} />
         </Suspense>
         </ErrorBoundary>
       </AgentPanel>
