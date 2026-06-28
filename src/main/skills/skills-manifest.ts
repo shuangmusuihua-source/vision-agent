@@ -3,7 +3,6 @@ import manifest from './skills-manifest.json'
 export interface BuiltinSkillManifest {
   id: string
   hasResources: boolean
-  contentVersion: number
   requiredPaths: string[]
 }
 

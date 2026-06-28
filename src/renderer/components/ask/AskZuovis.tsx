@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Monitor, FolderOpen, Trash2, Gauge } from 'lucide-react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
 import ChatInput from '../chat/ChatInput'
@@ -20,6 +20,12 @@ interface FeatureCard {
   colorClass: string
   prompt: string
   skillId?: string
+}
+
+interface AvailableFeatureSkill {
+  id: string
+  name: string
+  icon: string
 }
 
 const FEATURES: FeatureCard[] = [
@@ -45,6 +51,33 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
   const askUserRequest = useAskUserRequest('ask')
   const hasMessages = messages.length > 0
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [availableFeatureSkills, setAvailableFeatureSkills] = useState<Map<string, AvailableFeatureSkill>>(new Map())
+
+  const refreshFeatureSkills = useCallback(async () => {
+    try {
+      const skills = await window.api.skills.list()
+      setAvailableFeatureSkills(new Map(
+        skills
+          .filter(skill => skill.enabled !== false)
+          .map(skill => [skill.id, { id: skill.id, name: skill.name, icon: skill.icon }]),
+      ))
+    } catch (error) {
+      console.error('[AskZuovis] Failed to load feature Skills:', error)
+      setAvailableFeatureSkills(new Map())
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshFeatureSkills()
+    return window.api.skills.onChanged(() => {
+      void refreshFeatureSkills()
+    })
+  }, [refreshFeatureSkills])
+
+  const visibleFeatures = useMemo(
+    () => FEATURES.filter(feature => feature.skillId && availableFeatureSkills.has(feature.skillId)),
+    [availableFeatureSkills],
+  )
 
   // ── AskUser interaction ──
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
@@ -78,29 +111,15 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
 
   const handleCardClick = async (card: FeatureCard) => {
     if (isStreaming && agentStatus !== 'waitingForUserInput') return
+    const skill = card.skillId ? availableFeatureSkills.get(card.skillId) : undefined
+    if (!skill) return
     if (card.id === 'organize-files') {
       const result = await window.api.agent.selectFolder()
       if (result.canceled || !result.filePaths.length) return
-      if (card.skillId) {
-        useAgentStore.setState((prev) => ({
-          slots: {
-            ...prev.slots,
-            ask: { ...prev.slots.ask, activeSkillId: card.skillId ?? null },
-          },
-        }))
-      }
-      sendMessage(`使用整理文件夹 skill 整理这个文件夹：${result.filePaths[0]}`)
+      sendMessage(`使用整理文件夹 skill 整理这个文件夹：${result.filePaths[0]}`, undefined, { skill })
       return
     }
-    if (card.skillId) {
-      useAgentStore.setState((prev) => ({
-        slots: {
-          ...prev.slots,
-          ask: { ...prev.slots.ask, activeSkillId: card.skillId ?? null },
-        },
-      }))
-    }
-    sendMessage(card.prompt)
+    sendMessage(card.prompt, undefined, { skill })
   }
 
   const handleChatSend = useCallback((msg: string) => {
@@ -131,8 +150,8 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
               </div>
             </div>
 
-            <div className="ask-zuovis-grid">
-              {FEATURES.map((feature) => {
+            {visibleFeatures.length > 0 && <div className="ask-zuovis-grid">
+              {visibleFeatures.map((feature) => {
                 const Icon = feature.icon
                 return (
                   <button
@@ -159,7 +178,7 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
                   </button>
                 )
               })}
-            </div>
+            </div>}
 
           </div>
         ) : (

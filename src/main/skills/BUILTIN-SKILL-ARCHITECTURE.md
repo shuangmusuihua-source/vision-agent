@@ -28,7 +28,6 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
 {
   "id": "{skill-id}",
   "hasResources": true,
-  "contentVersion": 1,
   "requiredPaths": ["SKILL.md"]
 }
 ```
@@ -91,10 +90,10 @@ SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──
 - **源**: 开发环境为 `src/main/skills/{id}/`，正式环境为 `resources/skills/{id}/`
 - **目标**: `{userData}/.claude/skills/{id}/`
 - **递归拷贝**: 保留 SKILL.md、assets/、references/、scripts/、templates/ 等完整目录结构
-- **幂等**: 按每个 Skill 的 `contentVersion` 和已安装文件清单判断；版本变化或资源缺失时原子替换
+- **幂等**: 按每个 Skill 的内容指纹和已安装文件清单判断；内容变化或资源缺失时原子替换
 - **完整性**: `pack` / `dist` 完成后比较源目录与 `.app` 中的全部 Skill 文件，缺失即让发布命令失败
 - **发现**: SDK 保持原会话存储配置，使用 `settingSources: ['project']` 从工作区轻量链接发现 Skill；Ask sumi 直接从应用数据目录发现
-- **升级**: 修改内置 Skill 内容时必须递增对应 `contentVersion`
+- **升级**: 修改内置 Skill 内容后会自动生成新指纹，无需手工维护版本号
 
 ### 2. SkillOutputBridge — `skill-output-bridge.ts`
 

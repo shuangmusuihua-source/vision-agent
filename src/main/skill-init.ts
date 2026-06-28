@@ -5,7 +5,7 @@ import { join } from 'path'
 import { getAppUserDataDir } from './app-identity'
 import { installBuiltinSkills, type InstallBuiltinSkillsResult } from './builtin-skill-installer'
 import { BUILTIN_SKILLS } from './skills/skills-manifest'
-import { ensureWorkspaceSkillLinks } from './workspace-skill-links'
+import { ensureWorkspaceSkillLinks, type WorkspaceSkillLinkResult } from './workspace-skill-links'
 
 const userData = getAppUserDataDir()
 const appClaudeDir = join(userData, '.claude')
@@ -45,7 +45,7 @@ export function getAppSkillsCwd(): string {
 }
 
 /** Create lightweight project-source links without duplicating Skill resources. */
-export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<void> {
+export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<WorkspaceSkillLinkResult> {
   const result = await ensureWorkspaceSkillLinks({
     globalSkillsRoot: appSkillsDir,
     workspaceRoot: workspaceCwd,
@@ -55,6 +55,7 @@ export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<void>
   if (result.conflicts.length > 0) {
     console.warn('[SkillInit] workspace Skill conflicts preserved:', result.conflicts)
   }
+  return result
 }
 
 export function getBuiltinSkillNames(): string[] {

@@ -1,4 +1,5 @@
 import { readFile, readdir, stat } from 'fs/promises'
+import { createHash } from 'crypto'
 import { join, relative, sep } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -16,12 +17,16 @@ async function collectFiles(root, current = root) {
     if (entry.name === '.DS_Store' || entry.name === '.git') continue
     const fullPath = join(current, entry.name)
     if (entry.isDirectory()) {
-      for (const [path, size] of await collectFiles(root, fullPath)) files.set(path, size)
+      for (const [path, metadata] of await collectFiles(root, fullPath)) files.set(path, metadata)
       continue
     }
     if (!entry.isFile()) continue
     const fileStat = await stat(fullPath)
-    files.set(relative(root, fullPath).split(sep).join('/'), fileStat.size)
+    const content = await readFile(fullPath)
+    files.set(relative(root, fullPath).split(sep).join('/'), {
+      size: fileStat.size,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    })
   }
 
   return files
@@ -46,10 +51,11 @@ for (const skill of manifest.filter(item => item.hasResources)) {
     }
   }
 
-  for (const [path, size] of sourceFiles) {
-    const packagedSize = packagedFiles.get(path)
-    if (packagedSize === undefined) failures.push(`${skill.id}: packaged file is missing: ${path}`)
-    else if (packagedSize !== size) failures.push(`${skill.id}: packaged file size differs: ${path}`)
+  for (const [path, sourceMetadata] of sourceFiles) {
+    const packagedMetadata = packagedFiles.get(path)
+    if (packagedMetadata === undefined) failures.push(`${skill.id}: packaged file is missing: ${path}`)
+    else if (packagedMetadata.size !== sourceMetadata.size) failures.push(`${skill.id}: packaged file size differs: ${path}`)
+    else if (packagedMetadata.sha256 !== sourceMetadata.sha256) failures.push(`${skill.id}: packaged file content differs: ${path}`)
   }
 }
 

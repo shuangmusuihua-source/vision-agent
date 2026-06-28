@@ -236,6 +236,23 @@ export function setSkillOutputWindow(win: BrowserWindow): void {
 
 // ─── Main query loop ───────────────────────────────────────────────────
 
+function toUserFacingQueryError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (!getApiKey() && !process.env.ANTHROPIC_API_KEY) {
+    return '未配置 API Key。请在设置中添加 Anthropic API Key 后重试。'
+  }
+  if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|net::/i.test(message)) {
+    return '网络连接失败，请检查网络后重试。'
+  }
+  if (/401|authentication|invalid.api.key|invalid_api_key/i.test(message)) {
+    return 'API Key 无效，请在设置中检查配置。'
+  }
+  if (/429|rate.limit|quota/i.test(message)) {
+    return '请求频率过高，请稍后重试。'
+  }
+  return message
+}
+
 export async function sendMessage(
   mainWindow: BrowserWindow,
   prompt: string,
@@ -260,31 +277,31 @@ export async function sendMessage(
     workspacePath: effectiveWorkspaceCwd,
     sdkSessionId: sessionId,
   })
-
-  // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
-  let processedPrompt = prompt
-  const convertPaths = parseFileConvertPaths(prompt)
-  if (convertPaths.length > 0) {
-    const conversion = await convertAttachmentsToMarkdown(effectiveWorkspaceCwd, queryKey, convertPaths)
-    processedPrompt = appendAttachmentConversionSummary(stripFileConvertMarker(prompt), conversion)
-  }
-
-  sessionRuntime.beginSession(runtimeEnvelope)
-  try {
-    await ensureWorkspaceSkills(effectiveWorkspaceCwd)
-  } catch (error) {
-    const message = `Skill 初始化失败: ${(error as Error).message}`
-    sessionRuntime.emitExecutionError(mainWindow, runtimeEnvelope, message)
-    sessionRuntime.finalizeRun(mainWindow, queryKey, 0)
-    return
-  }
   let currentSessionId = sessionId
-  const getSessionId = () => currentSessionId
-  const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, runtimeEnvelope, getSessionId, skillId)
-  const appSessionKey = queryKey
-
   let queryInstanceId = 0
+
   try {
+    // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
+    let processedPrompt = prompt
+    const convertPaths = parseFileConvertPaths(prompt)
+    if (convertPaths.length > 0) {
+      const conversion = await convertAttachmentsToMarkdown(effectiveWorkspaceCwd, queryKey, convertPaths)
+      processedPrompt = appendAttachmentConversionSummary(stripFileConvertMarker(prompt), conversion)
+    }
+
+    sessionRuntime.beginSession(runtimeEnvelope)
+    try {
+      const skillLinks = await ensureWorkspaceSkills(effectiveWorkspaceCwd)
+      if (skillId && skillLinks.conflicts.includes(skillId)) {
+        throw new Error(`工作区中存在同名 Skill，无法确认实际来源: ${skillId}`)
+      }
+    } catch (error) {
+      throw new Error(`Skill 初始化失败: ${(error as Error).message}`)
+    }
+
+    const getSessionId = () => currentSessionId
+    const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, runtimeEnvelope, getSessionId, skillId)
+    const appSessionKey = queryKey
     const abortController = new AbortController()
     const messageStream = query({
       prompt: processedPrompt,
@@ -343,23 +360,12 @@ export async function sendMessage(
     // emitted inside the for-await loop via agent:event channel.
     // Send a session-level completion notification only.
     notifyAgentComplete(currentSessionId || '')
-  } catch (err) {
-    const errMsg = (err as Error).message || String(err)
-    let userMessage = errMsg
-    if (!getApiKey() && !process.env.ANTHROPIC_API_KEY) {
-      userMessage = '未配置 API Key。请在设置中添加 Anthropic API Key 后重试。'
-    } else if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|net::/i.test(errMsg)) {
-      userMessage = '网络连接失败，请检查网络后重试。'
-    } else if (/401|authentication|invalid.api.key|invalid_api_key/i.test(errMsg)) {
-      userMessage = 'API Key 无效，请在设置中检查配置。'
-    } else if (/429|rate.limit|quota/i.test(errMsg)) {
-      userMessage = '请求频率过高，请稍后重试。'
-    }
+  } catch (error) {
     if (!mainWindow.isDestroyed()) {
       sessionRuntime.emitExecutionError(mainWindow, {
         ...runtimeEnvelope,
         sdkSessionId: currentSessionId || runtimeEnvelope.sdkSessionId,
-      }, userMessage)
+      }, toUserFacingQueryError(error))
     }
   } finally {
     sessionRuntime.finalizeRun(mainWindow, queryKey, queryInstanceId)

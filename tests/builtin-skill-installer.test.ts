@@ -18,9 +18,8 @@ async function createSkill(sourceRoot: string, id: string): Promise<void> {
   await writeFile(join(sourceRoot, id, 'scripts', 'run.sh'), 'echo ok\n', 'utf8')
 }
 
-const skill = (contentVersion: number): BuiltinSkillSource => ({
+const skill = (): BuiltinSkillSource => ({
   id: 'example-skill',
-  contentVersion,
   requiredPaths: ['SKILL.md', 'scripts/run.sh'],
 })
 
@@ -35,22 +34,22 @@ describe('installBuiltinSkills', () => {
     const targetRoot = join(root, 'target')
     await createSkill(sourceRoot, 'example-skill')
 
-    const result = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
+    const result = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
 
     expect(result.installed).toEqual(['example-skill'])
     expect(await readFile(join(targetRoot, 'example-skill', 'scripts', 'run.sh'), 'utf8')).toBe('echo ok\n')
   })
 
-  it('skips a valid installation until its content version changes', async () => {
+  it('automatically updates a valid installation when source content changes', async () => {
     const root = await createTempDir()
     const sourceRoot = join(root, 'source')
     const targetRoot = join(root, 'target')
     await createSkill(sourceRoot, 'example-skill')
-    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
+    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
+    const unchanged = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
     await writeFile(join(sourceRoot, 'example-skill', 'scripts', 'run.sh'), 'echo updated\n', 'utf8')
 
-    const unchanged = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
-    const updated = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(2)] })
+    const updated = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
 
     expect(unchanged.unchanged).toEqual(['example-skill'])
     expect(updated.installed).toEqual(['example-skill'])
@@ -62,10 +61,10 @@ describe('installBuiltinSkills', () => {
     const sourceRoot = join(root, 'source')
     const targetRoot = join(root, 'target')
     await createSkill(sourceRoot, 'example-skill')
-    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
+    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
     await rm(join(targetRoot, 'example-skill', 'scripts', 'run.sh'))
 
-    const result = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
+    const result = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
 
     expect(result.installed).toEqual(['example-skill'])
     expect((await stat(join(targetRoot, 'example-skill', 'scripts', 'run.sh'))).isFile()).toBe(true)
@@ -76,10 +75,10 @@ describe('installBuiltinSkills', () => {
     const sourceRoot = join(root, 'source')
     const targetRoot = join(root, 'target')
     await createSkill(sourceRoot, 'example-skill')
-    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
+    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
     await rm(join(sourceRoot, 'example-skill', 'scripts', 'run.sh'))
 
-    await expect(installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(2)] }))
+    await expect(installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] }))
       .rejects.toThrow('Built-in skill resource is missing')
     expect(await readFile(join(targetRoot, 'example-skill', 'scripts', 'run.sh'), 'utf8')).toBe('echo ok\n')
   })
@@ -91,7 +90,7 @@ describe('installBuiltinSkills', () => {
     await createSkill(sourceRoot, 'example-skill')
     await mkdir(join(targetRoot, 'community-skill'), { recursive: true })
     await writeFile(join(targetRoot, 'community-skill', 'SKILL.md'), '# community\n', 'utf8')
-    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill(1)] })
+    await installBuiltinSkills({ sourceRoot, targetRoot, skills: [skill()] })
 
     const result = await installBuiltinSkills({ sourceRoot, targetRoot, skills: [] })
 

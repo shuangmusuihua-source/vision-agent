@@ -80,14 +80,14 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const handleInputChange = useCallback((val: string) => {
     setText(val)
 
-    if (val.startsWith('/')) {
+    if (context === 'editor' && val.startsWith('/')) {
       setShowSkillPopup(true)
       setSkillFilter(val.slice(1).toLowerCase())
       setSelectedSkillIdx(0)
     } else {
       setShowSkillPopup(false)
     }
-  }, [])
+  }, [context])
 
   const filteredSkills = skills.filter(s =>
     s.name.toLowerCase().includes(skillFilter) ||

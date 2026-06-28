@@ -9,6 +9,7 @@ import {
 } from '../community-skill-installer'
 import { CURATED_COMMUNITY_SKILLS, getCuratedCommunitySkill } from '../skills/community-catalog'
 import { sessionRuntime } from '../session-runtime'
+import { runSkillMutation } from '../skill-mutation-coordinator'
 import type { CommunitySkillCatalogItem, CommunitySkillMutationResult } from '../../shared/types'
 
 function emitSkillsChanged(skillId: string, reason: 'installed' | 'updated' | 'uninstalled' | 'toggled'): void {
@@ -91,8 +92,10 @@ export function registerSkillHandlers(): void {
       return { success: false, error: '该 Skill 与内置 Skill 重名，无法安装' }
     }
     try {
-      await installCommunitySkill({ targetRoot: getAppSkillsDir(), skill })
-      toggleSkill(skill.id, true)
+      await runSkillMutation(skill.id, async () => {
+        await installCommunitySkill({ targetRoot: getAppSkillsDir(), skill })
+        toggleSkill(skill.id, true)
+      })
       emitSkillsChanged(skill.id, 'installed')
       return { success: true }
     } catch (error) {
@@ -103,16 +106,20 @@ export function registerSkillHandlers(): void {
   ipcMain.handle('skills:update', async (_event, skillId: string): Promise<CommunitySkillMutationResult> => {
     const skill = getCuratedCommunitySkill(skillId)
     if (!skill) return { success: false, error: '该 Skill 不在当前精选目录中' }
-    if (sessionRuntime.isSkillActive(skill.id)) {
-      return { success: false, error: '该 Skill 正在执行，请等待任务结束后再更新' }
-    }
     try {
-      const installation = await inspectCommunitySkillInstallation(getAppSkillsDir(), skill.id)
-      if (!installation) return { success: false, error: '该 Skill 尚未安装' }
-      if (installation.sourceRef === skill.source.ref) return { success: true }
+      const changed = await runSkillMutation(skill.id, async () => {
+        if (sessionRuntime.isSkillActive(skill.id)) {
+          throw new Error('该 Skill 正在执行，请等待任务结束后再更新')
+        }
+        const installation = await inspectCommunitySkillInstallation(getAppSkillsDir(), skill.id)
+        if (!installation) throw new Error('该 Skill 尚未安装')
+        if (installation.sourceRef === skill.source.ref) return false
 
-      await installCommunitySkill({ targetRoot: getAppSkillsDir(), skill })
-      toggleSkill(skill.id, true)
+        await installCommunitySkill({ targetRoot: getAppSkillsDir(), skill })
+        toggleSkill(skill.id, true)
+        return true
+      })
+      if (!changed) return { success: true }
       emitSkillsChanged(skill.id, 'updated')
       return { success: true }
     } catch (error) {
@@ -123,12 +130,14 @@ export function registerSkillHandlers(): void {
   ipcMain.handle('skills:uninstall', async (_event, skillId: string): Promise<CommunitySkillMutationResult> => {
     const skill = getCuratedCommunitySkill(skillId)
     if (!skill) return { success: false, error: '该 Skill 不在当前精选目录中' }
-    if (sessionRuntime.isSkillActive(skill.id)) {
-      return { success: false, error: '该 Skill 正在执行，请等待任务结束后再卸载' }
-    }
     try {
-      await uninstallCommunitySkill(getAppSkillsDir(), skill.id)
-      toggleSkill(skill.id, false)
+      await runSkillMutation(skill.id, async () => {
+        if (sessionRuntime.isSkillActive(skill.id)) {
+          throw new Error('该 Skill 正在执行，请等待任务结束后再卸载')
+        }
+        await uninstallCommunitySkill(getAppSkillsDir(), skill.id)
+        toggleSkill(skill.id, false)
+      })
       emitSkillsChanged(skill.id, 'uninstalled')
       return { success: true }
     } catch (error) {

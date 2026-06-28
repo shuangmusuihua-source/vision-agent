@@ -1,25 +1,25 @@
 import { cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'fs/promises'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { dirname, join, relative, sep } from 'path'
 
 export interface BuiltinSkillSource {
   id: string
-  contentVersion: number
   requiredPaths: string[]
 }
 
 interface InstalledFile {
   path: string
   size: number
+  sha256: string
 }
 
 interface InstalledSkillState {
-  contentVersion: number
+  contentHash: string
   files: InstalledFile[]
 }
 
 interface BuiltinSkillInstallState {
-  schemaVersion: 1
+  schemaVersion: 2
   skills: Record<string, InstalledSkillState>
 }
 
@@ -71,7 +71,12 @@ async function collectFiles(root: string, current = root): Promise<InstalledFile
     if (!entry.isFile()) continue
 
     const fileStat = await stat(fullPath)
-    files.push({ path: relative(root, fullPath).split(sep).join('/'), size: fileStat.size })
+    const content = await readFile(fullPath)
+    files.push({
+      path: relative(root, fullPath).split(sep).join('/'),
+      size: fileStat.size,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    })
   }
 
   return files.sort((a, b) => a.path.localeCompare(b.path))
@@ -80,7 +85,7 @@ async function collectFiles(root: string, current = root): Promise<InstalledFile
 async function readState(statePath: string): Promise<BuiltinSkillInstallState | null> {
   try {
     const parsed = JSON.parse(await readFile(statePath, 'utf8')) as Partial<BuiltinSkillInstallState>
-    if (parsed.schemaVersion !== 1 || !parsed.skills || typeof parsed.skills !== 'object') return null
+    if (parsed.schemaVersion !== 2 || !parsed.skills || typeof parsed.skills !== 'object') return null
     return parsed as BuiltinSkillInstallState
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT' || error instanceof SyntaxError) return null
@@ -121,6 +126,17 @@ async function validateSource(sourceRoot: string, skill: BuiltinSkillSource): Pr
   return files
 }
 
+function hashFiles(files: InstalledFile[]): string {
+  const hash = createHash('sha256')
+  for (const file of files) {
+    hash.update(file.path)
+    hash.update('\0')
+    hash.update(file.sha256)
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
 async function replaceDirectory(sourceDir: string, targetDir: string): Promise<void> {
   const nonce = `${process.pid}-${randomUUID()}`
   const stagingDir = `${targetDir}.staging-${nonce}`
@@ -157,17 +173,18 @@ async function writeState(statePath: string, state: BuiltinSkillInstallState): P
 export async function installBuiltinSkills(options: InstallBuiltinSkillsOptions): Promise<InstallBuiltinSkillsResult> {
   const statePath = join(options.targetRoot, STATE_FILE_NAME)
   const previousState = await readState(statePath)
-  const nextState: BuiltinSkillInstallState = { schemaVersion: 1, skills: {} }
+  const nextState: BuiltinSkillInstallState = { schemaVersion: 2, skills: {} }
   const result: InstallBuiltinSkillsResult = { installed: [], removed: [], unchanged: [] }
 
   await mkdir(options.targetRoot, { recursive: true })
 
   for (const skill of options.skills) {
     const sourceFiles = await validateSource(options.sourceRoot, skill)
+    const sourceHash = hashFiles(sourceFiles)
     const targetDir = join(options.targetRoot, skill.id)
     const previousSkill = previousState?.skills[skill.id]
     const canReuse = !options.force
-      && previousSkill?.contentVersion === skill.contentVersion
+      && previousSkill?.contentHash === sourceHash
       && await isInstalledSkillValid(targetDir, previousSkill)
 
     if (canReuse) {
@@ -178,7 +195,7 @@ export async function installBuiltinSkills(options: InstallBuiltinSkillsOptions)
 
     await replaceDirectory(join(options.sourceRoot, skill.id), targetDir)
     nextState.skills[skill.id] = {
-      contentVersion: skill.contentVersion,
+      contentHash: sourceHash,
       files: sourceFiles,
     }
     result.installed.push(skill.id)
