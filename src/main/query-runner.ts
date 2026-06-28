@@ -18,6 +18,7 @@ import {
   parseFileConvertPaths,
   stripFileConvertMarker,
 } from './attachment-conversion'
+import { isSkillAvailableAtInitialization } from '../shared/skill-invocation'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -301,6 +302,12 @@ export async function sendMessage(
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
+
+      if (skillId && message.type === 'system' && message.subtype === 'init') {
+        if (!isSkillAvailableAtInitialization(skillId, message.skills, message.slash_commands)) {
+          throw new Error(`Skill 未被 Agent SDK 发现: ${skillId}`)
+        }
+      }
 
       const sdkSessionId = message.session_id || currentSessionId || runtimeEnvelope.sdkSessionId || undefined
       const eventEnvelope = sessionRuntime.resolveEventEnvelope(queryKey, runtimeEnvelope, sdkSessionId)

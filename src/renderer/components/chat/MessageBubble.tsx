@@ -10,6 +10,7 @@ import {
   stripInternalAttachmentContext,
   type AttachmentKind,
 } from '../../../shared/file-attachments'
+import { getSkillInvocationDisplayText } from '../../../shared/skill-invocation'
 import { stripSkillOutputBlock } from './message-text-utils'
 
 const AssistantMarkdown = lazy(() => import('./AssistantMarkdown'))
@@ -211,7 +212,7 @@ function UserBubble({ text, messageId, attachmentConversions, onSelectText, cont
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
-  const visibleText = stripInternalAttachmentContext(text)
+  const visibleText = getSkillInvocationDisplayText(text) || stripInternalAttachmentContext(text)
   const { attachments, body } = parseAttachments(visibleText)
   const isLatestStreamingUserMessage = useAgentStore((s) => {
     const slot = s.slots[context]

@@ -3,6 +3,7 @@ import { ArrowUp, Square, Paperclip, X } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
+import { isSkillVisibleInSlashMenu } from '../../../shared/skill-invocation'
 import { useAgentStore } from '../../store/agent-store-impl'
 import {
   encodeFileConvertPath,
@@ -58,11 +59,21 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     }
   }, [prefillText, context, variant])
 
-  // Load skills on mount
+  // Keep the slash menu in sync with runtime installs and uninstalls.
   useEffect(() => {
-    window.api.skills.list().then(
-      (all) => setSkills(all.filter((s) => !s.hideInSlashMenu))
-    ).catch(() => setSkills([]))
+    let active = true
+    const refreshSkills = () => {
+      window.api.skills.list().then(
+        (all) => { if (active) setSkills(all.filter(isSkillVisibleInSlashMenu)) }
+      ).catch(() => { if (active) setSkills([]) })
+    }
+
+    refreshSkills()
+    const unsubscribe = window.api.skills.onChanged(refreshSkills)
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [])
 
   // Detect "/" at start of input for skill popup

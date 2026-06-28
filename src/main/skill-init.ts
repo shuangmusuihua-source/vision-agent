@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { existsSync } from 'fs'
+import { readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { getAppUserDataDir } from './app-identity'
 import { installBuiltinSkills, type InstallBuiltinSkillsResult } from './builtin-skill-installer'
@@ -34,6 +35,10 @@ export function getAppClaudeConfigDir(): string {
   return appClaudeDir
 }
 
+export function getAppSkillsDir(): string {
+  return appSkillsDir
+}
+
 /** Working directory for Ask sumi sessions and app-owned data. */
 export function getAppSkillsCwd(): string {
   return userData
@@ -44,7 +49,7 @@ export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<void>
   const result = await ensureWorkspaceSkillLinks({
     globalSkillsRoot: appSkillsDir,
     workspaceRoot: workspaceCwd,
-    skillIds: getBuiltinSkillNames(),
+    skillIds: await getInstalledSkillNames(),
     legacyMarkerPath: join(workspaceCwd, '.vision', '.claude-skills-version'),
   })
   if (result.conflicts.length > 0) {
@@ -54,4 +59,31 @@ export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<void>
 
 export function getBuiltinSkillNames(): string[] {
   return BUILTIN_SKILLS.filter(skill => skill.hasResources).map(skill => skill.id)
+}
+
+export async function getInstalledSkillNames(): Promise<string[]> {
+  let entries
+  try {
+    entries = await readdir(appSkillsDir, { withFileTypes: true })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
+  }
+
+  const installed: string[] = []
+  for (const entry of entries) {
+    if (
+      entry.name.startsWith('.')
+      || entry.name.includes('.staging-')
+      || entry.name.includes('.backup-')
+      || !entry.isDirectory()
+    ) continue
+    try {
+      const skillFile = await stat(join(appSkillsDir, entry.name, 'SKILL.md'))
+      if (skillFile.isFile()) installed.push(entry.name)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+  }
+  return installed.sort((a, b) => a.localeCompare(b))
 }

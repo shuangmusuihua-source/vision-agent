@@ -1433,6 +1433,18 @@
   -webkit-app-region: no-drag;
 }
 
+.sidebar-ask-zuovis:not(.sidebar-skills-entry) {
+  margin-bottom: 4px;
+}
+
+.sidebar-skills-entry {
+  margin-bottom: 12px;
+}
+
+.sidebar-skills-icon {
+  border-radius: var(--radius-sm);
+}
+
 .sidebar-ask-zuovis:hover {
   background: var(--color-bg-hover);
 }

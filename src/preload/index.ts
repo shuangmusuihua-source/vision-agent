@@ -9,7 +9,7 @@ import type {
   SessionRoutedPermissionRequest,
   SessionRoutedSkillOutputState,
 } from '../shared/types'
-import type { IPCChannelMap, IPCRequest, IPCResponse } from '../shared/ipc-types'
+import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -25,6 +25,7 @@ type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
+type SkillsChangedPayload = IPCEventPayload<'skills:changed'>
 
 function invoke<K extends keyof IPCChannelMap>(
   channel: K,
@@ -248,6 +249,16 @@ const api = {
     list: () => ipcRenderer.invoke('skills:list'),
     toggle: (skillId: string, enabled: boolean) => ipcRenderer.invoke('skills:toggle', skillId, enabled),
     getEnabled: () => ipcRenderer.invoke('skills:getEnabled'),
+    builtins: () => ipcRenderer.invoke('skills:builtins'),
+    catalog: () => ipcRenderer.invoke('skills:catalog'),
+    install: (skillId: string) => ipcRenderer.invoke('skills:install', skillId),
+    update: (skillId: string) => ipcRenderer.invoke('skills:update', skillId),
+    uninstall: (skillId: string) => ipcRenderer.invoke('skills:uninstall', skillId),
+    onChanged: (callback: (change: SkillsChangedPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, change: SkillsChangedPayload) => callback(change)
+      ipcRenderer.on('skills:changed', handler)
+      return () => { ipcRenderer.removeListener('skills:changed', handler) }
+    },
   },
 
   search: {

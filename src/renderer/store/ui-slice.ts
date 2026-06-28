@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type PrimaryView = 'ask' | 'editor'
+export type PrimaryView = 'ask' | 'editor' | 'skills'
 
 interface UpdateInfo { version: string }
 

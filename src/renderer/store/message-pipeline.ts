@@ -30,6 +30,11 @@ import type {
 import { ContextSlot } from './agent-store'
 import { isTextBlock, isToolUseBlock, isToolResultBlock } from '../../shared/types'
 import { parseAttachmentConversionStatuses, stripInternalAttachmentContext } from '../../shared/file-attachments'
+import { getSkillInvocationDisplayText } from '../../shared/skill-invocation'
+
+function getVisibleUserText(rawText: string): string {
+  return getSkillInvocationDisplayText(rawText) || stripInternalAttachmentContext(rawText)
+}
 
 // ─── Accumulator helpers ──────────────────────────────────────────────
 
@@ -653,7 +658,7 @@ export function reduceUserMessage(
 
   if (textBlocks.length > 0) {
     const rawText = textBlocks.map((b) => b.text).join('')
-    const text = stripInternalAttachmentContext(rawText)
+    const text = getVisibleUserText(rawText)
     const attachmentConversions = parseAttachmentConversionStatuses(rawText)
     const attachmentPatch = attachmentConversions.length > 0 ? { attachmentConversions } : {}
     const existingUserIndex = text ? findLastUserMessageIndex(msgs, text) : -1
@@ -845,7 +850,7 @@ export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): Conversat
 
       if (textBlocks.length > 0) {
         const rawText = textBlocks.map(b => b.text).join('')
-        const text = stripInternalAttachmentContext(rawText)
+        const text = getVisibleUserText(rawText)
         const attachmentConversions = parseAttachmentConversionStatuses(rawText)
         const existingUserIndex = text ? findLastUserMessageIndex(messages, text) : -1
         if (existingUserIndex >= 0 && attachmentConversions.length > 0) {

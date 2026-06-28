@@ -1,5 +1,6 @@
 import { store, type CronTask } from './store-core'
 import { getBuiltinSkills } from '../skills/builtin'
+import { resolveEnabledSkillIds, updateSkillPreference } from '../../shared/skill-settings'
 
 // ─── Theme ──────────────────────────────────────────────────────────────
 
@@ -24,38 +25,32 @@ export function saveCronTasks(tasks: CronTask[]): void {
 // ─── Enabled skills ─────────────────────────────────────────────────────
 
 export function getEnabledSkills(): string[] {
-  const stored = store.get('enabledSkills')
+  const stored = store.get('enabledSkills') || []
+  const disabled = store.get('disabledSkills') || []
   const builtins = getBuiltinSkills().map((s: { id: string }) => s.id)
-  if (!stored || stored.length === 0) {
-    return builtins
+  const resolved = resolveEnabledSkillIds(stored, builtins, disabled)
+  if (resolved.length !== stored.length || resolved.some((skillId, index) => skillId !== stored[index])) {
+    store.set('enabledSkills', resolved)
   }
-  const merged = [...stored]
-  for (const id of builtins) {
-    if (!merged.includes(id)) merged.push(id)
-  }
-  if (merged.length !== stored.length) {
-    store.set('enabledSkills', merged)
-  }
-  return merged
+  return resolved
 }
 
 export function setEnabledSkills(skillIds: string[]): void {
   store.set('enabledSkills', skillIds)
+  const enabled = new Set(skillIds)
+  store.set('disabledSkills', (store.get('disabledSkills') || []).filter(skillId => !enabled.has(skillId)))
 }
 
 export function toggleSkill(skillId: string, enabled: boolean): string[] {
-  let current = store.get('enabledSkills')
-  if (!current || current.length === 0) {
-    current = getBuiltinSkills().map((s: { id: string }) => s.id)
-  }
-  let next: string[]
-  if (enabled) {
-    next = current.includes(skillId) ? current : [...current, skillId]
-  } else {
-    next = current.filter((id) => id !== skillId)
-  }
-  store.set('enabledSkills', next)
-  return next
+  const next = updateSkillPreference(
+    getEnabledSkills(),
+    store.get('disabledSkills') || [],
+    skillId,
+    enabled,
+  )
+  store.set('enabledSkills', next.enabledSkillIds)
+  store.set('disabledSkills', next.disabledSkillIds)
+  return next.enabledSkillIds
 }
 
 // ─── Compaction session IDs (persisted for restart survival) ────────────

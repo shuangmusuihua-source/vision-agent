@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -39,8 +39,10 @@ interface SidebarProps {
   onToggleGraph: () => void
   onDaydream: (mode: string) => void
   onAskZuovis: () => void
+  onOpenSkills: () => void
   onAskZuovisBack: () => void
   isAskZuovisActive: boolean
+  isSkillsActive: boolean
   isAskZuovisInChat: boolean
   isAskZuovisRunning: boolean
   showGraph: boolean
@@ -139,8 +141,10 @@ function Sidebar({
   onToggleGraph,
   onDaydream,
   onAskZuovis,
+  onOpenSkills,
   onAskZuovisBack,
   isAskZuovisActive,
+  isSkillsActive,
   isAskZuovisInChat,
   isAskZuovisRunning,
   showGraph,
@@ -265,6 +269,16 @@ function Sidebar({
           {isAskZuovisActive && isAskZuovisInChat && (
             <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
           )}
+        </div>
+
+        <div
+          className={`sidebar-ask-zuovis sidebar-skills-entry${isSkillsActive ? ' sidebar-ask-zuovis-active' : ''}`}
+          onClick={onOpenSkills}
+          role="button" tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSkills() } }}
+        >
+          <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Blocks size={13} /></div>
+          <span className="sidebar-ask-zuovis-label">技能</span>
         </div>
 
         {/* Workspaces with sessions */}

@@ -18,6 +18,44 @@ export interface ModelProfile {
   model: string
 }
 
+// ─── Curated community Skills ────────────────────────────────────────
+
+export interface CommunitySkillAudit {
+  name: string
+  status: 'passed' | 'reviewed'
+}
+
+export interface BuiltinSkillCatalogItem {
+  id: string
+  name: string
+  description: string
+  icon: string
+  enabled: boolean
+}
+
+export interface CommunitySkillCatalogItem {
+  id: string
+  name: string
+  author: string
+  category: string
+  summary: string
+  description: string
+  tags: string[]
+  sourcePageUrl: string
+  repositoryUrl: string
+  audits: CommunitySkillAudit[]
+  installed: boolean
+  enabled: boolean
+  updateAvailable: boolean
+  installedAt?: string
+  updatedAt?: string
+}
+
+export interface CommunitySkillMutationResult {
+  success: boolean
+  error?: string
+}
+
 // ─── Content Blocks ──────────────────────────────────────────────────
 
 export type TextBlock = {
@@ -115,6 +153,8 @@ export type SystemInitPayload = {
   session_id: string
   model: string
   tools: string[]
+  skills: string[]
+  slash_commands: string[]
 }
 
 export type SystemStatusPayload = {

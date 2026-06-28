@@ -16,6 +16,9 @@ import type {
   FileEntry,
   ModelProfile,
   SessionOutputs,
+  BuiltinSkillCatalogItem,
+  CommunitySkillCatalogItem,
+  CommunitySkillMutationResult,
 } from '../../shared/types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
@@ -167,6 +170,12 @@ interface SkillsApi {
   list: () => Promise<SkillDefinition[]>
   toggle: (skillId: string, enabled: boolean) => Promise<string[]>
   getEnabled: () => Promise<string[]>
+  builtins: () => Promise<BuiltinSkillCatalogItem[]>
+  catalog: () => Promise<CommunitySkillCatalogItem[]>
+  install: (skillId: string) => Promise<CommunitySkillMutationResult>
+  update: (skillId: string) => Promise<CommunitySkillMutationResult>
+  uninstall: (skillId: string) => Promise<CommunitySkillMutationResult>
+  onChanged: (callback: (change: { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }) => void) => () => void
 }
 
 interface SearchApi {

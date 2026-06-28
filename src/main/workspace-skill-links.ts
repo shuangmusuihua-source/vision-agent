@@ -1,5 +1,5 @@
-import { lstat, mkdir, readlink, rm, symlink } from 'fs/promises'
-import { join, resolve } from 'path'
+import { lstat, mkdir, readdir, readlink, rm, symlink } from 'fs/promises'
+import { join, relative, resolve } from 'path'
 
 export interface WorkspaceSkillLinkOptions {
   globalSkillsRoot: string
@@ -31,6 +31,27 @@ async function hasLegacyMarker(path?: string): Promise<boolean> {
   return await pathType(path) !== 'missing'
 }
 
+function isInside(parent: string, child: string): boolean {
+  const rel = relative(resolve(parent), resolve(child))
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+}
+
+async function removeStaleManagedLinks(
+  workspaceSkillsRoot: string,
+  globalSkillsRoot: string,
+  desiredSkillIds: Set<string>,
+): Promise<void> {
+  const entries = await readdir(workspaceSkillsRoot, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isSymbolicLink() || desiredSkillIds.has(entry.name)) continue
+    const linkPath = join(workspaceSkillsRoot, entry.name)
+    const currentTarget = resolve(workspaceSkillsRoot, await readlink(linkPath))
+    if (isInside(globalSkillsRoot, currentTarget)) {
+      await rm(linkPath, { force: true })
+    }
+  }
+}
+
 export async function ensureWorkspaceSkillLinks(options: WorkspaceSkillLinkOptions): Promise<WorkspaceSkillLinkResult> {
   const result: WorkspaceSkillLinkResult = { linked: [], unchanged: [], conflicts: [] }
   if (resolve(options.workspaceRoot) === resolve(join(options.globalSkillsRoot, '..', '..'))) return result
@@ -38,6 +59,8 @@ export async function ensureWorkspaceSkillLinks(options: WorkspaceSkillLinkOptio
   const workspaceSkillsRoot = join(options.workspaceRoot, '.claude', 'skills')
   const canReplaceLegacyCopies = await hasLegacyMarker(options.legacyMarkerPath)
   await mkdir(workspaceSkillsRoot, { recursive: true })
+  const desiredSkillIds = new Set(options.skillIds)
+  await removeStaleManagedLinks(workspaceSkillsRoot, options.globalSkillsRoot, desiredSkillIds)
 
   for (const skillId of options.skillIds) {
     const sourceDir = resolve(options.globalSkillsRoot, skillId)

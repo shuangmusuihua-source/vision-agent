@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
 import { stripInternalAttachmentContext } from '../../shared/file-attachments'
+import { getSkillInvocationDisplayText } from '../../shared/skill-invocation'
 import { emptySlot, type AgentStore } from '../store/agent-store'
 import type {
   AgentContext,
@@ -379,7 +380,11 @@ export function useAgent(context: AgentContext = 'editor') {
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
-  const sendMessage = useCallback(async (prompt: string, activeFilePath?: string) => {
+  const sendMessage = useCallback(async (
+    prompt: string,
+    activeFilePath?: string,
+    options?: { skill?: { id: string; name: string; icon: string } },
+  ) => {
     const state = store.getState()
     const slot = state.slots[context]
     let slotSid = slot.currentSessionId
@@ -427,14 +432,26 @@ export function useAgent(context: AgentContext = 'editor') {
     // Mirror to the context's session slot so the optimistic message
     // survives a session switch → switch back cycle.
     store.setState((s) => {
+      const visibleText = options?.skill
+        ? `执行 Skill: ${options.skill.name}`
+        : (getSkillInvocationDisplayText(prompt) || stripInternalAttachmentContext(prompt))
       const patch = {
         messages: [...s.slots[context].messages, {
           kind: 'user' as const,
           id: `user-${Date.now()}`,
           role: 'user',
-          textContent: stripInternalAttachmentContext(prompt),
+          textContent: visibleText,
+          ...(options?.skill ? {
+            skillMeta: {
+              id: options.skill.id,
+              name: options.skill.name,
+              icon: options.skill.icon,
+              status: 'running' as const,
+            },
+          } : {}),
           createdAt: Date.now(),
         }],
+        ...(options?.skill ? { activeSkillId: options.skill.id } : {}),
         isStreaming: true,
       }
       const result: Record<string, unknown> = {

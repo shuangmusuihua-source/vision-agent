@@ -78,4 +78,19 @@ describe('ensureWorkspaceSkillLinks', () => {
 
     expect(result).toEqual({ linked: [], unchanged: [], conflicts: [] })
   })
+
+  it('removes stale app-managed links after a Skill is uninstalled', async () => {
+    const root = await createTempDir()
+    const globalRoot = join(root, 'app-data', '.claude', 'skills')
+    const workspaceRoot = join(root, 'workspace')
+    await mkdir(join(globalRoot, 'community-skill'), { recursive: true })
+    await writeFile(join(globalRoot, 'community-skill', 'SKILL.md'), '# community\n', 'utf8')
+    await ensureWorkspaceSkillLinks({ globalSkillsRoot: globalRoot, workspaceRoot, skillIds: ['community-skill'] })
+    await rm(join(globalRoot, 'community-skill'), { recursive: true })
+
+    await ensureWorkspaceSkillLinks({ globalSkillsRoot: globalRoot, workspaceRoot, skillIds: [] })
+
+    await expect(lstat(join(workspaceRoot, '.claude', 'skills', 'community-skill')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
 })

@@ -15,6 +15,9 @@ import type {
   SessionRoutedSkillOutputState,
   UsageInfo,
   GraphData,
+  BuiltinSkillCatalogItem,
+  CommunitySkillCatalogItem,
+  CommunitySkillMutationResult,
 } from './types'
 
 // ─── Request/Response Channels ───────────────────────────────────────
@@ -237,6 +240,34 @@ export type IPCChannelMap = {
     request: void
     response: unknown[]
   }
+  'skills:toggle': {
+    request: [string, boolean]
+    response: string[]
+  }
+  'skills:getEnabled': {
+    request: void
+    response: string[]
+  }
+  'skills:builtins': {
+    request: void
+    response: BuiltinSkillCatalogItem[]
+  }
+  'skills:catalog': {
+    request: void
+    response: CommunitySkillCatalogItem[]
+  }
+  'skills:install': {
+    request: string
+    response: CommunitySkillMutationResult
+  }
+  'skills:update': {
+    request: string
+    response: CommunitySkillMutationResult
+  }
+  'skills:uninstall': {
+    request: string
+    response: CommunitySkillMutationResult
+  }
 
   // Search
   'search:query': {
@@ -268,6 +299,7 @@ export type IPCEventMap = {
   'agent:permissionTimeout': SessionRoutedRequestTimeout
   'agent:notification': AgentNotificationEvent
   'skill:output': SessionRoutedSkillOutputState
+  'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[] }
   'cron:taskCompleted': unknown

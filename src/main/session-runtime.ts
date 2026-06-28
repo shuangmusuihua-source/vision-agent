@@ -98,6 +98,13 @@ export class SessionRuntimeController {
     return this.activeRuns.get(sessionId)?.skillId ?? null
   }
 
+  isSkillActive(skillId: string): boolean {
+    for (const run of this.activeRuns.values()) {
+      if (run.skillId === skillId) return true
+    }
+    return false
+  }
+
   getEnvelope(sessionId: string): AgentSessionEnvelope | null {
     return this.activeRuns.get(sessionId)?.envelope ?? null
   }

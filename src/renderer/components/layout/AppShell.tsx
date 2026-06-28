@@ -26,10 +26,12 @@ import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
+import { buildSkillInvocationPrompt } from '../../../shared/skill-invocation'
 
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
 const GraphFloat = lazy(() => import('../graph/GraphFloat'))
+const SkillLibrary = lazy(() => import('../skills/SkillLibrary'))
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -652,25 +654,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const fileRef = selectedFile
       ? `\n\n输入文档：${selectedFile}\n开始执行 Skill 前，必须先使用 Read 工具读取该 Markdown 文件的完整内容，并以文档内容作为主要输入。`
       : ''
-    const prompt = skill.promptTemplate.replace('{activeFile}', fileRef)
-    useAgentStore.setState((s) => ({
-      slots: {
-        ...s.slots,
-        editor: {
-          ...s.slots.editor,
-          activeSkillId: skill.id,
-          messages: [...s.slots.editor.messages, {
-            kind: 'user' as const,
-            id: `skill-${Date.now()}`,
-            role: 'user',
-            textContent: `执行 Skill: ${skill.name}`,
-            skillMeta: { id: skill.id, name: skill.name, icon: skill.icon, status: 'running' },
-            createdAt: Date.now(),
-          }],
-        },
-      },
-    }))
-    editorSendMessage(prompt, selectedFile || undefined)
+    const prompt = buildSkillInvocationPrompt(skill.id, skill.promptTemplate, fileRef)
+    editorSendMessage(prompt, selectedFile || undefined, {
+      skill: { id: skill.id, name: skill.name, icon: skill.icon },
+    })
   }, [activeFilePath, editorSendMessage, linkedFile])
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -683,7 +670,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         fixedWorkspacePaths={workspace.fixedWorkspacePaths}
         memoryRefreshKey={memoryRefreshKey}
         sessions={editorSessionList}
-        activeSessionId={view === 'ask' ? null : activeSessionId}
+        activeSessionId={view === 'editor' ? activeSessionId : null}
         activeSessionRunning={isStreaming}
         onSessionSelect={handleSessionSelect}
         onDeleteSession={handleDeleteSession}
@@ -708,6 +695,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             setView('ask')
           }}
         isAskZuovisActive={view === 'ask'}
+        onOpenSkills={() => setView('skills')}
+        isSkillsActive={view === 'skills'}
         onAskZuovisBack={handleAskZuovisBack}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
@@ -716,14 +705,20 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         collapsed={sidebarCollapsed}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' ? ' main-content-skills' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
-           aria-label="编辑器">
+           aria-label={view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
         {view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
             onSelectText={handleSelectText}
           />
+        ) : view === 'skills' ? (
+          <ErrorBoundary onReset={() => {}}>
+            <Suspense fallback={<div className="skill-library-loading">正在加载技能...</div>}>
+              <SkillLibrary />
+            </Suspense>
+          </ErrorBoundary>
         ) : (
         <>
         <div className={`main-content-header${sidebarCollapsed ? ' main-content-header-cover-sidebar' : ''}`}>

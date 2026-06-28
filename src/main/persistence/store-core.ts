@@ -58,6 +58,7 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   cronTasks: CronTask[]
   enabledSkills: string[]
+  disabledSkills: string[]
 }
 
 export const store = new Store<AppSettings>({
@@ -74,5 +75,6 @@ export const store = new Store<AppSettings>({
     theme: 'system',
     cronTasks: [],
     enabledSkills: [],
+    disabledSkills: [],
   },
 })

@@ -84,6 +84,8 @@ function convertSystem(message: SDKSystemMessageAny): AgentIPCMessage | null {
         session_id: m.session_id,
         model: m.model,
         tools: m.tools,
+        skills: m.skills,
+        slash_commands: m.slash_commands,
       }
     }
 
