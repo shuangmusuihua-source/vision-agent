@@ -82,6 +82,15 @@
     text-transform: uppercase;
     font-weight: 500;
   }
+  /* Brand logo slot (optional, from brand profile; styles apply only once uncommented). */
+  .brand-logo {
+    display: block;
+    height: 72px;
+    width: auto;
+    max-width: 200px;
+    object-fit: contain;
+    margin-bottom: 16pt;
+  }
   .cover-center {
     display: flex;
     flex-direction: column;
@@ -460,7 +469,12 @@
 
 <!-- COVER -->
 <div class="cover">
-  <div class="cover-top">{{YEAR_RANGE - e.g. Selected Works 2023–2026}}</div>
+  <div class="cover-head">
+    <!-- Brand logo slot (optional, from the brand profile logo field). Leave commented when there is no logo; do not insert a broken image.
+         To use, uncomment and set src to an expanded local absolute path:
+    <img class="brand-logo" src="/absolute/path/to/logo.svg" alt=""> -->
+    <div class="cover-top">{{YEAR_RANGE - e.g. Selected Works 2023–2026}}</div>
+  </div>
 
   <div class="cover-center">
     <div class="cover-name">{{NAME}}<br>Portfolio</div>

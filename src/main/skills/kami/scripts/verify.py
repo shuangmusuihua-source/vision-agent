@@ -23,6 +23,22 @@ from shared import DIAGRAMS, EXAMPLES, TEMPLATES, load_checks_thresholds
 # Primary fonts expected in embedded PDF font names
 CN_PRIMARY_FONTS = {"TsangerJinKai02"}
 EN_PRIMARY_FONTS = {"Charter"}
+KO_PRIMARY_FONTS = {"Source-Han-Serif-K", "SourceHanSerifK"}
+RECOGNIZABLE_FALLBACK_FONT_MARKERS = (
+    "Georgia",
+    "Palatino",
+    "PT-Serif",
+    "PTSerif",
+    "TsangerJinKai",
+    "YuMincho",
+    "Hiragino",
+    "SourceHan",
+    "Noto",
+    "Charter",
+    "Songti",
+    "DejaVu",
+    "Liberation",
+)
 
 
 def show_fonts(pdf: Path) -> None:
@@ -118,8 +134,9 @@ def verify_target(
     if missing_fonts:
         for mf in missing_fonts:
             print(f"  [FONT MISS] {name}: {mf} not found")
-        print(f"  [FONT MISS] To fix: bash scripts/ensure-fonts.sh")
-        print(f"  [FONT MISS] Or install fallback: brew install --cask font-source-han-serif-sc")
+        print(f"  [FONT MISS] Repo fix: git checkout -- assets/fonts (commercial TTFs are tracked)")
+        print(f"  [FONT MISS] Skill recovery (downloads to the user font dir, not the skill): bash scripts/ensure-fonts.sh")
+        print(f"  [FONT MISS] Fallback: brew install --cask font-source-han-serif-sc")
 
     html_text = src.read_text(encoding="utf-8")
     html_text = highlight_code_blocks(html_text)
@@ -141,8 +158,7 @@ def verify_target(
     embedded = _pdf_font_names(out)
     fallback_present = any(
         kw in font for font in embedded
-        for kw in ("Georgia", "Palatino", "TsangerJinKai", "YuMincho", "Hiragino",
-                   "SourceHan", "Noto", "Charter", "Songti", "DejaVu", "Liberation")
+        for kw in RECOGNIZABLE_FALLBACK_FONT_MARKERS
     )
 
     # Diagram templates are language-neutral and often rely on fallback stacks,
@@ -154,7 +170,8 @@ def verify_target(
         return issues
 
     is_en = name.endswith("-en")
-    expected = EN_PRIMARY_FONTS if is_en else CN_PRIMARY_FONTS
+    is_ko = name.endswith("-ko")
+    expected = EN_PRIMARY_FONTS if is_en else (KO_PRIMARY_FONTS if is_ko else CN_PRIMARY_FONTS)
     if not any(exp in font_name for exp in expected for font_name in embedded):
         primary = next(iter(expected))
         if not fallback_present:

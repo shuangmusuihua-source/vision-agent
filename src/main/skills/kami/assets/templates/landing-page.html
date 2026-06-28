@@ -3,7 +3,7 @@
      LANDING PAGE · 中文 · parchment design system
      Screen-first product landing page with interactive gallery
      Sections: Hero · Gallery · Features · Principles · Pricing · FAQ · Footer
-     No PDF output — designed for browser delivery via Vercel / Netlify / static host
+     No PDF output, designed for browser delivery via Vercel / Netlify / static host
      ================================================================== -->
 <html lang="zh-CN">
 <head>
@@ -22,6 +22,19 @@
 <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
 <link rel="icon" type="image/png" sizes="32x32" href="{{FAVICON_32}}">
 <link rel="canonical" href="{{CANONICAL_URL}}">
+<!-- Multilingual SEO. Remove any line whose locale is not shipped. {{SITE_ORIGIN}} is e.g. https://example.com -->
+<link rel="alternate" hreflang="en"        href="{{SITE_ORIGIN}}/">
+<link rel="alternate" hreflang="zh-CN"     href="{{SITE_ORIGIN}}/zh/">
+<link rel="alternate" hreflang="zh-Hant"   href="{{SITE_ORIGIN}}/tw/">
+<link rel="alternate" hreflang="ja"        href="{{SITE_ORIGIN}}/ja/">
+<link rel="alternate" hreflang="ko"        href="{{SITE_ORIGIN}}/ko/">
+<link rel="alternate" hreflang="x-default" href="{{SITE_ORIGIN}}/">
+<link rel="alternate" type="text/plain"    href="{{SITE_ORIGIN}}/llms.txt">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -132,7 +145,7 @@ a:hover { color: var(--brand-light); }
   font-family: var(--latin-ui);
   font-weight: 500;
   font-size: 15px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: 0.2px;
   padding: 13px 28px;
   border-radius: 999px;
@@ -156,7 +169,7 @@ a:hover { color: var(--brand-light); }
   font-family: var(--latin-ui);
   font-weight: 500;
   font-size: 15px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   color: var(--brand);
   background: transparent;
   padding: 13px 28px;
@@ -587,7 +600,7 @@ pre.code {
   font-family: var(--mono);
   font-size: 13.5px;
   line-height: 1.55;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   color: var(--near-black);
   overflow-x: auto;
   margin: 0;
@@ -613,7 +626,7 @@ pre.code .k { color: var(--brand); }
   font-size: 36px;
   line-height: 1;
   color: var(--near-black);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .metric-label {
   font-family: var(--latin-ui);
@@ -1004,14 +1017,14 @@ footer.foot {
     </div>
 
     <dl class="faq">
-      <!-- {{FAQ_PAIRS}} — repeat per question:
+      <!-- {{FAQ_PAIRS}}, repeat per question:
       <div class="faq-pair">
         <dt>问题？</dt>
         <dd>回答。</dd>
       </div>
       -->
     </dl>
-    <!-- {{FAQ_TAIL}} — 可选的收尾段落，例如：
+    <!-- {{FAQ_TAIL}}，可选的收尾段落，例如：
     <p class="faq-tail">更多问题？请访问<a href="/help">帮助页面</a>。</p>
     -->
   </section>
@@ -1025,7 +1038,7 @@ footer.foot {
     </div>
     <div class="colophon">
       <div class="links">
-        <!-- {{FOOTER_LINKS}} — 居中点分隔链接，例如：
+        <!-- {{FOOTER_LINKS}}，居中点分隔链接，例如：
         <a href="https://x.com/..." target="_blank" rel="noopener">Twitter</a> &middot;
         <a href="mailto:...">邮箱</a> &middot;
         <a href="/help">帮助</a> &middot;

@@ -32,6 +32,7 @@ async function getCommunityCatalog(): Promise<CommunitySkillCatalogItem[]> {
       tags: skill.tags,
       sourcePageUrl: skill.sourcePageUrl,
       repositoryUrl: skill.repositoryUrl,
+      icon: skill.icon,
       audits: skill.audits,
       installed: Boolean(installation),
       enabled: Boolean(installation) && enabled.includes(skill.id),

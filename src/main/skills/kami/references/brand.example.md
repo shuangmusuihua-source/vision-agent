@@ -2,7 +2,7 @@
 #
 # Kami treats this as the lowest-resolution context: a fallback when the current
 # request is ambiguous. The current document's needs always come first. Leave
-# fields blank when you don't have a strong preference — silence is fine.
+# fields blank when you don't have a strong preference. Silence is fine.
 #
 # To activate: cp references/brand.example.md ~/.config/kami/brand.md
 # Then edit the values below.
@@ -21,7 +21,7 @@ country: ""                 # e.g. "USA"
 # ─── Brand identity ───
 company: ""                 # Company or project name for headers and footers
 tagline: ""                 # One-liner used in one-pager / long-doc footer
-logo: ""                    # Absolute path to logo file, e.g. "~/Downloads/logo.svg"
+logo: ""                    # Optional fallback logo path (SVG/PNG/JPG), e.g. "~/Downloads/logo.svg". Used in one-pager/portfolio/slides covers only when a request names none.
 brand_color: ""             # Hex to override --brand, e.g. "#1B365D". Warm palette still applies.
 
 # ─── Document defaults ───

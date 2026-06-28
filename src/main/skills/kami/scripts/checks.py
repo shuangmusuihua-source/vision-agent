@@ -4,6 +4,7 @@ Splits out from build.py:
   - check_placeholders: scan filled HTML for unreplaced `{{...}}` tokens.
   - check_orphans:      scan rendered PDFs for short trailing lines (typographic orphans).
   - check_density:      scan rendered PDFs for pages with too much trailing whitespace.
+  - check_resume_balance: scan resume PDFs for exact two-page balance.
   - check_rhythm:       scan slides Python source for monotonous deck sequences.
 
 Density scanning uses a parchment-aware pixel sweep. The hot path is
@@ -233,6 +234,101 @@ def check_density(paths: list[str]) -> int:
     if missing:
         print(f"{missing} input(s) missing")
     return 1
+
+
+# ---------- resume balance check ----------
+
+def _resume_balance_issues(
+    fills: list[float],
+    page_count: int,
+    min_fill: float,
+    max_fill: float,
+    max_gap: float,
+) -> list[str]:
+    """Return human-readable resume balance failures for unit tests and CLI."""
+    issues: list[str] = []
+    if page_count != 2:
+        issues.append(f"{page_count} pages (expected 2)")
+
+    for index, fill in enumerate(fills[:2], start=1):
+        if fill < min_fill:
+            issues.append(f"p{index} fill {fill:.0%} below {min_fill:.0%}")
+        elif fill > max_fill:
+            issues.append(f"p{index} fill {fill:.0%} above {max_fill:.0%}")
+
+    if len(fills) >= 2:
+        gap = abs(fills[0] - fills[1])
+        if gap > max_gap:
+            issues.append(f"page fill gap {gap:.0%} above {max_gap:.0%}")
+
+    return issues
+
+
+def _resume_page_fills(path: Path, dpi: int) -> tuple[list[float], int] | None:
+    try:
+        fitz = require_pymupdf()
+    except MissingDepError as exc:
+        print(f"ERROR: {exc}")
+        return None
+
+    doc = fitz.open(str(path))
+    fills: list[float] = []
+    for page in doc:
+        pix = page.get_pixmap(dpi=dpi)
+        if pix.height == 0:
+            fills.append(0.0)
+            continue
+        last_content_y = _last_content_y(pix.samples, pix.width, pix.height, pix.stride, pix.n)
+        fills.append((last_content_y + 1) / pix.height)
+    page_count = len(doc)
+    doc.close()
+    return fills, page_count
+
+
+def check_resume_balance(paths: list[str]) -> int:
+    """Require resume PDFs to be exactly 2 pages with balanced content fill."""
+    if not paths:
+        print("ERROR: provide at least one filled resume PDF to scan")
+        return 2
+
+    cfg = load_checks_thresholds()["resume_balance"]
+    min_fill = float(cfg["min_fill_pct"])
+    max_fill = float(cfg["max_fill_pct"])
+    max_gap = float(cfg["max_gap_pct"])
+    dpi = int(cfg["dpi"])
+
+    failures = 0
+    missing = 0
+    scanned = 0
+    for raw in paths:
+        path = Path(raw)
+        if not path.exists():
+            print(f"ERROR: {raw}: not found")
+            missing += 1
+            continue
+
+        result = _resume_page_fills(path, dpi)
+        if result is None:
+            return 2
+
+        fills, page_count = result
+        scanned += 1
+        rel = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        fill_text = " / ".join(f"{fill:.0%}" for fill in fills)
+        issues = _resume_balance_issues(fills, page_count, min_fill, max_fill, max_gap)
+        if issues:
+            failures += 1
+            print(f"ERROR: {rel}: {fill_text} ({'; '.join(issues)})")
+        else:
+            gap = abs(fills[0] - fills[1])
+            print(f"OK: {rel}: 2 pages, fill {fill_text}, gap {gap:.0%}")
+
+    if scanned == 0:
+        print(f"ERROR: no PDFs scanned ({missing} missing)")
+        return 2
+    if missing:
+        print(f"{missing} input(s) missing")
+    return 0 if failures == 0 and missing == 0 else 1
 
 
 # ---------- rhythm check ----------

@@ -246,12 +246,23 @@
     letter-spacing: 1.5pt;
     text-transform: uppercase;
   }
+  /* Brand logo slot (optional, from brand profile; styles apply only once uncommented). */
+  .cover .brand-logo {
+    height: 72px;
+    width: auto;
+    max-width: 220px;
+    object-fit: contain;
+    margin-bottom: 24pt;
+  }
 </style>
 </head>
 <body>
 
 <!-- Cover -->
 <section class="slide cover">
+  <!-- Brand logo slot (optional, from the brand profile logo field). Leave commented when there is no logo; do not insert a broken image.
+       To use, uncomment and set src to an expanded local absolute path:
+  <img class="brand-logo" src="/absolute/path/to/logo.svg" alt=""> -->
   <h1>{{Title}}</h1>
   <div class="sub">{{Subtitle}}</div>
   <div class="meta">{{Author}} · {{Date}}</div>

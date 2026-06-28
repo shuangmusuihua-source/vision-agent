@@ -315,9 +315,15 @@
 }
 
 .skill-detail {
+  position: sticky;
+  top: 0;
+  align-self: start;
   min-width: 0;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   padding: 4px 0 0 40px;
   border-left: 1px solid var(--color-border);
+  scrollbar-width: thin;
 }
 
 .skill-detail-head {
@@ -396,9 +402,24 @@
   font-size: var(--font-size-sm);
 }
 
-.skill-audit-row svg,
-.skill-audit-row span:last-child {
+.skill-audit-row-passed svg,
+.skill-audit-row-passed span:last-child {
   color: var(--color-success);
+}
+
+.skill-audit-row-reviewed svg,
+.skill-audit-row-reviewed span:last-child {
+  color: var(--color-text-tertiary);
+}
+
+.skill-audit-row-warning svg,
+.skill-audit-row-warning span:last-child {
+  color: var(--color-warning);
+}
+
+.skill-audit-row-failed svg,
+.skill-audit-row-failed span:last-child {
+  color: var(--color-error);
 }
 
 .skill-detail-links {
@@ -528,6 +549,9 @@
   }
 
   .skill-detail {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
     padding: 32px 0 0;
     border-top: 1px solid var(--color-border);
     border-left: 0;

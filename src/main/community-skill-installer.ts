@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
+import { chmod, lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { load as parseYaml } from 'js-yaml'
 import type { CuratedCommunitySkill } from './skills/community-catalog'
@@ -20,11 +20,16 @@ interface CommunitySkillMetadata {
   updatedAt?: string
 }
 
-interface GitHubContentEntry {
-  name: string
-  type: 'file' | 'dir' | 'symlink' | 'submodule'
+interface GitHubTreeEntry {
+  path: string
+  mode: string
+  type: 'blob' | 'tree' | 'commit'
   size?: number
-  download_url?: string | null
+}
+
+interface GitHubTreePayload {
+  tree?: unknown
+  truncated?: boolean
 }
 
 export interface CommunitySkillInstallation {
@@ -121,44 +126,61 @@ async function downloadDirectory(
 
   assertSafeSegment(owner, 'repository owner')
   assertSafeSegment(repository, 'repository name')
+  assertSafeSegment(ref, 'repository ref')
 
-  const visit = async (repositoryPath: string, relativeSegments: string[]): Promise<void> => {
-    const endpoint = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/contents/${encodeRepositoryPath(repositoryPath)}`)
-    endpoint.searchParams.set('ref', ref)
-    const payload = await fetchJson(fetcher, endpoint.toString())
-    if (!Array.isArray(payload)) throw new Error('Skill 下载源不是目录')
+  const endpoint = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/git/trees/${encodeURIComponent(ref)}`)
+  endpoint.searchParams.set('recursive', '1')
+  const payload = await fetchJson(fetcher, endpoint.toString())
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Skill 下载源数据无效')
+  }
+  const treePayload = payload as GitHubTreePayload
+  if (treePayload.truncated) throw new Error('Skill 下载源文件树不完整')
+  if (!Array.isArray(treePayload.tree)) throw new Error('Skill 下载源文件树无效')
 
-    for (const rawEntry of payload) {
-      if (!rawEntry || typeof rawEntry !== 'object') throw new Error('Skill 下载源数据无效')
-      const entry = rawEntry as GitHubContentEntry
-      assertSafeSegment(entry.name, 'Skill file name')
-      const nextRelative = [...relativeSegments, entry.name]
-      const nextRepositoryPath = `${repositoryPath}/${entry.name}`
-
-      if (entry.type === 'dir') {
-        await visit(nextRepositoryPath, nextRelative)
-        continue
-      }
-      if (entry.type !== 'file' || !entry.download_url) {
-        throw new Error(`Skill 包含不支持的资源: ${entry.name}`)
-      }
-
-      fileCount += 1
-      if (fileCount > MAX_FILE_COUNT) throw new Error('Skill 文件数量超过安全限制')
-      if ((entry.size || 0) > MAX_FILE_SIZE) throw new Error(`Skill 文件过大: ${entry.name}`)
-
-      const content = await downloadFile(fetcher, entry.download_url)
-      if (content.byteLength > MAX_FILE_SIZE) throw new Error(`Skill 文件过大: ${entry.name}`)
-      totalSize += content.byteLength
-      if (totalSize > MAX_TOTAL_SIZE) throw new Error('Skill 总大小超过安全限制')
-
-      const destination = join(stagingDir, ...nextRelative)
-      await mkdir(dirname(destination), { recursive: true })
-      await writeFile(destination, content)
-    }
+  const entries = treePayload.tree as GitHubTreeEntry[]
+  if (!entries.every(entry => (
+    entry
+    && typeof entry === 'object'
+    && typeof entry.path === 'string'
+    && typeof entry.mode === 'string'
+    && typeof entry.type === 'string'
+  ))) {
+    throw new Error('Skill 下载源数据无效')
+  }
+  const sourcePrefix = `${sourcePath}/`
+  if (!entries.some(entry => entry.path === sourcePath && entry.type === 'tree')) {
+    throw new Error('Skill 下载源不是目录')
   }
 
-  await visit(sourcePath, [])
+  for (const entry of entries) {
+    if (!entry.path.startsWith(sourcePrefix)) continue
+
+    const relativePath = entry.path.slice(sourcePrefix.length)
+    const relativeSegments = relativePath.split('/')
+    for (const segment of relativeSegments) assertSafeSegment(segment, 'Skill file name')
+
+    if (entry.type === 'tree') continue
+    if (entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) {
+      throw new Error(`Skill 包含不支持的资源: ${relativePath}`)
+    }
+
+    fileCount += 1
+    if (fileCount > MAX_FILE_COUNT) throw new Error('Skill 文件数量超过安全限制')
+    if ((entry.size || 0) > MAX_FILE_SIZE) throw new Error(`Skill 文件过大: ${relativePath}`)
+
+    const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/${encodeURIComponent(ref)}/${encodeRepositoryPath(entry.path)}`
+    const content = await downloadFile(fetcher, rawUrl)
+    if (content.byteLength > MAX_FILE_SIZE) throw new Error(`Skill 文件过大: ${relativePath}`)
+    totalSize += content.byteLength
+    if (totalSize > MAX_TOTAL_SIZE) throw new Error('Skill 总大小超过安全限制')
+
+    const destination = join(stagingDir, ...relativeSegments)
+    await mkdir(dirname(destination), { recursive: true })
+    await writeFile(destination, content)
+    if (entry.mode === '100755') await chmod(destination, 0o755)
+  }
+
   if (!await pathExists(join(stagingDir, 'SKILL.md'))) {
     throw new Error('Skill 包缺少 SKILL.md')
   }

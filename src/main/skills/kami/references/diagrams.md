@@ -1,8 +1,8 @@
 # Diagrams
 
-kami's drawing capability. **14 diagram types** covering structural, process, and data chart scenarios. All wear kami's skin (parchment + ink-blue + warm grays). No second design system.
+kami's drawing capability. **17 diagram types** covering structural, process, data chart, and interaction scenarios. All wear kami's skin (parchment + ink-blue + warm grays). No second design system.
 
-Every diagram is a **self-contained HTML + inline SVG**. No Mermaid, no JS, no build step. Browse them as standalone pages, or copy the `<svg>...</svg>` block into a long-doc `<figure>` to embed.
+Every diagram is a **self-contained HTML + inline SVG**: no JS and no build step to use one. Fourteen are hand-drawn; `sequence`, `class`, and `er` are authored from Mermaid text and re-themed to the Kami palette by `scripts/mermaid_normalize.py` (see `references/mermaid.md`). Browse them as standalone pages, or copy the `<svg>...</svg>` block into a long-doc `<figure>` to embed.
 
 ---
 

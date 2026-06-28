@@ -2,8 +2,8 @@
 
 ## 设计原则
 
-1. **Skill 文件零修改** — 原封不动拷入 `src/main/skills/{id}/`，SKILL.md、模板、脚本、references 全部保留原始相对路径，SDK 自然发现
-2. **Manifest 驱动** — `skills-manifest.json` 声明内容版本和必需资源，不硬编码
+1. **只打包运行时内容** — 优先同步上游的发行目录，而不是整个仓库；保留 SKILL.md、模板、脚本和 references 的相对路径，排除 README、演示站点、仓库配置、重复压缩包和非运行时素材
+2. **Manifest 驱动** — `skills-manifest.json` 声明内容版本、固定上游提交、许可证和必需资源；sumi 适配必须保持最小且可追溯
 3. **SkillDefinition 统一接口** — `builtin.ts` 定义 id/name/description/icon/promptTemplate/outputMode
 4. **SkillOutputBridge 统一捕获** — main 进程拦截原始 SDK 流事件，无论 Write 工具还是 skill-output 代码块，归一为 `skill:output` IPC 事件
 5. **Renderer 统一消费** — Zustand store 存 skillOutput，MessageBubble 只看 store 不关心通道来源
@@ -12,13 +12,14 @@
 
 ## 新增内置 Skill 三步流程
 
-### Step 1: 拷入 skill 文件
+### Step 1: 同步 Skill 运行时文件
 
 ```bash
 git clone --depth 1 {repo-url} /tmp/{skill-id}
-cp -r /tmp/{skill-id} src/main/skills/{skill-id}
-rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
+rsync -a --delete /tmp/{skill-id}/{runtime-path}/ src/main/skills/{skill-id}/
 ```
+
+`runtime-path` 优先使用上游提供的插件或发行目录。若上游只提供仓库根目录，逐项选择运行所需资源，不复制 `.git`、`.github`、README、demo/showcase、发布压缩包或维护脚本。
 
 ### Step 2: 注册到 manifest
 
@@ -28,9 +29,17 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
 {
   "id": "{skill-id}",
   "hasResources": true,
-  "requiredPaths": ["SKILL.md"]
+  "requiredPaths": ["SKILL.md"],
+  "version": "{optional-semver}",
+  "source": {
+    "repositoryUrl": "https://github.com/{owner}/{repo}",
+    "ref": "{40-char-commit}",
+    "license": "MIT"
+  }
 }
 ```
+
+没有明确许可证或无法确认来源提交时，不要补猜测值，也不要直接覆盖当前已授权快照。
 
 ### Step 3: 添加 SkillDefinition
 
@@ -41,7 +50,7 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
   id: '{skill-id}',
   name: '{显示名}',
   description: '{中文描述}',
-  icon: '{Phosphor图标名}',
+  icon: '{Lucide图标名}',
   promptTemplate: `使用 {skill-id} skill 接下来... {activeFile}`,
   outputMode: 'write',  // 或 'skill-output'
 },
@@ -61,8 +70,13 @@ rm -rf src/main/skills/{skill-id}/.git   # 移除嵌套 .git
 | id | name | outputMode |
 |----|------|------------|
 | kami | Kami · 紙 | write |
-| guizang-ppt-skill | PPT · 歸藏 | write |
-| frontend-slides | Slides · 前端 | write |
+| guizang-ppt-skill | guizang-ppt-skill | write |
+| frontend-slides | frontend-slides | write |
+| huashu-design | 花叔设计 | write |
+| system-cleanup | 系统清理 | default |
+| organize-desktop | 整理桌面 | default |
+| organize-folder | 整理文件夹 | default |
+| perf-optimize | 性能优化 | default |
 
 ---
 
@@ -93,7 +107,7 @@ SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──
 - **幂等**: 按每个 Skill 的内容指纹和已安装文件清单判断；内容变化或资源缺失时原子替换
 - **完整性**: `pack` / `dist` 完成后比较源目录与 `.app` 中的全部 Skill 文件，缺失即让发布命令失败
 - **发现**: SDK 保持原会话存储配置，使用 `settingSources: ['project']` 从工作区轻量链接发现 Skill；Ask sumi 直接从应用数据目录发现
-- **升级**: 修改内置 Skill 内容后会自动生成新指纹，无需手工维护版本号
+- **升级**: 修改内置 Skill 内容后会自动生成新指纹；第三方 Skill 同时更新 manifest 中的固定提交和可用版本号，应用仍通过 sumi 发版统一升级
 
 ### 2. SkillOutputBridge — `skill-output-bridge.ts`
 

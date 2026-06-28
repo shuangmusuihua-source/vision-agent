@@ -22,7 +22,7 @@ export interface ModelProfile {
 
 export interface CommunitySkillAudit {
   name: string
-  status: 'passed' | 'reviewed'
+  status: 'passed' | 'reviewed' | 'warning' | 'failed'
 }
 
 export interface BuiltinSkillCatalogItem {
@@ -43,6 +43,7 @@ export interface CommunitySkillCatalogItem {
   tags: string[]
   sourcePageUrl: string
   repositoryUrl: string
+  icon: string
   audits: CommunitySkillAudit[]
   installed: boolean
   enabled: boolean

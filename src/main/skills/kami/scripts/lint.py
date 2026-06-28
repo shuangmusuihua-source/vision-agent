@@ -8,10 +8,11 @@ Splits out from build.py:
 
 Each `Finding` is anchored to a file path + line number so editors can jump
 straight to the violation. Rules encode real WeasyPrint pitfalls (rgba on
-background, thin border with border-radius, etc.) — not style preferences.
+background, thin border with border-radius, etc.), not style preferences.
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,9 +24,13 @@ from shared import (
     ROOT,
     SCREEN_TEMPLATES,
     TEMPLATES,
-    load_cross_template_allowlist,
+    TOKENS_FILE,
 )
 from tokens import CSS_VAR, ROOT_BLOCK
+
+# Font-stack vars legitimately differ between a base template and its locale
+# variants (-en, -ko); every other :root var must match across the pair.
+CROSS_TEMPLATE_ALLOWED_VARS = {"--serif", "--sans", "--mono", "--latin-ui"}
 
 RGBA_BG_DIRECT = re.compile(r"background(?:-color)?\s*:\s*[^;]*rgba\s*\(", re.IGNORECASE)
 RGBA_VAR_DEF = re.compile(r"--([\w-]+)\s*:\s*[^;]*rgba\s*\(", re.IGNORECASE)
@@ -42,6 +47,18 @@ THIN_CLOSED_BORDER = re.compile(
 )
 BORDER_RADIUS_PROP = re.compile(r"border-radius\s*:", re.IGNORECASE)
 CSS_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+SVG_BLOCK_RE = re.compile(r"<svg\b.*?</svg>", re.DOTALL | re.IGNORECASE)
+
+# WeasyPrint-unsafe artifacts of un-normalized beautiful-mermaid SVG. These must
+# never reach a PDF-bound template/diagram: WeasyPrint does not resolve
+# color-mix(), render <foreignObject>, or fetch a runtime web font. The author
+# must pipe Mermaid output through scripts/mermaid_normalize.py first. Screen-only
+# landing pages are exempt (color-mix in CSS is fine in a real browser).
+MERMAID_UNSAFE = {
+    "mermaid-color-mix": re.compile(r"color-mix\s*\(", re.IGNORECASE),
+    "mermaid-foreignobject": re.compile(r"<foreignObject\b", re.IGNORECASE),
+    "mermaid-webfont-import": re.compile(r"fonts\.googleapis\.com", re.IGNORECASE),
+}
 
 
 @dataclass
@@ -77,6 +94,9 @@ def scan_file(path: Path) -> list[Finding]:
             rgba_vars.add(m.group(1))
 
     is_en = path.name.endswith("-en.html")
+    # Screen-only templates (landing pages) never go through WeasyPrint, so the
+    # Mermaid-unsafe-SVG rule does not apply to them.
+    is_screen = path.name in set(SCREEN_TEMPLATES.values())
 
     # Pass 2: per-line rule checks
     is_python = path.suffix == ".py"
@@ -129,6 +149,12 @@ def scan_file(path: Path) -> list[Finding]:
             if h in COOL_GRAY_BLOCKLIST:
                 findings.append(Finding(path, i, "cool-gray",
                                         f"{h} is a cool / neutral gray, use warm undertone"))
+
+        if not is_screen and not is_python:
+            for rule, pattern in MERMAID_UNSAFE.items():
+                if pattern.search(raw):
+                    findings.append(Finding(path, i, rule,
+                        "un-normalized Mermaid SVG (run scripts/mermaid_normalize.py before embedding)"))
 
     # Pass 3: thin-border-radius block scan (pitfall #2 double-ring).
     # For each thin closed border line, scan backward to the block open and
@@ -194,26 +220,110 @@ def check_all(verbose: bool) -> int:
     return 1
 
 
+# ---------- off-palette color guard ----------
+#
+# design.md core invariant: a single chromatic accent (ink-blue) plus warm
+# neutrals, zero cool tones. The salmon-border regression slipped past the
+# token-drift guard because it was a hardcoded hex inside a component rule, not
+# a :root token. This guard mechanizes the invariant: any hex literal in an
+# editorial template that is neither a registered token value nor a cool-gray
+# (those have their own rule) is an off-palette color. The single sanctioned
+# semantic exception (the changelog breaking-change badge) is registered as the
+# --breaking-* tokens, so it lands in `allowed` and passes.
+#
+# Scope is deliberately narrow: editorial TEMPLATES/*.html only. Diagrams use
+# warm-gray chart ramps that are intentionally not tokens, and inline <svg>
+# charts carry their own fills -- both are skipped (diagrams by directory, svg
+# by block). :root blocks define the tokens themselves, so they are skipped too.
+
+
+def _blank_block(text: str, regex: re.Pattern[str]) -> str:
+    """Replace each match with same-length whitespace (newlines preserved) so
+    line numbers stay accurate after a block is masked out."""
+    def repl(m: re.Match[str]) -> str:
+        return "".join(ch if ch == "\n" else " " for ch in m.group(0))
+    return regex.sub(repl, text)
+
+
+def _load_token_values() -> set[str]:
+    """Return the set of canonical token hex values (lowercased)."""
+    if not TOKENS_FILE.exists():
+        return set()
+    try:
+        data = json.loads(TOKENS_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return set()
+    return {v.lower() for v in data.values() if isinstance(v, str) and v.startswith("#")}
+
+
+def _off_palette_findings(path: Path, allowed: set[str]) -> list[Finding]:
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    text = _strip_css_block_comments(raw)
+    text = _blank_block(text, ROOT_BLOCK)
+    text = _blank_block(text, SVG_BLOCK_RE)
+    findings: list[Finding] = []
+    for i, line in enumerate(text.splitlines(), start=1):
+        for m in HEX_ANY.finditer(line):
+            h = m.group(0).lower()
+            if h in allowed:
+                continue
+            if h in COOL_GRAY_BLOCKLIST:
+                continue  # reported by the cool-gray rule in scan_file
+            findings.append(Finding(path, i, "off-palette",
+                                    f"{h} is not a registered token; single-accent palette violated"))
+    return findings
+
+
+def check_off_palette(verbose: bool = False) -> int:
+    allowed = _load_token_values()
+    targets = sorted(TEMPLATES.glob("*.html"))
+    findings: list[Finding] = []
+    for p in targets:
+        file_findings = _off_palette_findings(p, allowed)
+        findings.extend(file_findings)
+        if verbose:
+            print(f"scanned {p.relative_to(ROOT)}: {len(file_findings)} off-palette finding(s)")
+
+    if not findings:
+        print(f"OK: no off-palette colors across {len(targets)} template(s)")
+        return 0
+
+    print(f"\n[off-palette] {len(findings)}")
+    for f in findings:
+        print(f"  {f.file.relative_to(ROOT)}:{f.line}  {f.excerpt}")
+    return 1
+
+
 # ---------- cross-template consistency ----------
 #
 # The project intentionally ships CN/EN templates as forked single-file HTML
 # (no shared partials). The price of that decision is drift: a maintainer
 # updating one side of a pair can silently leave the other behind. This check
-# pairs each `foo.html` with its `foo-en.html`, parses the `:root { ... }`
-# block of both, and flags variables that differ. Font-stack variables
-# (`--serif`, `--sans`, `--mono`, `--latin-ui`) are allowlisted because CN/EN
-# deliberately use different fonts.
+# pairs each base template (e.g. `foo.html`) with every recognized locale
+# variant (`foo-en.html`, `foo-ko.html`), parses the `:root { ... }` block of
+# each, and flags variables that differ. Font-stack variables (`--serif`,
+# `--sans`, `--mono`, `--latin-ui`) are allowlisted because each locale
+# deliberately uses different fonts.
+
+_VARIANT_SUFFIXES: tuple[str, ...] = ("-en", "-ko")
+
 
 def _pair_names() -> list[tuple[str, str]]:
-    """Return [(cn_name, en_name), ...] for every CN template that has an -en sibling."""
+    """Return [(base_name, variant_name), ...] for every base template that has
+    one of the recognized locale-variant siblings (`-en`, `-ko`).
+
+    A base template is any registered name that does not itself end in a
+    recognized variant suffix.
+    """
     pairs: list[tuple[str, str]] = []
     seen = set(HTML_TEMPLATES) | set(SCREEN_TEMPLATES)
     for name in sorted(seen):
-        if name.endswith("-en"):
+        if any(name.endswith(s) for s in _VARIANT_SUFFIXES):
             continue
-        en_name = f"{name}-en"
-        if en_name in seen:
-            pairs.append((name, en_name))
+        for suffix in _VARIANT_SUFFIXES:
+            variant = f"{name}{suffix}"
+            if variant in seen:
+                pairs.append((name, variant))
     return pairs
 
 
@@ -240,41 +350,36 @@ def _extract_root_vars(html_path: Path) -> dict[str, str]:
 
 
 def check_cross_template_consistency(verbose: bool = False) -> int:
-    allowlist = load_cross_template_allowlist()
-    always_allowed = set(allowlist.get("always_allowed", []))
-    per_pair = allowlist.get("per_pair_allowed", {}) or {}
-
     pairs = _pair_names()
-    drift: list[tuple[str, str, str, str]] = []  # (pair, var, cn_value, en_value)
+    drift: list[tuple[str, str, str, str]] = []  # (pair, var, base_value, variant_value)
 
-    for cn_name, en_name in pairs:
+    for base_name, variant_name in pairs:
         try:
-            cn_path, _ = _source_for(cn_name)
-            en_path, _ = _source_for(en_name)
+            base_path, _ = _source_for(base_name)
+            variant_path, _ = _source_for(variant_name)
         except KeyError:
             continue
-        if not cn_path.exists() or not en_path.exists():
+        if not base_path.exists() or not variant_path.exists():
             continue
 
-        cn_vars = _extract_root_vars(cn_path)
-        en_vars = _extract_root_vars(en_path)
-        allowed_for_pair = always_allowed | set(per_pair.get(cn_name, []) or [])
+        base_vars = _extract_root_vars(base_path)
+        variant_vars = _extract_root_vars(variant_path)
 
-        shared_keys = set(cn_vars) & set(en_vars)
+        shared_keys = set(base_vars) & set(variant_vars)
         for key in sorted(shared_keys):
-            if key in allowed_for_pair:
+            if key in CROSS_TEMPLATE_ALLOWED_VARS:
                 continue
-            if cn_vars[key].lower() != en_vars[key].lower():
-                drift.append((cn_name, key, cn_vars[key], en_vars[key]))
+            if base_vars[key].lower() != variant_vars[key].lower():
+                drift.append((base_name, key, base_vars[key], variant_vars[key]))
 
         if verbose:
-            print(f"  pair {cn_name}/{en_name}: checked {len(shared_keys)} shared vars")
+            print(f"  pair {base_name}/{variant_name}: checked {len(shared_keys)} shared vars")
 
     if not drift:
-        print(f"OK: cross-template :root vars in sync across {len(pairs)} CN/EN pair(s)")
+        print(f"OK: cross-template :root vars in sync across {len(pairs)} base-variant pair(s)")
         return 0
 
     print(f"\n[cross-template-drift] {len(drift)}")
-    for pair, var, cn_val, en_val in drift:
-        print(f"  {pair}: {var} CN={cn_val} EN={en_val}")
+    for pair, var, base_val, variant_val in drift:
+        print(f"  {pair}: {var} base={base_val} variant={variant_val}")
     return 1

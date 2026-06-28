@@ -61,11 +61,18 @@ font-family: "TsangerJinKai02", "Source Han Serif SC",
 font-family: "YuMincho", "Yu Mincho", "Hiragino Mincho ProN",
              "Noto Serif CJK JP", "Source Han Serif JP",
              "TsangerJinKai02", Georgia, serif;
+
+/* Korean */
+font-family: "Source Han Serif K", "Source Han Serif KR",
+             "Noto Serif KR", "Apple SD Gothic Neo", AppleMyungjo,
+             Charter, Georgia, serif;
 ```
 
 **Font fallback affects page count**. Any font swap requires re-running the page-count check. If it overflows: lower `font-size` first, then tighten margins, then cut content.
 
-**Claude Desktop skill ZIPs do not bundle large Chinese font files**: `TsangerJinKai02-W04.ttf` and `TsangerJinKai02-W05.ttf` are close to 19MB each and can make Claude.ai / Desktop skill upload or execution time out. Release ZIPs must be generated with `scripts/package-skill.sh`, which excludes both TTF files. Templates still keep local-first and jsDelivr fallback `@font-face` paths.
+**Claude Desktop skill ZIPs do not bundle large CJK font files**: `TsangerJinKai02-W04.ttf`, `TsangerJinKai02-W05.ttf`, `SourceHanSerifKR-Regular.otf`, and `SourceHanSerifKR-Medium.otf` can make Claude.ai / Desktop skill upload or execution time out. The ZIP you upload must be the `scripts/package-skill.sh` output under the 6MB package ceiling, never a hand-zipped checkout. `package-skill.sh` excludes those large font files. Templates still keep local-first and jsDelivr fallback `@font-face` paths.
+
+When Chinese or Korean fonts are missing (the skill case), `scripts/ensure-fonts.sh` downloads them to the XDG user font dir (`${XDG_DATA_HOME:-~/.local/share}/fonts/kami`, override with `KAMI_FONT_DIR`), **not** into the skill's `assets/fonts`. fontconfig scans that dir by default on macOS and Linux, so WeasyPrint resolves `TsangerJinKai02` and `Source Han Serif K` from there while the installed skill stays small; online renders still use the jsDelivr `@font-face` URL.
 
 **Standalone HTML export** (sending a filled HTML file to someone else): this is not guaranteed to work outside the project tree. If the recipient cannot set up the font environment, use the PDF output instead.
 
@@ -213,6 +220,10 @@ English stack on PowerPoint:
 8. **Quote**: parchment, minimal, centered serif quote + `- Source`
 9. **Closing**: parchment, centered "Thank you / Q&A / Contact"
 
+### Template-bound PPTX inventory
+
+Use this only when the user provides a real PPTX or brand template and explicitly asks to preserve its layout system. First inspect the template visually, identify the few reusable layout families, and map each planned section to one existing slide family. Then edit content while preserving the template's shape structure. Do not run this inventory step for Kami's default WeasyPrint or Marp paths; those already have fixed template contracts.
+
 ### Script skeleton
 
 Full working example in `assets/templates/slides-en.py`. Key bits:
@@ -272,6 +283,76 @@ One rule covers most adjustments: **macro spacing x1.6, micro details x0.5** (le
 
 ---
 
+## Part 2.5 · Markdown -> Marp (variant deck path)
+
+Marp is the third rendering path, used only when the user explicitly asks for Marp / markdown slides / a deck that lives in a `.md` file. The repo does **not** declare `marp-cli` as a dependency; install it on the user's machine.
+
+### Install
+
+Use the `npx @marp-team/marp-cli@latest ...` form below for zero-install. For repeat use, install via `npm i -g @marp-team/marp-cli` or `brew install marp-cli` (see [marp-cli docs](https://github.com/marp-team/marp-cli)). Kami's build pipeline (`build.py` / `package-skill.sh`) does not call `marp`.
+
+### Files
+
+| Asset | Path |
+|---|---|
+| CN theme | `assets/templates/marp/slides-marp.css` (theme name: `kami`) |
+| EN theme | `assets/templates/marp/slides-marp-en.css` (theme name: `kami-en`) |
+| CN sample deck | `assets/templates/marp/slides-marp.md` |
+| EN sample deck | `assets/templates/marp/slides-marp-en.md` |
+
+### Render commands
+
+Run from the repo root so input paths resolve. **Input file must come before `--theme-set`**; `--theme-set` is a yargs array option and will swallow any positional arg that follows it.
+
+**Font path caveat**: Marp inlines the theme CSS into the output HTML verbatim. The `@font-face` `url("../../fonts/...")` paths in the theme therefore resolve relative to the *output file location*, not the theme CSS location. When the output sits inside the repo (e.g. `-o assets/examples/kami.html`), the relative path matches and local Tsanger / Charter loads. When the output sits elsewhere (e.g. `-o /tmp/kami.html`), the relative path misses and the browser falls back to the jsDelivr CDN URL declared alongside each local one. This needs network. This differs from WeasyPrint, where CSS paths resolve relative to the input HTML.
+
+```bash
+# HTML preview (no Chromium needed; zero external download)
+npx @marp-team/marp-cli@latest \
+  assets/templates/marp/slides-marp.md \
+  --theme-set assets/templates/marp \
+  -o /tmp/kami-cn.html
+
+# PDF (needs Chromium; see "Browser strategy" below)
+npx @marp-team/marp-cli@latest \
+  assets/templates/marp/slides-marp.md \
+  --theme-set assets/templates/marp \
+  --pdf --allow-local-files \
+  -o /tmp/kami-cn.pdf
+
+# PPTX (Chromium-rendered; not a python-pptx editable deck)
+npx @marp-team/marp-cli@latest \
+  assets/templates/marp/slides-marp.md \
+  --theme-set assets/templates/marp \
+  --pptx --allow-local-files \
+  -o /tmp/kami-cn.pptx
+```
+
+`--theme-set` points at the directory; Marp picks up every `.css` in there. `--allow-local-files` is required for PDF / PPTX so the renderer may read the local font files referenced by `@font-face` URLs.
+
+### Browser strategy (only for PDF / PPTX)
+
+HTML output is pure Node and needs no browser. PDF / PPTX rendering goes through a headless browser. Three options, lightest first:
+
+| Strategy | Setup | Cost |
+|---|---|---|
+| **HTML only, view in browser** | Use the HTML command above; open in any browser; export to PDF from the browser's print dialog if needed | 0 MB |
+| **Reuse a local Chromium-family browser** | Set `PUPPETEER_EXECUTABLE_PATH` to the absolute path of an installed Chrome, Edge, Brave, Arc, or Chromium binary. Marp also honours `--browser chrome` / `edge` / `firefox` with `--browser-path`. | 0 MB (assumes the browser is already installed) |
+| **Let Marp download its own Chromium** | First run of `--pdf` / `--pptx` triggers Puppeteer to fetch a pinned Chromium build (~150 MB to `~/.cache/puppeteer/`) | ~150 MB, one-time |
+
+For light verification of the theme and sample deck, prefer the HTML path.
+
+### Marp gotchas
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Two page numbers per slide | Deck pinned a `.page-num` element and also set `paginate: true` | Pick one; the theme injects pagination via `section::after` |
+| `position: absolute` does not pin `.co` | A child `<div>` overrode `position: relative` on the section | Marp themes already set `section { position: relative }`; do not override it per slide |
+| PDF / PPTX export hangs on first run | Marp is downloading Chromium | Network-restricted environments need `PUPPETEER_EXECUTABLE_PATH` to a pre-installed Chrome |
+| Markdown inside `<div class="c2">` renders as a literal HTML block | Missing blank line between the `<div>` and the Markdown body | Always leave a blank line above and below Markdown inside an HTML wrapper |
+
+---
+
 ## Part 3 · Verify & Debug
 
 ### The three-step loop (mandatory after every change)
@@ -308,18 +389,14 @@ python3 scripts/build.py --check       # scan for CSS rule violations
 python3 scripts/build.py --check-density       # warn on pages with >25% trailing whitespace
 ```
 
-### Layout stabilizer (HTML templates)
+### Page overflow (constrained templates)
 
-When a constrained template is near page overflow (one-pager, letter, resume, and English variants), run the stabilizer first, then verify:
+When a constrained template (one-pager, letter, resume, and their variants) runs over its page ceiling, fix it by editing content, not by shrinking type: cut or merge body copy until it fits, since tiny font / line-height / margin changes break the layout (see High-Risk Pitfalls). Then verify:
 
 ```bash
-python3 scripts/stabilize.py all --out-dir dist/stabilized --report
-python3 scripts/stabilize.py one-pager letter resume one-pager-en letter-en resume-en --strict --report
 python3 scripts/build.py --check
 python3 scripts/build.py --verify
 ```
-
-`scripts/stabilize.py` is intentionally independent from `scripts/build.py`. Thresholds and solver behavior are controlled by `references/stabilizer_profiles.json`.
 
 ### Hi-res visual inspection
 
@@ -342,6 +419,23 @@ A successful render is not enough. Scan these before delivery:
 | PDF readiness | Page count fits, placeholders are replaced, visual inspection shows no overflow, overlap, or broken page breaks |
 
 If any row fails, fix it before delivery.
+
+### Static product site pre-ship review
+
+Run this when the deliverable is a landing page, product site, or hosted showcase rather than a PDF:
+
+| Dimension | Pass standard |
+|---|---|
+| Runtime preview | Serve locally and inspect desktop plus 375px mobile. The first viewport shows the product category, real asset, CTA, and a hint of the next section. |
+| Generated output | If pages come from `template + i18n + content`, run the generator's check mode. It must fail on missing keys and committed output drift. |
+| Public metadata | Canonical, hreflang, `og:locale`, social image, JSON-LD, robots, sitemap, `llms.txt`, and `llms-full.txt` all reflect the shipped locale set. |
+| Copy sync | Product positioning, price, version, install path, support link, FAQ, `llms.txt`, and `llms-full.txt` carry the same factual claims in every locale. |
+| Asset reality | Screenshots are real product surfaces and every image path resolves from the repo or a public URL. No `/Users`, `file://`, or sibling-repo relative paths. |
+| Screenshot fit | Hero, gallery, feature, and social-image slots use stable ratios. UI text, numbers, prompts, and controls are not cropped away for aesthetics. |
+| Motion fallback | Gallery rotation, entrance animation, or custom transitions respect `prefers-reduced-motion`; a still page remains readable with motion disabled. |
+| Link surface | Primary CTA, download, releases, docs, help, social links, and internal locale links resolve. Any named release or download artifact exists. |
+
+If the site has only one or two locales, hand-maintained static pages are acceptable. For three or more locales, prefer a generator with a drift check over repeated manual edits.
 
 ---
 
@@ -423,6 +517,8 @@ For resume, one-pager, and other length-capped docs.
 
 Apply dense mode only when the 4-project layout already overflows. Do not use it as a default; the visual rhythm is noticeably tighter.
 
+Resume templates use section-title bottom rules and borderless project rows. Do not reintroduce project `border-top` as a density aid; it creates double rules below headings and orphan rules at page breaks.
+
 ### 4. (P1) Font fallback causes page count inconsistency
 
 **Symptom**: 2 pages locally, 4 pages in CI / on server.
@@ -432,7 +528,10 @@ Apply dense mode only when the 4-project layout already overflows. Do not use it
 **Fix**:
 
 ```bash
-# Preferred: multi-source download script (retries, size validation)
+# Preferred: multi-source download script (retries, size validation).
+# Lands fonts in ${XDG_DATA_HOME:-~/.local/share}/fonts/kami (fontconfig-scanned,
+# outside the skill dir), then runs fc-cache. Inside a repo checkout it is a
+# no-op because the committed TTFs already satisfy the templates' relative path.
 bash scripts/ensure-fonts.sh
 
 # Or put .ttf alongside the HTML
@@ -690,7 +789,7 @@ Quick check before building any demo: `rg 'src="(\.\./|/Users/|file://)' assets/
 
 **Root cause**: `align-items: baseline` aligns each metric to the **first line** of its label. When labels have different line counts, the visible heights differ but the numbers all sit at the same baseline (= top), making the row look uneven.
 
-**Fix**: Stack vertically (`flex-direction: column`). All numbers sit on the same top edge, all labels start at the same y below the numbers, and label wrap only extends each column's bottom — which is invisible on a slide / page.
+**Fix**: Stack vertically (`flex-direction: column`). All numbers sit on the same top edge, all labels start at the same y below the numbers, and label wrap only extends each column's bottom, which is invisible on a slide / page.
 
 ```css
 /* avoid: breaks visually when one label wraps */

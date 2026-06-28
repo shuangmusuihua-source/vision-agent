@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  AlertTriangle,
   Blocks,
   Check,
   CheckCircle2,
+  CircleX,
+  ClipboardList,
   Download,
   ExternalLink,
+  FileSpreadsheet,
   FileText,
   FolderOpen,
   Gauge,
+  Lightbulb,
   Loader2,
   Monitor,
   Palette,
   Presentation,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   WandSparkles,
@@ -32,6 +38,23 @@ const builtinSkillIcons = {
   'organize-desktop': Monitor,
   'organize-folder': FolderOpen,
   'perf-optimize': Gauge,
+}
+
+const communitySkillIcons: Record<string, typeof Blocks> = {
+  Palette,
+  Lightbulb,
+  Search,
+  ClipboardList,
+  Presentation,
+  FileText,
+  FileSpreadsheet,
+}
+
+const auditStatusLabels = {
+  passed: '通过',
+  reviewed: '已审核',
+  warning: '需复核',
+  failed: '未通过',
 }
 
 function SkillLibrary(): React.ReactElement {
@@ -81,9 +104,20 @@ function SkillLibrary(): React.ReactElement {
     const slots = [...Object.values(state.slots), ...Object.values(state.sessionSlots)]
     return slots.some(slot => slot.isStreaming && slot.activeSkillId === selectedId)
   })
+  const SelectedSkillIcon = selectedSkill ? communitySkillIcons[selectedSkill.icon] || Blocks : Blocks
 
   const install = useCallback(async () => {
     if (!selectedSkill || pendingAction) return
+    const failedAudits = selectedSkill.audits.filter(audit => audit.status === 'failed')
+    if (failedAudits.length > 0) {
+      const confirmed = await modal.confirm({
+        title: '安全审计未全部通过',
+        message: `${failedAudits.map(audit => audit.name).join('、')} 将该 Skill 标记为未通过。请先查看技能详情和源码，确认风险后再安装。`,
+        variant: 'danger',
+        confirmLabel: '仍然安装',
+      })
+      if (!confirmed) return
+    }
     setPendingAction('install')
     setError(null)
     try {
@@ -95,7 +129,7 @@ function SkillLibrary(): React.ReactElement {
     } finally {
       setPendingAction(null)
     }
-  }, [loadCatalog, pendingAction, selectedSkill])
+  }, [loadCatalog, modal, pendingAction, selectedSkill])
 
   const uninstall = useCallback(async () => {
     if (!selectedSkill || pendingAction) return
@@ -235,31 +269,34 @@ function SkillLibrary(): React.ReactElement {
           </div>
 
           <div className="skill-card-grid">
-            {skills.map(skill => (
-              <button
-                key={skill.id}
-                className={`skill-card${skill.id === selectedId ? ' skill-card-selected' : ''}`}
-                onClick={() => setSelectedId(skill.id)}
-                aria-pressed={skill.id === selectedId}
-              >
-                <div className="skill-card-topline">
-                  <span className="skill-card-icon" aria-hidden="true"><Palette size={19} /></span>
-                  <span className={`skill-card-status${skill.updateAvailable ? ' skill-card-status-update' : skill.installed ? ' skill-card-status-installed' : ''}`}>
-                    {skill.updateAvailable
-                      ? <><RefreshCw size={12} /> 可更新</>
-                      : skill.installed
-                        ? <><Check size={12} /> 已安装</>
-                        : '可安装'}
-                  </span>
-                </div>
-                <div className="skill-card-copy">
-                  <span className="skill-card-category">{skill.category}</span>
-                  <h3>{skill.name}</h3>
-                  <p>{skill.summary}</p>
-                </div>
-                <span className="skill-card-author">来自 {skill.author}</span>
-              </button>
-            ))}
+            {skills.map(skill => {
+              const Icon = communitySkillIcons[skill.icon] || Blocks
+              return (
+                <button
+                  key={skill.id}
+                  className={`skill-card${skill.id === selectedId ? ' skill-card-selected' : ''}`}
+                  onClick={() => setSelectedId(skill.id)}
+                  aria-pressed={skill.id === selectedId}
+                >
+                  <div className="skill-card-topline">
+                    <span className="skill-card-icon" aria-hidden="true"><Icon size={19} /></span>
+                    <span className={`skill-card-status${skill.updateAvailable ? ' skill-card-status-update' : skill.installed ? ' skill-card-status-installed' : ''}`}>
+                      {skill.updateAvailable
+                        ? <><RefreshCw size={12} /> 可更新</>
+                        : skill.installed
+                          ? <><Check size={12} /> 已安装</>
+                          : '可安装'}
+                    </span>
+                  </div>
+                  <div className="skill-card-copy">
+                    <span className="skill-card-category">{skill.category}</span>
+                    <h3>{skill.name}</h3>
+                    <p>{skill.summary}</p>
+                  </div>
+                  <span className="skill-card-author">来自 {skill.author}</span>
+                </button>
+              )
+            })}
           </div>
         </section>
 
@@ -267,7 +304,7 @@ function SkillLibrary(): React.ReactElement {
           {selectedSkill ? (
             <>
               <div className="skill-detail-head">
-                <div className="skill-detail-icon" aria-hidden="true"><Palette size={22} /></div>
+                <div className="skill-detail-icon" aria-hidden="true"><SelectedSkillIcon size={22} /></div>
                 <div>
                   <span>{selectedSkill.category}</span>
                   <h2>{selectedSkill.name}</h2>
@@ -284,13 +321,20 @@ function SkillLibrary(): React.ReactElement {
               <div className="skill-detail-section">
                 <h3><ShieldCheck size={15} /> 安全检查</h3>
                 <div className="skill-audit-list">
-                  {selectedSkill.audits.map(audit => (
-                    <div key={audit.name} className="skill-audit-row">
-                      <CheckCircle2 size={14} />
-                      <span>{audit.name}</span>
-                      <span>{audit.status === 'passed' ? '通过' : '已审核'}</span>
-                    </div>
-                  ))}
+                  {selectedSkill.audits.map(audit => {
+                    const AuditIcon = audit.status === 'failed'
+                      ? CircleX
+                      : audit.status === 'warning'
+                        ? AlertTriangle
+                        : CheckCircle2
+                    return (
+                      <div key={audit.name} className={`skill-audit-row skill-audit-row-${audit.status}`}>
+                        <AuditIcon size={14} />
+                        <span>{audit.name}</span>
+                        <span>{auditStatusLabels[audit.status]}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 

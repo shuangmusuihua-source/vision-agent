@@ -46,6 +46,9 @@ def sync_check(verbose: bool = False) -> int:
     targets: list[Path] = list(TEMPLATES.glob("*.html"))
     if DIAGRAMS.exists():
         targets.extend(DIAGRAMS.glob("*.html"))
+    marp_dir = TEMPLATES / "marp"
+    if marp_dir.exists():
+        targets.extend(marp_dir.glob("*.css"))
     py_targets: list[Path] = list(TEMPLATES.glob("*.py"))
 
     drift: list[tuple[str, str, str, str]] = []  # (file, token, expected, actual)

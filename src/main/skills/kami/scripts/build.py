@@ -5,7 +5,7 @@ Thin CLI shell. Implementation lives in:
   - lint.py    (scan_file, check_all, check_cross_template_consistency)
   - tokens.py  (sync_check)
   - verify.py  (verify_target, verify_all, show_fonts, font checks)
-  - checks.py  (check_placeholders, check_orphans, check_density, check_rhythm)
+  - checks.py  (check_placeholders, check_orphans, check_density, check_resume_balance, check_rhythm)
 
 Usage:
     python3 scripts/build.py                      # build all examples (HTML + diagrams + PPTX)
@@ -21,6 +21,7 @@ Usage:
     python3 scripts/build.py --check-orphans path/to/doc.pdf
     python3 scripts/build.py --check-density       # warn on pages with >25% trailing whitespace
     python3 scripts/build.py --check-density path/to/doc.pdf
+    python3 scripts/build.py --check-resume-balance path/to/resume.pdf
     python3 scripts/build.py --check-rhythm       # warn on monotonous slide sequences
     python3 scripts/build.py --check-rhythm slides slides-en
 """
@@ -44,6 +45,7 @@ from shared import (
     EXAMPLES,
     TEMPLATES,
     build_targets,
+    diagram_targets,
     screen_targets,
 )
 
@@ -54,17 +56,21 @@ from checks import (  # noqa: F401  re-exported for test_build.py
     _BG_R,
     _last_content_y,
     _parse_slide_sequence,
+    _resume_balance_issues,
     _scan_density,
     check_density,
     check_orphans,
     check_placeholders,
+    check_resume_balance,
     check_rhythm,
 )
 from lint import (  # noqa: F401  re-exported for test_build.py
     _extract_root_vars,
+    _off_palette_findings,
     _pair_names,
     check_all,
     check_cross_template_consistency,
+    check_off_palette,
     scan_file,
 )
 from tokens import sync_check
@@ -75,7 +81,7 @@ from verify import (
 )
 
 # name -> (source, max_pages). max_pages=0 means no hard check.
-# Sourced from shared.HTML_TEMPLATES so build.py and stabilize.py never drift.
+# Sourced from shared.HTML_TEMPLATES (single source of truth for targets).
 HTML_TARGETS: dict[str, tuple[str, int]] = build_targets()
 SCREEN_TARGETS: dict[str, str] = screen_targets()
 PPTX_TARGETS: dict[str, str] = {
@@ -84,22 +90,8 @@ PPTX_TARGETS: dict[str, str] = {
 }
 
 # Diagram HTMLs live in a separate directory and have no page-count contract.
-DIAGRAM_TARGETS: dict[str, str] = {
-    "diagram-architecture": "architecture.html",
-    "diagram-flowchart":    "flowchart.html",
-    "diagram-quadrant":     "quadrant.html",
-    "diagram-bar-chart":    "bar-chart.html",
-    "diagram-line-chart":   "line-chart.html",
-    "diagram-donut-chart":  "donut-chart.html",
-    "diagram-state-machine": "state-machine.html",
-    "diagram-timeline":      "timeline.html",
-    "diagram-swimlane":      "swimlane.html",
-    "diagram-tree":          "tree.html",
-    "diagram-layer-stack":   "layer-stack.html",
-    "diagram-venn":          "venn.html",
-    "diagram-candlestick":   "candlestick.html",
-    "diagram-waterfall":     "waterfall.html",
-}
+# Registry lives in shared.DIAGRAM_TEMPLATES (single home for all template lists).
+DIAGRAM_TARGETS: dict[str, str] = diagram_targets()
 
 
 # ------------------------- build helpers -------------------------
@@ -338,7 +330,8 @@ def main(argv: list[str]) -> int:
         css_result = check_all(verbose)
         sync_result = sync_check(verbose)
         cross_result = check_cross_template_consistency(verbose)
-        return max(css_result, sync_result, cross_result)
+        palette_result = check_off_palette(verbose)
+        return max(css_result, sync_result, cross_result, palette_result)
     if args[0] == "--sync":
         verbose = "-v" in args[1:] or "--verbose" in args[1:]
         return sync_check(verbose)
@@ -349,7 +342,9 @@ def main(argv: list[str]) -> int:
         return check_orphans(args[1:])
     if args[0] == "--check-density":
         return check_density(args[1:])
-    if args[0] in ("--check-placeholders", "--verify-filled"):
+    if args[0] == "--check-resume-balance":
+        return check_resume_balance(args[1:])
+    if args[0] == "--check-placeholders":
         return check_placeholders(args[1:])
     if args[0] == "--check-rhythm":
         slide_targets = [a for a in args[1:] if not a.startswith("-")]

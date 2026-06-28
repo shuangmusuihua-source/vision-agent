@@ -60,3 +60,39 @@ Common failures when AI generates professional documents. Organized by failure t
 | 27 | AI tone cliches (CN dashes and connectors) | "本质上是模型在做预测——这意味着..." / 大量破折号 | 删元评论框架，直接说结论。破折号换冒号或句号。自检: `grep -nE '本质是\|这意味着\|值得注意的是\|不仅.*而且\|[——–]'` |
 | 28 | Sans font stack missing CJK fallback | `font-family: Inter` 用在含中文的 th / h3 | CJK 回退到系统 sans (PingFang) 跟 serif 主调冲突。任何可能渲染 CJK 的元素用 `var(--serif)` |
 | 29 | Caption restates the slide title | Title: "ORM vs PRM 对比" / Cap: "ORM 跟 PRM 的对比" | Cap 必须给出标题之外的信息：取舍判据、适用场景、或讲到这里要带出的下一步。同义重写浪费了 cap 的注意力位 |
+
+## Landing Page
+
+The main `landing-page.html` template does not ship a price card or language switcher by default. Rules #30 and #31 below apply when you add either component (Kami's own `styles.css` L67-151 has a working `.lang-switch` reference).
+
+| # | Pattern | Bad | Fix |
+|---|---------|-----|-----|
+| 30 | Currency glyph shrunk and raised | `.price-currency { font-size: 0.5em; vertical-align: super }` floats `$` above the digit and breaks baseline | `font-size: 0.74em; line-height: 1; transform: translateY(0.015em)` keeps `$` and the digit on a shared baseline |
+| 31 | Language menu clips descenders | `.lang-menu a { line-height: 1 }` cuts the bottom of 'g' / 'y' / 'p' | `min-height: 32px; padding: 6px 10px; line-height: 1.35` plus an invisible `::before` bridge so the cursor can travel from trigger to menu without dismissal |
+| 32 | Sitemap lists locales without hreflang | `<url><loc>example.com/zh/</loc></url>` standing alone | Add `<xhtml:link rel="alternate" hreflang>` for every shipped locale plus `hreflang="x-default"` inside the same `<url>` entry |
+| 33 | Mixed CJK and Latin digits drift on baseline | `Mac/22/$19` shows digits at different heights because the serif falls back to oldstyle nums | `font-variant-numeric: lining-nums tabular-nums` on every node that displays numbers |
+| 34 | Hardcoded business data in the template | `<meta name="description" content="Acme is a $9 cleaner">` checked into the template file | Keep `{{PLACEHOLDER}}` slots so the user fills them at copy time. Templates ship with no real product data |
+| 35 | Multilingual site without `og:locale:alternate` | Single `og:locale` and no alternates listed | Self-reference the current page locale and list the others on `og:locale:alternate` so social previews pick the right thumbnail per region |
+| 36 | Stale product category | Hero still uses an old single-tool label after the product became a broader utility | Rewrite title, meta, hero, FAQ, JSON-LD, `llms.txt`, and `llms-full.txt` around the current category before adding feature bullets |
+| 37 | Generated locale pages without drift check | `template.html` and `i18n/*.json` generate committed pages, but no `--check` catches stale output | Add a check mode that fails on missing keys and generated-output drift before release or package work |
+| 38 | FAQ and `llms-full.txt` diverge | FAQ says one install path or price, AI-facing docs say another | Treat FAQ, JSON-LD, `llms.txt`, and `llms-full.txt` as one public fact set and update them together |
+| 39 | Screenshot gallery uses private local assets | `<img src="/Users/me/project/shot.png">` or `../other-repo/shots/app.webp` | Copy the image into the site repo or use a stable public URL; packaged templates must not depend on sibling checkouts |
+| 40 | Locale copy updated in only one place | One locale changes price, version, or install path while other locale pages still show the old facts | Search all locale pages plus structured data for the old value and update every matching surface |
+
+## Image Slots
+
+| # | Pattern | Bad | Fix |
+|---|---------|-----|-----|
+| 41 | Image generated before slot | A polished 16:9 concept image is forced into a 3:2 feature panel and loses its focal point | Decide the slot first, then crop, pad, or generate to that ratio |
+| 42 | Real screenshot redrawn as fake UI | A product screenshot is AI-redesigned and no longer matches the shipped app | Preserve real screenshots; use programmatic padding or split panels before redrawing |
+| 43 | Mixed screenshot ratios in one group | Three gallery panels jump between tall, wide, and square crops | Normalize the frame and padding; keep the screenshot content intact inside it |
+| 44 | Missing product image filled with atmosphere | A product page uses abstract texture because no screenshot was provided | Mark the material gap or omit the panel; do not substitute unrelated imagery |
+
+## Slides
+
+| # | Pattern | Bad | Fix |
+|---|---------|-----|-----|
+| 45 | Ghost deck fails | Reading only slide titles produces a pile of topics, not an argument | Rewrite titles and order before touching layout |
+| 46 | Multiple evidence shapes on one slide | One slide contains a chart, screenshot, code block, and quote | Pick the primary proof, then split the rest into adjacent slides or appendix |
+| 47 | Visual brief leaks into audience copy | Caption says "21:9 ultra-wide screenshot with quiet background" | Keep image prompts and crop notes in the slot map; captions state the insight |
+| 48 | Template inventory without a template | Default Kami deck gets a fake layout-mapping phase | Only inventory a real user-provided PPTX or brand template |

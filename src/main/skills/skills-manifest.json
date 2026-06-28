@@ -2,7 +2,13 @@
   {
     "id": "kami",
     "hasResources": true,
-    "requiredPaths": ["SKILL.md", "scripts/build.py", "assets/templates"]
+    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "assets/templates"],
+    "version": "1.9.0",
+    "source": {
+      "repositoryUrl": "https://github.com/tw93/kami",
+      "ref": "7882ed7bb0fe09ccbf3ba999d894347e8a553c26",
+      "license": "MIT"
+    }
   },
   {
     "id": "guizang-ppt-skill",
@@ -12,12 +18,22 @@
   {
     "id": "frontend-slides",
     "hasResources": true,
-    "requiredPaths": ["SKILL.md", "scripts/extract-pptx.py", "scripts/export-pdf.sh"]
+    "requiredPaths": ["SKILL.md", "LICENSE", "scripts/extract-pptx.py", "scripts/export-pdf.sh"],
+    "source": {
+      "repositoryUrl": "https://github.com/zarazhangrui/frontend-slides",
+      "ref": "9906a34d640d2111f724544cbc50f7f130569ae1",
+      "license": "MIT"
+    }
   },
   {
     "id": "huashu-design",
     "hasResources": true,
-    "requiredPaths": ["SKILL.md", "assets/animations.jsx", "scripts/verify.py"]
+    "requiredPaths": ["SKILL.md", "LICENSE", "assets/animations.jsx", "assets/deck_index.html", "references/slide-decks.md", "scripts/gen_deck_thumbs.mjs", "scripts/verify.py"],
+    "source": {
+      "repositoryUrl": "https://github.com/alchaincyf/huashu-design",
+      "ref": "ec9ec0fff8a66a932c4049b200ea4c2b09f8d25b",
+      "license": "MIT"
+    }
   },
   {
     "id": "system-cleanup",

@@ -38,36 +38,48 @@ async function createTempDir(): Promise<string> {
   return dir
 }
 
-function createFetcher(options?: { unsafeDownload?: boolean }): typeof fetch {
+function createFetcher(options?: { unsupportedEntry?: boolean }): typeof fetch {
   return vi.fn(async (input: string | URL | Request) => {
     const url = String(input)
-    if (url.includes('/contents/skills/frontend-design/assets')) {
-      return new Response(JSON.stringify([
-        {
-          name: 'guide.txt',
-          type: 'file',
-          size: 5,
-          download_url: 'https://raw.githubusercontent.com/anthropics/skills/main/skills/frontend-design/assets/guide.txt',
-        },
-      ]), { status: 200 })
-    }
-    if (url.includes('/contents/skills/frontend-design')) {
-      return new Response(JSON.stringify([
-        {
-          name: 'SKILL.md',
-          type: 'file',
-          size: 8,
-          download_url: options?.unsafeDownload
-            ? 'https://example.com/SKILL.md'
-            : 'https://raw.githubusercontent.com/anthropics/skills/main/skills/frontend-design/SKILL.md',
-        },
-        { name: 'assets', type: 'dir' },
-      ]), { status: 200 })
+    if (url.includes('/git/trees/')) {
+      return new Response(JSON.stringify({
+        truncated: false,
+        tree: [
+          { path: 'skills/frontend-design', type: 'tree', mode: '040000' },
+          {
+            path: 'skills/frontend-design/SKILL.md',
+            type: 'blob',
+            mode: '100644',
+            size: 8,
+          },
+          { path: 'skills/frontend-design/assets', type: 'tree', mode: '040000' },
+          {
+            path: 'skills/frontend-design/assets/guide.txt',
+            type: 'blob',
+            mode: options?.unsupportedEntry ? '120000' : '100644',
+            size: 5,
+          },
+        ],
+      }), { status: 200 })
     }
     if (url.endsWith('/SKILL.md')) {
       return new Response('---\nname: frontend-design\ndescription: Design frontend interfaces\n---\n\n# Skill\n', { status: 200 })
     }
     if (url.endsWith('/guide.txt')) return new Response('guide', { status: 200 })
+    return new Response('not found', { status: 404 })
+  }) as unknown as typeof fetch
+}
+
+function createTruncatedTreeFetcher(): typeof fetch {
+  return vi.fn(async (input: string | URL | Request) => {
+    if (String(input).includes('/git/trees/')) {
+      return new Response(JSON.stringify({
+        truncated: true,
+        tree: [
+          { path: 'skills/frontend-design', type: 'tree', mode: '040000' },
+        ],
+      }), { status: 200 })
+    }
     return new Response('not found', { status: 404 })
   }) as unknown as typeof fetch
 }
@@ -109,11 +121,19 @@ describe('community Skill installer', () => {
     })
   })
 
-  it('rejects file downloads outside the GitHub raw host', async () => {
+  it('rejects symbolic links and other unsupported repository entries', async () => {
     const targetRoot = await createTempDir()
 
-    await expect(installCommunitySkill({ targetRoot, skill, fetcher: createFetcher({ unsafeDownload: true }) }))
-      .rejects.toThrow('来源不受信任')
+    await expect(installCommunitySkill({ targetRoot, skill, fetcher: createFetcher({ unsupportedEntry: true }) }))
+      .rejects.toThrow('不支持的资源')
+    await expect(lstat(join(targetRoot, skill.id))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects a truncated GitHub file tree', async () => {
+    const targetRoot = await createTempDir()
+
+    await expect(installCommunitySkill({ targetRoot, skill, fetcher: createTruncatedTreeFetcher() }))
+      .rejects.toThrow('文件树不完整')
     await expect(lstat(join(targetRoot, skill.id))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 

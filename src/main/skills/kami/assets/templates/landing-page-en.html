@@ -3,7 +3,7 @@
      LANDING PAGE · English · parchment design system
      Screen-first product landing page with interactive gallery
      Sections: Hero · Gallery · Features · Principles · Pricing · FAQ · Footer
-     No PDF output — designed for browser delivery via Vercel / Netlify / static host
+     No PDF output, designed for browser delivery via Vercel / Netlify / static host
      ================================================================== -->
 <html lang="en">
 <head>
@@ -22,6 +22,19 @@
 <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
 <link rel="icon" type="image/png" sizes="32x32" href="{{FAVICON_32}}">
 <link rel="canonical" href="{{CANONICAL_URL}}">
+<!-- Multilingual SEO. Remove any line whose locale is not shipped. {{SITE_ORIGIN}} is e.g. https://example.com -->
+<link rel="alternate" hreflang="en"        href="{{SITE_ORIGIN}}/">
+<link rel="alternate" hreflang="zh-CN"     href="{{SITE_ORIGIN}}/zh/">
+<link rel="alternate" hreflang="zh-Hant"   href="{{SITE_ORIGIN}}/tw/">
+<link rel="alternate" hreflang="ja"        href="{{SITE_ORIGIN}}/ja/">
+<link rel="alternate" hreflang="ko"        href="{{SITE_ORIGIN}}/ko/">
+<link rel="alternate" hreflang="x-default" href="{{SITE_ORIGIN}}/">
+<link rel="alternate" type="text/plain"    href="{{SITE_ORIGIN}}/llms.txt">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -563,7 +576,7 @@ pre.code {
   font-family: var(--mono);
   font-size: 13.5px;
   line-height: 1.55;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   color: var(--near-black);
   overflow-x: auto;
   margin: 0;
@@ -589,7 +602,7 @@ pre.code .k { color: var(--brand); }
   font-size: 36px;
   line-height: 1;
   color: var(--near-black);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .metric-label {
   font-family: var(--latin-ui);
@@ -891,7 +904,7 @@ footer.foot {
     <div class="eyebrow">
       <span>{{EYEBROW_TEXT}} · <a class="version-link" href="{{RELEASES_URL}}">{{VERSION}}</a></span>
       <span class="hero-links">
-        <!-- {{HERO_LINKS}} — e.g. GitHub, X, website icons -->
+        <!-- {{HERO_LINKS}}, e.g. GitHub, X, website icons -->
       </span>
     </div>
 
@@ -900,7 +913,7 @@ footer.foot {
     <p class="tagline">{{TAGLINE}}</p>
 
     <div class="hero-tokens">
-      <!-- {{HERO_TOKENS}} — key facts as <span><b>value</b> label</span> -->
+      <!-- {{HERO_TOKENS}}, key facts as <span><b>value</b> label</span> -->
     </div>
 
     <div class="hero-cta">
@@ -920,7 +933,7 @@ footer.foot {
 
     <div class="gallery" data-gallery>
       <div class="gallery-frame" aria-live="polite">
-        <!-- {{GALLERY_PANELS}} — repeat this block per screenshot:
+        <!-- {{GALLERY_PANELS}}, repeat this block per screenshot:
         <figure class="gallery-panel is-active" data-title="Feature Name" data-line="Short poetic line.">
           <img src="./img/feature.jpg" alt="Description" loading="eager" decoding="async">
         </figure>
@@ -934,7 +947,7 @@ footer.foot {
         <p class="line" data-gallery-line></p>
       </div>
       <div class="gallery-tabs" aria-label="Choose a screenshot">
-        <!-- {{GALLERY_TABS}} — one <button> per panel:
+        <!-- {{GALLERY_TABS}}, one <button> per panel:
         <button type="button" class="is-active" aria-pressed="true">Feature Name</button>
         <button type="button" aria-pressed="false">Feature 2</button>
         -->
@@ -950,7 +963,7 @@ footer.foot {
     </div>
 
     <ol class="features">
-      <!-- {{FEATURES_LIST}} — repeat per feature:
+      <!-- {{FEATURES_LIST}}, repeat per feature:
       <li>
         <p class="name">Feature Name<small>Short poetic subtitle.</small></p>
         <p class="what">Description of what this feature does and why it matters.</p>
@@ -967,7 +980,7 @@ footer.foot {
     </div>
 
     <ol class="principles">
-      <!-- {{PRINCIPLES_LIST}} — repeat per principle:
+      <!-- {{PRINCIPLES_LIST}}, repeat per principle:
       <li>
         <span class="n">1</span>
         <span class="body"><b>Principle title</b><span>Explanation of the principle.</span></span>
@@ -1000,14 +1013,14 @@ footer.foot {
     </div>
 
     <dl class="faq">
-      <!-- {{FAQ_PAIRS}} — repeat per question:
+      <!-- {{FAQ_PAIRS}}, repeat per question:
       <div class="faq-pair">
         <dt>Question text?</dt>
         <dd>Answer text.</dd>
       </div>
       -->
     </dl>
-    <!-- {{FAQ_TAIL}} — optional closing line, e.g.:
+    <!-- {{FAQ_TAIL}}, optional closing line, e.g.:
     <p class="faq-tail">More questions? Visit the <a href="/help">help page</a>.</p>
     -->
   </section>
@@ -1021,7 +1034,7 @@ footer.foot {
     </div>
     <div class="colophon">
       <div class="links">
-        <!-- {{FOOTER_LINKS}} — middot-separated editorial links, e.g.:
+        <!-- {{FOOTER_LINKS}}, middot-separated editorial links, e.g.:
         <a href="https://x.com/..." target="_blank" rel="noopener">Twitter</a> &middot;
         <a href="mailto:...">Email</a> &middot;
         <a href="/help">Help</a> &middot;
@@ -1129,5 +1142,22 @@ footer.foot {
   start();
 })();
 </script>
+<!-- Optional: redirect first-time visitors to their browser-language version.
+     Uncomment when the shipped locales below match the actual /zh/, /tw/, /ja/, /ko/ pages.
+     Skips when the user has already chosen a language in this session, and when not at the site root.
+<script>
+(function(){
+  if (location.pathname !== '/' && location.pathname !== '/index.html') return;
+  if (sessionStorage.getItem('lang-choice')) return;
+  var map = { 'zh-CN':'/zh/', 'zh-Hans':'/zh/', 'zh':'/zh/', 'zh-TW':'/tw/', 'zh-Hant':'/tw/', 'ja':'/ja/', 'ko':'/ko/' };
+  var prefs = (navigator.languages || [navigator.language || '']);
+  for (var i = 0; i < prefs.length; i++) {
+    var tag = prefs[i];
+    var target = map[tag] || map[tag.split('-')[0]];
+    if (target) { sessionStorage.setItem('lang-choice', tag); location.replace(target); return; }
+  }
+})();
+</script>
+-->
 </body>
 </html>

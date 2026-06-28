@@ -36,7 +36,7 @@ One-page quick reference. Scan before filling a template or tweaking a detail. F
 | Warm Sand    | `#e8e6dc`     | Button / interactive surface                        |
 | Dark Surface | `#30302e`     | Dark container                                      |
 | Deep Dark    | `#141413`     | Dark page background                                |
-| **Brand**    | `**#1B365D`** | **Accent · CTA · title left bar (≤ 5% of surface)** |
+| **Brand**    | **`#1B365D`** | **Accent · CTA · title left bar (≤ 5% of surface)** |
 | Ink Light    | `#2D5A8A`     | Links on dark surfaces                              |
 | Near Black   | `#141413`     | Primary text                                        |
 | Dark Warm    | `#3d3d3a`     | Secondary text · table headers · links              |
@@ -53,7 +53,7 @@ One-page quick reference. Scan before filling a template or tweaking a detail. F
 | -------- | --------------------------- |
 | 0.08     | `#EEF2F7`                   |
 | 0.14     | `#E4ECF5`                   |
-| **0.18** | `**#E4ECF5`** ← default tag |
+| **0.18** | **`#E4ECF5`** ← default tag |
 | 0.22     | `#D0DCE9`                   |
 | 0.30     | `#D6E1EE`                   |
 
@@ -193,6 +193,8 @@ Any font-family that may render Chinese or Japanese must include a CJK fallback,
 }
 ```
 
+Resume exception: `resume*.html` uses a quiet bottom rule instead of the brand left bar. Keep project rows borderless so section titles do not create double rules or lonely page-top lines.
+
 ### Table (kami-table)
 
 Base class works on bare `<table>` or `.kami-table`. Add variant classes for density/alignment:
@@ -245,7 +247,7 @@ Combine freely: `<table class="kami-table financial striped">`.
 
 ## Diagram components
 
-Fourteen built-in diagram types. Extract the `<svg>` block and embed in a `<figure>` in long-doc / portfolio:
+Seventeen built-in diagram types (incl. Mermaid-sourced sequence / class / ER; see `references/mermaid.md`). Extract the `<svg>` block and embed in a `<figure>` in long-doc / portfolio:
 
 
 | Type          | File                                 | Use                                             |
@@ -294,6 +296,8 @@ Alternate light/dark rhythm: add `.sd-alt` to any section container.
 
 Source templates intentionally keep `{{...}}` fields. Run `python3 scripts/build.py --check-placeholders path/to/filled.html` on completed documents. Run `python3 scripts/build.py --check-density` to warn on pages with >25% trailing whitespace (skips cover).
 
+Marp variant deck (opt-in): `assets/templates/marp/`. Render with local `marp-cli`. See design.md §8 + production.md Part 2.5.
+
 ## Content quality (one rule per type)
 
 Full quality bars in `references/writing.md`. The single most important rule for each document type:
@@ -334,7 +338,15 @@ Page 1 carries the projects section, which is the densest content. Page 2 carrie
 </body>
 ```
 
+Filled resume PDFs should be exactly 2 pages with both pages visually used. Check the rendered result:
+
+```bash
+python3 scripts/build.py --check-resume-balance path/to/resume.pdf
+```
+
 Page 2 font sizes stay at template defaults. The density variant only tightens page 1 elements. If page 2 has unusually long content, reduce `.os-intro`, `.conv-body`, or `.skill-body` individually, never globally.
+
+Resume visual rule: header and section titles carry the only structural rules. Top metrics stack value over label so labels stay single-line; project rows separate by padding, not borders.
 
 ## Quick decisions
 
