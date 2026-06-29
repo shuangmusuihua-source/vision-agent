@@ -105,6 +105,8 @@ function SkillLibrary(): React.ReactElement {
     return slots.some(slot => slot.isStreaming && slot.activeSkillId === selectedId)
   })
   const SelectedSkillIcon = selectedSkill ? communitySkillIcons[selectedSkill.icon] || Blocks : Blocks
+  const installedCommunityCount = skills.filter(skill => skill.installed).length
+  const enabledBuiltinCount = builtinSkills.filter(skill => skill.enabled).length
 
   const install = useCallback(async () => {
     if (!selectedSkill || pendingAction) return
@@ -203,11 +205,13 @@ function SkillLibrary(): React.ReactElement {
   return (
     <div className="skill-library">
       <header className="skill-library-header">
-        <div className="skill-library-heading-icon" aria-hidden="true"><Blocks size={18} /></div>
         <div>
-          <div className="skill-library-eyebrow">SKILLS</div>
           <h1>技能</h1>
-          <p>管理 sumi 内置能力，并按需安装社区精选 Skill。</p>
+          <p>启用内置能力，或按需安装社区精选。</p>
+        </div>
+        <div className="skill-library-summary" aria-label="技能概况">
+          <span><strong>{installedCommunityCount}</strong> 个社区技能已安装</span>
+          <span><strong>{enabledBuiltinCount}</strong> 个内置技能已启用</span>
         </div>
       </header>
 
@@ -218,69 +222,29 @@ function SkillLibrary(): React.ReactElement {
         </div>
       )}
 
-      <section className="skill-builtin-section" aria-labelledby="builtin-skill-title">
-        <div className="skill-section-heading">
-          <div>
-            <h2 id="builtin-skill-title">内置技能</h2>
-            <p>随 sumi 提供并自动更新，新增技能默认启用。</p>
-          </div>
-          <span>{builtinSkills.filter(skill => skill.enabled).length} / {builtinSkills.length} 已启用</span>
-        </div>
-
-        <div className="skill-builtin-grid">
-          {builtinSkills.map(skill => {
-            const Icon = builtinSkillIcons[skill.id as keyof typeof builtinSkillIcons] || Blocks
-            const pending = pendingBuiltinId === skill.id
-            return (
-              <article className={`skill-builtin-card${skill.enabled ? '' : ' skill-builtin-card-disabled'}`} key={skill.id}>
-                <div className="skill-builtin-card-icon" aria-hidden="true"><Icon size={18} /></div>
-                <div className="skill-builtin-card-copy">
-                  <h3>{skill.name}</h3>
-                  <p>{skill.description}</p>
-                </div>
-                <button
-                  className="skill-builtin-toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked={skill.enabled}
-                  aria-label={`${skill.enabled ? '停用' : '启用'} ${skill.name}`}
-                  disabled={pendingBuiltinId !== null}
-                  onClick={() => void toggleBuiltin(skill)}
-                >
-                  <span className={`skill-toggle-track${skill.enabled ? ' skill-toggle-track-on' : ''}`} aria-hidden="true">
-                    <span className="skill-toggle-thumb" />
-                  </span>
-                  <span>{pending ? '更新中' : skill.enabled ? '已启用' : '已停用'}</span>
-                </button>
-              </article>
-            )
-          })}
-        </div>
-      </section>
-
       <div className="skill-library-layout">
         <section className="skill-catalog" aria-labelledby="skill-catalog-title">
           <div className="skill-section-heading">
             <div>
               <h2 id="skill-catalog-title">社区精选</h2>
-              <p>目录随应用版本更新，安装和更新时需要联网。</p>
+              <p>经筛选的社区技能，安装与更新时需要联网。</p>
             </div>
-            <span>{skills.length} 个</span>
+            <span>{installedCommunityCount} / {skills.length} 已安装</span>
           </div>
 
-          <div className="skill-card-grid">
+          <div className="skill-catalog-grid">
             {skills.map(skill => {
               const Icon = communitySkillIcons[skill.icon] || Blocks
               return (
                 <button
                   key={skill.id}
-                  className={`skill-card${skill.id === selectedId ? ' skill-card-selected' : ''}`}
+                  className={`skill-catalog-card${skill.id === selectedId ? ' skill-catalog-card-selected' : ''}`}
                   onClick={() => setSelectedId(skill.id)}
                   aria-pressed={skill.id === selectedId}
                 >
-                  <div className="skill-card-topline">
-                    <span className="skill-card-icon" aria-hidden="true"><Icon size={19} /></span>
-                    <span className={`skill-card-status${skill.updateAvailable ? ' skill-card-status-update' : skill.installed ? ' skill-card-status-installed' : ''}`}>
+                  <div className="skill-catalog-card-topline">
+                    <span className="skill-catalog-card-icon" aria-hidden="true"><Icon size={18} /></span>
+                    <span className={`skill-catalog-card-status${skill.updateAvailable ? ' skill-catalog-card-status-update' : skill.installed ? ' skill-catalog-card-status-installed' : ''}`}>
                       {skill.updateAvailable
                         ? <><RefreshCw size={12} /> 可更新</>
                         : skill.installed
@@ -288,12 +252,12 @@ function SkillLibrary(): React.ReactElement {
                           : '可安装'}
                     </span>
                   </div>
-                  <div className="skill-card-copy">
-                    <span className="skill-card-category">{skill.category}</span>
+                  <div className="skill-catalog-card-copy">
+                    <span className="skill-catalog-card-category">{skill.category}</span>
                     <h3>{skill.name}</h3>
                     <p>{skill.summary}</p>
                   </div>
-                  <span className="skill-card-author">来自 {skill.author}</span>
+                  <span className="skill-catalog-card-author">{skill.author}</span>
                 </button>
               )
             })}
@@ -313,6 +277,33 @@ function SkillLibrary(): React.ReactElement {
               </div>
 
               <p className="skill-detail-description">{selectedSkill.description}</p>
+
+              <div className="skill-detail-action">
+                {selectedSkill.installed ? (
+                  <div className="skill-action-buttons">
+                    {selectedSkill.updateAvailable && (
+                      <button className="skill-action-button skill-action-install" onClick={() => void update()} disabled={pendingAction !== null || selectedSkillRunning}>
+                        {pendingAction === 'update' ? <Loader2 className="skill-library-spinner" size={15} /> : <RefreshCw size={15} />}
+                        {pendingAction === 'update' ? '正在更新' : selectedSkillRunning ? '任务结束后更新' : '更新'}
+                      </button>
+                    )}
+                    <button className="skill-action-button skill-action-uninstall" onClick={() => void uninstall()} disabled={pendingAction !== null || selectedSkillRunning}>
+                      {pendingAction === 'uninstall' ? <Loader2 className="skill-library-spinner" size={15} /> : <Trash2 size={15} />}
+                      {pendingAction === 'uninstall' ? '正在卸载' : selectedSkillRunning ? '正在使用' : '卸载'}
+                    </button>
+                  </div>
+                ) : (
+                  <button className="skill-action-button skill-action-install" onClick={() => void install()} disabled={pendingAction !== null}>
+                    {pendingAction === 'install' ? <Loader2 className="skill-library-spinner" size={15} /> : <Download size={15} />}
+                    {pendingAction === 'install' ? '正在安装' : '安装技能'}
+                  </button>
+                )}
+                <span>{selectedSkill.updateAvailable
+                  ? '有新版本可用，更新后仍可在所有工作区中调用'
+                  : selectedSkill.installed
+                    ? '已是最新版本，可在工作区会话中调用'
+                    : '安装后会在所有工作区中可用'}</span>
+              </div>
 
               <div className="skill-detail-tags" aria-label="技能标签">
                 {selectedSkill.tags.map(tag => <span key={tag}>{tag}</span>)}
@@ -347,38 +338,54 @@ function SkillLibrary(): React.ReactElement {
                 </a>
               </div>
 
-              <div className="skill-detail-action">
-                {selectedSkill.installed ? (
-                  <div className="skill-action-buttons">
-                    {selectedSkill.updateAvailable && (
-                      <button className="skill-action-button skill-action-install" onClick={() => void update()} disabled={pendingAction !== null || selectedSkillRunning}>
-                        {pendingAction === 'update' ? <Loader2 className="skill-library-spinner" size={15} /> : <RefreshCw size={15} />}
-                        {pendingAction === 'update' ? '正在更新' : selectedSkillRunning ? '任务结束后更新' : '更新'}
-                      </button>
-                    )}
-                    <button className="skill-action-button skill-action-uninstall" onClick={() => void uninstall()} disabled={pendingAction !== null || selectedSkillRunning}>
-                      {pendingAction === 'uninstall' ? <Loader2 className="skill-library-spinner" size={15} /> : <Trash2 size={15} />}
-                      {pendingAction === 'uninstall' ? '正在卸载' : selectedSkillRunning ? '正在使用' : '卸载'}
-                    </button>
-                  </div>
-                ) : (
-                  <button className="skill-action-button skill-action-install" onClick={() => void install()} disabled={pendingAction !== null}>
-                    {pendingAction === 'install' ? <Loader2 className="skill-library-spinner" size={15} /> : <Download size={15} />}
-                    {pendingAction === 'install' ? '正在安装' : '安装技能'}
-                  </button>
-                )}
-                <span>{selectedSkill.updateAvailable
-                  ? '有新版本可用，更新后仍可在所有工作区中调用'
-                  : selectedSkill.installed
-                    ? '已是最新版本，可在输入框中通过 / 调用'
-                    : '安装后会在所有工作区中可用'}</span>
-              </div>
             </>
           ) : (
             <div className="skill-detail-empty">选择一个技能查看详情</div>
           )}
         </aside>
       </div>
+
+      <section className="skill-builtin-section" aria-labelledby="builtin-skill-title">
+        <div className="skill-section-heading">
+          <div>
+            <h2 id="builtin-skill-title">内置技能</h2>
+            <p>随 sumi 提供并自动更新，可随时启用或停用。</p>
+          </div>
+          <span>{enabledBuiltinCount} / {builtinSkills.length} 已启用</span>
+        </div>
+
+        <div className="skill-builtin-grid">
+          {builtinSkills.map(skill => {
+            const Icon = builtinSkillIcons[skill.id as keyof typeof builtinSkillIcons] || Blocks
+            const pending = pendingBuiltinId === skill.id
+            return (
+              <article className={`skill-builtin-card${skill.enabled ? '' : ' skill-builtin-card-disabled'}`} key={skill.id}>
+                <div className="skill-builtin-card-icon" aria-hidden="true"><Icon size={17} /></div>
+                <div className="skill-builtin-card-copy">
+                  <h3>{skill.name}</h3>
+                  <p>{skill.description}</p>
+                </div>
+                <button
+                  className="skill-builtin-toggle"
+                  type="button"
+                  role="switch"
+                  aria-checked={skill.enabled}
+                  aria-busy={pending}
+                  aria-label={`${skill.enabled ? '停用' : '启用'} ${skill.name}`}
+                  title={`${skill.enabled ? '停用' : '启用'} ${skill.name}`}
+                  disabled={pendingBuiltinId !== null}
+                  onClick={() => void toggleBuiltin(skill)}
+                >
+                  {pending && <Loader2 className="skill-library-spinner" size={14} aria-hidden="true" />}
+                  <span className={`skill-toggle-track${skill.enabled ? ' skill-toggle-track-on' : ''}`} aria-hidden="true">
+                    <span className="skill-toggle-thumb" />
+                  </span>
+                </button>
+              </article>
+            )
+          })}
+        </div>
+      </section>
     </div>
   )
 }
