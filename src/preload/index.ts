@@ -10,6 +10,7 @@ import type {
   SessionRoutedSkillOutputState,
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
+import type { MarkitdownFormat } from '../shared/markitdown-runtime'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -259,6 +260,11 @@ const api = {
       ipcRenderer.on('skills:changed', handler)
       return () => { ipcRenderer.removeListener('skills:changed', handler) }
     },
+  },
+
+  attachments: {
+    runtimeStatus: (formats?: MarkitdownFormat[]) => invoke('attachments:runtimeStatus', { formats }),
+    installRuntime: () => invoke('attachments:installRuntime', undefined),
   },
 
   search: {

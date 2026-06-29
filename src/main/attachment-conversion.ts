@@ -1,8 +1,12 @@
 import { execFile } from 'child_process'
 import { createHash } from 'crypto'
 import { mkdir, writeFile } from 'fs/promises'
-import { basename, join } from 'path'
+import { basename, extname, join } from 'path'
 import { ATTACHMENT_CONVERSION_CONTEXT_TAG } from '../shared/file-attachments'
+import { getMarkitdownRuntimeManager } from './markitdown-runtime'
+import type { MarkitdownFormat } from '../shared/markitdown-runtime'
+import { MARKITDOWN_FORMATS } from '../shared/markitdown-runtime'
+import { isAttachmentPathAuthorized } from './attachment-path-authorization'
 
 export interface AttachmentConversionRef {
   sourcePath: string
@@ -66,9 +70,21 @@ function convertedMarkdownPath(workspaceCwd: string, sessionKey: string, filePat
   return join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey), outName)
 }
 
-function runMarkitdown(filePath: string): Promise<string> {
+async function runMarkitdown(filePath: string): Promise<string> {
+  const format = extname(filePath).slice(1).toLowerCase() as MarkitdownFormat
+  if (!MARKITDOWN_FORMATS.includes(format)) {
+    throw new Error('不支持的附件格式')
+  }
+  if (!isAttachmentPathAuthorized(filePath)) {
+    throw new Error('附件路径未获得授权，请重新选择文件')
+  }
+  const runtime = await getMarkitdownRuntimeManager().getStatus([format])
+  if (runtime.state !== 'ready') {
+    throw new Error('附件解析组件尚未安装')
+  }
+
   return new Promise((resolve, reject) => {
-    execFile('python3', ['-m', 'markitdown', filePath], {
+    execFile(runtime.pythonPath, ['-m', 'markitdown', filePath], {
       encoding: 'utf-8',
       timeout: MARKITDOWN_TIMEOUT_MS,
       maxBuffer: MARKITDOWN_MAX_BUFFER_BYTES,

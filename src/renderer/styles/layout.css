@@ -530,6 +530,7 @@
   flex-shrink: 0;
 }
 .modal-icon-circle.danger  { background: var(--color-danger-bg); color: var(--color-danger); }
+.modal-icon-circle.primary { background: var(--color-action-bg); color: var(--color-action); }
 .modal-icon-circle.info    { background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
 
 .modal-title {

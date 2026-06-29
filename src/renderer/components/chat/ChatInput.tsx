@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, Square, Paperclip, X } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, X, Loader2 } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
 import type { AgentContext } from '../../../shared/types'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { isSkillVisibleInSlashMenu } from '../../../shared/skill-invocation'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { useModal } from '../common/ModalSystem'
+import type { MarkitdownFormat } from '../../../shared/markitdown-runtime'
 import {
   encodeFileConvertPath,
   fileExtension,
@@ -40,9 +42,12 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const [skillFilter, setSkillFilter] = useState('')
   const [selectedSkillIdx, setSelectedSkillIdx] = useState(0)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
+  const [isPreparingAttachments, setIsPreparingAttachments] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
+  const preparingAttachmentsRef = useRef(false)
+  const modal = useModal()
 
   // Prefill from store slot — context-aware
   const prefillText = useAgentStore((s) => s.slots[context]?.prefillText)
@@ -123,15 +128,61 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
-  const doSend = useCallback(() => {
+  const ensureAttachmentRuntime = useCallback(async (formats: MarkitdownFormat[]): Promise<boolean> => {
+    if (preparingAttachmentsRef.current) return false
+    preparingAttachmentsRef.current = true
+    setIsPreparingAttachments(true)
+
+    try {
+      const status = await window.api.attachments.runtimeStatus(formats)
+      if (status.state === 'ready') return true
+
+      if (status.state === 'python-missing') {
+        await modal.alert({
+          title: '需要 Python',
+          message: `未找到可用的 Python ${status.minimumPythonVersion} 或更高版本。请先安装 Python，再重新发送附件。`,
+        })
+        return false
+      }
+
+      const confirmed = await modal.confirm({
+        title: '安装附件解析组件',
+        message: 'sumi 需要使用 MarkItDown 读取 PDF、Word、PowerPoint 和 Excel。组件将安装到 sumi 的独立目录，不会修改系统 Python；首次安装需要联网，可能需要几分钟。',
+        variant: 'primary',
+        confirmLabel: '安装并继续',
+      })
+      if (!confirmed) return false
+
+      const result = await window.api.attachments.installRuntime()
+      if (!result.success) {
+        await modal.alert({ title: '安装失败', message: result.error })
+        return false
+      }
+      return true
+    } catch (error) {
+      await modal.alert({
+        title: '附件准备失败',
+        message: error instanceof Error ? error.message : '无法准备附件解析组件，请稍后重试。',
+      })
+      return false
+    } finally {
+      preparingAttachmentsRef.current = false
+      setIsPreparingAttachments(false)
+    }
+  }, [modal])
+
+  const doSend = useCallback(async () => {
     const hasContent = text.trim() || attachedFiles.length > 0
-    if (hasContent && !disabled) {
+    if (hasContent && !disabled && !preparingAttachmentsRef.current) {
       let prompt = text.trim()
       if (attachedFiles.length > 0) {
         // Hidden marker for main process to convert non-text files (pptx/xlsx/docx/pdf)
-        const convPaths = attachedFiles
-          .filter(f => isConvertibleAttachmentPath(f.path || f.name))
-          .map(f => encodeFileConvertPath(f.path))
+        const convertibleFiles = attachedFiles.filter(f => isConvertibleAttachmentPath(f.path || f.name))
+        const convPaths = convertibleFiles.map(f => encodeFileConvertPath(f.path))
+        if (convertibleFiles.length > 0) {
+          const formats = [...new Set(convertibleFiles.map(file => fileExtension(file.path || file.name)))] as MarkitdownFormat[]
+          if (!await ensureAttachmentRuntime(formats)) return
+        }
         const fileParts = attachedFiles.map(formatAttachmentPromptLine)
         const prefix = convPaths.length > 0 ? '<!--FILE_CONVERT:' + convPaths.join('|') + '-->\n' : ''
         prompt = prefix + fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
@@ -141,7 +192,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       setAttachedFiles([])
       setShowSkillPopup(false)
     }
-  }, [text, disabled, onSend, attachedFiles])
+  }, [text, disabled, onSend, attachedFiles, ensureAttachmentRuntime])
 
   // Skill popup keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
@@ -170,7 +221,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
 
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      doSend()
+      void doSend()
     }
   }, [showSkillPopup, filteredSkills, selectedSkillIdx, handleSelectSkill, doSend])
 
@@ -220,7 +271,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           <button
             className="ask-zuovis-attach-btn"
             onClick={handleAttachFiles}
-            disabled={disabled}
+            disabled={disabled || isPreparingAttachments}
             type="button"
             title="上传文件"
           >
@@ -234,7 +285,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             value={text}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={disabled}
+            disabled={disabled || isPreparingAttachments}
             autoFocus
           />
           {isStreaming && onStop ? (
@@ -248,12 +299,13 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             </button>
           ) : (
             <button
-              className={`ask-zuovis-send-btn ${(text.trim() || attachedFiles.length > 0) && !disabled ? 'ask-zuovis-send-btn-active' : ''}`}
-              onClick={doSend}
-              disabled={(!text.trim() && attachedFiles.length === 0) || disabled}
+              className={`ask-zuovis-send-btn ${(text.trim() || attachedFiles.length > 0) && !disabled && !isPreparingAttachments ? 'ask-zuovis-send-btn-active' : ''}`}
+              onClick={() => void doSend()}
+              disabled={(!text.trim() && attachedFiles.length === 0) || disabled || isPreparingAttachments}
               type="button"
+              title={isPreparingAttachments ? '正在准备附件解析组件' : '发送'}
             >
-              <ArrowUp size={16} />
+              {isPreparingAttachments ? <Loader2 size={16} className="spin" /> : <ArrowUp size={16} />}
             </button>
           )}
         </div>
@@ -313,7 +365,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
         <button
           className="chat-input-attach-btn"
           onClick={handleAttachFiles}
-          disabled={disabled}
+          disabled={disabled || isPreparingAttachments}
           type="button"
           title="上传文件"
         >
@@ -326,7 +378,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           value={text}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={disabled}
+          disabled={disabled || isPreparingAttachments}
           rows={1}
           autoFocus
         />
@@ -341,12 +393,13 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           </button>
         ) : (
           <button
-            className={`chat-send-btn ${(text.trim() || attachedFiles.length > 0) && !disabled ? 'chat-send-btn-active' : ''}`}
-            onClick={doSend}
-            disabled={(!text.trim() && attachedFiles.length === 0) || disabled}
+            className={`chat-send-btn ${(text.trim() || attachedFiles.length > 0) && !disabled && !isPreparingAttachments ? 'chat-send-btn-active' : ''}`}
+            onClick={() => void doSend()}
+            disabled={(!text.trim() && attachedFiles.length === 0) || disabled || isPreparingAttachments}
             type="button"
+            title={isPreparingAttachments ? '正在准备附件解析组件' : '发送'}
           >
-            <ArrowUp size={16} />
+            {isPreparingAttachments ? <Loader2 size={16} className="spin" /> : <ArrowUp size={16} />}
           </button>
         )}
       </div>

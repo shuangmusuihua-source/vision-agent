@@ -5,6 +5,7 @@ import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSession
 import type { AgentContext } from '../../shared/types'
 import type { IPCRequest } from '../../shared/ipc-types'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
+import { authorizeAttachmentPaths } from '../attachment-path-authorization'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -250,15 +251,17 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('workspace:selectFiles', async () => {
     const window = getMainWindow()
     if (!window) return { canceled: true, filePaths: [] }
-    return await dialog.showOpenDialog(window, {
+    const result = await dialog.showOpenDialog(window, {
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'All Supported', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'pdf'] },
+        { name: 'All Supported', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'pdf', 'docx', 'pptx', 'xlsx'] },
         { name: 'Text', extensions: ['txt', 'md', 'json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'env', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'tsx', 'jsx', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'css', 'html', 'svg'] },
         { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
-        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'Documents', extensions: ['pdf', 'docx', 'pptx', 'xlsx'] },
         { name: 'All Files', extensions: ['*'] },
       ],
     })
+    if (!result.canceled) authorizeAttachmentPaths(result.filePaths)
+    return result
   })
 }

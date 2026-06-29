@@ -19,6 +19,11 @@ import type {
   CommunitySkillCatalogItem,
   CommunitySkillMutationResult,
 } from './types'
+import type {
+  MarkitdownFormat,
+  MarkitdownRuntimeInstallResult,
+  MarkitdownRuntimeStatus,
+} from './markitdown-runtime'
 
 // ─── Request/Response Channels ───────────────────────────────────────
 
@@ -267,6 +272,16 @@ export type IPCChannelMap = {
   'skills:uninstall': {
     request: string
     response: CommunitySkillMutationResult
+  }
+
+  // Attachment conversion runtime
+  'attachments:runtimeStatus': {
+    request: { formats?: MarkitdownFormat[] }
+    response: MarkitdownRuntimeStatus
+  }
+  'attachments:installRuntime': {
+    request: void
+    response: MarkitdownRuntimeInstallResult
   }
 
   // Search

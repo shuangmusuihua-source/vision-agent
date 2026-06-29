@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Trash2, AlertTriangle, Info } from 'lucide-react'
+import { Trash2, AlertTriangle, Info, Download } from 'lucide-react'
 
-type ModalVariant = 'confirm' | 'danger' | 'info' | 'danger-input'
+type ModalVariant = 'confirm' | 'primary' | 'danger' | 'info' | 'danger-input'
 
 interface ModalState {
   open: boolean
@@ -100,6 +100,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 
   const iconMap: Record<ModalVariant, ReactNode> = {
     confirm:    <div className="modal-icon-circle danger"><Trash2 size={16} /></div>,
+    primary:    <div className="modal-icon-circle primary"><Download size={16} /></div>,
     danger:     <div className="modal-icon-circle danger"><AlertTriangle size={16} /></div>,
     'danger-input': <div className="modal-icon-circle danger"><AlertTriangle size={16} /></div>,
     info:       <div className="modal-icon-circle info"><Info size={16} /></div>,
@@ -130,7 +131,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               </>
             )}
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={handleCancel}>取消</button>
+              <button className="btn-modal btn-modal-cancel" onClick={handleCancel}>
+                {modal.variant === 'info' ? '知道了' : '取消'}
+              </button>
               {modal.variant !== 'info' && (
                 <button
                   className={`btn-modal ${modal.variant === 'confirm' || modal.variant === 'danger' || modal.variant === 'danger-input' ? 'btn-modal-danger' : 'btn-modal-primary'}`}

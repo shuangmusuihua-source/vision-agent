@@ -20,6 +20,11 @@ import type {
   CommunitySkillCatalogItem,
   CommunitySkillMutationResult,
 } from '../../shared/types'
+import type {
+  MarkitdownFormat,
+  MarkitdownRuntimeInstallResult,
+  MarkitdownRuntimeStatus,
+} from '../../shared/markitdown-runtime'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -135,7 +140,7 @@ interface AgentApi {
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
   setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean; error?: string }>
   forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => Promise<{ success: boolean; sessionId?: string; error?: string }>
-  selectFolder: () => Promise<Electron.OpenDialogReturnValue>
+  selectFolder: () => Promise<{ canceled: boolean; filePaths: string[] }>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
   removeSessionRecord: (sessionId: string) => Promise<{ success: boolean }>
@@ -178,6 +183,11 @@ interface SkillsApi {
   onChanged: (callback: (change: { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }) => void) => () => void
 }
 
+interface AttachmentsApi {
+  runtimeStatus: (formats?: MarkitdownFormat[]) => Promise<MarkitdownRuntimeStatus>
+  installRuntime: () => Promise<MarkitdownRuntimeInstallResult>
+}
+
 interface SearchApi {
   query: (keyword: string) => Promise<SearchResult[]>
 }
@@ -216,6 +226,7 @@ interface WindowApi {
   graph: GraphApi
   cron: CronApi
   skills: SkillsApi
+  attachments: AttachmentsApi
   search: SearchApi
   menu: MenuApi
   notification: NotificationApi
@@ -245,6 +256,7 @@ export type {
   GraphApi,
   CronApi,
   SkillsApi,
+  AttachmentsApi,
   SearchApi,
   MenuApi,
   NotificationApi,
