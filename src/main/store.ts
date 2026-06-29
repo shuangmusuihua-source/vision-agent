@@ -64,6 +64,6 @@ export {
   getSessionArtifacts,
   getSessionArtifactOutputs,
   upsertSessionArtifact,
-  recordSessionArtifactFromTool,
+  recordSessionArtifactsFromTool,
   removeSessionArtifacts,
 } from './persistence/artifact-store'

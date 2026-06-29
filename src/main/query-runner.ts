@@ -3,7 +3,7 @@ import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { ensureWorkspaceSkills, getAppSkillsCwd } from './skill-init'
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
-import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactFromTool } from './store'
+import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactsFromTool } from './store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { buildSumiIdentityPrompt } from './agent-identity'
@@ -46,7 +46,7 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       tool: tool_name,
       result: JSON.stringify(tool_response).substring(0, 500)
     })
-    recordSessionArtifactFromTool({
+    recordSessionArtifactsFromTool({
       sessionId: hookContext.envelope.sessionId,
       sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
       workspacePath: hookContext.envelope.workspacePath,

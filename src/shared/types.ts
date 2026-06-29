@@ -381,7 +381,16 @@ export type ToolCallState = {
   status: 'pending' | 'running' | 'completed' | 'error'
 }
 
-export type ArtifactFileType = 'html' | 'md' | 'png' | 'svg' | 'json'
+export type ArtifactFileType =
+  | 'html'
+  | 'md'
+  | 'png'
+  | 'svg'
+  | 'json'
+  | 'pdf'
+  | 'docx'
+  | 'pptx'
+  | 'xlsx'
 
 export type ArtifactData = {
   fileName: string

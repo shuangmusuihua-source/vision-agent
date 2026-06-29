@@ -4,6 +4,7 @@ import {
   artifactCategoryFromFileType,
   artifactFileTypeFromPath,
   extractArtifactPathFromToolInput,
+  extractArtifactPathsFromToolInput,
   isMemoryArtifactPath,
   normalizeArtifactPath,
 } from '../src/main/artifact-utils'
@@ -30,6 +31,9 @@ describe('session artifact utilities', () => {
     expect(artifactCategoryFromFileType('svg')).toBe('skill_output')
     expect(artifactFileTypeFromPath('summary.md')).toBe('md')
     expect(artifactCategoryFromFileType('md')).toBe('document')
+    expect(artifactFileTypeFromPath('research.pdf')).toBe('pdf')
+    expect(artifactCategoryFromFileType('pdf')).toBe('skill_output')
+    expect(artifactCategoryFromFileType('pptx')).toBe('skill_output')
   })
 
   it('extracts file_path only from Write/Edit tool inputs', () => {
@@ -37,6 +41,24 @@ describe('session artifact utilities', () => {
     expect(extractArtifactPathFromToolInput('Edit', { file_path: 'b.md' })).toBe('b.md')
     expect(extractArtifactPathFromToolInput('Read', { file_path: 'c.md' })).toBeNull()
     expect(extractArtifactPathFromToolInput('Write', { file_path: '' })).toBeNull()
+  })
+
+  it('extracts generated deliverable paths from Bash export commands', () => {
+    expect(extractArtifactPathsFromToolInput('Bash', {
+      command: 'bash scripts/export-pdf.sh "deck.html" "deliverables/market research.pdf"',
+    })).toEqual(['deck.html', 'deliverables/market research.pdf'])
+    expect(extractArtifactPathsFromToolInput('Bash', {
+      command: 'python3 build.py --output report.pptx',
+    })).toEqual(['report.pptx'])
+    expect(extractArtifactPathsFromToolInput('Bash', {
+      command: 'bash scripts/export-pdf.sh "deliverables/market research.html" --compact',
+    })).toEqual([
+      'deliverables/market research.html',
+      'deliverables/market research.pdf',
+    ])
+    expect(extractArtifactPathsFromToolInput('Bash', {
+      command: 'ls existing.pdf',
+    })).toEqual([])
   })
 
   it('excludes memory files from session artifact collection', () => {

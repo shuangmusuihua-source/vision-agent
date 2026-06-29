@@ -102,6 +102,10 @@ function fileTypeFromExt(filePath: string): ArtifactFileType {
   if (ext === 'svg') return 'svg'
   if (ext === 'json') return 'json'
   if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'png'
+  if (ext === 'pdf') return 'pdf'
+  if (ext === 'docx') return 'docx'
+  if (ext === 'pptx') return 'pptx'
+  if (ext === 'xlsx') return 'xlsx'
   return 'md'
 }
 

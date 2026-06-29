@@ -15,13 +15,24 @@ export function artifactFileTypeFromPath(filePath: string): ArtifactFileType {
   if (ext === 'svg') return 'svg'
   if (ext === 'json') return 'json'
   if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'png'
+  if (ext === 'pdf') return 'pdf'
+  if (ext === 'docx') return 'docx'
+  if (ext === 'pptx') return 'pptx'
+  if (ext === 'xlsx') return 'xlsx'
   return 'md'
 }
 
 export function artifactCategoryFromFileType(
   fileType: ArtifactFileType
 ): SessionArtifactRecord['category'] {
-  if (fileType === 'html' || fileType === 'svg') return 'skill_output'
+  if (
+    fileType === 'html'
+    || fileType === 'svg'
+    || fileType === 'pdf'
+    || fileType === 'docx'
+    || fileType === 'pptx'
+    || fileType === 'xlsx'
+  ) return 'skill_output'
   return 'document'
 }
 
@@ -34,8 +45,44 @@ export function extractArtifactPathFromToolInput(
   toolName: string,
   toolInput: unknown
 ): string | null {
-  if (toolName !== 'Write' && toolName !== 'Edit') return null
-  if (!toolInput || typeof toolInput !== 'object') return null
-  const filePath = (toolInput as Record<string, unknown>).file_path
-  return typeof filePath === 'string' && filePath.trim() ? filePath : null
+  return extractArtifactPathsFromToolInput(toolName, toolInput)[0] || null
+}
+
+const BASH_ARTIFACT_EXTENSION = '(?:html?|md|markdown|svg|png|jpe?g|json|pdf|docx|pptx|xlsx)'
+
+export function extractArtifactPathsFromToolInput(
+  toolName: string,
+  toolInput: unknown
+): string[] {
+  if (!toolInput || typeof toolInput !== 'object') return []
+  const input = toolInput as Record<string, unknown>
+
+  if (toolName === 'Write' || toolName === 'Edit') {
+    const filePath = input.file_path
+    return typeof filePath === 'string' && filePath.trim() ? [filePath] : []
+  }
+
+  if (toolName !== 'Bash' || typeof input.command !== 'string') return []
+  const command = input.command
+  const createsFiles = /(?:^|[;&|]\s*)(?:bash|sh|python\d*|node|cp|mv|convert|magick)\b|(?:^|\s)(?:tee\b|>{1,2})/i.test(command)
+  if (!createsFiles) return []
+
+  const pathPattern = new RegExp(
+    `"([^"\\n]+\\.${BASH_ARTIFACT_EXTENSION})"|'([^'\\n]+\\.${BASH_ARTIFACT_EXTENSION})'|([^\\s"'|;&<>]+\\.${BASH_ARTIFACT_EXTENSION})`,
+    'gi'
+  )
+  const paths = new Set<string>()
+  for (const match of command.matchAll(pathPattern)) {
+    const filePath = match[1] || match[2] || match[3]
+    if (filePath) paths.add(filePath)
+  }
+
+  // The bundled frontend-slides exporter derives <input>.pdf when the
+  // optional output argument is omitted. Register that implicit output too.
+  if (/\bexport-pdf\.sh\b/i.test(command) && ![...paths].some((filePath) => /\.pdf$/i.test(filePath))) {
+    const htmlInput = [...paths].find((filePath) => /\.html?$/i.test(filePath))
+    if (htmlInput) paths.add(htmlInput.replace(/\.html?$/i, '.pdf'))
+  }
+
+  return [...paths]
 }

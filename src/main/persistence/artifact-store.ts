@@ -5,7 +5,7 @@ import {
   artifactCategoryFromFileType,
   artifactFileName,
   artifactFileTypeFromPath,
-  extractArtifactPathFromToolInput,
+  extractArtifactPathsFromToolInput,
   isMemoryArtifactPath,
   normalizeArtifactPath,
 } from '../artifact-utils'
@@ -132,20 +132,24 @@ export function upsertSessionArtifact(input: UpsertSessionArtifactInput): Sessio
   return next
 }
 
-export function recordSessionArtifactFromTool(
+export function recordSessionArtifactsFromTool(
   input: RecordArtifactFromToolInput
-): SessionArtifactRecord | null {
-  const filePath = extractArtifactPathFromToolInput(input.toolName, input.toolInput)
-  if (!input.sessionId || !filePath) return null
+): SessionArtifactRecord[] {
+  const filePaths = extractArtifactPathsFromToolInput(input.toolName, input.toolInput)
+  if (!input.sessionId || filePaths.length === 0) return []
+  const sessionId = input.sessionId
 
-  return upsertSessionArtifact({
-    sessionId: input.sessionId,
-    sdkSessionId: input.sdkSessionId,
-    workspacePath: input.workspacePath || process.cwd(),
-    filePath,
-    source: input.source || input.toolName,
-    sourceTool: input.toolName,
-    skillId: input.skillId,
+  return filePaths.flatMap((filePath) => {
+    const artifact = upsertSessionArtifact({
+      sessionId,
+      sdkSessionId: input.sdkSessionId,
+      workspacePath: input.workspacePath || process.cwd(),
+      filePath,
+      source: input.source || input.toolName,
+      sourceTool: input.toolName,
+      skillId: input.skillId,
+    })
+    return artifact ? [artifact] : []
   })
 }
 
