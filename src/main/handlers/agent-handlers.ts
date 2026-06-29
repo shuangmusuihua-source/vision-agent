@@ -1,7 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession, setPermissionMode } from '../agent-manager'
-import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactFromTool } from '../store'
+import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactsFromTool } from '../store'
 import type { AgentContext } from '../../shared/types'
 import type { IPCRequest } from '../../shared/ipc-types'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
@@ -190,8 +190,8 @@ export function registerAgentHandlers(): void {
         for (const block of contentBlocks) {
           if (block.type !== 'tool_use') continue
           const name = block.name as string
-          if (name !== 'Write' && name !== 'Edit') continue
-          recordSessionArtifactFromTool({
+          if (name !== 'Write' && name !== 'Edit' && name !== 'Bash') continue
+          recordSessionArtifactsFromTool({
             sessionId: appSessionId,
             sdkSessionId: record?.sdkSessionId,
             workspacePath,
