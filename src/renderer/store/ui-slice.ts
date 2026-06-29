@@ -1,8 +1,26 @@
 import { create } from 'zustand'
+import type { UpdateDownloadProgress } from '../../shared/update-types'
 
 export type PrimaryView = 'ask' | 'editor' | 'skills'
 
-interface UpdateInfo { version: string }
+export type AppUpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'latest'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'installing'
+  | 'skipped'
+  | 'error'
+
+export interface AppUpdateState {
+  status: AppUpdateStatus
+  version?: string
+  message?: string
+  progress?: UpdateDownloadProgress
+  recovery?: 'manual-download'
+}
 
 interface UiSlice {
   // ── View routing ─────────────────────────────────────────────────
@@ -27,13 +45,9 @@ interface UiSlice {
   editorStats: { words: number; chars: number }
   setEditorStats: (stats: { words: number; chars: number }) => void
 
-  // ── Update banner ────────────────────────────────────────────────
-  updateAvailable: UpdateInfo | null
-  setUpdateAvailable: (info: UpdateInfo | null) => void
-  updateDownloaded: boolean
-  setUpdateDownloaded: (v: boolean) => void
-  updateError: string | null
-  setUpdateError: (error: string | null) => void
+  // ── Application update ───────────────────────────────────────────
+  updateState: AppUpdateState
+  setUpdateState: (state: AppUpdateState) => void
 
   // ── Error banner ─────────────────────────────────────────────────
   mainError: string | null
@@ -71,12 +85,8 @@ export const useUiStore = create<UiSlice>((set) => ({
   editorStats: { words: 0, chars: 0 },
   setEditorStats: (editorStats) => set({ editorStats }),
 
-  updateAvailable: null,
-  setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
-  updateDownloaded: false,
-  setUpdateDownloaded: (updateDownloaded) => set({ updateDownloaded }),
-  updateError: null,
-  setUpdateError: (updateError) => set({ updateError }),
+  updateState: { status: 'idle' },
+  setUpdateState: (updateState) => set({ updateState }),
 
   mainError: null,
   setMainError: (mainError) => set({ mainError }),

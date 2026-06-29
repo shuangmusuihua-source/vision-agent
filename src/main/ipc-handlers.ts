@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
 import { readdir } from 'fs/promises'
 import { join, extname } from 'path'
 import { getMainWindow } from './ipc-sender'
@@ -62,6 +62,7 @@ export { pushSettingsToRenderer }
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('ping', () => 'pong')
+  ipcMain.handle('app:getVersion', () => app.getVersion())
 
   registerWorkspaceHandlers(scanDirectory, listMarkdownFiles, pushSettingsToRenderer, getSessionOverview)
   registerSettingsHandlers(pushSettingsToRenderer)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
-import { FileText, Download, ArrowLeftRight, ChevronLeft, RefreshCw } from 'lucide-react'
+import { FileText, Download, ArrowLeftRight, ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -27,6 +27,7 @@ import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/gr
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
 import { buildSkillInvocationPrompt } from '../../../shared/skill-invocation'
+import { checkForAppUpdates, getUpdateProgressLabel, performPrimaryUpdateAction } from '../../lib/app-update'
 
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
@@ -93,8 +94,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     showSearch, searchQuery, openSearch, closeSearch: closeSearchPanel,
     sourceMode, setSourceMode, focusMode, setFocusMode,
     editorStats, setEditorStats, linkedFile, setLinkedFile,
-    view, setView, updateAvailable, setUpdateAvailable, updateDownloaded, setUpdateDownloaded,
-    updateError, setUpdateError,
+    view, setView, updateState, setUpdateState,
     showDaydream, daydreamMode, openDaydream, closeDaydream,
     mainError, setMainError,
   } = useUiStore()
@@ -103,7 +103,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const focusModeRef = useRef(focusMode)
   focusModeRef.current = focusMode
   const changedFileCount = useChangedFileCount()
-  const [updateActionState, setUpdateActionState] = useState<'idle' | 'downloading' | 'installing'>('idle')
+  const updateError = updateState.status === 'error' ? updateState.message || '未知错误' : null
 
   const editorRef = useRef<{ toggleSourceMode: () => void } | null>(null)
 
@@ -157,73 +157,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (activeTab && isFileTab(activeTab)) setEditorLinkedFile(activeTab.path)
   }, [activeTab, setEditorLinkedFile])
 
-  // ── IPC subscriptions (update, menu, graph, main error) ─────────────
-
-  useEffect(() => {
-    const a = window.api.update.onAvailable((info) => {
-      setUpdateAvailable(info)
-      setUpdateDownloaded(false)
-      setUpdateError(null)
-      setUpdateActionState('idle')
-    })
-    const b = window.api.update.onDownloaded(() => {
-      setUpdateDownloaded(true)
-      setUpdateError(null)
-      setUpdateActionState('idle')
-    })
-    const c = window.api.update.onError((error) => {
-      setUpdateError(error.message)
-      setUpdateActionState('idle')
-    })
-    return () => { a(); b(); c() }
+  const handleUpdateAction = useCallback(async () => {
+    await performPrimaryUpdateAction()
   }, [])
 
-  const handleUpdateAction = useCallback(async () => {
-    if (updateActionState !== 'idle') return
-
-    if (updateDownloaded) {
-      setUpdateActionState('installing')
-      try {
-        await window.api.update.install()
-      } catch (error) {
-        setUpdateActionState('idle')
-        setUpdateError(error instanceof Error ? error.message : String(error))
-      }
-      return
-    }
-
-    if (!updateAvailable) return
-    setUpdateActionState('downloading')
-    setUpdateError(null)
-    try {
-      await window.api.update.download()
-      setUpdateDownloaded(true)
-      setUpdateError(null)
-    } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setUpdateActionState('idle')
-    }
-  }, [setUpdateDownloaded, setUpdateError, updateActionState, updateAvailable, updateDownloaded])
-
   const handleRetryUpdateCheck = useCallback(async () => {
-    setUpdateError(null)
-    setUpdateActionState('idle')
-    try {
-      const result = await window.api.update.checkForUpdates()
-      if (result.status === 'available') {
-        setUpdateAvailable({ version: result.version || '未知版本' })
-        setUpdateDownloaded(false)
-      } else if (result.status === 'not-available') {
-        setUpdateAvailable(null)
-        setUpdateDownloaded(false)
-      } else if (result.status === 'error') {
-        setUpdateError(result.message)
-      }
-    } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : String(error))
-    }
-  }, [setUpdateAvailable, setUpdateDownloaded, setUpdateError])
+    await checkForAppUpdates()
+  }, [])
 
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
   const editorWorkspacePath = useAgentStore((s) => s.slots.editor.workspacePath || s.activeWorkspacePath)
@@ -859,10 +799,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       {updateError && (
         <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
           <span>更新失败: {updateError.slice(0, 60)}{updateError.length > 60 ? '...' : ''}</span>
-          <button className="update-banner-btn" onClick={() => { void handleRetryUpdateCheck() }}>
-            <Download size={14} /> 重试
+          <button
+            className="update-banner-btn"
+            onClick={() => {
+              void (updateState.recovery === 'manual-download'
+                ? performPrimaryUpdateAction()
+                : handleRetryUpdateCheck())
+            }}
+          >
+            {updateState.recovery === 'manual-download'
+              ? <><ExternalLink size={14} /> 打开下载页</>
+              : <><Download size={14} /> 重试</>}
           </button>
-          <button className="update-banner-dismiss" onClick={() => setUpdateError(null)}>✕</button>
+          <button className="update-banner-dismiss" onClick={() => setUpdateState({ status: 'idle' })}>✕</button>
         </div>
       )}
       {sessionLoadError && (
@@ -905,16 +854,37 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         />
         </Suspense>
       )}
-      {!updateError && (updateAvailable || updateDownloaded) && (
+      {!updateError && ['available', 'downloading', 'downloaded', 'installing'].includes(updateState.status) && (
         <div className="update-action-area">
           <button
-            className={`update-action-btn${updateDownloaded ? ' update-action-btn-ready' : ''}${updateActionState !== 'idle' ? ' update-action-btn-working' : ''}`}
+            className={`update-action-btn${updateState.status === 'downloaded' ? ' update-action-btn-ready' : ''}${updateState.status === 'installing' ? ' update-action-btn-working' : ''}${updateState.status === 'downloading' ? ' update-action-btn-progress' : ''}`}
             onClick={() => { void handleUpdateAction() }}
-            disabled={updateActionState !== 'idle'}
-            title={updateDownloaded ? '安装更新并重启' : updateActionState === 'downloading' ? '正在下载更新' : `下载更新 v${updateAvailable?.version || ''}`}
-            aria-label={updateDownloaded ? '安装更新并重启' : updateActionState === 'downloading' ? '正在下载更新' : `下载更新 v${updateAvailable?.version || ''}`}
+            disabled={['downloading', 'installing'].includes(updateState.status)}
+            title={updateState.status === 'downloaded'
+              ? '安装更新并重启'
+              : updateState.status === 'downloading'
+                ? getUpdateProgressLabel(updateState)
+                : updateState.status === 'installing'
+                  ? '正在安装更新'
+                  : `下载更新 v${updateState.version || ''}`}
+            aria-label={updateState.status === 'downloaded'
+              ? '安装更新并重启'
+              : updateState.status === 'downloading'
+                ? getUpdateProgressLabel(updateState)
+                : updateState.status === 'installing'
+                  ? '正在安装更新'
+                  : `下载更新 v${updateState.version || ''}`}
           >
-            {updateActionState !== 'idle' || updateDownloaded ? <RefreshCw size={15} /> : <Download size={15} />}
+            {updateState.status === 'downloading' ? (
+              <>
+                <Download size={12} />
+                <span>{Math.round(updateState.progress?.percent || 0)}%</span>
+              </>
+            ) : updateState.status === 'downloaded' || updateState.status === 'installing' ? (
+              <RefreshCw size={15} />
+            ) : (
+              <Download size={15} />
+            )}
           </button>
         </div>
       )}

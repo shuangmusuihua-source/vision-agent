@@ -17,6 +17,7 @@ import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
 import { flushAuditLog } from './agent-audit'
 import { APP_NAME } from '../shared/branding'
+import { toUpdateErrorPayload, type UpdateDownloadProgress } from '../shared/update-types'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -81,10 +82,10 @@ function isMissingUpdateFeedError(error: unknown): boolean {
   return message.includes('404') && message.includes('releases.atom')
 }
 
-function sendUpdateError(message: string): void {
+function sendUpdateError(error: unknown): void {
   const win = getMainWindow()
   if (win && !win.isDestroyed()) {
-    win.webContents.send('update:error', { message })
+    win.webContents.send('update:error', toUpdateErrorPayload(error))
   }
 }
 
@@ -250,6 +251,19 @@ app.whenReady().then(async () => {
       }
     })
 
+    autoUpdater.on('download-progress', (progress) => {
+      const win = getMainWindow()
+      if (win && !win.isDestroyed()) {
+        const payload: UpdateDownloadProgress = {
+          percent: Math.max(0, Math.min(100, progress.percent)),
+          transferred: progress.transferred,
+          total: progress.total,
+          bytesPerSecond: progress.bytesPerSecond,
+        }
+        win.webContents.send('update:download-progress', payload)
+      }
+    })
+
     autoUpdater.on('error', (err) => {
       if (silentUpdateChecks > 0 && isMissingUpdateFeedError(err)) {
         console.warn('[AutoUpdater] update feed unavailable; skipping launch check')
@@ -257,7 +271,7 @@ app.whenReady().then(async () => {
       }
       console.error('[AutoUpdater] error:', err)
       Sentry.captureException(err)
-      sendUpdateError(err.message)
+      sendUpdateError(err)
     })
 
     checkForUpdatesSilently('launch')
@@ -274,14 +288,17 @@ app.whenReady().then(async () => {
 })
 
 // IPC: update actions from renderer
-ipcMain.handle('update:download', () => autoUpdater.downloadUpdate())
+ipcMain.handle('update:download', async () => {
+  await autoUpdater.downloadUpdate()
+})
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
+ipcMain.handle('update:openLatestRelease', () => shell.openExternal('https://github.com/shuangmusuihua-source/vision-agent/releases/latest'))
 ipcMain.handle('update:checkForUpdates', async () => {
   try {
     return await checkForUpdates()
   } catch (error) {
     const message = getErrorMessage(error)
-    sendUpdateError(message)
+    sendUpdateError(error)
     console.error('[AutoUpdater] manual check failed:', error)
     return { status: 'error', message }
   }
