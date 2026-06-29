@@ -25,6 +25,7 @@ import type {
   MarkitdownRuntimeInstallResult,
   MarkitdownRuntimeStatus,
 } from '../../shared/markitdown-runtime'
+import type { UpdateDownloadProgress, UpdateErrorPayload } from '../../shared/update-types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -209,16 +210,19 @@ export type UpdateCheckResult =
 interface UpdateApi {
   download: () => Promise<void>
   install: () => Promise<void>
+  openLatestRelease: () => Promise<void>
   checkForUpdates: () => Promise<UpdateCheckResult>
   onAvailable: (callback: (info: { version: string }) => void) => () => void
   onDownloaded: (callback: () => void) => () => void
-  onError: (callback: (error: { message: string }) => void) => () => void
+  onDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => () => void
+  onError: (callback: (error: UpdateErrorPayload) => void) => () => void
 }
 
 // ─── Window API ──────────────────────────────────────────────────────
 
 interface WindowApi {
   ping: () => Promise<string>
+  getVersion: () => Promise<string>
   workspace: WorkspaceApi
   settings: SettingsApi
   agent: AgentApi

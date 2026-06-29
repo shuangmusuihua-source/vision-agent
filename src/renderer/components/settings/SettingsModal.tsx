@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   CheckCircle2,
   Cpu,
+  Download,
   Eye,
   EyeOff,
   Info,
@@ -21,7 +22,9 @@ import {
   Zap
 } from 'lucide-react'
 import { useSettings, useSettingsStore } from '../../store/settings-cache'
+import { useUiStore, type AppUpdateState } from '../../store/ui-slice'
 import type { ModelProfile } from '../../lib/ipc'
+import { getUpdateProgressLabel, performPrimaryUpdateAction } from '../../lib/app-update'
 import { APP_NAME } from '../../../shared/branding'
 import appIcon from '../../../../build/icon_preview.png'
 
@@ -56,6 +59,34 @@ const NEW_PROFILE: Omit<ModelProfile, 'id'> = {
   model: ''
 }
 
+function getUpdateActionLabel(state: AppUpdateState): string {
+  switch (state.status) {
+    case 'checking': return '检查中'
+    case 'available': return state.version ? `下载 v${state.version}` : '下载更新'
+    case 'downloading': return `正在下载 ${Math.round(state.progress?.percent || 0)}%`
+    case 'downloaded': return '安装并重启'
+    case 'installing': return '正在安装'
+    case 'error': return state.recovery === 'manual-download'
+      ? '打开下载页'
+      : state.version ? '重新下载' : '重新检查'
+    default: return '检查更新'
+  }
+}
+
+function getUpdateStatusMessage(state: AppUpdateState): string {
+  switch (state.status) {
+    case 'checking': return '正在检查更新...'
+    case 'latest': return state.version ? `已是最新版本 v${state.version}` : '已是最新版本'
+    case 'available': return state.version ? `发现新版本 v${state.version}` : '发现新版本'
+    case 'downloading': return getUpdateProgressLabel(state)
+    case 'downloaded': return state.version ? `v${state.version} 已下载，等待安装` : '更新已下载，等待安装'
+    case 'installing': return '正在退出并安装更新...'
+    case 'skipped':
+    case 'error': return state.message || ''
+    default: return ''
+  }
+}
+
 function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [activePage, setActivePage] = useState<SettingsPage>('appearance')
   const [theme, setTheme] = useState<'light' | 'dark' | 'system' | null>(null)
@@ -67,7 +98,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [isNewProfile, setIsNewProfile] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
   const [connectionTest, setConnectionTest] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message?: string }>({ status: 'idle' })
-  const [updateCheck, setUpdateCheck] = useState<{ status: 'idle' | 'checking' | 'latest' | 'available' | 'skipped' | 'error'; message?: string }>({ status: 'idle' })
+  const [appVersion, setAppVersion] = useState('')
+  const updateState = useUiStore((state) => state.updateState)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const baseUrlInputRef = useRef<HTMLInputElement>(null)
   const apiKeyInputRef = useRef<HTMLInputElement>(null)
@@ -82,6 +114,16 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       setTheme(cachedSettings.theme)
     }
   }, [cachedSettings])
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.getVersion().then((version) => {
+      if (!cancelled) setAppVersion(version)
+    }).catch(() => {
+      if (!cancelled) setAppVersion('未知')
+    })
+    return () => { cancelled = true }
+  }, [])
 
   const handleThemeChange = useCallback(async (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme)
@@ -213,30 +255,6 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
     }
   }, [editForm.baseUrl, editForm.apiKey, editForm.model])
 
-  const handleCheckUpdates = useCallback(async () => {
-    setUpdateCheck({ status: 'checking', message: '正在检查更新...' })
-    try {
-      const result = await window.api.update.checkForUpdates()
-      if (result.status === 'available') {
-        setUpdateCheck({
-          status: 'available',
-          message: result.version ? `发现新版本 v${result.version}` : '发现新版本',
-        })
-      } else if (result.status === 'not-available') {
-        setUpdateCheck({
-          status: 'latest',
-          message: result.version ? `已是最新版本 v${result.version}` : '已是最新版本',
-        })
-      } else if (result.status === 'skipped') {
-        setUpdateCheck({ status: 'skipped', message: result.message })
-      } else {
-        setUpdateCheck({ status: 'error', message: result.message })
-      }
-    } catch (err) {
-      setUpdateCheck({ status: 'error', message: (err as Error).message })
-    }
-  }, [])
-
   const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -316,7 +334,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
             <div className="settings-summary-value">{activeProfile?.name || '未选择'}</div>
             <div className="settings-summary-meta">{themeLabel}</div>
           </div>
-          <div className="settings-sidebar-version">Version 1.3.0</div>
+          <div className="settings-sidebar-version">Version {appVersion || '...'}</div>
         </aside>
 
         <section className="settings-content">
@@ -637,22 +655,32 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                   <img src={appIcon} alt="" />
                 </div>
                 <div className="about-logo">{APP_NAME}</div>
-                <div className="about-version">Version 1.3.0</div>
+                <div className="about-version">Version {appVersion || '...'}</div>
                 <div className="about-desc">
                   我是 sumi，一个围绕具体事务展开协作的智能工作台。你可以按事务建立工作区、按任务创建会话，和我一起消化资料、厘清问题、形成可编辑文档，再通过 Skill 生成交付物，把有价值的成果沉淀为自己的知识。
                 </div>
                 <div className="about-update-actions">
                   <button
-                    className={`about-update-btn ${updateCheck.status === 'checking' ? 'about-update-btn-checking' : ''}`}
-                    onClick={handleCheckUpdates}
-                    disabled={updateCheck.status === 'checking'}
+                    className={`about-update-btn ${['checking', 'installing'].includes(updateState.status) ? 'about-update-btn-checking' : ''}`}
+                    onClick={() => { void performPrimaryUpdateAction() }}
+                    disabled={['checking', 'downloading', 'installing'].includes(updateState.status)}
                   >
-                    <RefreshCw size={15} />
-                    {updateCheck.status === 'checking' ? '检查中' : '检查更新'}
+                    {['available', 'downloading'].includes(updateState.status)
+                      ? <Download size={15} />
+                      : <RefreshCw size={15} />}
+                    {getUpdateActionLabel(updateState)}
                   </button>
-                  {updateCheck.status !== 'idle' && updateCheck.message && (
-                    <div className={`about-update-status about-update-status-${updateCheck.status}`} role="status">
-                      {updateCheck.message}
+                  {updateState.status === 'downloading' && (
+                    <progress
+                      className="about-update-progress"
+                      max={100}
+                      value={updateState.progress?.percent || 0}
+                      aria-label="更新下载进度"
+                    />
+                  )}
+                  {updateState.status !== 'idle' && getUpdateStatusMessage(updateState) && (
+                    <div className={`about-update-status about-update-status-${updateState.status}`} role="status" aria-live="polite">
+                      {getUpdateStatusMessage(updateState)}
                     </div>
                   )}
                 </div>

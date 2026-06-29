@@ -13,6 +13,7 @@ import AppShell from './components/layout/AppShell'
 import SettingsModal from './components/settings/SettingsModal'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { ModalProvider } from './components/common/ModalSystem'
+import { subscribeToAppUpdates } from './lib/app-update'
 
 function applyTheme(theme: 'light' | 'dark' | 'system'): void {
   let effective: 'light' | 'dark'
@@ -36,6 +37,8 @@ function App(): React.ReactElement {
     })
     return unsub
   }, [])
+
+  useEffect(() => subscribeToAppUpdates(), [])
 
   // Apply theme from cached settings
   useEffect(() => {

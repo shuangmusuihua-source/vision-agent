@@ -11,6 +11,7 @@ import type {
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
+import type { UpdateDownloadProgress, UpdateErrorPayload } from '../shared/update-types'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -37,6 +38,7 @@ function invoke<K extends keyof IPCChannelMap>(
 
 const api = {
   ping: (): Promise<string> => ipcRenderer.invoke('ping'),
+  getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
 
   workspace: {
     listFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listFiles', dirPath),
@@ -286,6 +288,7 @@ const api = {
   update: {
     download: () => ipcRenderer.invoke('update:download'),
     install: () => ipcRenderer.invoke('update:install'),
+    openLatestRelease: () => ipcRenderer.invoke('update:openLatestRelease'),
     checkForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
     onAvailable: (callback: (info: { version: string }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
@@ -297,8 +300,13 @@ const api = {
       ipcRenderer.on('update:downloaded', handler)
       return () => { ipcRenderer.removeListener('update:downloaded', handler) }
     },
-    onError: (callback: (error: { message: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, error: { message: string }) => callback(error)
+    onDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateDownloadProgress) => callback(progress)
+      ipcRenderer.on('update:download-progress', handler)
+      return () => { ipcRenderer.removeListener('update:download-progress', handler) }
+    },
+    onError: (callback: (error: UpdateErrorPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, error: UpdateErrorPayload) => callback(error)
       ipcRenderer.on('update:error', handler)
       return () => { ipcRenderer.removeListener('update:error', handler) }
     }
