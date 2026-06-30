@@ -106,7 +106,8 @@ function fileTypeFromExt(filePath: string): ArtifactFileType {
   if (ext === 'docx') return 'docx'
   if (ext === 'pptx') return 'pptx'
   if (ext === 'xlsx') return 'xlsx'
-  return 'md'
+  if (ext === 'md' || ext === 'markdown') return 'md'
+  return 'other'
 }
 
 function fileTypeFromContent(content: string): ArtifactFileType {

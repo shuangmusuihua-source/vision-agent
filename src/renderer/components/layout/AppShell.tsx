@@ -19,7 +19,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
-import type { AgentContext, FileEntry, TabDescriptor } from '../../../shared/types'
+import type { AgentContext, TabDescriptor } from '../../../shared/types'
 import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
@@ -73,12 +73,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // (the workspace object changes every render — avoid putting it in dep arrays)
   const workspacePathsRef = useRef(workspace.workspacePaths)
   workspacePathsRef.current = workspace.workspacePaths
-  const refreshAllFilesRef = useRef(workspace.refreshAllFiles)
-  refreshAllFilesRef.current = workspace.refreshAllFiles
-  const refreshFilesRef = useRef(workspace.refreshFiles)
-  refreshFilesRef.current = workspace.refreshFiles
-  const visibleWorkspacePathsRef = useRef<string[]>([])
-  visibleWorkspacePathsRef.current = [...workspace.fixedWorkspacePaths, ...workspace.workspacePaths]
 
   // ── Layout hooks ────────────────────────────────────────────────────
 
@@ -111,22 +105,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const updateError = updateState.status === 'error' ? updateState.message || '未知错误' : null
 
   const editorRef = useRef<MarkdownEditorHandle | null>(null)
-
-  const flushActiveEditorForPath = useCallback(async (path: string, includeChildren = false) => {
-    const activePath = activeFilePathRef.current
-    const matches = includeChildren ? activePath.startsWith(`${path}/`) : activePath === path
-    if (!matches) return true
-    try {
-      await editorRef.current?.flushPendingSave()
-      return true
-    } catch (error) {
-      await modal.alert({
-        title: '保存失败',
-        message: `文件尚未安全保存，已取消后续操作：${(error as Error).message}`,
-      })
-      return false
-    }
-  }, [modal])
 
   const handleSaveFile = useCallback(async (filePath: string, content: string): Promise<SaveFileResult> => {
     return saveFile(filePath, content)
@@ -501,107 +479,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     await openFile(path)
   }, [openFile, view, workspace.fixedWorkspacePaths, workspace.workspacePaths])
 
+  const handleAddToKnowledge = useCallback(async (filePath: string) => {
+    const result = await window.api.workspace.addToKnowledge(filePath, activeSessionId || undefined)
+    if (!result.success) {
+      await modal.alert({ title: '无法放入知识库', message: result.error || '请稍后重试' })
+    }
+    return result
+  }, [activeSessionId, modal])
+
   // ── File operations (bridging workspace + tabs) ─────────────────────
-
-  const handleFileDelete = useCallback(async (filePath: string) => {
-    const confirmed = await modal.confirm({
-      title: '删除文件',
-      message: '确定删除此文件？此操作不可撤销。',
-      variant: 'danger',
-    })
-    if (!confirmed) return
-    if (!await flushActiveEditorForPath(filePath)) return
-    const result = await window.api.workspace.deleteFile(filePath)
-    if (result.success) {
-      if (hasFileTab(filePath)) closeTab({ type: 'file', path: filePath })
-      await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-    } else {
-      modal.alert({ title: '删除失败', message: result.error || '删除失败' })
-    }
-  }, [closeTab, flushActiveEditorForPath, hasFileTab, modal])
-
-  const handleFileRename = useCallback(async (filePath: string, newName: string) => {
-    if (!await flushActiveEditorForPath(filePath)) return
-    const result = await window.api.workspace.renameFile(filePath, newName)
-    if (result.success) {
-      if (hasFileTab(filePath)) {
-        closeTab({ type: 'file', path: filePath })
-        if (result.newPath) await openFile(result.newPath)
-      }
-      await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-    } else {
-      modal.alert({ title: '重命名失败', message: result.error || '重命名失败' })
-    }
-  }, [closeTab, flushActiveEditorForPath, hasFileTab, modal, openFile])
-
-  const handleFileMove = useCallback(async (sourcePath: string, targetDir: string) => {
-    if (!await flushActiveEditorForPath(sourcePath)) return
-    const result = await window.api.workspace.moveFile(sourcePath, targetDir)
-    if (result.success) {
-      if (hasFileTab(sourcePath)) {
-        closeTab({ type: 'file', path: sourcePath })
-        if (result.newPath) await openFile(result.newPath)
-      }
-      await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-    } else {
-      modal.alert({ title: '移动失败', message: result.error || '移动失败' })
-    }
-  }, [closeTab, flushActiveEditorForPath, hasFileTab, modal, openFile])
-
-  const handleCreateFile = useCallback(async (parentPath: string, name: string) => {
-    const result = await window.api.workspace.createFile(parentPath, name)
-    if (!result.success) {
-      await modal.alert({ title: '新建失败', message: result.error || '无法新建文件' })
-      return
-    }
-    await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-    if (result.path) await handleFileSelect(result.path)
-  }, [handleFileSelect, modal])
-
-  const handleCreateDirectory = useCallback(async (parentPath: string, name: string) => {
-    const result = await window.api.workspace.createDir(parentPath, name)
-    if (!result.success) {
-      await modal.alert({ title: '新建失败', message: result.error || '无法新建文件夹' })
-      return
-    }
-    await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-  }, [modal])
-
-  const handleRenameEntry = useCallback(async (entry: FileEntry, name: string) => {
-    if (!entry.isDirectory) {
-      await handleFileRename(entry.path, name)
-      return
-    }
-    if (!await flushActiveEditorForPath(entry.path, true)) return
-    const result = await window.api.workspace.renameEntry(entry.path, name)
-    if (!result.success) {
-      await modal.alert({ title: '重命名失败', message: result.error || '重命名失败' })
-      return
-    }
-    closeTabsByPrefix(`${entry.path}/`)
-    await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-  }, [closeTabsByPrefix, flushActiveEditorForPath, handleFileRename, modal])
-
-  const handleDeleteEntry = useCallback(async (entry: FileEntry) => {
-    if (!entry.isDirectory) {
-      await handleFileDelete(entry.path)
-      return
-    }
-    const confirmed = await modal.confirm({
-      title: '删除文件夹',
-      message: `确定删除“${entry.name}”及其中全部内容？此操作不可撤销。`,
-      variant: 'danger',
-    })
-    if (!confirmed) return
-    if (!await flushActiveEditorForPath(entry.path, true)) return
-    const result = await window.api.workspace.deleteDir(entry.path)
-    if (!result.success) {
-      await modal.alert({ title: '删除失败', message: result.error || '删除失败' })
-      return
-    }
-    closeTabsByPrefix(`${entry.path}/`)
-    await refreshFilesRef.current(visibleWorkspacePathsRef.current)
-  }, [closeTabsByPrefix, flushActiveEditorForPath, handleFileDelete, modal])
 
   // ── Auto-refresh after agent finishes ───────────────────────────────
 
@@ -614,8 +500,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (!hasMessages) return
 
     setMemoryRefreshKey((k) => k + 1)
-    refreshAllFilesRef.current(workspacePathsRef.current)
-
     // Refresh session outputs so OverviewPanel shows newly produced files
     const sid = useAgentStore.getState().activeSessionId.editor
     if (sid) {
@@ -696,7 +580,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <Sidebar
         workspacePaths={workspace.workspacePaths}
         fixedWorkspacePaths={workspace.fixedWorkspacePaths}
-        files={workspace.files}
         memoryRefreshKey={memoryRefreshKey}
         sessions={editorSessionList}
         activeSessionId={view === 'editor' ? activeSessionId : null}
@@ -712,13 +595,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         newSessionInputRef={newSessionInputRef}
         onNewWorkspace={workspace.handleOpenNewWorkspaceModal}
         onRemoveWorkspace={workspace.handleRemoveWorkspace}
-        onRefreshWorkspace={workspace.handleRefreshWorkspace}
-        onOpenFile={handleFileSelect}
-        onCreateFile={handleCreateFile}
-        onCreateDirectory={handleCreateDirectory}
-        onRenameEntry={handleRenameEntry}
-        onDeleteEntry={handleDeleteEntry}
-        onMoveFile={handleFileMove}
         onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => openSearch()}
@@ -790,6 +666,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             sessionId={activeSessionId}
             activeFilePath={linkedFile || activeFilePath}
             onOpenFile={handleFileSelect}
+            onAddToKnowledge={handleAddToKnowledge}
           />
           </ErrorBoundary>
         ) : (

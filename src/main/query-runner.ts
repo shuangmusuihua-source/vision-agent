@@ -6,7 +6,7 @@ import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUser
 import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactsFromTool } from './store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
-import { buildSumiIdentityPrompt } from './agent-identity'
+import { buildSumiContextPrompt, buildSumiIdentityPrompt } from './agent-identity'
 import { writeAuditLog } from './agent-audit'
 import { extractToolPathInput, isToolUsePathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
@@ -46,7 +46,7 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       tool: tool_name,
       result: JSON.stringify(tool_response).substring(0, 500)
     })
-    recordSessionArtifactsFromTool({
+    await recordSessionArtifactsFromTool({
       sessionId: hookContext.envelope.sessionId,
       sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
       workspacePath: hookContext.envelope.workspacePath,
@@ -94,21 +94,15 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     sdkSessionId: getSessionId?.() || sessionEnvelope.sdkSessionId,
   })
 
-  // Build workspace context for the agent
-  const workspaceName = workspaceCwd.split('/').pop() || workspaceCwd
-  const workspaceContextLines = [
-    `## 当前工作区`,
-    `- 工作区名称: ${workspaceName}`,
-    `- 工作区路径: ${workspaceCwd}`,
-    `- 该工作区是用户的独立工作环境，所有文件读写应在该目录下进行`,
-    `- 会话结束后，关键结论应记录为 markdown 文件保存到该工作区`,
-  ].join('\n')
+  const workspaceContextLines = buildSumiContextPrompt(context, workspaceCwd)
 
   const systemPromptAppend = [
     buildSumiIdentityPrompt(context),
     '当你需要用户提供信息或做出选择时，请使用 AskUserQuestion 工具，将选项通过 options 参数提供，而不是在文本中列出建议。',
     workspaceContextLines,
-    `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
+    context === 'ask'
+      ? '可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。通过 Bash 调用；仅在任务确实需要时生成截图，并使用用户明确授权的位置。'
+      : `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
     activeFilePath ? `用户已将以下文件关联到当前对话: ${activeFilePath.replace(/[\n\r]/g, '')}\n回答问题或执行 Skill 前，必须先使用 Read 工具读取该文件的完整内容，并以文件内容作为主要上下文。` : '',
     workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : '',
 

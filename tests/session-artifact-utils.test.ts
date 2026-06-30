@@ -34,6 +34,8 @@ describe('session artifact utilities', () => {
     expect(artifactFileTypeFromPath('research.pdf')).toBe('pdf')
     expect(artifactCategoryFromFileType('pdf')).toBe('skill_output')
     expect(artifactCategoryFromFileType('pptx')).toBe('skill_output')
+    expect(artifactFileTypeFromPath('archive.zip')).toBe('other')
+    expect(artifactCategoryFromFileType('other')).toBe('other')
   })
 
   it('extracts file_path only from Write/Edit tool inputs', () => {
@@ -46,16 +48,18 @@ describe('session artifact utilities', () => {
   it('extracts generated deliverable paths from Bash export commands', () => {
     expect(extractArtifactPathsFromToolInput('Bash', {
       command: 'bash scripts/export-pdf.sh "deck.html" "deliverables/market research.pdf"',
-    })).toEqual(['deck.html', 'deliverables/market research.pdf'])
+    })).toEqual(['deliverables/market research.pdf'])
     expect(extractArtifactPathsFromToolInput('Bash', {
       command: 'python3 build.py --output report.pptx',
     })).toEqual(['report.pptx'])
     expect(extractArtifactPathsFromToolInput('Bash', {
       command: 'bash scripts/export-pdf.sh "deliverables/market research.html" --compact',
     })).toEqual([
-      'deliverables/market research.html',
       'deliverables/market research.pdf',
     ])
+    expect(extractArtifactPathsFromToolInput('Bash', {
+      command: 'python3 inspect.py source.pdf --format text',
+    })).toEqual([])
     expect(extractArtifactPathsFromToolInput('Bash', {
       command: 'ls existing.pdf',
     })).toEqual([])

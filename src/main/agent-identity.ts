@@ -16,3 +16,22 @@ export function buildSumiIdentityPrompt(context: AgentContext): string {
 
   return [BASE_SUMI_IDENTITY_PROMPT, contextLine].join('\n')
 }
+
+export function buildSumiContextPrompt(context: AgentContext, workspaceCwd: string): string {
+  if (context === 'ask') {
+    return [
+      '## Ask sumi 场景',
+      '- 这是独立于工作区的通用问答和工具场景，不要将当前运行目录描述为用户工作区。',
+      '- 除非用户明确要求生成文件或所选工具必须产生文件，否则不要把回答保存为本地文档。',
+      '- 需要生成交付文件时，只能使用用户明确选择或授权的目标位置。',
+    ].join('\n')
+  }
+
+  return [
+    '## 当前工作区',
+    `- 工作区名称: ${workspaceCwd.split('/').pop() || workspaceCwd}`,
+    `- 工作区路径: ${workspaceCwd}`,
+    '- 该工作区是用户的独立工作环境，所有文件读写应在该目录下进行',
+    '- 会话结束后，关键结论应记录为 markdown 文件保存到该工作区',
+  ].join('\n')
+}

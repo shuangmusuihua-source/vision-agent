@@ -14,19 +14,13 @@ import { atomicWriteTextFile } from '../atomic-write'
 import type { WorkspaceDigest } from '../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 import { KNOWLEDGE_BASE_NAME, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
+import { addMarkdownToKnowledge } from '../knowledge-curation'
 
 export function registerWorkspaceHandlers(
-  scanDirectory: (dir: string) => Promise<import('../../shared/types').FileEntry[]>,
   listMarkdownFiles: (dir: string) => Promise<{ label: string; path: string }[]>,
   pushSettingsToRenderer: () => void,
   getSessionOverview?: (workspaceDir: string) => Promise<WorkspaceDigest | null>,
 ): void {
-  ipcMain.handle('workspace:listFiles', async (_event, dirPath: string) => {
-    if (!isPathAuthorized(dirPath)) return []
-    try { return await scanDirectory(dirPath) }
-    catch (e) { console.error('[workspace:listFiles] failed:', dirPath, e); return [] }
-  })
-
   ipcMain.handle('workspace:readFile', async (_event, filePath: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try { const content = await readFile(filePath, 'utf-8'); return { success: true, content } }
@@ -37,6 +31,17 @@ export function registerWorkspaceHandlers(
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try { await atomicWriteTextFile(filePath, content); return { success: true } }
     catch (err) { return { success: false, error: (err as Error).message } }
+  })
+
+  ipcMain.handle('workspace:addToKnowledge', async (_event, request: { sourcePath: string; sessionId?: string }) => {
+    if (!isPathAuthorized(request.sourcePath)) {
+      return { success: false, error: '源文件路径未授权' }
+    }
+    return addMarkdownToKnowledge({
+      sourcePath: request.sourcePath,
+      knowledgeDir: getKnowledgeBaseDir(),
+      sessionId: request.sessionId,
+    })
   })
 
   ipcMain.handle('workspace:deleteFile', async (_event, filePath: string) => {

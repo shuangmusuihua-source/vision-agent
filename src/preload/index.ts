@@ -41,10 +41,11 @@ const api = {
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
 
   workspace: {
-    listFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listFiles', dirPath),
     readFile: (filePath: string) => ipcRenderer.invoke('workspace:readFile', filePath),
     writeFile: (filePath: string, content: string) =>
       ipcRenderer.invoke('workspace:writeFile', filePath, content),
+    addToKnowledge: (sourcePath: string, sessionId?: string) =>
+      invoke('workspace:addToKnowledge', { sourcePath, sessionId }),
     listMarkdownFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listMarkdownFiles', dirPath),
     openDirectoryDialog: () => ipcRenderer.invoke('workspace:openDirectoryDialog'),
     openInBrowser: (filePath: string) => ipcRenderer.invoke('workspace:openInBrowser', filePath),

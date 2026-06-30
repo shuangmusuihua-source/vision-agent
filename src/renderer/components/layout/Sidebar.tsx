@@ -4,10 +4,9 @@ import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, P
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
-import WorkspaceFileTree from './WorkspaceFileTree'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
-import type { FileEntry, SdkSessionInfo } from '../../../shared/types'
+import type { SdkSessionInfo } from '../../../shared/types'
 import type { ContextSlot } from '../../store/agent-store'
 
 interface MemoryEntry {
@@ -18,7 +17,6 @@ interface MemoryEntry {
 interface SidebarProps {
   workspacePaths: string[]
   fixedWorkspacePaths: string[]
-  files: Record<string, FileEntry[]>
   memoryRefreshKey: number
   sessions: SdkSessionInfo[]
   activeSessionId: string | null
@@ -34,13 +32,6 @@ interface SidebarProps {
   newSessionInputRef: React.RefObject<HTMLInputElement | null>
   onNewWorkspace: () => void
   onRemoveWorkspace: (path: string) => void
-  onRefreshWorkspace: (path: string) => void
-  onOpenFile: (path: string) => void
-  onCreateFile: (parentPath: string, name: string) => Promise<void>
-  onCreateDirectory: (parentPath: string, name: string) => Promise<void>
-  onRenameEntry: (entry: FileEntry, name: string) => Promise<void>
-  onDeleteEntry: (entry: FileEntry) => Promise<void>
-  onMoveFile: (sourcePath: string, targetDir: string) => Promise<void>
   onReorderWorkspaces: (paths: string[]) => void
   onOpenSettings: () => void
   onOpenSearch: () => void
@@ -127,7 +118,6 @@ function getSessionAttention(slot?: ContextSlot | null): {
 function Sidebar({
   workspacePaths,
   fixedWorkspacePaths,
-  files,
   memoryRefreshKey,
   sessions,
   activeSessionId,
@@ -143,13 +133,6 @@ function Sidebar({
   newSessionInputRef,
   onNewWorkspace,
   onRemoveWorkspace,
-  onRefreshWorkspace,
-  onOpenFile,
-  onCreateFile,
-  onCreateDirectory,
-  onRenameEntry,
-  onDeleteEntry,
-  onMoveFile,
   onReorderWorkspaces,
   onOpenSettings,
   onOpenSearch,
@@ -473,17 +456,6 @@ function Sidebar({
                             />
                           </div>
                         )}
-                        <WorkspaceFileTree
-                          rootPath={wsPath}
-                          entries={files[wsPath] || []}
-                          onOpenFile={onOpenFile}
-                          onCreateFile={onCreateFile}
-                          onCreateDirectory={onCreateDirectory}
-                          onRenameEntry={onRenameEntry}
-                          onDeleteEntry={onDeleteEntry}
-                          onMoveFile={onMoveFile}
-                          onRefresh={() => onRefreshWorkspace(wsPath)}
-                        />
                       </div>
                       </div>
                   </div>
@@ -495,35 +467,20 @@ function Sidebar({
 
         <div className="sidebar-section-divider" />
 
-        {/* Knowledge — fixed file tree */}
-        {fixedWorkspacePaths.map((wsPath) => {
-          const isCollapsed = collapsedWorkspaces.has(wsPath)
-          return (
-            <div key={wsPath} className={`sidebar-workspace-section sidebar-workspace-fixed${isCollapsed ? ' sidebar-workspace-collapsed' : ''}`}>
-              <div className="sidebar-workspace-module-header" onClick={() => toggleWorkspace(wsPath)} style={{ cursor: 'pointer' }} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') toggleWorkspace(wsPath) }}>
-                <span className="sidebar-workspace-module-title">Knowledge</span>
-                <div className="sidebar-workspace-module-actions">
-                  {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                </div>
-              </div>
-              <div className="sidebar-workspace-body">
-                <div className="sidebar-workspace-body-inner">
-                  <WorkspaceFileTree
-                    rootPath={wsPath}
-                    entries={files[wsPath] || []}
-                    onOpenFile={onOpenFile}
-                    onCreateFile={onCreateFile}
-                    onCreateDirectory={onCreateDirectory}
-                    onRenameEntry={onRenameEntry}
-                    onDeleteEntry={onDeleteEntry}
-                    onMoveFile={onMoveFile}
-                    onRefresh={() => onRefreshWorkspace(wsPath)}
-                  />
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {/* Knowledge */}
+        {fixedWorkspacePaths.length > 0 && (
+          <div className="sidebar-workspace-section sidebar-workspace-fixed">
+            <button
+              type="button"
+              className="sidebar-workspace-module-header sidebar-knowledge-entry"
+              onClick={onToggleGraph}
+              aria-label="打开知识库图谱"
+            >
+              <span className="sidebar-workspace-module-title">Knowledge</span>
+              <GitGraph size={13} aria-hidden="true" />
+            </button>
+          </div>
+        )}
 
         {/* Memory */}
         {memoryFiles.length > 0 && (

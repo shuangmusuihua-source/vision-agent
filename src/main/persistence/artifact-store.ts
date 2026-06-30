@@ -1,5 +1,7 @@
 import { createHash } from 'crypto'
-import { existsSync, statSync } from 'fs'
+import { existsSync } from 'fs'
+import { stat } from 'fs/promises'
+import { join } from 'path'
 import type { SessionArtifactRecord, SessionOutputEntry } from '../../shared/types'
 import {
   artifactCategoryFromFileType,
@@ -10,6 +12,13 @@ import {
   normalizeArtifactPath,
 } from '../artifact-utils'
 import { store } from './store-core'
+import { getAppUserDataDir } from '../app-identity'
+import {
+  createSessionArtifactSnapshot,
+  removeSessionArtifactSnapshots,
+} from '../artifact-snapshot'
+
+const ARTIFACT_SNAPSHOT_ROOT = join(getAppUserDataDir(), 'session-artifacts')
 
 type UpsertSessionArtifactInput = {
   sessionId: string
@@ -60,59 +69,98 @@ export function toSessionOutputEntry(record: SessionArtifactRecord): SessionOutp
     filePath: record.filePath,
     fileType: record.fileType,
     category: record.category,
+    availability: record.availability || (existsSync(record.filePath) ? 'available' : 'missing'),
     source: record.source,
     size: record.size,
     createdAt: record.createdAt,
   }
 }
 
-export function getSessionArtifactOutputs(sessionId: string): SessionOutputEntry[] {
-  const artifacts = getSessionArtifacts(sessionId)
-  const existing = artifacts.filter((artifact) => existsSync(artifact.filePath))
-  if (existing.length !== artifacts.length) {
-    const existingIds = new Set(existing.map((artifact) => artifact.id))
-    const records = store
-      .get('sessionArtifacts')
-      .filter((artifact) => artifact.sessionId !== sessionId || existingIds.has(artifact.id))
-    store.set('sessionArtifacts', records)
-    syncSessionArtifactCount(sessionId)
+export async function getSessionArtifactOutputs(sessionId: string): Promise<SessionOutputEntry[]> {
+  const legacyArtifacts = getSessionArtifacts(sessionId).filter((artifact) => !artifact.sourceFilePath)
+  for (const artifact of legacyArtifacts) {
+    if (!existsSync(artifact.filePath)) continue
+    await upsertSessionArtifact({
+      sessionId: artifact.sessionId,
+      sdkSessionId: artifact.sdkSessionId,
+      workspacePath: artifact.workspacePath,
+      filePath: artifact.filePath,
+      source: artifact.source,
+      sourceTool: artifact.sourceTool,
+      skillId: artifact.skillId,
+      createdAt: artifact.createdAt,
+    })
   }
-  return existing.map(toSessionOutputEntry)
+
+  const artifacts = getSessionArtifacts(sessionId)
+  let changed = false
+  const records = store.get('sessionArtifacts')
+  for (const artifact of artifacts) {
+    const availability = existsSync(artifact.filePath) ? 'available' : 'missing'
+    if (artifact.availability === availability) continue
+    const idx = records.findIndex((record) => record.id === artifact.id)
+    if (idx >= 0) {
+      records[idx] = { ...records[idx], availability, updatedAt: Date.now() }
+      changed = true
+    }
+  }
+  if (changed) store.set('sessionArtifacts', records)
+  return getSessionArtifacts(sessionId).map(toSessionOutputEntry)
 }
 
-export function upsertSessionArtifact(input: UpsertSessionArtifactInput): SessionArtifactRecord | null {
+export async function upsertSessionArtifact(input: UpsertSessionArtifactInput): Promise<SessionArtifactRecord | null> {
   const sessionId = input.sessionId
   const workspacePath = input.workspacePath || process.cwd()
-  const filePath = normalizeArtifactPath(input.filePath, workspacePath)
+  const sourceFilePath = normalizeArtifactPath(input.filePath, workspacePath)
 
-  if (!sessionId || !filePath || isMemoryArtifactPath(filePath) || !existsSync(filePath)) {
+  if (!sessionId || !sourceFilePath || isMemoryArtifactPath(sourceFilePath) || !existsSync(sourceFilePath)) {
     return null
   }
 
   let size: number | undefined
   try {
-    const stat = statSync(filePath)
-    if (!stat.isFile()) return null
-    size = stat.size
+    const sourceStat = await stat(sourceFilePath)
+    if (!sourceStat.isFile()) return null
+    size = sourceStat.size
   } catch {
     return null
   }
 
   const now = Date.now()
   const records = store.get('sessionArtifacts')
-  const id = artifactId(sessionId, filePath)
-  const idx = records.findIndex((record) => record.sessionId === sessionId && record.filePath === filePath)
+  const idx = records.findIndex((record) => (
+    record.sessionId === sessionId
+    && (record.sourceFilePath === sourceFilePath || record.filePath === sourceFilePath)
+  ))
   const existing = idx >= 0 ? records[idx] : null
-  const fileType = artifactFileTypeFromPath(filePath)
+  const originalSourcePath = existing?.sourceFilePath || sourceFilePath
+  const id = existing?.id || artifactId(sessionId, originalSourcePath)
+  const fileName = existing?.fileName || artifactFileName(originalSourcePath)
+  let snapshotPath: string
+  try {
+    snapshotPath = await createSessionArtifactSnapshot({
+      snapshotRoot: ARTIFACT_SNAPSHOT_ROOT,
+      sessionId,
+      artifactId: id,
+      sourceFilePath,
+      fileName,
+    })
+  } catch (error) {
+    console.error('[ArtifactStore] failed to snapshot artifact:', error)
+    return null
+  }
+  const fileType = artifactFileTypeFromPath(originalSourcePath)
   const next: SessionArtifactRecord = {
     id,
     sessionId,
     sdkSessionId: input.sdkSessionId || existing?.sdkSessionId,
     workspacePath,
-    fileName: artifactFileName(filePath),
-    filePath,
+    fileName,
+    filePath: snapshotPath,
+    sourceFilePath: originalSourcePath,
     fileType,
     category: artifactCategoryFromFileType(fileType),
+    availability: 'available',
     source: input.source,
     sourceTool: input.sourceTool,
     skillId: input.skillId ?? existing?.skillId ?? null,
@@ -132,15 +180,15 @@ export function upsertSessionArtifact(input: UpsertSessionArtifactInput): Sessio
   return next
 }
 
-export function recordSessionArtifactsFromTool(
+export async function recordSessionArtifactsFromTool(
   input: RecordArtifactFromToolInput
-): SessionArtifactRecord[] {
+): Promise<SessionArtifactRecord[]> {
   const filePaths = extractArtifactPathsFromToolInput(input.toolName, input.toolInput)
   if (!input.sessionId || filePaths.length === 0) return []
   const sessionId = input.sessionId
 
-  return filePaths.flatMap((filePath) => {
-    const artifact = upsertSessionArtifact({
+  const artifacts = await Promise.all(filePaths.map((filePath) => (
+    upsertSessionArtifact({
       sessionId,
       sdkSessionId: input.sdkSessionId,
       workspacePath: input.workspacePath || process.cwd(),
@@ -149,12 +197,15 @@ export function recordSessionArtifactsFromTool(
       sourceTool: input.toolName,
       skillId: input.skillId,
     })
-    return artifact ? [artifact] : []
-  })
+  )))
+  return artifacts.filter((artifact): artifact is SessionArtifactRecord => artifact !== null)
 }
 
 export function removeSessionArtifacts(sessionId: string): void {
   const records = store.get('sessionArtifacts').filter((artifact) => artifact.sessionId !== sessionId)
   store.set('sessionArtifacts', records)
   syncSessionArtifactCount(sessionId)
+  void removeSessionArtifactSnapshots(ARTIFACT_SNAPSHOT_ROOT, sessionId).catch((error) => {
+    console.error('[ArtifactStore] failed to remove snapshots:', error)
+  })
 }

@@ -1,32 +1,21 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { FileEntry } from '../lib/ipc'
 import { filterUserWorkspacePaths, KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
 
-interface UseWorkspaceOptions {
-  /** Called after file operations that change the files list. */
-  onFilesChanged?: () => void
-}
-
 /**
- * Workspace management — paths, file listing, CRUD modals.
+ * Workspace management — paths and CRUD modals.
  *
- * Keeps workspace-level state (paths, files, modals) in one place.
- * File operations that bridge workspace and tabs (delete/rename/move)
- * stay in AppShell; this hook provides the pure-workspace building blocks.
+ * Keeps workspace-level state and modals in one place. File discovery is
+ * handled by the search/index modules rather than duplicated in renderer state.
  */
-export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
+export function useWorkspace() {
   const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
   const [fixedWorkspacePaths, setFixedWorkspacePaths] = useState<string[]>([])
-  const [files, setFiles] = useState<Record<string, FileEntry[]>>({})
 
   // Knowledge base dir
   useEffect(() => {
     window.api.workspace.knowledgeDir().then(dir => {
       setFixedWorkspacePaths([dir])
       setWorkspacePaths((prev) => filterUserWorkspacePaths(prev, [dir]))
-      window.api.workspace.listFiles(dir).then((entries) => {
-        setFiles((prev) => ({ ...prev, [dir]: entries }))
-      }).catch(() => {})
     })
   }, [])
 
@@ -34,39 +23,16 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
 
   const prevAuthDirsRef = useRef<string>('')
 
-  /** Pull workspace dirs + file listings from cached settings on change. */
+  /** Pull workspace directories from cached settings on change. */
   function syncFromSettings(dirs: string[], fixedDirs: string[] = fixedWorkspacePaths): void {
     const userDirs = filterUserWorkspacePaths(dirs, fixedDirs)
     const key = `${userDirs.join(',')}::${fixedDirs.join(',')}`
     if (key === prevAuthDirsRef.current) return
     prevAuthDirsRef.current = key
     setWorkspacePaths(userDirs)
-    const allDirs = [...fixedDirs, ...userDirs]
-    const fileEntries: Record<string, FileEntry[]> = {}
-    Promise.all(
-      allDirs.map(async (dir) => {
-        fileEntries[dir] = await window.api.workspace.listFiles(dir)
-      })
-    ).then(() => setFiles(fileEntries))
-  }
-
-  async function refreshFiles(paths: string[]): Promise<void> {
-    const fileEntries: Record<string, FileEntry[]> = {}
-    await Promise.all(
-      paths.map(async (dir) => {
-        fileEntries[dir] = await window.api.workspace.listFiles(dir)
-      })
-    )
-    setFiles((prev) => ({ ...prev, ...fileEntries }))
-    onFilesChanged?.()
   }
 
   // ── Workspace-level handlers ──────────────────────────────────────
-
-  const handleRefreshWorkspace = useCallback(async (path: string) => {
-    const entries = await window.api.workspace.listFiles(path)
-    setFiles((prev) => ({ ...prev, [path]: entries }))
-  }, [])
 
   const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
     const userPaths = filterUserWorkspacePaths(paths, fixedWorkspacePaths)
@@ -125,8 +91,6 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
       if (dirPath) {
         if (!workspacePaths.includes(dirPath)) {
           setWorkspacePaths((prev) => [...prev, dirPath])
-          const entries = await window.api.workspace.listFiles(dirPath)
-          setFiles((prev) => ({ ...prev, [dirPath]: entries }))
           await window.api.settings.addDirectory(dirPath)
         }
         handleCloseNewWorkspaceModal()
@@ -150,48 +114,19 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
     const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
     if (result.success) {
       setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
-      setFiles((prev) => {
-        const next = { ...prev }
-        delete next[deleteWsPath!]
-        return next
-      })
       setDeleteWsPath(null)
-      onFilesChanged?.()
     }
     return result
-  }, [deleteWsPath, onFilesChanged])
-
-  // ── Bulk file refresh (called after agent finishes) ────────────────
-
-  const refreshAllFiles = useCallback(async (paths: string[]) => {
-    const results = await Promise.all(
-      paths.map(async (dir) => {
-        const entries = await window.api.workspace.listFiles(dir)
-        return { dir, entries }
-      })
-    )
-    setFiles((prev) => {
-      const next = { ...prev }
-      for (const { dir, entries } of results) {
-        next[dir] = entries
-      }
-      return next
-    })
-  }, [])
+  }, [deleteWsPath])
 
   return {
     // State
     workspacePaths,
     setWorkspacePaths,
     fixedWorkspacePaths,
-    files,
-    setFiles,
     // Settings
     syncFromSettings,
-    refreshFiles,
-    refreshAllFiles,
     // Workspace handlers
-    handleRefreshWorkspace,
     handleReorderWorkspaces,
     handleRemoveWorkspace,
     // New workspace modal

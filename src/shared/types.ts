@@ -391,6 +391,7 @@ export type ArtifactFileType =
   | 'docx'
   | 'pptx'
   | 'xlsx'
+  | 'other'
 
 export type ArtifactData = {
   fileName: string
@@ -626,13 +627,6 @@ export type FileChangeEvent = {
 
 // ─── File Entry (workspace tree) ────────────────────────────────────
 
-export type FileEntry = {
-  name: string
-  path: string
-  isDirectory: boolean
-  children?: FileEntry[]
-}
-
 // ─── Workspace Record (P0: workspace-centric architecture) ────────────
 
 export interface WorkspaceRecord {
@@ -676,9 +670,11 @@ export interface SessionArtifactRecord {
   sdkSessionId?: string    // Claude SDK session_id for traceability only
   workspacePath: string    // Workspace used to resolve relative tool paths
   fileName: string
-  filePath: string         // Normalized absolute filesystem path
+  filePath: string         // Session-owned snapshot path
+  sourceFilePath?: string  // Original normalized filesystem path
   fileType: ArtifactFileType
   category: 'document' | 'skill_output' | 'other'
+  availability?: 'available' | 'missing'
   source: string           // e.g. Write, Edit, history-backfill
   sourceTool?: string
   skillId?: string | null
@@ -745,6 +741,7 @@ export interface SessionOutputEntry {
   filePath: string
   fileType: ArtifactFileType
   category: 'document' | 'skill_output' | 'other'
+  availability: 'available' | 'missing'
   source: string
   size?: number
   createdAt: number

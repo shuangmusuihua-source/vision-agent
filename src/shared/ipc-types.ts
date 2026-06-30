@@ -107,10 +107,6 @@ export type IPCChannelMap = {
   }
 
   // Workspace
-  'workspace:listFiles': {
-    request: string
-    response: unknown
-  }
   'workspace:readFile': {
     request: string
     response: { success: boolean; content?: string; error?: string }
@@ -118,6 +114,16 @@ export type IPCChannelMap = {
   'workspace:writeFile': {
     request: [string, string]
     response: { success: boolean; error?: string }
+  }
+  'workspace:addToKnowledge': {
+    request: { sourcePath: string; sessionId?: string }
+    response: {
+      success: boolean
+      filePath?: string
+      fileName?: string
+      alreadyExists?: boolean
+      error?: string
+    }
   }
   'workspace:listMarkdownFiles': {
     request: string

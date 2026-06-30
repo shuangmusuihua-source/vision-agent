@@ -13,7 +13,6 @@ import type {
   AskUserQuestionOption,
   GraphNode,
   GraphEdge,
-  FileEntry,
   ModelProfile,
   SessionOutputs,
   BuiltinSkillCatalogItem,
@@ -91,9 +90,15 @@ interface NotificationHistoryItem {
 // ─── API Interfaces ──────────────────────────────────────────────────
 
 interface WorkspaceApi {
-  listFiles: (dirPath: string) => Promise<FileEntry[]>
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
+  addToKnowledge: (sourcePath: string, sessionId?: string) => Promise<{
+    success: boolean
+    filePath?: string
+    fileName?: string
+    alreadyExists?: boolean
+    error?: string
+  }>
   openDirectoryDialog: () => Promise<string | null>
   newDirectoryDialog: () => Promise<string | null>
   createWorkspace: (name: string) => Promise<string | null>
@@ -267,7 +272,6 @@ export type {
   NotificationApi,
   UpdateApi,
   NotificationHistoryItem,
-  FileEntry,
   ModelProfile,
   AppSettings,
   SkillDefinition,

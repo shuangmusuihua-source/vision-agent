@@ -3,7 +3,7 @@ import type { ForkSessionOptions, SessionMutationOptions } from '@anthropic-ai/c
 import { getAppSkillsCwd } from './skill-init'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
-import { getSessionRecords, removeSessionRecord, updateSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
+import { getSessionRecords, removeSessionRecord, removeSessionArtifacts, updateSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { readFile } from 'node:fs/promises'
 import { resolveClaudeSessionJsonlPath } from './claude-session-path'
 import { readJsonlTailPage } from './jsonl-tail-reader'
@@ -346,6 +346,7 @@ export async function deleteSdkSession(sessionId: string): Promise<void> {
   await withSessionDirFallback(sessionId, (_sdkSessionId, options) => deleteSession(sdkSessionId, options))
   compactionSessionIds.delete(sdkSessionId)
   deleteCompactionSessionId(sdkSessionId)
+  removeSessionArtifacts(appSessionId)
   removeSessionRecord(appSessionId)
 }
 

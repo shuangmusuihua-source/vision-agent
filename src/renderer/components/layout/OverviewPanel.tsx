@@ -1,4 +1,5 @@
-import { FileText, Box, ArrowUpRight, type LucideIcon } from 'lucide-react'
+import { useState } from 'react'
+import { FileText, Box, ArrowUpRight, BookmarkPlus, Check, LoaderCircle, type LucideIcon } from 'lucide-react'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { SessionOutputEntry } from '../../../shared/types'
 
@@ -6,12 +7,14 @@ interface OverviewPanelProps {
   sessionId: string | null
   activeFilePath?: string
   onOpenFile: (path: string) => void
+  onAddToKnowledge: (path: string) => Promise<{ success: boolean; alreadyExists?: boolean; error?: string }>
 }
 
 type OverviewFileIcon = LucideIcon | ((props: { size?: number; strokeWidth?: number }) => React.ReactElement)
 
-function OverviewPanel({ sessionId, activeFilePath, onOpenFile }: OverviewPanelProps): React.ReactElement {
+function OverviewPanel({ sessionId, activeFilePath, onOpenFile, onAddToKnowledge }: OverviewPanelProps): React.ReactElement {
   const sessionOutputs = useAgentStore((s) => s.sessionOutputs)
+  const [knowledgeStatus, setKnowledgeStatus] = useState<Record<string, 'adding' | 'added'>>({})
 
   // No session selected
   if (!sessionId) {
@@ -65,7 +68,7 @@ function OverviewPanel({ sessionId, activeFilePath, onOpenFile }: OverviewPanelP
   } => {
     const ext = fileName.split('.').pop()?.toLowerCase() || ''
     const isHtmlSlides = ext === 'html' || ext === 'htm'
-    const isMarkdown = ext === 'md' || variant === 'md'
+    const isMarkdown = ext === 'md'
 
     return {
       badge: isHtmlSlides ? 'HTML' : isMarkdown ? 'MD' : ext.toUpperCase() || 'FILE',
@@ -80,24 +83,59 @@ function OverviewPanel({ sessionId, activeFilePath, onOpenFile }: OverviewPanelP
         const meta = getFileMeta(f.fileName, variant)
         const FileIcon = meta.icon
         const isActive = activeFilePath === f.filePath
+        const isMissing = f.availability === 'missing'
+        const canAddToKnowledge = f.fileType === 'md' && !isMissing
+        const addStatus = knowledgeStatus[f.filePath]
+
+        const handleAddToKnowledge = async () => {
+          if (!canAddToKnowledge || addStatus) return
+          setKnowledgeStatus((current) => ({ ...current, [f.filePath]: 'adding' }))
+          const result = await onAddToKnowledge(f.filePath)
+          setKnowledgeStatus((current) => {
+            const next = { ...current }
+            if (result.success) next[f.filePath] = 'added'
+            else delete next[f.filePath]
+            return next
+          })
+        }
 
         return (
-          <button
-            key={f.filePath}
-            className={`overview-file-chip overview-file-chip--${variant} overview-file-chip--${meta.kind}${isActive ? ' overview-file-chip--active' : ''}`}
-            onClick={() => onOpenFile(f.filePath)}
-            title={f.filePath}
-            aria-current={isActive ? 'page' : undefined}
-          >
-            <span className="overview-file-chip-icon" aria-hidden="true">
-              <FileIcon size={20} strokeWidth={1.9} />
-            </span>
-            <span className="overview-file-chip-content">
-              <span className="overview-file-chip-name">{f.fileName}</span>
-              <span className={`overview-file-chip-badge overview-file-chip-badge--${meta.kind}`}>{meta.badge}</span>
-            </span>
-            <ArrowUpRight size={12} className="overview-file-chip-arrow" aria-hidden="true" />
-          </button>
+          <div className="overview-file-row" key={f.filePath}>
+            <button
+              className={`overview-file-chip overview-file-chip--${variant} overview-file-chip--${meta.kind}${isActive ? ' overview-file-chip--active' : ''}${isMissing ? ' overview-file-chip--missing' : ''}`}
+              onClick={() => onOpenFile(f.filePath)}
+              title={isMissing ? `${f.fileName} 的会话副本不可用` : f.filePath}
+              aria-current={isActive ? 'page' : undefined}
+              disabled={isMissing}
+            >
+              <span className="overview-file-chip-icon" aria-hidden="true">
+                <FileIcon size={20} strokeWidth={1.9} />
+              </span>
+              <span className="overview-file-chip-content">
+                <span className="overview-file-chip-name">{f.fileName}</span>
+                <span className={`overview-file-chip-badge overview-file-chip-badge--${meta.kind}`}>
+                  {isMissing ? '不可用' : meta.badge}
+                </span>
+              </span>
+              <ArrowUpRight size={12} className="overview-file-chip-arrow" aria-hidden="true" />
+            </button>
+            {canAddToKnowledge && (
+              <button
+                type="button"
+                className={`overview-knowledge-action${addStatus === 'added' ? ' overview-knowledge-action--added' : ''}`}
+                onClick={() => void handleAddToKnowledge()}
+                disabled={addStatus === 'adding' || addStatus === 'added'}
+                title={addStatus === 'added' ? '已放入知识库' : '放入知识库'}
+                aria-label={addStatus === 'added' ? `${f.fileName} 已放入知识库` : `将 ${f.fileName} 放入知识库`}
+              >
+                {addStatus === 'adding'
+                  ? <LoaderCircle size={16} className="overview-knowledge-action-spinner" />
+                  : addStatus === 'added'
+                    ? <Check size={16} />
+                    : <BookmarkPlus size={16} />}
+              </button>
+            )}
+          </div>
         )
       })}
     </div>

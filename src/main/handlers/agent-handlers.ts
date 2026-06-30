@@ -1,7 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession, setPermissionMode } from '../agent-manager'
-import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactsFromTool } from '../store'
+import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactsFromTool, removeSessionArtifacts } from '../store'
 import type { AgentContext } from '../../shared/types'
 import type { IPCRequest } from '../../shared/ipc-types'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
@@ -84,7 +84,7 @@ async function ensureLegacyArtifactsBackfilled(sessionId: string): Promise<void>
         for (const block of msg.message.content) {
           if (block.type !== 'tool_use') continue
           if (block.name !== 'Write' && block.name !== 'Edit' && block.name !== 'Bash') continue
-          recordSessionArtifactsFromTool({
+          await recordSessionArtifactsFromTool({
             sessionId: appSessionId,
             sdkSessionId: record?.sdkSessionId,
             workspacePath: record?.workspacePath,
@@ -188,6 +188,7 @@ export function registerAgentHandlers(): void {
     const request: AgentRemoveSessionRecordRequest = isObjectRequest(requestOrId)
       ? requestOrId
       : { sessionId: requestOrId }
+    removeSessionArtifacts(request.sessionId)
     removeSessionRecord(request.sessionId)
     return { success: true }
   })
@@ -228,7 +229,7 @@ export function registerAgentHandlers(): void {
       // overview loads read only the app-owned artifact registry.
       await ensureLegacyArtifactsBackfilled(request.sessionId)
 
-      const files = getSessionArtifactOutputs(appSessionId)
+      const files = await getSessionArtifactOutputs(appSessionId)
       return { sessionId: appSessionId, workspacePath: workspacePath || '', files }
     } catch (e) {
       console.error('[agent:getSessionOutputs] failed:', e)

@@ -3,7 +3,7 @@ import { readdir } from 'fs/promises'
 import { join, extname } from 'path'
 import { getMainWindow } from './ipc-sender'
 import { getSettings, getSessionsByWorkspace } from './store'
-import type { FileEntry, WorkspaceDigest } from '../shared/types'
+import type { WorkspaceDigest } from '../shared/types'
 import { registerWorkspaceHandlers } from './handlers/workspace-handlers'
 import { registerSettingsHandlers } from './handlers/settings-handlers'
 import { registerAgentHandlers } from './handlers/agent-handlers'
@@ -17,29 +17,6 @@ function pushSettingsToRenderer(): void {
   if (window && !window.isDestroyed()) {
     window.webContents.send('settings:changed', getSettings())
   }
-}
-
-async function scanDirectory(dirPath: string, maxDepth = 12, depth = 0): Promise<FileEntry[]> {
-  if (depth > maxDepth) return []
-  const entries = await readdir(dirPath, { withFileTypes: true })
-  const result: FileEntry[] = []
-  const ignoredDirs = new Set(['node_modules', 'out', 'dist'])
-  const sortedEntries = entries.sort((a, b) => {
-    if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1
-    return a.name.localeCompare(b.name, 'zh-CN')
-  })
-  for (const entry of sortedEntries) {
-    if (entry.name.startsWith('.')) continue
-    const fullPath = join(dirPath, entry.name)
-    if (entry.isDirectory()) {
-      if (ignoredDirs.has(entry.name)) continue
-      const children = await scanDirectory(fullPath, maxDepth, depth + 1)
-      result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
-    } else if (extname(entry.name) === '.md') {
-      result.push({ name: entry.name, path: fullPath, isDirectory: false })
-    }
-  }
-  return result
 }
 
 async function listMarkdownFiles(dirPath: string): Promise<Array<{ label: string; path: string }>> {
@@ -61,14 +38,13 @@ async function listMarkdownFiles(dirPath: string): Promise<Array<{ label: string
 
 // ─── Registration ────────────────────────────────────────────────
 
-export { scanDirectory }
 export { pushSettingsToRenderer }
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('ping', () => 'pong')
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
-  registerWorkspaceHandlers(scanDirectory, listMarkdownFiles, pushSettingsToRenderer, getSessionOverview)
+  registerWorkspaceHandlers(listMarkdownFiles, pushSettingsToRenderer, getSessionOverview)
   registerSettingsHandlers(pushSettingsToRenderer)
   registerAgentHandlers()
   registerSystemHandlers()

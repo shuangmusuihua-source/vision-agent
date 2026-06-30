@@ -19,7 +19,8 @@ export function artifactFileTypeFromPath(filePath: string): ArtifactFileType {
   if (ext === 'docx') return 'docx'
   if (ext === 'pptx') return 'pptx'
   if (ext === 'xlsx') return 'xlsx'
-  return 'md'
+  if (ext === 'md' || ext === 'markdown') return 'md'
+  return 'other'
 }
 
 export function artifactCategoryFromFileType(
@@ -33,7 +34,8 @@ export function artifactCategoryFromFileType(
     || fileType === 'pptx'
     || fileType === 'xlsx'
   ) return 'skill_output'
-  return 'document'
+  if (fileType === 'md' || fileType === 'json' || fileType === 'png') return 'document'
+  return 'other'
 }
 
 export function isMemoryArtifactPath(filePath: string): boolean {
@@ -50,6 +52,19 @@ export function extractArtifactPathFromToolInput(
 
 const BASH_ARTIFACT_EXTENSION = '(?:html?|md|markdown|svg|png|jpe?g|json|pdf|docx|pptx|xlsx)'
 
+function extractSupportedArtifactPaths(value: string): string[] {
+  const pathPattern = new RegExp(
+    `"([^"\\n]+\\.${BASH_ARTIFACT_EXTENSION})"|'([^'\\n]+\\.${BASH_ARTIFACT_EXTENSION})'|([^\\s"'|;&<>]+\\.${BASH_ARTIFACT_EXTENSION})`,
+    'gi'
+  )
+  const paths = new Set<string>()
+  for (const match of value.matchAll(pathPattern)) {
+    const filePath = match[1] || match[2] || match[3]
+    if (filePath) paths.add(filePath)
+  }
+  return [...paths]
+}
+
 export function extractArtifactPathsFromToolInput(
   toolName: string,
   toolInput: unknown
@@ -64,24 +79,36 @@ export function extractArtifactPathsFromToolInput(
 
   if (toolName !== 'Bash' || typeof input.command !== 'string') return []
   const command = input.command
-  const createsFiles = /(?:^|[;&|]\s*)(?:bash|sh|python\d*|node|cp|mv|convert|magick)\b|(?:^|\s)(?:tee\b|>{1,2})/i.test(command)
-  if (!createsFiles) return []
-
-  const pathPattern = new RegExp(
-    `"([^"\\n]+\\.${BASH_ARTIFACT_EXTENSION})"|'([^'\\n]+\\.${BASH_ARTIFACT_EXTENSION})'|([^\\s"'|;&<>]+\\.${BASH_ARTIFACT_EXTENSION})`,
-    'gi'
-  )
+  const candidates = extractSupportedArtifactPaths(command)
   const paths = new Set<string>()
-  for (const match of command.matchAll(pathPattern)) {
-    const filePath = match[1] || match[2] || match[3]
-    if (filePath) paths.add(filePath)
+
+  for (const match of command.matchAll(/(?:^|\s)(?:--out(?:put)?|-o)(?:=|\s+)(?:"[^"]+"|'[^']+'|[^\s|;&<>]+)/gi)) {
+    const output = extractSupportedArtifactPaths(match[0]).at(-1)
+    if (output) paths.add(output)
+  }
+
+  for (const match of command.matchAll(/>{1,2}\s*(?:"[^"]+"|'[^']+'|[^\s|;&<>]+)/g)) {
+    const output = extractSupportedArtifactPaths(match[0]).at(-1)
+    if (output) paths.add(output)
+  }
+
+  for (const match of command.matchAll(/\btee\s+(?:-[A-Za-z]+\s+)*(?:"[^"]+"|'[^']+'|[^\s|;&<>]+)/gi)) {
+    const output = extractSupportedArtifactPaths(match[0]).at(-1)
+    if (output) paths.add(output)
+  }
+
+  if (/(?:^|[;&|]\s*)(?:cp|mv)\b/i.test(command)) {
+    const destination = candidates.at(-1)
+    if (destination) paths.add(destination)
   }
 
   // The bundled frontend-slides exporter derives <input>.pdf when the
   // optional output argument is omitted. Register that implicit output too.
-  if (/\bexport-pdf\.sh\b/i.test(command) && ![...paths].some((filePath) => /\.pdf$/i.test(filePath))) {
-    const htmlInput = [...paths].find((filePath) => /\.html?$/i.test(filePath))
-    if (htmlInput) paths.add(htmlInput.replace(/\.html?$/i, '.pdf'))
+  if (/\bexport-pdf\.sh\b/i.test(command)) {
+    const explicitPdf = candidates.find((filePath) => /\.pdf$/i.test(filePath))
+    if (explicitPdf) paths.add(explicitPdf)
+    const htmlInput = candidates.find((filePath) => /\.html?$/i.test(filePath))
+    if (!explicitPdf && htmlInput) paths.add(htmlInput.replace(/\.html?$/i, '.pdf'))
   }
 
   return [...paths]

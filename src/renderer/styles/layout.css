@@ -325,6 +325,26 @@
   user-select: none;
 }
 
+.sidebar-knowledge-entry {
+  width: calc(100% - 12px);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-knowledge-entry:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.sidebar-knowledge-entry:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
 .sidebar-workspace-module-actions {
   display: flex;
   align-items: center;
@@ -774,68 +794,6 @@
   white-space: nowrap;
 }
 
-.sidebar-file-tree {
-  margin: 6px 6px 8px 22px;
-  padding-top: 6px;
-  border-top: 1px solid var(--color-border);
-}
-
-.sidebar-files-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 24px;
-  padding: 0 6px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-.sidebar-file-main {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  color: inherit;
-  text-align: left;
-}
-
-.sidebar-tree-indent {
-  width: 12px;
-  flex: 0 0 12px;
-}
-
-.sidebar-tree-actions {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-}
-
-.sidebar-file-action-danger:hover {
-  color: var(--color-danger);
-  background: var(--color-danger-bg);
-}
-
-.sidebar-tree-input-row {
-  padding: 2px 6px;
-}
-
-.sidebar-tree-status,
-.sidebar-tree-empty {
-  padding: 4px 8px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
-}
-
-.sidebar-file-main:focus-visible,
-.sidebar-file-action:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 1px;
-  border-radius: var(--radius-sm);
-}
-
 /* Session entries (replaces file tree in workspace) */
 .sidebar-session-entry {
   position: relative;
@@ -1010,7 +968,7 @@
 }
 
 .sidebar-file-action {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   width: 20px;
@@ -1018,21 +976,10 @@
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   flex-shrink: 0;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .sidebar-file:hover .sidebar-file-action {
   display: flex;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.sidebar-tree-actions-visible .sidebar-file-action,
-.sidebar-entry:hover .sidebar-file-action,
-.sidebar-entry:focus-within .sidebar-file-action {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .sidebar-file-action:hover {
