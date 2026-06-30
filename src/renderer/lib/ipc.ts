@@ -160,8 +160,9 @@ interface AgentApi {
 }
 
 interface GraphApi {
-  getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>
-  onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => () => void
+  getData: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; changeVersion?: number }>
+  acknowledgeChanges: (version: number) => Promise<{ count: number; files: string[]; version: number }>
+  onFilesChanged: (callback: (data: { count: number; files: string[]; version: number }) => void) => () => void
 }
 
 interface CronApi {

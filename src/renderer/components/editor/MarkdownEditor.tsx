@@ -10,7 +10,7 @@ import { Highlight } from '@tiptap/extension-highlight'
 import { Typography } from '@tiptap/extension-typography'
 import Placeholder from '@tiptap/extension-placeholder'
 import { common, createLowlight } from 'lowlight'
-import { useEffect, useCallback, useRef, useState, memo } from 'react'
+import { useEffect, useCallback, useRef, useState, memo, forwardRef, useImperativeHandle } from 'react'
 import { ReactRenderer } from '@tiptap/react'
 import tippy, { type Instance as TippyInstance } from 'tippy.js'
 import { Wikilink } from './extensions/wikilink'
@@ -75,6 +75,10 @@ interface MarkdownEditorProps {
   onStatsUpdate: (wordCount: number, charCount: number) => void
 }
 
+export interface MarkdownEditorHandle {
+  flushPendingSave: () => Promise<boolean>
+}
+
 function SuggestionList({ items, command, selectedIndex }: {
   items: MarkdownFile[]
   command: (item: MarkdownFile) => void
@@ -100,7 +104,7 @@ function SuggestionList({ items, command, selectedIndex }: {
   )
 }
 
-function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMode, onOpenFile, onSave, onAskAgent, onStatsUpdate }: MarkdownEditorProps): React.ReactElement {
+const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMode, onOpenFile, onSave, onAskAgent, onStatsUpdate }, ref): React.ReactElement {
   const [markdownFiles, setMarkdownFiles] = useState<MarkdownFile[]>([])
   const filesRef = useRef<MarkdownFile[]>([])
   const [internalSourceMode, setInternalSourceMode] = useState(sourceMode)
@@ -108,17 +112,31 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   const frontmatterRef = useRef('')
   const isLocalChange = useRef(false)
   const sourceSaveControllerRef = useRef<SourceSaveController | null>(null)
+  const editorSaveControllerRef = useRef<SourceSaveController | null>(null)
   const sourceFilePathRef = useRef(filePath)
   const isMemoryFile = filePath.includes('.vision/memory/')
 
   if (!sourceSaveControllerRef.current) {
     sourceSaveControllerRef.current = new SourceSaveController(onSave)
   }
+  if (!editorSaveControllerRef.current) {
+    editorSaveControllerRef.current = new SourceSaveController(onSave)
+  }
   const sourceSaveController = sourceSaveControllerRef.current
+  const editorSaveController = editorSaveControllerRef.current
+
+  useImperativeHandle(ref, () => ({
+    flushPendingSave: async () => {
+      const editorFlushed = await editorSaveController.flushAsync()
+      const sourceFlushed = await sourceSaveController.flushAsync()
+      return sourceFlushed || editorFlushed
+    },
+  }), [editorSaveController, sourceSaveController])
 
   useEffect(() => {
     sourceSaveController.setSaveHandler(onSave)
-  }, [onSave, sourceSaveController])
+    editorSaveController.setSaveHandler(onSave)
+  }, [editorSaveController, onSave, sourceSaveController])
 
   // Normalize markdown for comparison: strip trailing whitespace
   const normalizeMd = (md: string) => md.replace(/\n+$/, '')
@@ -330,6 +348,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       if (!editor || editor.isDestroyed) return
       if (sourceMode) {
         // Entering source mode: save current full markdown to sourceText
+        editorSaveController.flush()
         sourceFilePathRef.current = filePath
         setSourceText(getFullMarkdown(editor))
       } else {
@@ -345,7 +364,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       }
       setInternalSourceMode(sourceMode)
     }
-  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, filePath])
+  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, filePath, editorSaveController])
 
   useEffect(() => {
     if (!internalSourceMode) {
@@ -400,28 +419,20 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
   useEffect(() => {
     if (!editor || editor.isDestroyed || !filePath || isMemoryFile) return
 
-    const handleUpdate = () => {
-      isLocalChange.current = true
-      const saveTimer = setTimeout(() => {
-        if (editor.isDestroyed) return
-        const md = getFullMarkdown(editor)
-        onSave(filePath, md)
-      }, 1500)
-      return () => clearTimeout(saveTimer)
-    }
-
-    let cleanup: (() => void) | undefined
     const handler = () => {
-      cleanup?.()
-      cleanup = handleUpdate()
+      isLocalChange.current = true
+      if (editor.isDestroyed) return
+      editorSaveController.schedule(filePath, getFullMarkdown(editor))
     }
 
     editor.on('update', handler)
     return () => {
       editor.off('update', handler)
-      cleanup?.()
+      // A tab switch or unmount tears down this effect before the debounce
+      // expires. Persist the captured markdown for the old path first.
+      editorSaveController.flush()
     }
-  }, [editor, filePath, onSave])
+  }, [editor, editorSaveController, filePath, isMemoryFile])
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
@@ -501,7 +512,7 @@ function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMod
       <EditorContent editor={editor} />
     </div>
   )
-}
+})
 
 export default memo(MarkdownEditor, (prev, next) =>
   prev.content === next.content &&

@@ -11,6 +11,7 @@ export type GraphStore = {
   // File change tracking
   changedFileCount: number
   changedFiles: string[]
+  changedFileVersion: number
 
   // UI state
   searchQuery: string
@@ -21,7 +22,7 @@ export type GraphStore = {
   toggleGraph: () => void
   setShowGraph: (show: boolean) => void
   loadGraphData: () => Promise<void>
-  handleFilesChanged: (data: { count: number; files: string[] }) => void
+  handleFilesChanged: (data: { count: number; files: string[]; version: number }) => void
   clearChangedFiles: () => void
 }
 
@@ -35,6 +36,7 @@ export const useGraphStore = create<GraphStore>((set) => ({
   // File change tracking
   changedFileCount: 0,
   changedFiles: [],
+  changedFileVersion: 0,
 
   // UI state
   searchQuery: '',
@@ -57,14 +59,24 @@ export const useGraphStore = create<GraphStore>((set) => ({
   loadGraphData: async () => {
     try {
       const data = await window.api.graph.getData()
-      set({ graphData: data, filteredData: data, changedFileCount: 0, changedFiles: [] })
+      const loadedVersion = data.changeVersion || 0
+      await window.api.graph.acknowledgeChanges(loadedVersion)
+      set((state) => state.changedFileVersion > loadedVersion
+        ? { graphData: data, filteredData: data }
+        : {
+            graphData: data,
+            filteredData: data,
+            changedFileCount: 0,
+            changedFiles: [],
+            changedFileVersion: loadedVersion,
+          })
     } catch (err) {
       console.error('[GraphStore] Failed to load graph data:', err)
     }
   },
 
   handleFilesChanged: (data) => {
-    set({ changedFileCount: data.count, changedFiles: data.files })
+    set({ changedFileCount: data.count, changedFiles: data.files, changedFileVersion: data.version })
   },
 
   clearChangedFiles: () => {

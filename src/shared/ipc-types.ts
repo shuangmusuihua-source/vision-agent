@@ -221,6 +221,10 @@ export type IPCChannelMap = {
     request: void
     response: GraphData
   }
+  'graph:acknowledgeChanges': {
+    request: number
+    response: { count: number; files: string[]; version: number }
+  }
 
   // Cron
   'cron:register': {
@@ -316,7 +320,7 @@ export type IPCEventMap = {
   'skill:output': SessionRoutedSkillOutputState
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': Record<string, unknown>
-  'graph:filesChanged': { count: number; files: string[] }
+  'graph:filesChanged': { count: number; files: string[]; version: number }
   'cron:taskCompleted': unknown
   'menu-action': string
 }

@@ -22,6 +22,9 @@ type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 
+const artifactBackfills = new Map<string, Promise<void>>()
+const completedArtifactBackfills = new Set<string>()
+
 function isObjectRequest<T extends object>(value: T | string | undefined): value is T {
   return typeof value === 'object' && value !== null
 }
@@ -62,6 +65,48 @@ function normalizeSendMessageRequest(
     title,
     clientSessionKey,
   }
+}
+
+async function ensureLegacyArtifactsBackfilled(sessionId: string): Promise<void> {
+  const record = getSessionRecords().find(r => r.id === sessionId || r.sdkSessionId === sessionId)
+  const appSessionId = record?.id || sessionId
+  if (record?.artifactIndexBackfilledAt || completedArtifactBackfills.has(appSessionId)) return
+  const existing = artifactBackfills.get(appSessionId)
+  if (existing) return existing
+
+  const backfill = (async () => {
+    let offset = 0
+    let previousOffset = -1
+    do {
+      const page = await loadSdkSessionMessagesPaginated(sessionId, 200, offset)
+      for (const msg of page.messages) {
+        if (msg.type !== 'assistant') continue
+        for (const block of msg.message.content) {
+          if (block.type !== 'tool_use') continue
+          if (block.name !== 'Write' && block.name !== 'Edit' && block.name !== 'Bash') continue
+          recordSessionArtifactsFromTool({
+            sessionId: appSessionId,
+            sdkSessionId: record?.sdkSessionId,
+            workspacePath: record?.workspacePath,
+            toolName: block.name,
+            toolInput: block.input,
+          })
+        }
+      }
+
+      previousOffset = offset
+      offset = page.offset
+      if (!page.hasMore || offset === previousOffset) break
+    } while (true)
+
+    completedArtifactBackfills.add(appSessionId)
+    if (record) updateSessionRecord(appSessionId, { artifactIndexBackfilledAt: Date.now() })
+  })().finally(() => {
+    artifactBackfills.delete(appSessionId)
+  })
+
+  artifactBackfills.set(appSessionId, backfill)
+  return backfill
 }
 
 export function registerAgentHandlers(): void {
@@ -179,27 +224,9 @@ export function registerAgentHandlers(): void {
       const workspacePath = record?.workspacePath
       const appSessionId = record?.id || request.sessionId
 
-      // Backfill legacy sessions from SDK history, then read the app-owned
-      // artifact registry as the source of truth for overview display.
-      const messages = await loadSdkSessionMessages(request.sessionId)
-      for (const msg of messages) {
-        const content = (msg as Record<string, unknown>).message as Record<string, unknown> | undefined
-        const contentBlocks = content?.content as Array<Record<string, unknown>> | undefined
-        if (!contentBlocks) continue
-
-        for (const block of contentBlocks) {
-          if (block.type !== 'tool_use') continue
-          const name = block.name as string
-          if (name !== 'Write' && name !== 'Edit' && name !== 'Bash') continue
-          recordSessionArtifactsFromTool({
-            sessionId: appSessionId,
-            sdkSessionId: record?.sdkSessionId,
-            workspacePath,
-            toolName: name,
-            toolInput: block.input,
-          })
-        }
-      }
+      // Legacy history is indexed once in bounded tail pages. Subsequent
+      // overview loads read only the app-owned artifact registry.
+      await ensureLegacyArtifactsBackfilled(request.sessionId)
 
       const files = getSessionArtifactOutputs(appSessionId)
       return { sessionId: appSessionId, workspacePath: workspacePath || '', files }

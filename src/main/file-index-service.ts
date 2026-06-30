@@ -27,7 +27,8 @@ export class FileIndexService {
   private readyCallbacks: Array<() => void> = []
   private knowledgeReady = false
   private knowledgeReadyCallbacks: Array<() => void> = []
-  private changedFiles = new Set<string>()
+  private changedFiles = new Map<string, number>()
+  private changeVersion = 0
   private knowledgeWatcher: FSWatcher | null = null
 
   /** Initialize one searchable index across all authorized workspaces. */
@@ -188,25 +189,46 @@ export class FileIndexService {
       }
       console.error(`[FileIndexService] handleFileChange failed for ${filePath}:`, err)
     }
-    this.changedFiles.add(filePath)
+    this.markFileChanged(filePath)
     this.notifyFileChange()
   }
 
   /** Handle file deletion */
   private handleFileDelete(filePath: string): void {
     this.index.delete(filePath)
-    this.changedFiles.add(filePath)
+    this.markFileChanged(filePath)
     this.notifyFileChange()
+  }
+
+  private markFileChanged(filePath: string): void {
+    this.changeVersion += 1
+    this.changedFiles.set(filePath, this.changeVersion)
+  }
+
+  getChangeVersion(): number {
+    return this.changeVersion
+  }
+
+  acknowledgeChanges(version: number): { count: number; files: string[]; version: number } {
+    for (const [filePath, changedAt] of this.changedFiles) {
+      if (changedAt <= version) this.changedFiles.delete(filePath)
+    }
+    return this.getFileChangeSnapshot()
+  }
+
+  getFileChangeSnapshot(): { count: number; files: string[]; version: number } {
+    return {
+      count: this.changedFiles.size,
+      files: Array.from(this.changedFiles.keys()),
+      version: this.changeVersion,
+    }
   }
 
   /** Push file change notification to renderer */
   private notifyFileChange(): void {
     const window = getMainWindow()
     if (window && !window.isDestroyed()) {
-      window.webContents.send('graph:filesChanged', {
-        count: this.changedFiles.size,
-        files: Array.from(this.changedFiles),
-      })
+      window.webContents.send('graph:filesChanged', this.getFileChangeSnapshot())
     }
   }
 
@@ -232,21 +254,21 @@ export class FileIndexService {
     this.knowledgeWatcher.on('add', async (filePath) => {
       if (filePath.endsWith('.md')) {
         await this.indexKnowledgeFile(filePath)
-        this.changedFiles.add(filePath)
+        this.markFileChanged(filePath)
         this.notifyFileChange()
       }
     })
     this.knowledgeWatcher.on('change', async (filePath) => {
       if (filePath.endsWith('.md')) {
         await this.indexKnowledgeFile(filePath)
-        this.changedFiles.add(filePath)
+        this.markFileChanged(filePath)
         this.notifyFileChange()
       }
     })
     this.knowledgeWatcher.on('unlink', (filePath) => {
       if (filePath.endsWith('.md')) {
         this.knowledgeIndex.delete(filePath)
-        this.changedFiles.add(filePath)
+        this.markFileChanged(filePath)
         this.notifyFileChange()
       }
     })
@@ -296,26 +318,41 @@ export class FileIndexService {
   getKnowledgeGraphData(): GraphData {
     const nodes: GraphNode[] = []
     const edges: GraphEdge[] = []
+    const filePathToId = new Map<string, string>()
 
     for (const [filePath, data] of this.knowledgeIndex) {
       const label = path.basename(filePath, '.md')
       const isMemory = filePath.includes(`${path.sep}.vision${path.sep}memory${path.sep}`)
       const id = isMemory ? `memory:${label}` : filePath
       nodes.push({ id, label, type: isMemory ? 'memory' : 'file' })
+      filePathToId.set(filePath, id)
     }
 
-    const labelToId = new Map<string, string>()
+    const labelToIds = new Map<string, string[]>()
     for (const node of nodes) {
-      labelToId.set(node.label, node.id)
+      const ids = labelToIds.get(node.label) || []
+      ids.push(node.id)
+      labelToIds.set(node.label, ids)
     }
 
     for (const [, data] of this.knowledgeIndex) {
-      for (const link of data.wikilinks) {
-        const targetId = labelToId.get(link)
+      const sourceId = filePathToId.get(data.filePath)
+      if (!sourceId) continue
+      for (const rawLink of data.wikilinks) {
+        const link = rawLink.split('|')[0].split('#')[0].trim()
+        if (!link) continue
+        const linkPath = link.toLowerCase().endsWith('.md') ? link : `${link}.md`
+        const relativeCandidate = path.resolve(path.dirname(data.filePath), linkPath)
+        const rootCandidate = this.knowledgeBaseDir
+          ? path.resolve(this.knowledgeBaseDir, linkPath)
+          : null
+        const label = path.basename(linkPath, '.md')
+        const labelMatches = labelToIds.get(label) || []
+        const targetId = filePathToId.get(relativeCandidate)
+          || (rootCandidate ? filePathToId.get(rootCandidate) : undefined)
+          || (labelMatches.length === 1 ? labelMatches[0] : undefined)
         if (targetId) {
-          const sourceLabel = path.basename(data.filePath, '.md')
-          const sourceId = labelToId.get(sourceLabel)
-          if (sourceId && sourceId !== targetId) {
+          if (sourceId !== targetId) {
             edges.push({ source: sourceId, target: targetId, type: 'reference' })
           }
         }
@@ -393,6 +430,7 @@ export class FileIndexService {
     await this.destroyWorkspaceIndex()
     await this.destroyKnowledgeIndex()
     this.changedFiles.clear()
+    this.changeVersion = 0
   }
 }
 

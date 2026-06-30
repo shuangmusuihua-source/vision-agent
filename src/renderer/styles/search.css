@@ -85,6 +85,11 @@
   gap: 8px;
   padding: 8px 16px;
   cursor: pointer;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
 .search-result-item:hover {
@@ -149,4 +154,10 @@
 
 .search-result-item.selected {
   background: var(--color-bg-tertiary);
+}
+
+.search-result-item:focus-visible,
+.search-clear-btn:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
 }

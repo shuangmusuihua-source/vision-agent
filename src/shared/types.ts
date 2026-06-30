@@ -613,6 +613,8 @@ export type GraphEdge = {
 export type GraphData = {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  /** File-index version represented by this graph snapshot. */
+  changeVersion?: number
 }
 
 // ─── File Entry (workspace tree) ────────────────────────────────────
@@ -661,6 +663,8 @@ export interface SessionRecord {
   lastModified: number
   messageCount: number
   artifactCount: number
+  /** Set after legacy JSONL tool output has been indexed into the artifact registry. */
+  artifactIndexBackfilledAt?: number
   legacyMigration?: boolean
 }
 

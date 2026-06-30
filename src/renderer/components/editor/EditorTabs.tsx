@@ -16,6 +16,7 @@ function getFileName(path: string): string {
 
 function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProps): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>())
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
@@ -80,15 +81,35 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
   const fixedTabs = tabs.filter(isFixedTab)
   const fileTabs = tabs.filter(isFileTab)
   const hasBoth = fixedTabs.length > 0 && fileTabs.length > 0
+  const orderedTabs = [...fixedTabs, ...fileTabs]
+
+  const handleTabKeyDown = useCallback((event: React.KeyboardEvent, tab: TabDescriptor) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onTabSwitch(tab)
+      return
+    }
+    const currentIndex = orderedTabs.findIndex(candidate => tabKey(candidate) === tabKey(tab))
+    let nextIndex = -1
+    if (event.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1)
+    if (event.key === 'ArrowRight') nextIndex = Math.min(orderedTabs.length - 1, currentIndex + 1)
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = orderedTabs.length - 1
+    if (nextIndex < 0 || nextIndex === currentIndex) return
+    event.preventDefault()
+    const nextTab = orderedTabs[nextIndex]
+    onTabSwitch(nextTab)
+    requestAnimationFrame(() => tabRefs.current.get(tabKey(nextTab))?.focus())
+  }, [onTabSwitch, orderedTabs])
 
   return (
     <div className="editor-tabs-container">
       {canScrollLeft && (
-        <button className="editor-tabs-nav editor-tabs-nav-left" onClick={() => scroll('left')}>
+        <button className="editor-tabs-nav editor-tabs-nav-left" onClick={() => scroll('left')} aria-label="向左滚动标签">
           <ChevronLeft size={14} />
         </button>
       )}
-      <div className="editor-tabs" ref={scrollRef}>
+      <div className="editor-tabs" ref={scrollRef} role="tablist" aria-label="已打开的文档">
         {/* Fixed tabs */}
         {fixedTabs.map((tab) => {
           const key = tabKey(tab)
@@ -97,11 +118,21 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
             <div
               key={key}
               className={`editor-tab editor-tab-fixed ${isActive ? 'editor-tab-active' : ''}`}
-              onClick={() => onTabSwitch(tab)}
               title="会话概览"
             >
-              <LayoutDashboard size={13} className="editor-tab-fixed-icon" />
-              <span className="editor-tab-name">概览</span>
+              <button
+                type="button"
+                className="editor-tab-trigger"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                ref={(element) => { if (element) tabRefs.current.set(key, element); else tabRefs.current.delete(key) }}
+                onClick={() => onTabSwitch(tab)}
+                onKeyDown={(event) => handleTabKeyDown(event, tab)}
+              >
+                <LayoutDashboard size={13} className="editor-tab-fixed-icon" />
+                <span className="editor-tab-name">概览</span>
+              </button>
             </div>
           )
         })}
@@ -117,13 +148,24 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
             <div
               key={key}
               className={`editor-tab ${isActive ? 'editor-tab-active' : ''}`}
-              onClick={() => onTabSwitch(tab)}
               title={tab.path}
             >
-              <span className="editor-tab-name">{getFileName(tab.path)}</span>
+              <button
+                type="button"
+                className="editor-tab-trigger"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                ref={(element) => { if (element) tabRefs.current.set(key, element); else tabRefs.current.delete(key) }}
+                onClick={() => onTabSwitch(tab)}
+                onKeyDown={(event) => handleTabKeyDown(event, tab)}
+              >
+                <span className="editor-tab-name">{getFileName(tab.path)}</span>
+              </button>
               <button
                 className="editor-tab-close"
                 onClick={(e) => handleClose(e, tab)}
+                aria-label={`关闭 ${getFileName(tab.path)}`}
               >
                 <X size={12} />
               </button>
@@ -132,7 +174,7 @@ function EditorTabs({ tabs, activeTab, onTabSwitch, onTabClose }: EditorTabsProp
         })}
       </div>
       {canScrollRight && (
-        <button className="editor-tabs-nav editor-tabs-nav-right" onClick={() => scroll('right')}>
+        <button className="editor-tabs-nav editor-tabs-nav-right" onClick={() => scroll('right')} aria-label="向右滚动标签">
           <ChevronRight size={14} />
         </button>
       )}

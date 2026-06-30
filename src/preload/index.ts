@@ -228,8 +228,9 @@ const api = {
 
   graph: {
     getData: () => ipcRenderer.invoke('graph:getData'),
-    onFilesChanged: (callback: (data: { count: number; files: string[] }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { count: number; files: string[] }) => callback(data)
+    acknowledgeChanges: (version: number) => ipcRenderer.invoke('graph:acknowledgeChanges', version),
+    onFilesChanged: (callback: (data: { count: number; files: string[]; version: number }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { count: number; files: string[]; version: number }) => callback(data)
       ipcRenderer.on('graph:filesChanged', handler)
       return () => { ipcRenderer.removeListener('graph:filesChanged', handler) }
     }

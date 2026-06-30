@@ -9,6 +9,11 @@ export function registerGraphHandlers(): void {
     return {
       nodes: rawData.nodes as GraphNode[],
       edges: rawData.edges.map(e => ({ ...e, type: 'reference' as const })),
+      changeVersion: fileIndexService.getChangeVersion(),
     }
+  })
+
+  ipcMain.handle('graph:acknowledgeChanges', (_event, version: number) => {
+    return fileIndexService.acknowledgeChanges(version)
   })
 }

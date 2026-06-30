@@ -4,8 +4,9 @@ import { getAppSkillsCwd } from './skill-init'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
 import { getSessionRecords, removeSessionRecord, updateSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
-import { readFileSync, existsSync } from 'fs'
+import { readFile } from 'node:fs/promises'
 import { resolveClaudeSessionJsonlPath } from './claude-session-path'
+import { readJsonlTailPage } from './jsonl-tail-reader'
 
 // ─── Compaction tracking ───────────────────────────────────────────────
 // Track session IDs created by SDK mid-stream compaction.
@@ -216,15 +217,17 @@ export async function getSdkSessionTotalMessageCount(
  * truncates pre-compaction messages. SDK stores sessions at:
  *   {userData}/.claude/projects/{workspacePath with /→-}/{sessionId}.jsonl
  */
-function readSessionJsonlDirect(sessionId: string): Array<Record<string, unknown>> | null {
+function getSessionJsonlPath(sessionId: string): string | null {
+  const record = getRecordForSession(sessionId)
+  return resolveClaudeSessionJsonlPath(getSdkSessionId(sessionId), record?.workspacePath)
+}
+
+async function readSessionJsonlDirect(sessionId: string): Promise<Array<Record<string, unknown>> | null> {
   try {
-    const record = getRecordForSession(sessionId)
-    const fileSessionId = getSdkSessionId(sessionId)
-    const jsonlPath = resolveClaudeSessionJsonlPath(fileSessionId, record?.workspacePath)
+    const jsonlPath = getSessionJsonlPath(sessionId)
+    if (!jsonlPath) return null
 
-    if (!jsonlPath || !existsSync(jsonlPath)) return null
-
-    const raw = readFileSync(jsonlPath, 'utf-8')
+    const raw = await readFile(jsonlPath, 'utf-8')
     const lines = raw.trim().split('\n')
     return lines.map(line => {
       try { return JSON.parse(line) as Record<string, unknown> }
@@ -242,7 +245,7 @@ export async function loadSdkSessionMessages(
   offset?: number
 ): Promise<Array<Record<string, unknown>>> {
   // Direct JSONL read returns ALL messages including pre-compaction history.
-  const direct = readSessionJsonlDirect(sessionId)
+  const direct = await readSessionJsonlDirect(sessionId)
   if (direct) {
     const start = offset ?? 0
     const end = limit != null ? start + limit : undefined
@@ -274,27 +277,19 @@ export async function loadSdkSessionMessagesPaginated(
   // JSONL is append-only (oldest → newest). We read backward:
   //   offset=0 → newest messages (from end of file)
   //   offset>0 → older messages before the current window (backward)
-  const direct = readSessionJsonlDirect(sessionId)
-  let nextOffset = offset
-  if (direct && direct.length > 0) {
-    let slice: Array<Record<string, unknown>>
-    if (offset === 0) {
-      // Initial load: newest messages from the tail.
-      const startIdx = Math.max(0, direct.length - limit)
-      slice = direct.slice(startIdx)
-      nextOffset = startIdx
-    } else {
-      // Load more: older messages before the current window.
-      const startIdx = Math.max(0, offset - limit)
-      slice = direct.slice(startIdx, offset)
-      nextOffset = startIdx
+  const jsonlPath = getSessionJsonlPath(sessionId)
+  if (jsonlPath) {
+    try {
+      const page = await readJsonlTailPage(jsonlPath, limit, offset)
+      const messages: AgentIPCMessage[] = []
+      for (const m of page.records) {
+        const converted = toAgentIPCMessage(m as any)
+        if (converted) messages.push(converted)
+      }
+      return { messages, offset: page.offset, limit, hasMore: page.hasMore }
+    } catch (err) {
+      console.warn('[SessionStore] Tail JSONL read failed, falling back to SDK:', (err as Error).message)
     }
-    const messages: AgentIPCMessage[] = []
-    for (const m of slice) {
-      const converted = toAgentIPCMessage(m as any)
-      if (converted) messages.push(converted)
-    }
-    return { messages, offset: nextOffset, limit, hasMore: nextOffset > 0 }
   }
 
   // Fallback to SDK API — used only when direct JSONL read fails

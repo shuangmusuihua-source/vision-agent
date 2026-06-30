@@ -15,9 +15,15 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     inputRef.current?.focus()
+    return () => {
+      const target = returnFocusRef.current
+      if (target?.isConnected) target.focus()
+    }
   }, [])
 
   useEffect(() => {
@@ -46,25 +52,6 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
     el.addEventListener('keydown', handleTab)
     return () => el.removeEventListener('keydown', handleTab)
   }, [])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement === inputRef.current && e.key !== 'Escape') return
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setSelectedIndex((prev) => Math.max(prev - 1, -1))
-      } else if (e.key === 'Enter' && selectedIndex >= 0 && results[selectedIndex]) {
-        const result = results[selectedIndex]
-        onOpenFile(result.filePath)
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [results, selectedIndex, onClose, onOpenFile])
 
   const handleSearch = useCallback(async () => {
     if (!keyword.trim()) {
@@ -99,12 +86,25 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
+      e.preventDefault()
       onClose()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex((prev) => Math.max(prev - 1, -1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const selected = selectedIndex >= 0 ? results[selectedIndex] : null
+      if (selected) {
+        onOpenFile(selected.filePath)
+        onClose()
+      } else {
+        void handleSearch()
+      }
     }
-    if (e.key === 'Enter') {
-      handleSearch()
-    }
-  }, [onClose, handleSearch])
+  }, [handleSearch, onClose, onOpenFile, results, selectedIndex])
 
   const highlightKeyword = useCallback((text: string) => {
     if (!keyword.trim()) return text
@@ -117,8 +117,8 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
   }, [keyword])
 
   return (
-    <div className="search-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="search-panel" role="dialog" aria-modal="true" aria-label="Search" onClick={(e) => e.stopPropagation()}>
+    <div className="search-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }} onKeyDown={(event) => { if (event.key === 'Escape' && event.target !== inputRef.current) onClose() }}>
+      <div className="search-panel" role="dialog" aria-modal="true" aria-label="搜索" onClick={(e) => e.stopPropagation()}>
         <div className="search-input-row">
           <Search size={16} className="search-icon" />
           <input
@@ -129,26 +129,35 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={handleKeyDown}
+            role="combobox"
+            aria-controls="search-results"
+            aria-expanded={results.length > 0}
+            aria-activedescendant={selectedIndex >= 0 ? `search-result-${selectedIndex}` : undefined}
           />
           {keyword && (
-            <button className="search-clear-btn" onClick={() => setKeyword('')}>
+            <button className="search-clear-btn" onClick={() => setKeyword('')} aria-label="清空搜索">
               <X size={14} />
             </button>
           )}
         </div>
 
-        <div className="search-results">
+        <div className="search-results" id="search-results" role="listbox" aria-label="搜索结果">
           {!searching && keyword.trim() && results.length > 0 && (
             <div className="search-count">{results.length} 个结果</div>
           )}
           {searching && <div className="search-loading">搜索中...</div>}
           {!searching && keyword.trim() && results.length === 0 && (
-            <div className="search-empty">没有找到匹配结果</div>
+            <div className="search-empty">没有找到匹配结果，请尝试更短或不同的关键词</div>
           )}
           {!searching && results.map((result, idx) => (
-            <div
+            <button
+              type="button"
+              id={`search-result-${idx}`}
               key={`${result.filePath}-${result.line}-${idx}`}
               className={`search-result-item ${idx === selectedIndex ? 'selected' : ''}`}
+              role="option"
+              aria-selected={idx === selectedIndex}
+              onMouseEnter={() => setSelectedIndex(idx)}
               onClick={() => {
                 onOpenFile(result.filePath)
                 onClose()
@@ -167,7 +176,7 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
               <div className="search-result-content">
                 {highlightKeyword(result.content)}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

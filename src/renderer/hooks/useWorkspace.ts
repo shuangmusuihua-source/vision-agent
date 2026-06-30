@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { FileEntry } from '../lib/ipc'
-import { filterUserWorkspacePaths, isReservedKnowledgeWorkspacePath, KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
+import { filterUserWorkspacePaths, KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
 
 interface UseWorkspaceOptions {
   /** Called after file operations that change the files list. */
@@ -24,15 +24,9 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
     window.api.workspace.knowledgeDir().then(dir => {
       setFixedWorkspacePaths([dir])
       setWorkspacePaths((prev) => filterUserWorkspacePaths(prev, [dir]))
-      setFiles((prev) => {
-        const next: Record<string, FileEntry[]> = {}
-        for (const [path, entries] of Object.entries(prev)) {
-          if (!isReservedKnowledgeWorkspacePath(path, [dir])) {
-            next[path] = entries
-          }
-        }
-        return next
-      })
+      window.api.workspace.listFiles(dir).then((entries) => {
+        setFiles((prev) => ({ ...prev, [dir]: entries }))
+      }).catch(() => {})
     })
   }, [])
 
@@ -47,9 +41,10 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
     if (key === prevAuthDirsRef.current) return
     prevAuthDirsRef.current = key
     setWorkspacePaths(userDirs)
+    const allDirs = [...fixedDirs, ...userDirs]
     const fileEntries: Record<string, FileEntry[]> = {}
     Promise.all(
-      userDirs.map(async (dir) => {
+      allDirs.map(async (dir) => {
         fileEntries[dir] = await window.api.workspace.listFiles(dir)
       })
     ).then(() => setFiles(fileEntries))
@@ -62,7 +57,7 @@ export function useWorkspace({ onFilesChanged }: UseWorkspaceOptions = {}) {
         fileEntries[dir] = await window.api.workspace.listFiles(dir)
       })
     )
-    setFiles(fileEntries)
+    setFiles((prev) => ({ ...prev, ...fileEntries }))
     onFilesChanged?.()
   }
 

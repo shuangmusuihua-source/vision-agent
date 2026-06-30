@@ -48,8 +48,9 @@ export function registerWorkspaceHandlers(
   ipcMain.handle('workspace:renameFile', async (_event, filePath: string, newName: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
     try {
-      const safeName = sanitizeFileName(newName.trim())
+      let safeName = sanitizeFileName(newName.trim())
       if (!safeName) return { success: false, error: 'Invalid file name' }
+      if (extname(filePath).toLowerCase() === '.md' && !extname(safeName)) safeName += '.md'
       const dir = dirname(filePath)
       const destPath = join(dir, safeName)
       if (!isPathAuthorized(destPath)) return { success: false, error: 'Path not authorized' }

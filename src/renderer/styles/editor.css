@@ -506,6 +506,24 @@
   background: var(--color-bg-hover);
 }
 
+.editor-tab-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.editor-tab-trigger:focus-visible,
+.editor-tab-close:focus-visible,
+.editor-tabs-nav:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
 .editor-tab-active {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);
@@ -541,6 +559,7 @@
 }
 
 .editor-tab:hover .editor-tab-close,
+.editor-tab:focus-within .editor-tab-close,
 .editor-tab-active .editor-tab-close {
   opacity: 1;
 }

@@ -19,18 +19,22 @@ function pushSettingsToRenderer(): void {
   }
 }
 
-async function scanDirectory(dirPath: string, maxDepth = 1, depth = 0): Promise<FileEntry[]> {
-  if (depth >= maxDepth) return []
+async function scanDirectory(dirPath: string, maxDepth = 12, depth = 0): Promise<FileEntry[]> {
+  if (depth > maxDepth) return []
   const entries = await readdir(dirPath, { withFileTypes: true })
   const result: FileEntry[] = []
-  for (const entry of entries) {
+  const ignoredDirs = new Set(['node_modules', 'out', 'dist'])
+  const sortedEntries = entries.sort((a, b) => {
+    if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1
+    return a.name.localeCompare(b.name, 'zh-CN')
+  })
+  for (const entry of sortedEntries) {
     if (entry.name.startsWith('.')) continue
     const fullPath = join(dirPath, entry.name)
     if (entry.isDirectory()) {
+      if (ignoredDirs.has(entry.name)) continue
       const children = await scanDirectory(fullPath, maxDepth, depth + 1)
-      if (children.length > 0) {
-        result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
-      }
+      result.push({ name: entry.name, path: fullPath, isDirectory: true, children })
     } else if (extname(entry.name) === '.md') {
       result.push({ name: entry.name, path: fullPath, isDirectory: false })
     }
