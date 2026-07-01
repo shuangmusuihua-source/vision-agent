@@ -13,8 +13,6 @@ function resetStore() {
     sessionSlots: {},
     sessionAccessOrder: [],
     activeWorkspacePath: null,
-    workspaceDigest: null,
-    workspaceDigestLoading: false,
     activeSessionId: { editor: null, ask: null },
     sessionOutputs: null,
     sessionOutputsLoading: false,

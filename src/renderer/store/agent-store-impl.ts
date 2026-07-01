@@ -264,8 +264,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     sessionSlots: {},
     sessionAccessOrder: [],
     activeWorkspacePath: null,
-    workspaceDigest: null,
-    workspaceDigestLoading: false,
     activeSessionId: { editor: null, ask: null },
     sessionOutputs: null,
     sessionOutputsLoading: false,
@@ -799,10 +797,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
         return base
       })
-    },
-
-    setWorkspaceDigest(digest) {
-      set({ workspaceDigest: digest, workspaceDigestLoading: false })
     },
 
     // ─── Session Actions ──────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 {
   "name": "sumi",
   "version": "1.4.0",
-  "description": "Local Agent-driven workspace client powered by Claude Agent SDK",
+  "description": "A task-focused intelligent workspace for collaborative research, editable documents, skill-driven deliverables, and personal knowledge.",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

@@ -129,21 +129,9 @@ export type IPCChannelMap = {
     request: string
     response: Array<{ label: string; path: string }>
   }
-  'workspace:openDirectoryDialog': {
-    request: void
-    response: string | null
-  }
-  'workspace:newDirectoryDialog': {
-    request: void
-    response: string | null
-  }
   'workspace:createWorkspace': {
     request: string
     response: string | null
-  }
-  'workspace:createFile': {
-    request: [string, string]
-    response: { success: boolean; path?: string; error?: string }
   }
   'workspace:openInBrowser': {
     request: string

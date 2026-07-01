@@ -99,24 +99,14 @@ interface WorkspaceApi {
     alreadyExists?: boolean
     error?: string
   }>
-  openDirectoryDialog: () => Promise<string | null>
-  newDirectoryDialog: () => Promise<string | null>
   createWorkspace: (name: string) => Promise<string | null>
-  createFile: (dirPath: string, fileName: string) => Promise<{ success: boolean; path?: string; error?: string }>
-  deleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
-  renameFile: (filePath: string, newName: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
-  moveFile: (sourcePath: string, targetDir: string) => Promise<{ success: boolean; newPath?: string; error?: string }>
   deleteWorkspace: (dirPath: string) => Promise<{ success: boolean; error?: string }>
   knowledgeDir: () => Promise<string>
-  createDir: (parentPath: string, dirName: string) => Promise<{ success: boolean; path?: string; error?: string }>
-  renameEntry: (oldPath: string, newName: string) => Promise<{ success: boolean; path?: string; error?: string }>
-  deleteDir: (dirPath: string) => Promise<{ success: boolean; error?: string }>
   selectFiles: () => Promise<{ canceled: boolean; filePaths: string[] }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
   previewArtifact: (options: { fileName: string; content: string }) => Promise<{ success: boolean; filePath?: string }>
-  getSessionOverview: (workspaceDir: string) => Promise<import('../../shared/types').WorkspaceDigest | null>
 }
 
 interface SettingsApi {

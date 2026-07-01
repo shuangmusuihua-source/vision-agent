@@ -47,33 +47,16 @@ const api = {
     addToKnowledge: (sourcePath: string, sessionId?: string) =>
       invoke('workspace:addToKnowledge', { sourcePath, sessionId }),
     listMarkdownFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listMarkdownFiles', dirPath),
-    openDirectoryDialog: () => ipcRenderer.invoke('workspace:openDirectoryDialog'),
     openInBrowser: (filePath: string) => ipcRenderer.invoke('workspace:openInBrowser', filePath),
     saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) =>
       ipcRenderer.invoke('workspace:saveArtifact', options),
     previewArtifact: (options: { fileName: string; content: string }) =>
       ipcRenderer.invoke('workspace:previewArtifact', options),
-    newDirectoryDialog: () => ipcRenderer.invoke('workspace:newDirectoryDialog'),
     createWorkspace: (name: string) => ipcRenderer.invoke('workspace:createWorkspace', name),
-    createFile: (dirPath: string, fileName: string) =>
-      ipcRenderer.invoke('workspace:createFile', dirPath, fileName),
-    deleteFile: (filePath: string) =>
-      ipcRenderer.invoke('workspace:deleteFile', filePath),
-    renameFile: (filePath: string, newName: string) =>
-      ipcRenderer.invoke('workspace:renameFile', filePath, newName),
-    moveFile: (sourcePath: string, targetDir: string) =>
-      ipcRenderer.invoke('workspace:moveFile', sourcePath, targetDir),
     deleteWorkspace: (dirPath: string) =>
       ipcRenderer.invoke('workspace:deleteWorkspace', dirPath),
     knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir'),
-    createDir: (parentPath: string, dirName: string) =>
-      ipcRenderer.invoke('workspace:createDir', parentPath, dirName),
-    renameEntry: (oldPath: string, newName: string) =>
-      ipcRenderer.invoke('workspace:renameEntry', oldPath, newName),
-    deleteDir: (dirPath: string) =>
-      ipcRenderer.invoke('workspace:deleteDir', dirPath),
     selectFiles: () => ipcRenderer.invoke('workspace:selectFiles'),
-    getSessionOverview: (workspaceDir: string) => ipcRenderer.invoke('workspace:getSessionOverview', workspaceDir),
   },
 
   settings: {

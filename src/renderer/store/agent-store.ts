@@ -13,7 +13,6 @@ import type {
   SkillOutputState,
   TodoTaskList,
   WorkspaceRecord,
-  WorkspaceDigest,
   SessionOutputs,
 } from '../../shared/types'
 import type { SessionListAction } from './session-protocol'
@@ -114,8 +113,6 @@ export type AgentStore = {
 
   // Workspace state
   activeWorkspacePath: string | null
-  workspaceDigest: WorkspaceDigest | null
-  workspaceDigestLoading: boolean
 
   // Session state (sidebar + overview) — per-context to avoid editor/ask collision
   activeSessionId: { editor: string | null; ask: string | null }
@@ -136,7 +133,6 @@ export type AgentStore = {
   setPrefill: (context: AgentContext, text: string) => void
   consumePrefill: (context: AgentContext) => void
   setActiveWorkspace: (path: string | null) => void
-  setWorkspaceDigest: (digest: WorkspaceDigest | null) => void
   setActiveSession: (sessionId: string | null, context?: AgentContext) => void
   setSessionOutputs: (outputs: SessionOutputs | null) => void
   dispatchSessionList: (action: SessionListAction) => void

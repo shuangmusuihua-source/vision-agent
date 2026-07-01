@@ -682,36 +682,6 @@ export interface SessionArtifactRecord {
   createdAt: number
   updatedAt: number
 }
-// ─── Session Digest (lightweight, for overview display) ────────────────
-
-export interface SessionDigest {
-  sessionId: string
-  title: string
-  firstPrompt: string       // first user message, max 80 chars
-  assistantSummary: string  // first assistant text, max 150 chars
-  createdAt: number
-  lastModified: number
-  messageCount: number
-  artifactCount: number
-  status: SessionStatus
-  artifactFiles: Array<{ fileName: string; filePath: string; fileType: ArtifactFileType }>
-}
-
-// ─── Workspace Digest (aggregate overview data) ────────────────────────
-
-export interface WorkspaceDigest {
-  workspacePath: string
-  workspaceName: string
-  stats: {
-    totalSessions: number
-    totalArtifacts: number
-    totalFiles: number
-    lastActiveAt: number | null
-  }
-  recentSessions: SessionDigest[]
-  recentFiles: Array<{ name: string; path: string }>
-}
-
 // ─── Tab Descriptor (supports fixed tabs + file tabs) ──────────────────
 
 export interface FileTab {
