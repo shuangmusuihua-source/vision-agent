@@ -10,7 +10,8 @@ import type {
   AskUserRequestIPC,
   SdkSessionInfo,
   StreamingAccumulator,
-  SkillOutputState,
+  GenerationActivity,
+  SessionRoutedGenerationActivity,
   TodoTaskList,
   WorkspaceRecord,
   SessionOutputs,
@@ -32,7 +33,7 @@ export type ContextSlot = {
   permissionQueue: PermissionRequestIPC[]
   askUserRequest: AskUserRequestIPC | null
   askUserQueue: AskUserRequestIPC[]
-  skillOutput: SkillOutputState | null
+  generationActivity: GenerationActivity | null
   activeSkillId: string | null
   lastEditedFile: string | null
   linkedFile: string | null
@@ -63,7 +64,7 @@ function emptySlot(): ContextSlot {
     permissionQueue: [],
     askUserRequest: null,
     askUserQueue: [],
-    skillOutput: null,
+    generationActivity: null,
     activeSkillId: null,
     lastEditedFile: null,
     linkedFile: null,
@@ -129,7 +130,7 @@ export type AgentStore = {
   handleAskUserResponse: (requestId: string, answers: Record<string, string>) => void
   handleAskUserTimeout: (requestId: string) => void
   handlePermissionTimeout: (requestId: string) => void
-  handleSkillOutput: (state: SkillOutputState) => void
+  handleGenerationActivity: (state: SessionRoutedGenerationActivity) => void
   setPrefill: (context: AgentContext, text: string) => void
   consumePrefill: (context: AgentContext) => void
   setActiveWorkspace: (path: string | null) => void
@@ -162,5 +163,5 @@ export type {
 export type {
   AgentContext,
   AskUserQuestionOption,
-  SkillOutputState,
+  GenerationActivity,
 } from '../../shared/types'

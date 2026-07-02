@@ -2,7 +2,7 @@
 //
 // agent-manager was split into two deepened modules:
 //   query-runner.ts  — sendMessage, abortActiveQuery, handleWindowDestroy,
-//                      setSkillOutputWindow, buildOptions, hooks
+//                      setGenerationWindow, buildOptions, hooks
 //   session-store.ts — listSdkSessions, loadSdkSessionMessagesPaginated,
 //                      renameSdkSession, deleteSdkSession, compaction tracking
 //
@@ -15,7 +15,7 @@ export {
   abortActiveQueryAndWait,
   handleWindowDestroy,
   setPermissionMode,
-  setSkillOutputWindow,
+  setGenerationWindow,
 } from './query-runner'
 
 export {

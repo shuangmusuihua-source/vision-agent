@@ -13,7 +13,7 @@ import type {
   SessionRoutedRequestTimeout,
 } from '../shared/types'
 import { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
-import { SkillOutputBridge } from './skill-output-bridge'
+import { GenerationActivityProjector } from './generation-activity-projector'
 import { toAgentIPCMessage } from './message-converter'
 import {
   deletePendingAskUser,
@@ -64,24 +64,24 @@ export { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 export class SessionRuntimeController {
   private instanceCounter = 0
   private activeRuns = new Map<string, ActiveSessionRun>()
-  private skillOutputBridge = new SkillOutputBridge()
-  private skillOutputWindow: BrowserWindow | null = null
+  private generationProjector = new GenerationActivityProjector()
+  private generationWindow: BrowserWindow | null = null
   private completionResolvers = new Map<number, () => void>()
 
   constructor() {
-    this.skillOutputBridge.setOutputEmitter((state) => {
-      const win = this.skillOutputWindow
+    this.generationProjector.setEmitter((state) => {
+      const win = this.generationWindow
       if (!win || win.isDestroyed()) return
-      win.webContents.send('skill:output', state)
+      win.webContents.send('agent:generationActivity', state)
     })
   }
 
-  setSkillOutputWindow(win: BrowserWindow): void {
-    this.skillOutputWindow = win
+  setGenerationWindow(win: BrowserWindow): void {
+    this.generationWindow = win
   }
 
-  beginSession(envelope: AgentSessionEnvelope): void {
-    this.skillOutputBridge.reset(envelope.sessionId, envelope)
+  beginSession(envelope: AgentSessionEnvelope, skillId: string | null = null): void {
+    this.generationProjector.reset(envelope.sessionId, envelope, skillId)
   }
 
   registerRun(input: SessionRuntimeStart): number {
@@ -131,13 +131,21 @@ export class SessionRuntimeController {
     if (!run) return null
     const envelope = { ...run.envelope, sdkSessionId }
     this.activeRuns.set(sessionId, { ...run, envelope })
-    this.skillOutputBridge.setSessionEnvelope(sessionId, envelope)
+    this.generationProjector.setSessionEnvelope(sessionId, envelope)
     return envelope
   }
 
-  processSkillRawEvent(sessionId: string, rawMessage: SDKMessage): void {
+  processGenerationRawMessage(sessionId: string, rawMessage: SDKMessage): void {
     const skillId = this.getActiveSkillId(sessionId)
-    this.skillOutputBridge.processRawEvent(sessionId, rawMessage, skillId)
+    this.generationProjector.processRawMessage(sessionId, rawMessage, skillId)
+  }
+
+  finishGenerationTool(
+    sessionId: string,
+    toolUseId: string,
+    outcome: 'completed' | 'failed'
+  ): void {
+    this.generationProjector.finishTool(sessionId, toolUseId, outcome)
   }
 
   emitSdkMessage(
@@ -146,7 +154,7 @@ export class SessionRuntimeController {
     envelope: AgentSessionEnvelope,
     rawMessage: SDKMessage
   ): void {
-    this.processSkillRawEvent(sessionId, rawMessage)
+    this.processGenerationRawMessage(sessionId, rawMessage)
 
     const textDeltaText = isTextDeltaEvent(rawMessage)
     if (textDeltaText !== null) {
@@ -177,6 +185,7 @@ export class SessionRuntimeController {
   }
 
   emitExecutionError(win: BrowserWindow, envelope: AgentSessionEnvelope, message: string): void {
+    this.generationProjector.finishSession(envelope.sessionId, 'failed')
     this.emitAgentEvent(win, envelope, {
       type: 'result',
       subtype: 'error_during_execution',
@@ -351,6 +360,7 @@ export class SessionRuntimeController {
       const matchedKey = this.findRunKey(queryKey)
       if (matchedKey) {
         const run = this.activeRuns.get(matchedKey)
+        this.generationProjector.finishSession(matchedKey, 'cancelled')
         run?.abortController.abort()
         rejectAllPendingPermissions(matchedKey)
         rejectAllPendingAskUser(matchedKey)
@@ -364,7 +374,8 @@ export class SessionRuntimeController {
       return
     }
 
-    for (const [, run] of this.activeRuns) {
+    for (const [key, run] of this.activeRuns) {
+      this.generationProjector.finishSession(key, 'cancelled')
       run.abortController.abort()
     }
     this.activeRuns.clear()
@@ -407,13 +418,14 @@ export class SessionRuntimeController {
     rejectAllPendingPermissions()
     rejectAllPendingAskUser()
     discardAllTextBatches()
+    this.generationProjector.cleanupAll()
   }
 
   cleanupRun(sessionId: string, instanceId: number): void {
     const current = this.activeRuns.get(sessionId)
     if (current && current.instanceId === instanceId) {
       discardTextBatch(sessionId)
-      this.skillOutputBridge.cleanup(sessionId)
+      this.generationProjector.cleanup(sessionId)
       this.activeRuns.delete(sessionId)
       rejectAllPendingPermissions(sessionId)
       rejectAllPendingAskUser(sessionId)

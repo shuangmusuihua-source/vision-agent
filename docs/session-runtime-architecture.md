@@ -65,7 +65,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 - app ID / SDK ID / context alias 查找
 - SDK session materialization
 - 文本 delta 批处理、flush 和丢弃
-- SkillOutputBridge 生命周期
+- GenerationActivityProjector 生命周期
 - 权限与 AskUser pending Promise、五分钟超时和 abort 清理
 - session-scoped abort 与 completion 等待
 - 带 envelope 的 main-to-renderer 事件
@@ -90,7 +90,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 - `agent:askUser`
 - `agent:askUserTimeout`
 - session-scoped `agent:notification`
-- `skill:output`
+- `agent:generationActivity`
 
 App-level 通知（例如 Cron 失败）可以使用不带 session ownership 的 general notification。
 

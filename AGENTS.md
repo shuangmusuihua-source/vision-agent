@@ -37,7 +37,8 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `index.ts` — boot, BrowserWindow, Sentry, updater, indexing, Skill initialization, persisted cron restoration
 - `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
-- `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, Skill output routing
+- `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
+- `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
 - `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
 - `session-store.ts` — SDK transcript listing, paging, rename, delete, and compaction filtering
 - `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata

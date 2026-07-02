@@ -292,7 +292,7 @@ export type SessionRoutedPermissionRequest = PermissionRequestIPC & AgentSession
 export type SessionRoutedAskUserRequest = AskUserRequestIPC & AgentSessionEnvelope
 export type SessionRoutedRequestTimeout = { requestId: string } & AgentSessionEnvelope
 export type SessionRoutedNotification = { type: string; message: string; title: string } & AgentSessionEnvelope
-export type SessionRoutedSkillOutputState = SkillOutputState & AgentSessionEnvelope
+export type SessionRoutedGenerationActivity = GenerationActivity & AgentSessionEnvelope
 export type GeneralAgentNotification = {
   type: string
   message: string
@@ -473,20 +473,26 @@ export type StreamingAccumulator = {
   thinkingText: string
 }
 
-// ─── Skill Output State (unified capture layer) ─────────────────────
+// ─── Live Generation Activity ───────────────────────────────────────
 
-export type SkillOutputState = {
+export type GenerationActivityPhase =
+  | 'preparing'
+  | 'generating'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
+export type GenerationActivity = {
+  /** Stable within one streamed content block. */
+  activityId: string
   skillId: string | null
+  phase: GenerationActivityPhase
+  source: 'tool-input' | 'skill-output'
+  toolName?: string
+  label: string
   content: string
-  isStreaming: boolean
   language: string
-  context?: AgentContext
-  /** App-owned stable session key used for renderer routing. */
-  sessionId?: string
-  clientSessionKey?: string
-  /** Claude SDK session_id, when already materialized. */
-  sdkSessionId?: string
-  workspacePath?: string
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────

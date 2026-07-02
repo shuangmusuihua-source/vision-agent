@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
-import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useSkillOutput } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useGenerationActivity } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
-import SkillOutputCard from './SkillOutputCard'
+import GenerationActivityCard from './GenerationActivityCard'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
 
@@ -27,7 +27,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const isResuming = useIsResumingSession()
   const agentState = useAgentStatus(context)
   const ttftMs = useTtftMs(context)
-  const skillOutput = useSkillOutput(context)
+  const generationActivity = useGenerationActivity(context)
   const bottomRef = useRef<HTMLDivElement>(null)
   const internalContainerRef = useRef<HTMLDivElement>(null)
   const containerRef = externalScrollRef || internalContainerRef
@@ -44,8 +44,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   }, [messages, visibleCount])
 
   const hasMore = messages.length > visibleCount
-  const showLiveSkillOutput = isStreaming && !!skillOutput?.content
-  const skillOutputContentLength = skillOutput?.content.length ?? 0
+  const generationContentLength = generationActivity?.content.length ?? 0
 
   const handleLoadMore = useCallback(async () => {
     if (hasMoreSdkMessages) {
@@ -106,7 +105,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
       })
     }
     prevScrollHeightRef.current = newHeight
-  }, [messages, isStreaming, skillOutputContentLength, containerRef])
+  }, [messages, isStreaming, generationContentLength, containerRef])
 
   // Reset visibleCount and scroll height ref when messages are cleared (new session)
   useEffect(() => {
@@ -174,14 +173,10 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
           ))}
         </Suspense>
       )}
-      {showLiveSkillOutput && (
+      {generationActivity && (
         <div className="message-bubble message-assistant">
           <div className="message-assistant-content">
-            <SkillOutputCard
-              content={skillOutput.content}
-              isStreaming={skillOutput.isStreaming}
-              language={skillOutput.language}
-            />
+            <GenerationActivityCard activity={generationActivity} />
           </div>
         </div>
       )}

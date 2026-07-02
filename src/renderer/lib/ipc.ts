@@ -6,7 +6,7 @@ import type {
   AgentSessionEnvelope,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
-  SessionRoutedSkillOutputState,
+  SessionRoutedGenerationActivity,
   ContentBlock,
   SdkSessionInfo,
   UsageInfo,
@@ -154,7 +154,7 @@ interface AgentApi {
   onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
   onPermissionTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
   onNotification: (callback: (data: AgentNotificationEvent) => void) => () => void
-  onSkillOutput: (callback: (state: SessionRoutedSkillOutputState) => void) => () => void
+  onGenerationActivity: (callback: (state: SessionRoutedGenerationActivity) => void) => () => void
 }
 
 interface GraphApi {

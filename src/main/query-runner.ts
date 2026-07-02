@@ -14,7 +14,12 @@ import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { buildSumiContextPrompt, buildSumiIdentityPrompt } from './agent-identity'
 import { writeAuditLog } from './agent-audit'
-import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
+import type {
+  PreToolUseHookInput,
+  PostToolUseHookInput,
+  PostToolUseFailureHookInput,
+  NotificationHookInput,
+} from '@anthropic-ai/claude-agent-sdk'
 import { createSessionEnvelope, sessionRuntime } from './session-runtime'
 import { persistMaterializedSession, recordCompactionSessionId } from './session-persistence-adapter'
 import {
@@ -49,13 +54,14 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
     return {}
   }
 
-  const auditPostToolUse: HookCallback = async (input, _toolUseID, _options) => {
+  const auditPostToolUse: HookCallback = async (input, toolUseID, _options) => {
     const { tool_name, tool_input, tool_response } = input as PostToolUseHookInput
     writeAuditLog({
       event: 'PostToolUse',
       tool: tool_name,
       result: JSON.stringify(tool_response).substring(0, 500)
     })
+    sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'completed')
     if (
       hookContext.envelope.context === 'editor'
       && isSessionFileMutationTool(tool_name)
@@ -66,6 +72,17 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
         sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
       })
     }
+    return {}
+  }
+
+  const auditPostToolUseFailure: HookCallback = async (input, toolUseID, _options) => {
+    const { tool_name, error } = input as PostToolUseFailureHookInput
+    writeAuditLog({
+      event: 'PostToolUseFailure',
+      tool: tool_name,
+      result: error.substring(0, 500),
+    })
+    sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'failed')
     return {}
   }
 
@@ -85,6 +102,7 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
   return {
     PreToolUse: [{ hooks: [auditPreToolUse] }],
     PostToolUse: [{ hooks: [auditPostToolUse] }],
+    PostToolUseFailure: [{ hooks: [auditPostToolUseFailure] }],
     Notification: [{ hooks: [notificationHook] }]
   }
 }
@@ -259,8 +277,8 @@ export function handleWindowDestroy(): void {
   sessionRuntime.handleWindowDestroy()
 }
 
-export function setSkillOutputWindow(win: BrowserWindow): void {
-  sessionRuntime.setSkillOutputWindow(win)
+export function setGenerationWindow(win: BrowserWindow): void {
+  sessionRuntime.setGenerationWindow(win)
 }
 
 // ─── Main query loop ───────────────────────────────────────────────────
@@ -400,7 +418,7 @@ export async function sendMessage(
         abortController,
       }
     })
-    sessionRuntime.beginSession(runtimeEnvelope)
+    sessionRuntime.beginSession(runtimeEnvelope, skillId ?? null)
     queryInstanceId = sessionRuntime.registerRun({
       query: messageStream as Query,
       skillId: skillId ?? null,

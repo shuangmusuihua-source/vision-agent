@@ -12,7 +12,7 @@ import { migrateStore } from './store-migration'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
-import { setSkillOutputWindow, handleWindowDestroy, abortActiveQuery } from './agent-manager'
+import { setGenerationWindow, handleWindowDestroy, abortActiveQuery } from './agent-manager'
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
 import { flushAuditLog } from './agent-audit'
@@ -232,7 +232,7 @@ app.whenReady().then(async () => {
   createWindow()
 
   const win = getMainWindow()
-  if (win) setSkillOutputWindow(win)
+  if (win) setGenerationWindow(win)
 
   // Auto-updater: check for updates after launch (production only)
   if (app.isPackaged) {

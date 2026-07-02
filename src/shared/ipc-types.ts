@@ -12,7 +12,7 @@ import type {
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   SessionRoutedRequestTimeout,
-  SessionRoutedSkillOutputState,
+  SessionRoutedGenerationActivity,
   UsageInfo,
   GraphData,
   BuiltinSkillCatalogItem,
@@ -345,7 +345,7 @@ export type IPCEventMap = {
   'agent:askUserTimeout': SessionRoutedRequestTimeout
   'agent:permissionTimeout': SessionRoutedRequestTimeout
   'agent:notification': AgentNotificationEvent
-  'skill:output': SessionRoutedSkillOutputState
+  'agent:generationActivity': SessionRoutedGenerationActivity
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[]; version: number }

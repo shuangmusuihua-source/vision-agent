@@ -170,7 +170,8 @@ describe('session runtime event routing', () => {
     })
   })
 
-  it('emits skill output with the session envelope', () => {
+  it('emits live generation activity with the session envelope', () => {
+    vi.useFakeTimers()
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
     const envelope = createSessionEnvelope({
@@ -186,8 +187,8 @@ describe('session runtime event routing', () => {
       envelope,
     })
 
-    runtime.setSkillOutputWindow(win as never)
-    runtime.beginSession(envelope)
+    runtime.setGenerationWindow(win as never)
+    runtime.beginSession(envelope, 'slides')
     runtime.emitSdkMessage(win as never, 'app-session-skill-output', envelope, {
       type: 'stream_event',
       uuid: 'skill-delta-1',
@@ -197,13 +198,16 @@ describe('session runtime event routing', () => {
         delta: { type: 'text_delta', text: '```skill-output\n<html>' },
       },
     } as never)
-    runtime.cleanupRun('app-session-skill-output', instanceId)
+    vi.advanceTimersByTime(80)
 
-    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
-    expect(skillOutput?.payload).toMatchObject({
+    const activity = sent.filter((entry) => entry.channel === 'agent:generationActivity').at(-1)
+    expect(activity?.payload).toMatchObject({
+      activityId: 'skill-output:skill-delta-1',
       skillId: 'slides',
+      phase: 'generating',
+      source: 'skill-output',
+      label: '正在生成内容',
       content: '<html>',
-      isStreaming: true,
       language: 'html',
       context: 'editor',
       sessionId: 'app-session-skill-output',
@@ -211,6 +215,7 @@ describe('session runtime event routing', () => {
       sdkSessionId: 'sdk-session-skill-output',
       workspacePath: '/workspace/skill-output',
     })
+    runtime.cleanupRun('app-session-skill-output', instanceId)
   })
 
   it('applies permission mode to the active query by app session, SDK session, or context', async () => {
@@ -239,7 +244,8 @@ describe('session runtime event routing', () => {
     expect(setPermissionMode).toHaveBeenNthCalledWith(3, 'dontAsk')
   })
 
-  it('keeps skill output on the app session after the SDK session materializes', () => {
+  it('keeps generation activity on the app session after the SDK session materializes', () => {
+    vi.useFakeTimers()
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
     const envelope = createSessionEnvelope({
@@ -254,8 +260,8 @@ describe('session runtime event routing', () => {
       envelope,
     })
 
-    runtime.setSkillOutputWindow(win as never)
-    runtime.beginSession(envelope)
+    runtime.setGenerationWindow(win as never)
+    runtime.beginSession(envelope, 'slides')
     runtime.materializeSdkSession('app-session-late-sdk', 'sdk-session-late')
     runtime.emitSdkMessage(win as never, 'app-session-late-sdk', envelope, {
       type: 'stream_event',
@@ -266,13 +272,14 @@ describe('session runtime event routing', () => {
         delta: { type: 'text_delta', text: '```skill-output\n<html>late sdk</html>' },
       },
     } as never)
-    runtime.cleanupRun('app-session-late-sdk', instanceId)
+    vi.advanceTimersByTime(80)
 
-    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
-    expect(skillOutput?.payload).toMatchObject({
+    const activity = sent.filter((entry) => entry.channel === 'agent:generationActivity').at(-1)
+    expect(activity?.payload).toMatchObject({
       skillId: 'slides',
+      phase: 'generating',
+      source: 'skill-output',
       content: '<html>late sdk</html>',
-      isStreaming: true,
       language: 'html',
       context: 'editor',
       sessionId: 'app-session-late-sdk',
@@ -280,9 +287,11 @@ describe('session runtime event routing', () => {
       sdkSessionId: 'sdk-session-late',
       workspacePath: '/workspace/late-sdk',
     })
+    runtime.cleanupRun('app-session-late-sdk', instanceId)
   })
 
-  it('emits skill output from Edit new_string deltas', () => {
+  it('projects Edit new_string deltas into generation activity', () => {
+    vi.useFakeTimers()
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
     const envelope = createSessionEnvelope({
@@ -298,8 +307,8 @@ describe('session runtime event routing', () => {
       envelope,
     })
 
-    runtime.setSkillOutputWindow(win as never)
-    runtime.beginSession(envelope)
+    runtime.setGenerationWindow(win as never)
+    runtime.beginSession(envelope, 'frontend-slides')
     runtime.emitSdkMessage(win as never, 'app-session-edit-output', envelope, {
       type: 'stream_event',
       uuid: 'edit-start',
@@ -325,13 +334,17 @@ describe('session runtime event routing', () => {
         },
       },
     } as never)
-    runtime.cleanupRun('app-session-edit-output', instanceId)
+    vi.advanceTimersByTime(80)
 
-    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
-    expect(skillOutput?.payload).toMatchObject({
+    const activity = sent.filter((entry) => entry.channel === 'agent:generationActivity').at(-1)
+    expect(activity?.payload).toMatchObject({
+      activityId: 'tool:tool-edit-1',
       skillId: 'frontend-slides',
+      phase: 'generating',
+      source: 'tool-input',
+      toolName: 'Edit',
+      label: '正在更新内容',
       content: '<section class="slide"><h1>Slide A</h1></section>',
-      isStreaming: true,
       language: 'html',
       context: 'editor',
       sessionId: 'app-session-edit-output',
@@ -339,9 +352,10 @@ describe('session runtime event routing', () => {
       sdkSessionId: 'sdk-session-edit-output',
       workspacePath: '/workspace/edit-output',
     })
+    runtime.cleanupRun('app-session-edit-output', instanceId)
   })
 
-  it('emits skill output from Bash heredoc artifact writes', () => {
+  it('emits Bash generation activity without treating command text as artifact content', () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
     const envelope = createSessionEnvelope({
@@ -357,8 +371,8 @@ describe('session runtime event routing', () => {
       envelope,
     })
 
-    runtime.setSkillOutputWindow(win as never)
-    runtime.beginSession(envelope)
+    runtime.setGenerationWindow(win as never)
+    runtime.beginSession(envelope, 'guizang-ppt-skill')
     runtime.emitSdkMessage(win as never, 'app-session-bash-output', envelope, {
       type: 'stream_event',
       uuid: 'bash-start',
@@ -384,12 +398,16 @@ describe('session runtime event routing', () => {
     } as never)
     runtime.cleanupRun('app-session-bash-output', instanceId)
 
-    const skillOutput = sent.find((entry) => entry.channel === 'skill:output')
-    expect(skillOutput?.payload).toMatchObject({
+    const activity = sent.find((entry) => entry.channel === 'agent:generationActivity')
+    expect(activity?.payload).toMatchObject({
+      activityId: 'tool:tool-bash-1',
       skillId: 'guizang-ppt-skill',
-      content: '<!DOCTYPE html>\n<html><body>Deck</body></html>',
-      isStreaming: true,
-      language: 'html',
+      phase: 'preparing',
+      source: 'tool-input',
+      toolName: 'Bash',
+      label: '准备执行生成任务',
+      content: '',
+      language: 'text',
       context: 'editor',
       sessionId: 'app-session-bash-output',
       clientSessionKey: 'app-session-bash-output',
@@ -398,7 +416,7 @@ describe('session runtime event routing', () => {
     })
   })
 
-  it('does not treat ordinary Bash heredoc scripts as skill output', () => {
+  it('keeps script-based generation visible even when no previewable body exists', () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
     const envelope = createSessionEnvelope({
@@ -414,8 +432,8 @@ describe('session runtime event routing', () => {
       envelope,
     })
 
-    runtime.setSkillOutputWindow(win as never)
-    runtime.beginSession(envelope)
+    runtime.setGenerationWindow(win as never)
+    runtime.beginSession(envelope, 'frontend-slides')
     runtime.emitSdkMessage(win as never, 'app-session-bash-script', envelope, {
       type: 'stream_event',
       uuid: 'bash-script-start',
@@ -441,7 +459,16 @@ describe('session runtime event routing', () => {
     } as never)
     runtime.cleanupRun('app-session-bash-script', instanceId)
 
-    expect(sent.some((entry) => entry.channel === 'skill:output')).toBe(false)
+    const activity = sent.find((entry) => entry.channel === 'agent:generationActivity')
+    expect(activity?.payload).toMatchObject({
+      activityId: 'tool:tool-bash-script',
+      phase: 'preparing',
+      source: 'tool-input',
+      toolName: 'Bash',
+      content: '',
+      context: 'editor',
+      sessionId: 'app-session-bash-script',
+    })
   })
 
   it('emits execution errors with the session envelope', () => {
