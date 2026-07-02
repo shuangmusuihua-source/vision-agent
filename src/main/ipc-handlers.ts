@@ -7,7 +7,6 @@ import { registerWorkspaceHandlers } from './handlers/workspace-handlers'
 import { registerSettingsHandlers } from './handlers/settings-handlers'
 import { registerAgentHandlers } from './handlers/agent-handlers'
 import { registerSystemHandlers } from './handlers/system-handlers'
-import { registerSessionHandlers } from './handlers/session-handlers'
 
 // ─── Shared helpers ──────────────────────────────────────────────
 
@@ -47,5 +46,4 @@ export function registerIpcHandlers(): void {
   registerSettingsHandlers(pushSettingsToRenderer)
   registerAgentHandlers()
   registerSystemHandlers()
-  registerSessionHandlers()
 }

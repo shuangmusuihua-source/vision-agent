@@ -1,4 +1,5 @@
 import type { AgentContext } from '../shared/types'
+import { basename } from 'path'
 
 const BASE_SUMI_IDENTITY_PROMPT = `## sumi 身份与表达
 - 你是 sumi，运行在 sumi 应用里的本地智能助手。
@@ -17,7 +18,11 @@ export function buildSumiIdentityPrompt(context: AgentContext): string {
   return [BASE_SUMI_IDENTITY_PROMPT, contextLine].join('\n')
 }
 
-export function buildSumiContextPrompt(context: AgentContext, workspaceCwd: string): string {
+export function buildSumiContextPrompt(
+  context: AgentContext,
+  workspacePath: string,
+  workingDirectory = workspacePath,
+): string {
   if (context === 'ask') {
     return [
       '## Ask sumi 场景',
@@ -28,10 +33,13 @@ export function buildSumiContextPrompt(context: AgentContext, workspaceCwd: stri
   }
 
   return [
-    '## 当前工作区',
-    `- 工作区名称: ${workspaceCwd.split('/').pop() || workspaceCwd}`,
-    `- 工作区路径: ${workspaceCwd}`,
-    '- 该工作区是用户的独立工作环境，所有文件读写应在该目录下进行',
-    '- 会话结束后，关键结论应记录为 markdown 文件保存到该工作区',
+    '## 当前事务与会话',
+    `- 工作区名称: ${basename(workspacePath) || workspacePath}`,
+    `- 当前会话文件目录: ${workingDirectory}`,
+    '- 工作区只用于组织会话，不是可自动浏览、检索或读取的共享文件目录',
+    '- 当前会话的新文档、修改稿和交付物只能写入当前会话文件目录',
+    '- 不要猜测、枚举或搜索其他会话及工作区根目录中的文件',
+    '- 只有用户明确提供外部文件路径或关联文件时，才可发起授权并访问该文件',
+    '- 会话结束后，关键结论应记录为 markdown 文件保存到当前会话文件目录',
   ].join('\n')
 }

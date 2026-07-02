@@ -111,7 +111,6 @@ export function addSessionRecord(record: SessionRecord): void {
 export function removeSessionRecord(id: string): void {
   const sessions = store.get('sessions').filter(s => s.id !== id)
   store.set('sessions', sessions)
-  store.set('sessionArtifacts', store.get('sessionArtifacts').filter(a => a.sessionId !== id))
 }
 
 export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): void {
@@ -136,16 +135,14 @@ export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): 
     createdAt: numberOrDefault(patch.createdAt, now),
     lastModified: numberOrDefault(patch.lastModified, now),
     messageCount: numberOrDefault(patch.messageCount, 0),
-    artifactCount: numberOrDefault(patch.artifactCount, 0),
   }
 
   if (typeof patch.sdkSessionId === 'string') record.sdkSessionId = patch.sdkSessionId
+  if (typeof patch.workingDirectory === 'string') record.workingDirectory = patch.workingDirectory
   if (typeof patch.title === 'string') record.title = patch.title
   if (typeof patch.summary === 'string') record.summary = patch.summary
   if (typeof patch.firstPrompt === 'string') record.firstPrompt = patch.firstPrompt
   if (Array.isArray(patch.tags)) record.tags = patch.tags.filter((tag): tag is string => typeof tag === 'string')
-  if (typeof patch.legacyMigration === 'boolean') record.legacyMigration = patch.legacyMigration
-
   store.set('sessions', [...sessions, record])
 }
 

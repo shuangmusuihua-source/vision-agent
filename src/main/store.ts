@@ -60,10 +60,4 @@ export {
   deleteCompactionSessionId,
 } from './persistence/settings-store'
 
-export {
-  getSessionArtifacts,
-  getSessionArtifactOutputs,
-  upsertSessionArtifact,
-  recordSessionArtifactsFromTool,
-  removeSessionArtifacts,
-} from './persistence/artifact-store'
+export { getSessionFileOutputs } from './session-file-catalog'

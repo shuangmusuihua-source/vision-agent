@@ -62,10 +62,6 @@ export type IPCChannelMap = {
     request: { context: 'editor' | 'ask'; mode: string }
     response: { success: boolean; error?: string }
   }
-  'agent:forkSession': {
-    request: { sessionId: string; options?: { upToMessageId?: string; title?: string } }
-    response: { success: boolean; sessionId?: string; error?: string }
-  }
   'agent:respondAskUser': {
     request: {
       requestId: string
@@ -76,10 +72,6 @@ export type IPCChannelMap = {
   'agent:listSdkSessions': {
     request: { workspaceCwd?: string }
     response: SdkSessionInfo[]
-  }
-  'agent:loadSessionMessages': {
-    request: { sessionId: string; limit?: number; offset?: number }
-    response: AgentIPCMessage[]
   }
   'agent:loadSessionMessagesPaginated': {
     request: { sessionId: string; limit: number; offset: number }

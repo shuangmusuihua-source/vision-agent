@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type MockState = {
   sessions: unknown[]
-  sessionArtifacts: unknown[]
   authorizedDirectories: string[]
   fixedDirectories: string[]
   workspaces: unknown[]
@@ -10,7 +9,6 @@ type MockState = {
 
 const mockState: MockState = {
   sessions: [],
-  sessionArtifacts: [],
   authorizedDirectories: [],
   fixedDirectories: [],
   workspaces: [],
@@ -31,7 +29,6 @@ const { getSessionRecords, updateSessionRecord } = await import('../src/main/per
 describe('session record persistence', () => {
   beforeEach(() => {
     mockState.sessions = []
-    mockState.sessionArtifacts = []
     mockState.authorizedDirectories = []
     mockState.fixedDirectories = []
     mockState.workspaces = []
@@ -41,12 +38,12 @@ describe('session record persistence', () => {
     updateSessionRecord('new-123', {
       title: 'draft',
       workspacePath: '/workspace',
+      workingDirectory: '/workspace/.sumi/sessions/session-a',
       context: 'editor',
       status: 'empty',
       createdAt: 10,
       lastModified: 10,
       messageCount: 0,
-      artifactCount: 0,
     })
 
     expect(getSessionRecords()).toEqual([
@@ -54,12 +51,12 @@ describe('session record persistence', () => {
         id: 'new-123',
         title: 'draft',
         workspacePath: '/workspace',
+        workingDirectory: '/workspace/.sumi/sessions/session-a',
         context: 'editor',
         status: 'empty',
         createdAt: 10,
         lastModified: 10,
         messageCount: 0,
-        artifactCount: 0,
       },
     ])
   })

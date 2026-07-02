@@ -106,7 +106,7 @@ SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──
 - **递归拷贝**: 保留 SKILL.md、assets/、references/、scripts/、templates/ 等完整目录结构
 - **幂等**: 按每个 Skill 的内容指纹和已安装文件清单判断；内容变化或资源缺失时原子替换
 - **完整性**: `pack` / `dist` 完成后比较源目录与 `.app` 中的全部 Skill 文件，缺失即让发布命令失败
-- **发现**: SDK 保持原会话存储配置，使用 `settingSources: ['project']` 从工作区轻量链接发现 Skill；Ask sumi 直接从应用数据目录发现
+- **发现**: 工作区会话与 Ask sumi 都使用独立运行目录，通过 `settingSources: ['project']` 从会话内的只读 Skill 链接发现能力；应用数据根目录不作为 Agent cwd
 - **升级**: 修改内置 Skill 内容后会自动生成新指纹；第三方 Skill 同时更新 manifest 中的固定提交和可用版本号，应用仍通过 sumi 发版统一升级
 
 ### 2. SkillOutputBridge — `skill-output-bridge.ts`

@@ -142,7 +142,6 @@ export type AgentStore = {
   loadMoreSessionMessages: (sessionId: string) => Promise<void>
   clearSessionLoadError: () => void
   retrySessionLoad: () => Promise<void>
-  renameCurrentSession: (title: string) => Promise<void>
 }
 
 // ─── Backward-compatible type aliases ────────────────────────────────────

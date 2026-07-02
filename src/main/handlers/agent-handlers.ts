@@ -1,17 +1,17 @@
 import { ipcMain, dialog } from 'electron'
 import { getMainWindow } from '../ipc-sender'
-import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessages, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, deleteSdkSession, forkSdkSession, setPermissionMode } from '../agent-manager'
-import { getSessionRecords, updateSessionRecord, removeSessionRecord, getSessionArtifactOutputs, recordSessionArtifactsFromTool, removeSessionArtifacts } from '../store'
+import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, abortActiveQueryAndWait, deleteSdkSession, setPermissionMode } from '../agent-manager'
+import { getSessionRecords, getSessionRecordById, updateSessionRecord, removeSessionRecord, getSessionFileOutputs } from '../store'
 import type { AgentContext } from '../../shared/types'
 import type { IPCRequest } from '../../shared/ipc-types'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
-import { authorizeAttachmentPaths } from '../attachment-path-authorization'
+import { removeSessionWorkingDirectory } from '../session-files'
+import { createAttachmentPathGrant } from '../attachment-path-authorization'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
 type AgentRespondAskUserRequest = IPCRequest<'agent:respondAskUser'>
 type AgentListSdkSessionsRequest = IPCRequest<'agent:listSdkSessions'>
-type AgentLoadSessionMessagesRequest = IPCRequest<'agent:loadSessionMessages'>
 type AgentLoadSessionMessagesPaginatedRequest = IPCRequest<'agent:loadSessionMessagesPaginated'>
 type AgentRenameSessionRequest = IPCRequest<'agent:renameSession'>
 type AgentUpdateSessionRecordRequest = IPCRequest<'agent:updateSessionRecord'>
@@ -19,11 +19,7 @@ type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
-type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
-
-const artifactBackfills = new Map<string, Promise<void>>()
-const completedArtifactBackfills = new Set<string>()
 
 function isObjectRequest<T extends object>(value: T | string | undefined): value is T {
   return typeof value === 'object' && value !== null
@@ -67,48 +63,6 @@ function normalizeSendMessageRequest(
   }
 }
 
-async function ensureLegacyArtifactsBackfilled(sessionId: string): Promise<void> {
-  const record = getSessionRecords().find(r => r.id === sessionId || r.sdkSessionId === sessionId)
-  const appSessionId = record?.id || sessionId
-  if (record?.artifactIndexBackfilledAt || completedArtifactBackfills.has(appSessionId)) return
-  const existing = artifactBackfills.get(appSessionId)
-  if (existing) return existing
-
-  const backfill = (async () => {
-    let offset = 0
-    let previousOffset = -1
-    do {
-      const page = await loadSdkSessionMessagesPaginated(sessionId, 200, offset)
-      for (const msg of page.messages) {
-        if (msg.type !== 'assistant') continue
-        for (const block of msg.message.content) {
-          if (block.type !== 'tool_use') continue
-          if (block.name !== 'Write' && block.name !== 'Edit' && block.name !== 'Bash') continue
-          await recordSessionArtifactsFromTool({
-            sessionId: appSessionId,
-            sdkSessionId: record?.sdkSessionId,
-            workspacePath: record?.workspacePath,
-            toolName: block.name,
-            toolInput: block.input,
-          })
-        }
-      }
-
-      previousOffset = offset
-      offset = page.offset
-      if (!page.hasMore || offset === previousOffset) break
-    } while (true)
-
-    completedArtifactBackfills.add(appSessionId)
-    if (record) updateSessionRecord(appSessionId, { artifactIndexBackfilledAt: Date.now() })
-  })().finally(() => {
-    artifactBackfills.delete(appSessionId)
-  })
-
-  artifactBackfills.set(appSessionId, backfill)
-  return backfill
-}
-
 export function registerAgentHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, requestOrPrompt: AgentSendMessageRequest | string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string, clientSessionKey?: string) => {
     const window = getMainWindow()
@@ -150,13 +104,6 @@ export function registerAgentHandlers(): void {
     return await listSdkSessions(workspaceCwd)
   })
 
-  ipcMain.handle('agent:loadSessionMessages', async (_event, requestOrId: AgentLoadSessionMessagesRequest | string, limit?: number, offset?: number) => {
-    const request: AgentLoadSessionMessagesRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId, limit, offset }
-    return await loadSdkSessionMessages(request.sessionId, request.limit, request.offset)
-  })
-
   ipcMain.handle('agent:loadSessionMessagesPaginated', async (_event, requestOrId: AgentLoadSessionMessagesPaginatedRequest | string, limit?: number, offset?: number) => {
     const request: AgentLoadSessionMessagesPaginatedRequest = isObjectRequest(requestOrId)
       ? requestOrId
@@ -184,11 +131,15 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:removeSessionRecord', (_event, requestOrId: AgentRemoveSessionRecordRequest | string) => {
+  ipcMain.handle('agent:removeSessionRecord', async (_event, requestOrId: AgentRemoveSessionRecordRequest | string) => {
     const request: AgentRemoveSessionRecordRequest = isObjectRequest(requestOrId)
       ? requestOrId
       : { sessionId: requestOrId }
-    removeSessionArtifacts(request.sessionId)
+    await abortActiveQueryAndWait(request.sessionId)
+    const record = getSessionRecordById(request.sessionId)
+    if (record) {
+      await removeSessionWorkingDirectory(record.workspacePath, record.workingDirectory, record.context)
+    }
     removeSessionRecord(request.sessionId)
     return { success: true }
   })
@@ -209,7 +160,7 @@ export function registerAgentHandlers(): void {
     // Abort any running query for this session before deletion — prevents
     // resource leaks (orphaned subprocess, pending permissions) and avoids
     // the SDK recreating the session file from a still-running query.
-    abortActiveQuery(request.sessionId)
+    await abortActiveQueryAndWait(request.sessionId)
     await deleteSdkSession(request.sessionId)
     return { success: true }
   })
@@ -225,11 +176,7 @@ export function registerAgentHandlers(): void {
       const workspacePath = record?.workspacePath
       const appSessionId = record?.id || request.sessionId
 
-      // Legacy history is indexed once in bounded tail pages. Subsequent
-      // overview loads read only the app-owned artifact registry.
-      await ensureLegacyArtifactsBackfilled(request.sessionId)
-
-      const files = await getSessionArtifactOutputs(appSessionId)
+      const files = await getSessionFileOutputs(appSessionId)
       return { sessionId: appSessionId, workspacePath: workspacePath || '', files }
     } catch (e) {
       console.error('[agent:getSessionOutputs] failed:', e)
@@ -257,19 +204,6 @@ export function registerAgentHandlers(): void {
     }
   })
 
-  ipcMain.handle('agent:forkSession', async (_event, requestOrId: AgentForkSessionRequest | string, options?: AgentForkSessionRequest['options']) => {
-    const request: AgentForkSessionRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId, options }
-    try {
-      const result = await forkSdkSession(request.sessionId, request.options)
-      if (result) return { success: true, sessionId: result.sessionId }
-      return { success: false, error: 'Fork failed' }
-    } catch (err) {
-      return { success: false, error: (err as Error).message }
-    }
-  })
-
   ipcMain.handle('agent:selectFolder', async () => {
     const window = getMainWindow()
     if (!window) return { canceled: true, filePaths: [] }
@@ -289,7 +223,10 @@ export function registerAgentHandlers(): void {
         { name: 'All Files', extensions: ['*'] },
       ],
     })
-    if (!result.canceled) authorizeAttachmentPaths(result.filePaths)
-    return result
+    if (result.canceled) return result
+    return {
+      ...result,
+      attachmentGrantId: createAttachmentPathGrant(result.filePaths),
+    }
   })
 }

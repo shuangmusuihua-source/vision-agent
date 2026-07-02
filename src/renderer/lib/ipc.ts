@@ -102,7 +102,7 @@ interface WorkspaceApi {
   createWorkspace: (name: string) => Promise<string | null>
   deleteWorkspace: (dirPath: string) => Promise<{ success: boolean; error?: string }>
   knowledgeDir: () => Promise<string>
-  selectFiles: () => Promise<{ canceled: boolean; filePaths: string[] }>
+  selectFiles: () => Promise<{ canceled: boolean; filePaths: string[]; attachmentGrantId?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
@@ -129,13 +129,11 @@ interface AgentApi {
   respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => Promise<{ success: boolean }>
   respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
-  loadSessionMessages: (sessionId: string) => Promise<AgentIPCMessage[]>
   loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }>
   renameSession: (sessionId: string, title: string) => Promise<{ success: boolean }>
   updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
   setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean; error?: string }>
-  forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => Promise<{ success: boolean; sessionId?: string; error?: string }>
   selectFolder: () => Promise<{ canceled: boolean; filePaths: string[] }>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
@@ -146,6 +144,7 @@ interface AgentApi {
 
   // Lifecycle channels
   onSessionCreated: (callback: (data: AgentSessionEnvelope) => void) => () => void
+  onSessionFilesChanged: (callback: (data: { sessionId: string }) => void) => () => void
   onPermissionRequest: (callback: (data: SessionRoutedPermissionRequest) => void) => () => void
   onAskUser: (callback: (data: SessionRoutedAskUserRequest) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void

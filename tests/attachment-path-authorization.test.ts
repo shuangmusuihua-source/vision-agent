@@ -3,8 +3,8 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  authorizeAttachmentPaths,
-  isAttachmentPathAuthorized,
+  consumeAttachmentPathGrant,
+  createAttachmentPathGrant,
 } from '../src/main/attachment-path-authorization'
 
 const temporaryDirectories: string[] = []
@@ -22,10 +22,11 @@ describe('attachment path authorization', () => {
     await writeFile(selected, 'selected')
     await writeFile(sibling, 'sibling')
 
-    authorizeAttachmentPaths([selected])
+    const grantId = createAttachmentPathGrant([selected])
 
-    expect(isAttachmentPathAuthorized(selected)).toBe(true)
-    expect(isAttachmentPathAuthorized(sibling)).toBe(false)
+    expect(consumeAttachmentPathGrant(grantId, sibling)).toBe(false)
+    expect(consumeAttachmentPathGrant(grantId, selected)).toBe(true)
+    expect(consumeAttachmentPathGrant(grantId, selected)).toBe(false)
   })
 
   it('canonicalizes symlinks before comparing paths', async () => {
@@ -36,9 +37,8 @@ describe('attachment path authorization', () => {
     await writeFile(selected, 'selected')
     await symlink(selected, alias)
 
-    authorizeAttachmentPaths([selected])
+    const grantId = createAttachmentPathGrant([selected])
 
-    expect(isAttachmentPathAuthorized(alias)).toBe(true)
+    expect(consumeAttachmentPathGrant(grantId, alias)).toBe(true)
   })
 })
-

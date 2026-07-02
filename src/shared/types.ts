@@ -647,6 +647,8 @@ export interface SessionRecord {
   id: string            // App-owned stable session key
   sdkSessionId?: string // Claude SDK session_id once materialized
   workspacePath: string // FK → WorkspaceRecord.path
+  /** Isolated SDK cwd for sessions created with the session-files model. */
+  workingDirectory?: string
   title?: string        // user or auto-generated title
   summary?: string      // first assistant response, truncated
   firstPrompt?: string  // first user message, truncated
@@ -656,31 +658,6 @@ export interface SessionRecord {
   createdAt: number
   lastModified: number
   messageCount: number
-  artifactCount: number
-  /** Set after legacy JSONL tool output has been indexed into the artifact registry. */
-  artifactIndexBackfilledAt?: number
-  legacyMigration?: boolean
-}
-
-// ─── Session Artifact Registry (app-owned durable outputs) ────────────
-
-export interface SessionArtifactRecord {
-  id: string
-  sessionId: string        // App-owned stable session key
-  sdkSessionId?: string    // Claude SDK session_id for traceability only
-  workspacePath: string    // Workspace used to resolve relative tool paths
-  fileName: string
-  filePath: string         // Session-owned snapshot path
-  sourceFilePath?: string  // Original normalized filesystem path
-  fileType: ArtifactFileType
-  category: 'document' | 'skill_output' | 'other'
-  availability?: 'available' | 'missing'
-  source: string           // e.g. Write, Edit, history-backfill
-  sourceTool?: string
-  skillId?: string | null
-  size?: number
-  createdAt: number
-  updatedAt: number
 }
 // ─── Tab Descriptor (supports fixed tabs + file tabs) ──────────────────
 
@@ -712,7 +689,6 @@ export interface SessionOutputEntry {
   fileType: ArtifactFileType
   category: 'document' | 'skill_output' | 'other'
   availability: 'available' | 'missing'
-  source: string
   size?: number
   createdAt: number
 }

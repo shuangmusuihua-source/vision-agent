@@ -1,12 +1,11 @@
-import { listSessions, getSessionMessages, renameSession, deleteSession, getSessionInfo, tagSession, forkSession as sdkForkSession } from '@anthropic-ai/claude-agent-sdk'
-import type { ForkSessionOptions, SessionMutationOptions } from '@anthropic-ai/claude-agent-sdk'
-import { getAppSkillsCwd } from './skill-init'
+import { listSessions, getSessionMessages, renameSession, deleteSession } from '@anthropic-ai/claude-agent-sdk'
+import type { SessionMutationOptions } from '@anthropic-ai/claude-agent-sdk'
 import { toAgentIPCMessage } from './message-converter'
 import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
-import { getSessionRecords, removeSessionRecord, removeSessionArtifacts, updateSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
-import { readFile } from 'node:fs/promises'
+import { getSessionRecords, removeSessionRecord, updateSessionRecord, getCompactionSessionIds, addCompactionSessionId, deleteCompactionSessionId } from './store'
 import { resolveClaudeSessionJsonlPath } from './claude-session-path'
 import { readJsonlTailPage } from './jsonl-tail-reader'
+import { removeSessionWorkingDirectory } from './session-files'
 
 // ─── Compaction tracking ───────────────────────────────────────────────
 // Track session IDs created by SDK mid-stream compaction.
@@ -48,8 +47,7 @@ function getAppSessionId(sessionId: string): string {
 
 function getSessionDir(sessionId: string): string | undefined {
   const record = getRecordForSession(sessionId)
-  if (record?.workspacePath) return record.workspacePath
-  if (record?.context === 'ask') return getAppSkillsCwd()
+  if (record?.workingDirectory) return record.workingDirectory
   return undefined
 }
 
@@ -62,19 +60,14 @@ function isSessionNotFoundError(err: unknown): boolean {
   return err instanceof Error && /not found/i.test(err.message)
 }
 
-async function withSessionDirFallback<T>(
+async function withSessionDir<T>(
   sessionId: string,
   operation: (sdkSessionId: string, options?: SessionMutationOptions) => Promise<T>
 ): Promise<T> {
   const sdkSessionId = getSdkSessionId(sessionId)
   const options = getSessionMutationOptions(sessionId)
-  if (!options) return operation(sdkSessionId, undefined)
-  try {
-    return await operation(sdkSessionId, options)
-  } catch (err) {
-    if (!isSessionNotFoundError(err)) throw err
-    return await operation(sdkSessionId, undefined)
-  }
+  if (!options) throw new Error(`Session working directory not found: ${sessionId}`)
+  return await operation(sdkSessionId, options)
 }
 
 // ─── SDK session listing ───────────────────────────────────────────────
@@ -87,65 +80,48 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
     const sessionContextMap = new Map<string, string>()
     const sessionTitleMap = new Map<string, string>()
     const sessionAppIdMap = new Map<string, string>()
+    const sessionCreatedAtMap = new Map<string, number>()
     for (const r of records) {
       const sdkId = r.sdkSessionId || r.id
       if (r.workspacePath) sessionWorkspaceMap.set(sdkId, r.workspacePath)
       sessionContextMap.set(sdkId, r.context)
       sessionAppIdMap.set(sdkId, r.id)
+      sessionCreatedAtMap.set(sdkId, r.createdAt)
       if (r.title) sessionTitleMap.set(sdkId, r.title)
     }
 
-    const globalCwd = getAppSkillsCwd()
     const results: SdkSessionInfo[] = []
     const seenIds = new Set<string>()
-
-    try {
-      const globalResult = await listSessions({ dir: globalCwd })
-      for (const s of globalResult) {
-        if (!seenIds.has(s.sessionId)) {
-          seenIds.add(s.sessionId)
-          if (compactionSessionIds.has(s.sessionId)) continue
-          const appId = sessionAppIdMap.get(s.sessionId) || s.sessionId
-          results.push({
-            id: appId,
-            sdkSessionId: s.sessionId,
-            title: s.customTitle || sessionTitleMap.get(s.sessionId) || s.summary || s.firstPrompt,
-            createdAt: s.createdAt,
-            lastModified: s.lastModified,
-            messageCount: (s as Record<string, unknown>).messageCount as number || 0,
-            cwd: globalCwd,
-            workspacePath: sessionWorkspaceMap.get(s.sessionId),
-            context: sessionContextMap.get(s.sessionId),
-          })
-        }
-      }
-    } catch (err) {
-      console.error('[SessionStore] listSessions global error:', err)
+    const sessionDirs = new Set<string>()
+    for (const record of records) {
+      if (workspaceCwd && record.workspacePath !== workspaceCwd) continue
+      if (record.workingDirectory) sessionDirs.add(record.workingDirectory)
     }
 
-    if (workspaceCwd && workspaceCwd !== globalCwd) {
+    for (const dir of sessionDirs) {
       try {
-        const wsResult = await listSessions({ dir: workspaceCwd })
-        for (const s of wsResult) {
+        const dirResult = await listSessions({ dir })
+        for (const s of dirResult) {
           if (!seenIds.has(s.sessionId)) {
             seenIds.add(s.sessionId)
             if (compactionSessionIds.has(s.sessionId)) continue
-            const appId = sessionAppIdMap.get(s.sessionId) || s.sessionId
+            const appId = sessionAppIdMap.get(s.sessionId)
+            if (!appId) continue
             results.push({
               id: appId,
               sdkSessionId: s.sessionId,
-              title: s.customTitle || sessionTitleMap.get(s.sessionId) || s.summary || s.firstPrompt,
-              createdAt: s.createdAt,
+              title: sessionTitleMap.get(s.sessionId) || s.customTitle || s.summary || s.firstPrompt,
+              createdAt: sessionCreatedAtMap.get(s.sessionId) ?? s.createdAt,
               lastModified: s.lastModified,
               messageCount: (s as Record<string, unknown>).messageCount as number || 0,
-              cwd: workspaceCwd,
-              workspacePath: sessionWorkspaceMap.get(s.sessionId) || workspaceCwd,
+              cwd: dir,
+              workspacePath: sessionWorkspaceMap.get(s.sessionId),
               context: sessionContextMap.get(s.sessionId),
             })
           }
         }
       } catch (err) {
-        console.error('[SessionStore] listSessions workspace error:', err)
+        console.error('[SessionStore] listSessions directory error:', dir, err)
       }
     }
 
@@ -162,7 +138,7 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
           createdAt: r.createdAt,
           lastModified: r.lastModified,
           messageCount: r.messageCount || 0,
-          cwd: globalCwd,
+          cwd: r.workingDirectory,
           workspacePath: r.workspacePath,
           context: r.context,
         })
@@ -171,7 +147,11 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
 
     // Return both entry types. The renderer separates Ask sumi sessions
     // from workspace sessions by context so the two entry points stay isolated.
-    return results
+    return results.sort((a, b) => (
+      (b.createdAt || 0) - (a.createdAt || 0)
+      || (b.lastModified || 0) - (a.lastModified || 0)
+      || a.id.localeCompare(b.id)
+    ))
   } catch (err) {
     console.error('[SessionStore] listSessions error:', err)
     return []
@@ -180,14 +160,13 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
 
 export async function getSdkSessionTotalMessageCount(
   sessionId: string,
-  workspaceCwd?: string
+  _workspaceCwd?: string
 ): Promise<number> {
   try {
     const sdkSessionId = getSdkSessionId(sessionId)
-    const dirs = [getAppSkillsCwd()]
     const sessionDir = getSessionDir(sessionId)
-    if (sessionDir && !dirs.includes(sessionDir)) dirs.push(sessionDir)
-    if (workspaceCwd && !dirs.includes(workspaceCwd)) dirs.push(workspaceCwd)
+    if (!sessionDir) return 0
+    const dirs = [sessionDir]
     const seenIds = new Set<string>()
     const compactionIds = compactionSessionIds
     for (const dir of dirs) {
@@ -218,54 +197,7 @@ export async function getSdkSessionTotalMessageCount(
  *   {userData}/.claude/projects/{workspacePath with /→-}/{sessionId}.jsonl
  */
 function getSessionJsonlPath(sessionId: string): string | null {
-  const record = getRecordForSession(sessionId)
-  return resolveClaudeSessionJsonlPath(getSdkSessionId(sessionId), record?.workspacePath)
-}
-
-async function readSessionJsonlDirect(sessionId: string): Promise<Array<Record<string, unknown>> | null> {
-  try {
-    const jsonlPath = getSessionJsonlPath(sessionId)
-    if (!jsonlPath) return null
-
-    const raw = await readFile(jsonlPath, 'utf-8')
-    const lines = raw.trim().split('\n')
-    return lines.map(line => {
-      try { return JSON.parse(line) as Record<string, unknown> }
-      catch { return null }
-    }).filter(Boolean) as Array<Record<string, unknown>>
-  } catch (err) {
-    console.error('[SessionStore] Direct JSONL read failed:', (err as Error).message)
-    return null
-  }
-}
-
-export async function loadSdkSessionMessages(
-  sessionId: string,
-  limit?: number,
-  offset?: number
-): Promise<Array<Record<string, unknown>>> {
-  // Direct JSONL read returns ALL messages including pre-compaction history.
-  const direct = await readSessionJsonlDirect(sessionId)
-  if (direct) {
-    const start = offset ?? 0
-    const end = limit != null ? start + limit : undefined
-    return direct.slice(start, end)
-  }
-
-  // Fallback to SDK API (for edge cases where direct read can't find the file)
-  try {
-    const sdkSessionId = getSdkSessionId(sessionId)
-    const options: Record<string, unknown> = { includeSystemMessages: true }
-    const dir = getSessionDir(sessionId)
-    if (dir) options.dir = dir
-    if (limit !== undefined) options.limit = limit
-    if (offset !== undefined) options.offset = offset
-    const messages = await getSessionMessages(sdkSessionId, options)
-    return messages.map((m) => m as unknown as Record<string, unknown>)
-  } catch (err) {
-    console.error('[SessionStore] getSessionMessages error:', err)
-    return []
-  }
+  return resolveClaudeSessionJsonlPath(getSdkSessionId(sessionId), getSessionDir(sessionId))
 }
 
 export async function loadSdkSessionMessagesPaginated(
@@ -299,11 +231,12 @@ export async function loadSdkSessionMessagesPaginated(
   // direct path's "newest first" behavior for initial load — it returns
   // the oldest messages instead.  Acceptable because this path is rarely hit.
   const dir = getSessionDir(sessionId)
+  if (!dir) return { messages: [], offset, limit, hasMore: false }
   const sdkMessages = await getSessionMessages(getSdkSessionId(sessionId), {
     limit,
     offset,
     includeSystemMessages: true,
-    ...(dir ? { dir } : {}),
+    dir,
   })
   const messages: AgentIPCMessage[] = []
   for (const m of sdkMessages) {
@@ -314,21 +247,25 @@ export async function loadSdkSessionMessagesPaginated(
 }
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
+  const record = getRecordForSession(sessionId)
   const appSessionId = getAppSessionId(sessionId)
   updateSessionRecord(appSessionId, { title, lastModified: Date.now() })
 
+  // Empty app-owned sessions have no SDK history yet. The app record is the
+  // authoritative title and is sufficient until the first message materializes.
+  if (record && !record.sdkSessionId) return
+
   try {
-    await withSessionDirFallback(sessionId, (sdkSessionId, options) => renameSession(sdkSessionId, title, options))
+    await withSessionDir(sessionId, (sdkSessionId, options) => renameSession(sdkSessionId, title, options))
   } catch (err) {
-    if (isSessionNotFoundError(err)) {
-      console.warn('[SessionStore] renameSession skipped; SDK session not found:', {
-        sessionId: appSessionId,
-        sdkSessionId: getSdkSessionId(sessionId),
-      })
-      return
-    }
-    console.error('[SessionStore] renameSession error:', err)
-    throw err
+    // SDK metadata is a secondary mirror. Keep the app-owned title durable
+    // even if SDK history has already been compacted or removed.
+    console.warn('[SessionStore] SDK title mirror skipped:', {
+      sessionId: appSessionId,
+      sdkSessionId: getSdkSessionId(sessionId),
+      missing: isSessionNotFoundError(err),
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -338,66 +275,32 @@ export async function renameSdkSession(sessionId: string, title: string): Promis
  * function — query-runner.abortActiveQuery(sessionId) should be called first.</summary>
 */
 export async function deleteSdkSession(sessionId: string): Promise<void> {
-  // Delete from SDK storage first — the critical operation.
-  // Only clean up tracking metadata after it succeeds, so a failed
-  // deletion leaves the session intact rather than orphaned.
   const sdkSessionId = getSdkSessionId(sessionId)
   const appSessionId = getAppSessionId(sessionId)
-  await withSessionDirFallback(sessionId, (_sdkSessionId, options) => deleteSession(sdkSessionId, options))
+  const record = getRecordForSession(sessionId)
+
+  try {
+    const options = getSessionMutationOptions(sessionId)
+    if (options && record?.sdkSessionId) {
+      await deleteSession(sdkSessionId, options)
+    }
+  } catch (err) {
+    console.warn('[SessionStore] SDK history cleanup skipped:', {
+      sessionId: appSessionId,
+      sdkSessionId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  if (record) {
+    await removeSessionWorkingDirectory(
+      record.workspacePath,
+      record.workingDirectory,
+      record.context,
+    )
+  }
+
   compactionSessionIds.delete(sdkSessionId)
   deleteCompactionSessionId(sdkSessionId)
-  removeSessionArtifacts(appSessionId)
   removeSessionRecord(appSessionId)
-}
-
-// ─── SDK Session Operations ──────────────────────────────────────────────
-
-export async function tagSdkSession(sessionId: string, tag: string): Promise<boolean> {
-  try {
-    await withSessionDirFallback(sessionId, (sdkSessionId, options) => tagSession(sdkSessionId, tag, options))
-    return true
-  } catch {
-    return false
-  }
-}
-
-export async function getSdkSessionInfo(sessionId: string): Promise<Record<string, unknown> | null> {
-  try {
-    const info = await withSessionDirFallback(sessionId, (sdkSessionId, options) => getSessionInfo(sdkSessionId, options))
-    return info as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
-export async function forkSdkSession(sessionId: string, options?: ForkSessionOptions): Promise<{ sessionId: string } | null> {
-  try {
-    const dir = getSessionDir(sessionId) || options?.dir
-    const sdkSessionId = getSdkSessionId(sessionId)
-    const run = (mutationOptions?: ForkSessionOptions) => sdkForkSession(sdkSessionId, mutationOptions)
-    let result
-    try {
-      result = await run({
-        ...options,
-        ...(dir ? { dir } : {}),
-      } as ForkSessionOptions)
-    } catch (err) {
-      if (!dir || !isSessionNotFoundError(err)) throw err
-      result = await run(options)
-    }
-    return result as { sessionId: string } | null
-  } catch {
-    return null
-  }
-}
-
-export async function loadSdkSessionMessagesTyped(sessionId: string): Promise<AgentIPCMessage[]> {
-  try {
-    const dir = getSessionDir(sessionId) || getAppSkillsCwd()
-    const raw = await getSessionMessages(getSdkSessionId(sessionId), { dir })
-    if (!Array.isArray(raw)) return []
-    return raw.map(m => toAgentIPCMessage(m as any)).filter((m): m is AgentIPCMessage => m !== null)
-  } catch {
-    return []
-  }
 }

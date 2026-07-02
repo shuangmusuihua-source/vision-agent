@@ -877,4 +877,67 @@ describe('session runtime event routing', () => {
       updatedInput: { file_path: '/workspace/a/result.md' },
     })
   })
+
+  it('waits for the active run to finish cleanup before deletion continues', async () => {
+    const runtime = new SessionRuntimeController()
+    const abortController = new AbortController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-delete',
+      sdkSessionId: 'sdk-session-delete',
+      workspacePath: '/workspace/delete',
+    })
+    const instanceId = runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController,
+      envelope,
+    })
+    let completed = false
+
+    const waiting = runtime.abortAndWait('sdk-session-delete', 1000).then(() => {
+      completed = true
+    })
+    await Promise.resolve()
+
+    expect(abortController.signal.aborted).toBe(true)
+    expect(completed).toBe(false)
+
+    runtime.cleanupRun('app-session-delete', instanceId)
+    await waiting
+    expect(completed).toBe(true)
+  })
+
+  it('does not let stale run cleanup affect a replacement run in the same session', async () => {
+    const { win, sent } = fakeWindow()
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-replaced',
+      workspacePath: '/workspace/replaced',
+    })
+    const staleInstance = runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: new AbortController(),
+      envelope,
+    })
+    runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: new AbortController(),
+      envelope,
+    })
+    const permission = runtime.requestPermissionApproval(win as never, envelope, {
+      toolName: 'Write',
+      input: { file_path: '/workspace/replaced/result.md' },
+    })
+
+    runtime.finalizeRun(win as never, envelope.sessionId, staleInstance)
+
+    const permissionEvent = sent.find((event) => event.channel === 'agent:permissionRequest')
+    const requestId = (permissionEvent?.payload as { id: string }).id
+    runtime.resolvePermission(requestId, 'allow')
+    await expect(permission).resolves.toMatchObject({ behavior: 'allow' })
+  })
 })

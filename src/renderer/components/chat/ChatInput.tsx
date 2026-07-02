@@ -9,6 +9,7 @@ import { useModal } from '../common/ModalSystem'
 import type { MarkitdownFormat } from '../../../shared/markitdown-runtime'
 import {
   encodeFileConvertPath,
+  encodeAttachmentReferencePath,
   fileExtension,
   formatAttachmentPromptLine,
   isConvertibleAttachmentPath,
@@ -22,6 +23,7 @@ interface AttachedFile {
   base64?: string
   mimeType?: string
   size?: number
+  attachmentGrantId?: string
 }
 
 interface ChatInputProps {
@@ -119,7 +121,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       const ext = fileExtension(name)
       const type = ext === 'pdf' ? 'pdf' :
         imageExts.includes(ext) ? 'image' : 'text'
-      files.push({ name, path: filePath, type })
+      files.push({ name, path: filePath, type, attachmentGrantId: result.attachmentGrantId })
     }
     setAttachedFiles((prev) => [...prev, ...files])
   }, [])
@@ -178,13 +180,18 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
       if (attachedFiles.length > 0) {
         // Hidden marker for main process to convert non-text files (pptx/xlsx/docx/pdf)
         const convertibleFiles = attachedFiles.filter(f => isConvertibleAttachmentPath(f.path || f.name))
-        const convPaths = convertibleFiles.map(f => encodeFileConvertPath(f.path))
+        const convPaths = convertibleFiles.map(f => encodeFileConvertPath(f.path, f.attachmentGrantId))
         if (convertibleFiles.length > 0) {
           const formats = [...new Set(convertibleFiles.map(file => fileExtension(file.path || file.name)))] as MarkitdownFormat[]
           if (!await ensureAttachmentRuntime(formats)) return
         }
         const fileParts = attachedFiles.map(formatAttachmentPromptLine)
-        const prefix = convPaths.length > 0 ? '<!--FILE_CONVERT:' + convPaths.join('|') + '-->\n' : ''
+        const attachmentPaths = attachedFiles.map(file => (
+          encodeAttachmentReferencePath(file.path, file.attachmentGrantId)
+        ))
+        const attachmentPrefix = '<!--FILE_ATTACH:' + attachmentPaths.join('|') + '-->\n'
+        const conversionPrefix = convPaths.length > 0 ? '<!--FILE_CONVERT:' + convPaths.join('|') + '-->\n' : ''
+        const prefix = attachmentPrefix + conversionPrefix
         prompt = prefix + fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
       }
       onSend(prompt)

@@ -1,5 +1,4 @@
 import type { AgentContext } from '../shared/types'
-import { registerSession } from './agent-sessions'
 import { addCompactionId } from './session-store'
 import { addCompactionSessionId, addSessionRecord, getSessionRecordById } from './store'
 
@@ -7,12 +6,12 @@ type MaterializedSessionInput = {
   appSessionId: string
   sdkSessionId: string
   workspacePath: string
+  workingDirectory?: string
   context: AgentContext
   title?: string
 }
 
 export function persistMaterializedSession(input: MaterializedSessionInput): void {
-  registerSession(input.sdkSessionId, input.workspacePath)
   const existing = getSessionRecordById(input.appSessionId)
   const now = Date.now()
   addSessionRecord({
@@ -20,13 +19,13 @@ export function persistMaterializedSession(input: MaterializedSessionInput): voi
     id: input.appSessionId,
     sdkSessionId: input.sdkSessionId,
     workspacePath: input.workspacePath,
+    workingDirectory: input.workingDirectory ?? existing?.workingDirectory,
     context: input.context,
     status: 'active',
     title: input.title ?? existing?.title,
     createdAt: existing?.createdAt ?? now,
     lastModified: now,
     messageCount: existing?.messageCount ?? 0,
-    artifactCount: existing?.artifactCount ?? 0,
   })
 }
 

@@ -41,7 +41,7 @@ const mergeSession = (existing: SdkSessionInfo, incoming: SdkSessionInfo): SdkSe
     workspacePath: incoming.workspacePath ?? existing.workspacePath,
     context: incoming.context ?? existing.context,
     cwd: incoming.cwd ?? existing.cwd,
-    title: incoming.title ?? existing.title,
+    title: existing.title ?? incoming.title,
   }
 }
 
@@ -50,6 +50,7 @@ const mergeSession = (existing: SdkSessionInfo, incoming: SdkSessionInfo): SdkSe
 export type SessionListAction =
   | CreateTemp
   | Materialize
+  | Rename
   | Delete
   | ReplaceSdk
 
@@ -75,6 +76,13 @@ export interface Materialize {
 export interface Delete {
   type: 'DELETE'
   sessionId: string
+}
+
+/** User renamed an app-owned session. */
+export interface Rename {
+  type: 'RENAME'
+  sessionId: string
+  title: string
 }
 
 /** loadSessions() returned fresh data from the SDK on workspace change. */
@@ -149,6 +157,12 @@ export function sessionListReducer(
     // ── User deleted a session ─────────────────────────────────────
     case 'DELETE': {
       return state.filter(s => s.id !== action.sessionId)
+    }
+
+    case 'RENAME': {
+      return state.map((session) => (
+        session.id === action.sessionId ? { ...session, title: action.title } : session
+      ))
     }
 
     // ── Workspace changed → reload from SDK ────────────────────────

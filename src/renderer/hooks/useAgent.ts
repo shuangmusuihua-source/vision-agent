@@ -189,14 +189,6 @@ export function useIPCSubscriptions() {
           window.api.agent.renameSession(sdkSessionId, sessionTitle).catch(
             (err) => console.error('[useAgent] renameSession failed:', err)
           )
-          window.api.agent.updateSessionRecord(clientSessionKey, {
-            title: sessionTitle,
-            sdkSessionId,
-            workspacePath: data.workspacePath,
-            context: data.context,
-            status: 'active',
-            lastModified: Date.now(),
-          }).catch(() => {})
         }
       }
       refreshWatchdogAfterState(data.context, clientSessionKey)

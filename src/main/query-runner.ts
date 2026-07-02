@@ -1,31 +1,41 @@
 import type { BrowserWindow } from 'electron'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
-import { ensureWorkspaceSkills, getAppSkillsCwd } from './skill-init'
+import { ensureWorkspaceSkills, getAppSkillsCwd, getAppSkillsDir } from './skill-init'
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
-import { getApiKey, getAuthorizedDirectories, getEnabledSkills, recordSessionArtifactsFromTool } from './store'
+import {
+  getApiKey,
+  getAuthorizedDirectories,
+  getEnabledSkills,
+  getSessionRecordById,
+  updateSessionRecord,
+} from './store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { buildSumiContextPrompt, buildSumiIdentityPrompt } from './agent-identity'
 import { writeAuditLog } from './agent-audit'
-import { extractToolPathInput, isToolUsePathAuthorized } from './agent-path-utils'
 import type { PreToolUseHookInput, PostToolUseHookInput, NotificationHookInput } from '@anthropic-ai/claude-agent-sdk'
 import { createSessionEnvelope, sessionRuntime } from './session-runtime'
 import { persistMaterializedSession, recordCompactionSessionId } from './session-persistence-adapter'
 import {
   appendAttachmentConversionSummary,
+  claimPromptAttachments,
   convertAttachmentsToMarkdown,
-  parseFileConvertPaths,
   stripFileConvertMarker,
 } from './attachment-conversion'
 import { isSkillAvailableAtInitialization } from '../shared/skill-invocation'
+import {
+  ensureAskSessionWorkingDirectory,
+  ensureSessionWorkingDirectory,
+} from './session-files'
+import { decideSessionFileAccess, extractExplicitAbsolutePaths } from './session-file-access'
+import { isSessionFileMutationTool } from './session-file-catalog'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
 type HookSessionContext = {
   envelope: AgentSessionEnvelope
   getSdkSessionId?: () => string | undefined
-  skillId?: string | null
 }
 
 function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext): Partial<Record<string, HookCallbackMatcher[]>> {
@@ -46,14 +56,15 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       tool: tool_name,
       result: JSON.stringify(tool_response).substring(0, 500)
     })
-    await recordSessionArtifactsFromTool({
-      sessionId: hookContext.envelope.sessionId,
-      sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
-      workspacePath: hookContext.envelope.workspacePath,
-      toolName: tool_name,
-      toolInput: tool_input,
-      skillId: hookContext.skillId,
-    })
+    if (
+      hookContext.envelope.context === 'editor'
+      && isSessionFileMutationTool(tool_name)
+      && !mainWindow.isDestroyed()
+    ) {
+      mainWindow.webContents.send('agent:sessionFilesChanged', {
+        sessionId: hookContext.envelope.sessionId,
+      })
+    }
     return {}
   }
 
@@ -79,14 +90,26 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
 
 // ─── Options builder ───────────────────────────────────────────────────
 
-function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, context: AgentContext = 'editor', workspaceCwdOverride?: string, sessionId?: string, envelope?: AgentSessionEnvelope, getSessionId?: () => string | undefined, skillId?: string | null) {
+function buildOptions(
+  mainWindow: BrowserWindow,
+  activeFilePath?: string,
+  context: AgentContext = 'editor',
+  workspacePathOverride?: string,
+  workingDirectoryOverride?: string,
+  sessionId?: string,
+  envelope?: AgentSessionEnvelope,
+  getSessionId?: () => string | undefined,
+  authorizedAttachmentPaths: string[] = [],
+  explicitExternalPaths: string[] = [],
+) {
   const dirs = getAuthorizedDirectories()
-  const workspaceCwd = workspaceCwdOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
-  const allowedReadRoots = [...dirs, getAppSkillsCwd()]
+  const workspacePath = workspacePathOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
+  const workingDirectory = workingDirectoryOverride || workspacePath
+  const skillsDirectory = getAppSkillsDir()
   const sessionEnvelope = envelope || createSessionEnvelope({
     context,
     sessionId: sessionId || context,
-    workspacePath: workspaceCwd,
+    workspacePath,
     sdkSessionId: sessionId,
   })
   const currentEnvelope = (): AgentSessionEnvelope => ({
@@ -94,7 +117,7 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     sdkSessionId: getSessionId?.() || sessionEnvelope.sdkSessionId,
   })
 
-  const workspaceContextLines = buildSumiContextPrompt(context, workspaceCwd)
+  const workspaceContextLines = buildSumiContextPrompt(context, workspacePath, workingDirectory)
 
   const systemPromptAppend = [
     buildSumiIdentityPrompt(context),
@@ -102,9 +125,9 @@ function buildOptions(mainWindow: BrowserWindow, activeFilePath?: string, contex
     workspaceContextLines,
     context === 'ask'
       ? '可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。通过 Bash 调用；仅在任务确实需要时生成截图，并使用用户明确授权的位置。'
-      : `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workspaceCwd}、agent-browser snapshot -i 等。截图存到工作区目录方便后续 Read。通过 Bash 调用。`,
+      : `可使用 agent-browser CLI 操控真实浏览器（基于 Chrome）。能力：打开网页、截图、点击、填表、提取内容。适用于 SPA 页面、需要登录的页面、需截图的场景。用法：agent-browser open <url>、agent-browser screenshot --screenshot-dir ${workingDirectory}、agent-browser snapshot -i 等。截图存到当前会话目录方便后续 Read。通过 Bash 调用。`,
     activeFilePath ? `用户已将以下文件关联到当前对话: ${activeFilePath.replace(/[\n\r]/g, '')}\n回答问题或执行 Skill 前，必须先使用 Read 工具读取该文件的完整内容，并以文件内容作为主要上下文。` : '',
-    workspaceCwd !== getAppSkillsCwd() ? `用户的工作区目录: ${workspaceCwd.replace(/[\n\r]/g, '')}\n读写用户文件时，请使用完整路径。` : '',
+    context === 'editor' ? `当前会话文件目录: ${workingDirectory.replace(/[\n\r]/g, '')}。` : '',
 
     `你可使用 \`\`\`json-render 代码块输出富交互 UI。支持的组件及属性：
 - Card: { title: string, description?: string } — 卡片容器，可嵌套子组件
@@ -123,16 +146,19 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
   return buildAgentOptions({
     permissionMode: 'default',
-    allowedTools: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
+    allowedTools: ['WebSearch', 'WebFetch'],
     includePartialMessages: true,
     settingSources: ['project'],
-    workspaceCwd,
+    managedSettings: {
+      allowManagedHooksOnly: true,
+      allowManagedPermissionRulesOnly: true,
+    },
+    workspaceCwd: workingDirectory,
     skills: getEnabledSkills(),
     systemPromptAppend,
     hooks: buildHooks(mainWindow, {
       envelope: sessionEnvelope,
       getSdkSessionId: getSessionId,
-      skillId,
     }),
     resume: sessionId || undefined,
     canUseTool: async (
@@ -149,21 +175,25 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
       if (toolName === 'WebSearch' || toolName === 'WebFetch') {
         return { behavior: 'allow', updatedInput: input }
       }
-
-      // Auto-allow file-discovery tools only inside authorized roots. Glob/Grep
-      // default to the SDK cwd when no path is supplied, so authorize ".".
-      if (toolName === 'Glob' || toolName === 'Grep') {
-        if (isToolUsePathAuthorized(toolName, input, allowedReadRoots, { cwd: workspaceCwd })) {
-          return { behavior: 'allow', updatedInput: input }
-        }
-        return { behavior: 'deny', message: 'Path not authorized for file search' }
+      if (toolName === 'Skill') {
+        return { behavior: 'allow', updatedInput: input }
       }
 
-      // Auto-allow Read within authorized directories and app skills directory.
-      if (toolName === 'Read') {
-        const rawPath = extractToolPathInput(toolName, input)
-        if (rawPath && isToolUsePathAuthorized(toolName, input, allowedReadRoots, { cwd: workspaceCwd })) {
-          return { behavior: 'allow', updatedInput: input }
+      const fileAccess = decideSessionFileAccess({
+        toolName,
+        input,
+        workingDirectory,
+        skillsDirectory,
+        authorizedExternalReadPaths: authorizedAttachmentPaths,
+        explicitExternalPaths,
+      })
+      if (fileAccess === 'allow') {
+        return { behavior: 'allow', updatedInput: input }
+      }
+      if (fileAccess === 'deny') {
+        return {
+          behavior: 'deny',
+          message: '该路径不属于当前会话，且用户未在本次消息中明确提供。',
         }
       }
 
@@ -215,6 +245,10 @@ export function abortActiveQuery(queryKey?: string): void {
   sessionRuntime.abort(queryKey)
 }
 
+export async function abortActiveQueryAndWait(queryKey: string): Promise<void> {
+  await sessionRuntime.abortAndWait(queryKey)
+}
+
 export async function setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {
   return sessionRuntime.setPermissionMode(queryKey, mode)
 }
@@ -244,6 +278,9 @@ function toUserFacingQueryError(error: unknown): string {
   if (/429|rate.limit|quota/i.test(message)) {
     return '请求频率过高，请稍后重试。'
   }
+  if (/Agent run did not stop in time/i.test(message)) {
+    return '上一个任务仍在结束中，请稍后重试。'
+  }
   return message
 }
 
@@ -258,17 +295,59 @@ export async function sendMessage(
   clientSessionKey?: string,
   title?: string
 ): Promise<void> {
-  // Abort any previous query for the same app-owned session key.
-  // Different sessions in the same context can now run in parallel.
   const queryKey = clientSessionKey || sessionId || context
-  abortActiveQuery(queryKey)
-  const effectiveWorkspaceCwd = workspacePath
+  const effectiveWorkspacePath = workspacePath
     || (context === 'ask' ? getAppSkillsCwd() : undefined)
     || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
+
+  // A session has one ordered execution stream. Wait for the previous run's
+  // finally block before starting its replacement so stale cleanup cannot
+  // discard the new run's text, Skill state, or permission requests.
+  try {
+    await abortActiveQueryAndWait(queryKey)
+  } catch (error) {
+    sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
+      context,
+      sessionId: queryKey,
+      workspacePath: effectiveWorkspacePath,
+      sdkSessionId: sessionId,
+    }), toUserFacingQueryError(error))
+    return
+  }
+
+  const existingRecord = getSessionRecordById(queryKey)
+  let effectiveWorkingDirectory = effectiveWorkspacePath
+
+  try {
+    if (context === 'editor') {
+      effectiveWorkingDirectory = await ensureSessionWorkingDirectory(effectiveWorkspacePath, queryKey)
+    } else {
+      effectiveWorkingDirectory = await ensureAskSessionWorkingDirectory(effectiveWorkspacePath, queryKey)
+    }
+
+    updateSessionRecord(queryKey, {
+      workspacePath: effectiveWorkspacePath,
+      workingDirectory: effectiveWorkingDirectory,
+      context,
+      status: existingRecord?.status || 'empty',
+      createdAt: existingRecord?.createdAt || Date.now(),
+      lastModified: Date.now(),
+      messageCount: existingRecord?.messageCount || 0,
+    })
+  } catch (error) {
+    sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
+      context,
+      sessionId: queryKey,
+      workspacePath: effectiveWorkspacePath,
+      sdkSessionId: sessionId,
+    }), toUserFacingQueryError(error))
+    return
+  }
+
   let runtimeEnvelope = createSessionEnvelope({
     context,
     sessionId: queryKey,
-    workspacePath: effectiveWorkspaceCwd,
+    workspacePath: effectiveWorkspacePath,
     sdkSessionId: sessionId,
   })
   let currentSessionId = sessionId
@@ -276,17 +355,22 @@ export async function sendMessage(
 
   try {
     // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
-    let processedPrompt = prompt
-    const convertPaths = parseFileConvertPaths(prompt)
+    const { attachmentPaths, convertRequests } = claimPromptAttachments(prompt)
+    const convertPaths = convertRequests.map((request) => request.sourcePath)
+    let processedPrompt = stripFileConvertMarker(prompt)
+    const explicitExternalPaths = [...new Set([
+      ...(activeFilePath ? [activeFilePath] : []),
+      ...convertPaths,
+      ...extractExplicitAbsolutePaths(prompt),
+    ])]
     if (convertPaths.length > 0) {
-      const conversion = await convertAttachmentsToMarkdown(effectiveWorkspaceCwd, queryKey, convertPaths)
-      processedPrompt = appendAttachmentConversionSummary(stripFileConvertMarker(prompt), conversion)
+      const conversion = await convertAttachmentsToMarkdown(effectiveWorkingDirectory, queryKey, convertRequests)
+      processedPrompt = appendAttachmentConversionSummary(processedPrompt, conversion)
     }
 
-    sessionRuntime.beginSession(runtimeEnvelope)
     try {
-      const skillLinks = await ensureWorkspaceSkills(effectiveWorkspaceCwd)
-      if (skillId && skillLinks.conflicts.includes(skillId)) {
+      const sessionSkillLinks = await ensureWorkspaceSkills(effectiveWorkingDirectory)
+      if (skillId && sessionSkillLinks.conflicts.includes(skillId)) {
         throw new Error(`工作区中存在同名 Skill，无法确认实际来源: ${skillId}`)
       }
     } catch (error) {
@@ -294,7 +378,18 @@ export async function sendMessage(
     }
 
     const getSessionId = () => currentSessionId
-    const options = buildOptions(mainWindow, activeFilePath, context, effectiveWorkspaceCwd, sessionId, runtimeEnvelope, getSessionId, skillId)
+    const options = buildOptions(
+      mainWindow,
+      activeFilePath,
+      context,
+      effectiveWorkspacePath,
+      effectiveWorkingDirectory,
+      sessionId,
+      runtimeEnvelope,
+      getSessionId,
+      attachmentPaths,
+      explicitExternalPaths,
+    )
     const appSessionKey = queryKey
     const abortController = new AbortController()
     const messageStream = query({
@@ -304,6 +399,7 @@ export async function sendMessage(
         abortController,
       }
     })
+    sessionRuntime.beginSession(runtimeEnvelope)
     queryInstanceId = sessionRuntime.registerRun({
       query: messageStream as Query,
       skillId: skillId ?? null,
@@ -334,7 +430,8 @@ export async function sendMessage(
         persistMaterializedSession({
           appSessionId: appSessionKey,
           sdkSessionId: currentSessionId,
-          workspacePath: effectiveWorkspaceCwd,
+          workspacePath: effectiveWorkspacePath,
+          workingDirectory: effectiveWorkingDirectory,
           context,
           title,
         })

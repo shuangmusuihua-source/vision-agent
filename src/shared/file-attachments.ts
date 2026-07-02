@@ -18,6 +18,7 @@ export const ATTACHMENT_CONVERSION_CONTEXT_TAG = 'attachment_conversion_context'
 
 const CONVERTIBLE_EXTENSION_SET = new Set<string>(CONVERTIBLE_ATTACHMENT_EXTENSIONS)
 const FILE_CONVERT_MARKER_REGEX = /<!--FILE_CONVERT:[\s\S]*?-->\n?/g
+const FILE_ATTACHMENT_MARKER_REGEX = /<!--FILE_ATTACH:[\s\S]*?-->\n?/g
 const ATTACHMENT_CONVERSION_CONTEXT_REGEX =
   /(?:\n{0,2})<attachment_conversion_context>[\s\S]*?<\/attachment_conversion_context>/g
 const LEGACY_ATTACHMENT_CONVERSION_SUMMARY_REGEX = /(?:\n{0,2})---\n附件转换(?:结果|失败)：[\s\S]*$/g
@@ -33,8 +34,14 @@ export function isConvertibleAttachmentPath(filePathOrName: string): boolean {
   return CONVERTIBLE_EXTENSION_SET.has(fileExtension(filePathOrName))
 }
 
-export function encodeFileConvertPath(filePath: string): string {
-  return encodeURIComponent(filePath)
+export function encodeFileConvertPath(filePath: string, grantId?: string): string {
+  const encodedPath = encodeURIComponent(filePath)
+  return grantId ? `${grantId}@${encodedPath}` : encodedPath
+}
+
+export function encodeAttachmentReferencePath(filePath: string, grantId?: string): string {
+  const encodedPath = encodeURIComponent(filePath)
+  return grantId ? `${grantId}@${encodedPath}` : encodedPath
 }
 
 function sanitizePromptPath(filePath: string): string {
@@ -118,6 +125,7 @@ export function parseAttachmentConversionStatuses(text: string): AttachmentConve
 export function stripInternalAttachmentContext(text: string): string {
   return text
     .replace(FILE_CONVERT_MARKER_REGEX, '')
+    .replace(FILE_ATTACHMENT_MARKER_REGEX, '')
     .replace(ATTACHMENT_CONVERSION_CONTEXT_REGEX, '')
     .replace(LEGACY_ATTACHMENT_CONVERSION_SUMMARY_REGEX, '')
     .trim()

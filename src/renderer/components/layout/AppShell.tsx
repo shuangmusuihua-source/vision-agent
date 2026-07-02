@@ -174,6 +174,43 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     activeFilePath,
     [...workspace.workspacePaths, ...workspace.fixedWorkspacePaths],
   )
+  const sessionOutputRequestVersions = useRef(new Map<string, number>())
+  const sessionOutputRefreshTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+  const refreshSessionOutputs = useCallback((sessionId: string, showLoading = false) => {
+    const requestVersion = (sessionOutputRequestVersions.current.get(sessionId) || 0) + 1
+    sessionOutputRequestVersions.current.set(sessionId, requestVersion)
+    if (showLoading) useAgentStore.setState({ sessionOutputsLoading: true })
+
+    return window.api.agent.getSessionOutputs(sessionId).then((outputs) => {
+      const isLatestRequest = sessionOutputRequestVersions.current.get(sessionId) === requestVersion
+      const isActiveSession = useAgentStore.getState().activeSessionId.editor === sessionId
+      if (isLatestRequest && isActiveSession) {
+        useAgentStore.getState().setSessionOutputs(outputs)
+      }
+    }).catch(() => {
+      const isLatestRequest = sessionOutputRequestVersions.current.get(sessionId) === requestVersion
+      const isActiveSession = useAgentStore.getState().activeSessionId.editor === sessionId
+      if (isLatestRequest && isActiveSession) {
+        useAgentStore.getState().setSessionOutputs(null)
+      }
+    })
+  }, [])
+
+  const scheduleSessionOutputsRefresh = useCallback((sessionId: string) => {
+    const existing = sessionOutputRefreshTimers.current.get(sessionId)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      sessionOutputRefreshTimers.current.delete(sessionId)
+      void refreshSessionOutputs(sessionId)
+    }, 120)
+    sessionOutputRefreshTimers.current.set(sessionId, timer)
+  }, [refreshSessionOutputs])
+
+  useEffect(() => () => {
+    for (const timer of sessionOutputRefreshTimers.current.values()) clearTimeout(timer)
+    sessionOutputRefreshTimers.current.clear()
+  }, [])
 
   // Load sessions when workspace changes
   const skipNextSessionLoad = useRef(false)
@@ -195,27 +232,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // Load session outputs when active session changes
   useEffect(() => {
     if (activeSessionId) {
-      const sdkSessionId = useAgentStore.getState().sessionSlots[activeSessionId]?.sdkSessionId
-        || useAgentStore.getState().sessionList.find(s => s.id === activeSessionId)?.sdkSessionId
-        || (activeSessionId.startsWith('new-') ? null : activeSessionId)
-      if (!sdkSessionId) {
-        useAgentStore.getState().setSessionOutputs(null)
-        return
-      }
-      useAgentStore.setState({ sessionOutputsLoading: true })
-      window.api.agent.getSessionOutputs(activeSessionId).then((outputs) => {
-        if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
-          useAgentStore.getState().setSessionOutputs(outputs)
-        }
-      }).catch(() => {
-        if (useAgentStore.getState().activeSessionId.editor === activeSessionId) {
-          useAgentStore.getState().setSessionOutputs(null)
-        }
-      })
+      void refreshSessionOutputs(activeSessionId, true)
     } else {
       useAgentStore.getState().setSessionOutputs(null)
     }
-  }, [activeSessionId])
+  }, [activeSessionId, refreshSessionOutputs])
+
+  useEffect(() => {
+    return window.api.agent.onSessionFilesChanged(({ sessionId }) => {
+      if (useAgentStore.getState().activeSessionId.editor !== sessionId) return
+      scheduleSessionOutputsRefresh(sessionId)
+    })
+  }, [scheduleSessionOutputsRefresh])
 
   // ── Session selection / new conversation handlers ─────────────────────
 
@@ -238,6 +266,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
   const newSessionInputRef = useRef<HTMLInputElement>(null)
+  const creatingSessionRequestRef = useRef(false)
 
   useEffect(() => {
     if (creatingSessionIn) {
@@ -248,12 +277,33 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const handleCreateSession = useCallback(async (wsPath: string) => {
     const name = newSessionName.trim()
-    if (!name) return
+    if (!name || creatingSessionRequestRef.current) return
+    creatingSessionRequestRef.current = true
+    const tempSessionId = `new-${Date.now()}`
+    const now = Date.now()
+    try {
+      const result = await window.api.agent.updateSessionRecord(tempSessionId, {
+        title: name,
+        workspacePath: wsPath,
+        context: 'editor',
+        status: 'empty',
+        createdAt: now,
+        lastModified: now,
+        messageCount: 0,
+      })
+      if (!result.success) throw new Error('会话记录未保存')
+    } catch (error) {
+      console.error('[AppShell] create session persistence failed:', error)
+      await modal.alert({ title: '创建失败', message: '无法保存新会话，请稍后重试' })
+      return
+    } finally {
+      creatingSessionRequestRef.current = false
+    }
+
     if (wsPath !== activeWorkspacePath) {
       skipNextSessionLoad.current = true
     }
-    // Create a new empty editor slot with a placeholder session ID and store the title
-    const tempSessionId = `new-${Date.now()}`
+    // Only expose the session after its app-owned record is durable.
     useAgentStore.getState().switchToSession(tempSessionId, 'editor', wsPath)
     setEditorLinkedFile(null)
     if (wsPath !== activeWorkspacePath) {
@@ -277,24 +327,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       title: name,
       workspacePath: wsPath,
     })
-    // Persist immediately so empty named sessions survive restart even
-    // before the first message is sent (which creates the real SDK session).
-    window.api.agent.updateSessionRecord(tempSessionId, {
-      title: name,
-      workspacePath: wsPath,
-      context: 'editor',
-      status: 'empty',
-      createdAt: Date.now(),
-      lastModified: Date.now(),
-      messageCount: 0,
-      artifactCount: 0,
-    }).catch(() => {})
     setCreatingSessionIn(null)
     if (view !== 'editor') {
       useAgentStore.setState({ context: 'editor' })
       setView('editor')
     }
-  }, [newSessionName, activeWorkspacePath, view, setEditorLinkedFile])
+  }, [newSessionName, activeWorkspacePath, view, setEditorLinkedFile, modal])
 
   useEffect(() => {
     return window.api.onMainError((error) => {
@@ -350,39 +388,29 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const handleDeleteSession = useCallback(async (sessionId: string, workspacePath: string) => {
     const ok = await modal.confirm({
       title: '删除会话',
-      message: '确定删除此会话？会话中的所有对话记录将被永久删除，此操作不可撤销。',
+      message: '确定删除此会话？会话中的对话记录和会话文件将被永久删除，此操作不可撤销。',
       variant: 'danger',
     })
     if (!ok) return
     const wasActive = useAgentStore.getState().activeSessionId.editor === sessionId
 
-    // Abort any running query for this session before deletion.
-    // Without this, a streaming session's SDK subprocess keeps running,
-    // writing events to a deleted session file — resource leak + potential
-    // session file recreation on disk.
     const slot = useAgentStore.getState().sessionSlots[sessionId]
-    if (slot?.isStreaming || (wasActive && useAgentStore.getState().slots.editor.isStreaming)) {
-      window.api.agent.abort(sessionId).catch(() => {})
-    }
-
     const sdkSessionId = slot?.sdkSessionId
       || useAgentStore.getState().sessionList.find(s => s.id === sessionId)?.sdkSessionId
       || (sessionId.startsWith('new-') ? null : sessionId)
 
-    if (!sdkSessionId) {
-      useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
-      window.api.agent.removeSessionRecord(sessionId).catch(() => {})
-    } else {
-      try {
+    try {
+      if (sdkSessionId) {
         await window.api.agent.deleteSession(sdkSessionId)
-        useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
-        window.api.agent.removeSessionRecord(sessionId).catch(() => {})
-      } catch (err) {
-        console.error('[AppShell] deleteSession error:', err)
-        modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
-        return
+      } else {
+        await window.api.agent.removeSessionRecord(sessionId)
       }
+    } catch (err) {
+      console.error('[AppShell] deleteSession error:', err)
+      await modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
+      return
     }
+    useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
     // Remove the deleted session's cached slot from sessionSlots
     useAgentStore.setState((s) => {
       const { [sessionId]: _, ...rest } = s.sessionSlots
@@ -397,6 +425,17 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }
     }
   }, [modal, view, loadSessions, setEditorLinkedFile])
+
+  const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
+    try {
+      const result = await window.api.agent.renameSession(sessionId, title)
+      if (!result.success) throw new Error('会话名称未保存')
+      useAgentStore.getState().dispatchSessionList({ type: 'RENAME', sessionId, title })
+    } catch (error) {
+      console.error('[AppShell] rename session failed:', error)
+      await modal.alert({ title: '重命名失败', message: '无法保存会话名称，请稍后重试' })
+    }
+  }, [modal])
 
   const isStreaming = useIsStreaming('editor')
   const prevIsStreamingRef = useRef(isStreaming)
@@ -503,15 +542,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     // Refresh session outputs so OverviewPanel shows newly produced files
     const sid = useAgentStore.getState().activeSessionId.editor
     if (sid) {
-      const sdkSessionId = useAgentStore.getState().sessionSlots[sid]?.sdkSessionId
-        || useAgentStore.getState().sessionList.find(s => s.id === sid)?.sdkSessionId
-        || (sid.startsWith('new-') ? null : sid)
-      if (!sdkSessionId) return
-      window.api.agent.getSessionOutputs(sid).then((outputs) => {
-        if (useAgentStore.getState().activeSessionId.editor === sid) {
-          useAgentStore.getState().setSessionOutputs(outputs)
-        }
-      }).catch(() => {})
+      scheduleSessionOutputsRefresh(sid)
     }
 
     const tab = activeTabRef.current
@@ -519,7 +550,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       const timer = setTimeout(() => { refreshActiveContentRef.current().catch(() => {}) }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isStreaming])
+  }, [isStreaming, scheduleSessionOutputsRefresh])
 
   // ── Text selection, ask-agent, stats, skill ─────────────────────────
 
@@ -586,6 +617,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         activeSessionRunning={isStreaming}
         onSessionSelect={handleSessionSelect}
         onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession}
         onNewConversation={(wsPath) => setCreatingSessionIn(wsPath)}
         onCancelNewSession={() => setCreatingSessionIn(null)}
         creatingSessionIn={creatingSessionIn}

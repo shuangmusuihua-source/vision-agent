@@ -1156,32 +1156,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
     },
 
-    async renameCurrentSession(title: string) {
-      const sessionId = get().activeSessionId.editor
-      if (!sessionId) return
-
-      // Always update sessionList optimistically — this includes new-
-      // sessions whose real sessionId has not been assigned yet. The
-      // SDK rename & electron-store persist are deferred to onSessionCreated
-      // which reads the title from sessionList after MATERIALIZE.
-      set((state) => ({
-        sessionList: state.sessionList.map((s) =>
-          s.id === sessionId ? { ...s, title } : s
-        ),
-      }))
-
-      const sdkSessionId = getSdkSessionIdForClient(get(), sessionId)
-      if (!sdkSessionId) return
-
-      try {
-        await window.api.agent.renameSession(sdkSessionId, title)
-      } catch (err) {
-        console.error('[AgentStore] renameCurrentSession SDK rename failed:', err)
-      }
-      // Persist to electron-store regardless of SDK outcome so the title
-      // survives restarts even when listSessions does not pick up customTitle.
-      window.api.agent.updateSessionRecord(sessionId, { title, sdkSessionId }).catch(() => {})
-    },
   }
 })
 

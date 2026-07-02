@@ -738,6 +738,19 @@ describe('session-scoped store routing', () => {
     ])
   })
 
+  it('renames an app-owned empty session through the session protocol', () => {
+    const initial = [sdkSession('new-editor-1', '/workspace', 1)]
+
+    const next = sessionListReducer(initial, {
+      type: 'RENAME',
+      sessionId: 'new-editor-1',
+      title: '新的会话名称',
+    })
+
+    expect(next[0].title).toBe('新的会话名称')
+    expect(next[0].id).toBe('new-editor-1')
+  })
+
   it('keeps unrelated workspace session order when another workspace refreshes from SDK', () => {
     const productSessions = [
       sdkSession('product-1', '/new-product', 10),
@@ -773,7 +786,7 @@ describe('session-scoped store routing', () => {
     expect(next.find(s => s.id === 'nextai-1')?.lastModified).toBe(100)
   })
 
-  it('updates refreshed workspace metadata without shuffling that workspace session order', () => {
+  it('updates refreshed metadata without replacing the user-owned session title', () => {
     const state = [
       sdkSession('product-1', '/new-product', 10),
       sdkSession('product-2', '/new-product', 20),
@@ -796,7 +809,7 @@ describe('session-scoped store routing', () => {
       'product-2',
       'product-3',
     ])
-    expect(next.find(s => s.id === 'product-2')?.title).toBe('updated 2')
+    expect(next.find(s => s.id === 'product-2')?.title).toBe('product-2')
     expect(next.find(s => s.id === 'nextai-1')?.lastModified).toBe(1)
   })
 

@@ -29,11 +29,19 @@ describe('sumi agent identity prompt', () => {
     expect(prompt).not.toContain('/internal/app-data')
   })
 
-  it('keeps workspace persistence guidance in editor sessions', () => {
-    const prompt = buildSumiContextPrompt('editor', '/workspace/product-plan')
+  it('treats the session directory as the only default file scope', () => {
+    const prompt = buildSumiContextPrompt(
+      'editor',
+      '/workspace/product-plan',
+      '/workspace/product-plan/.sumi/sessions/current',
+    )
 
-    expect(prompt).toContain('## 当前工作区')
-    expect(prompt).toContain('/workspace/product-plan')
+    expect(prompt).toContain('## 当前事务与会话')
+    expect(prompt).not.toContain('工作区路径')
+    expect(prompt).toContain('/workspace/product-plan/.sumi/sessions/current')
+    expect(prompt).toContain('不是可自动浏览、检索或读取的共享文件目录')
+    expect(prompt).toContain('不要猜测、枚举或搜索其他会话')
+    expect(prompt).toContain('用户明确提供外部文件路径')
     expect(prompt).toContain('关键结论应记录')
   })
 })

@@ -17,7 +17,6 @@ type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
 type AgentRespondAskUserRequest = IPCRequest<'agent:respondAskUser'>
 type AgentListSdkSessionsRequest = IPCRequest<'agent:listSdkSessions'>
-type AgentLoadSessionMessagesRequest = IPCRequest<'agent:loadSessionMessages'>
 type AgentLoadSessionMessagesPaginatedRequest = IPCRequest<'agent:loadSessionMessagesPaginated'>
 type AgentRenameSessionRequest = IPCRequest<'agent:renameSession'>
 type AgentUpdateSessionRecordRequest = IPCRequest<'agent:updateSessionRecord'>
@@ -25,7 +24,6 @@ type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
-type AgentForkSessionRequest = IPCRequest<'agent:forkSession'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 type SkillsChangedPayload = IPCEventPayload<'skills:changed'>
 
@@ -108,10 +106,6 @@ const api = {
       const request: AgentListSdkSessionsRequest = { workspaceCwd }
       return invoke('agent:listSdkSessions', request)
     },
-    loadSessionMessages: (sessionId: string) => {
-      const request: AgentLoadSessionMessagesRequest = { sessionId }
-      return invoke('agent:loadSessionMessages', request)
-    },
     loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => {
       const request: AgentLoadSessionMessagesPaginatedRequest = { sessionId, limit, offset }
       return invoke('agent:loadSessionMessagesPaginated', request)
@@ -135,10 +129,6 @@ const api = {
     setPermissionMode: (context: 'editor' | 'ask', mode: string) => {
       const request: AgentSetPermissionModeRequest = { context, mode }
       return invoke('agent:setPermissionMode', request)
-    },
-    forkSession: (sessionId: string, options?: { upToMessageId?: string; title?: string }) => {
-      const request: AgentForkSessionRequest = { sessionId, options }
-      return invoke('agent:forkSession', request)
     },
     selectFolder: () => invoke('agent:selectFolder', undefined),
     getSessionOutputs: (sessionId: string) => {
@@ -164,6 +154,12 @@ const api = {
       const handler = (_event: Electron.IpcRendererEvent, data: AgentSessionEnvelope) => callback(data)
       ipcRenderer.on('agent:sessionCreated', handler)
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
+    },
+
+    onSessionFilesChanged: (callback: (data: { sessionId: string }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string }) => callback(data)
+      ipcRenderer.on('agent:sessionFilesChanged', handler)
+      return () => { ipcRenderer.removeListener('agent:sessionFilesChanged', handler) }
     },
 
     onPermissionRequest: (callback: (request: SessionRoutedPermissionRequest) => void) => {

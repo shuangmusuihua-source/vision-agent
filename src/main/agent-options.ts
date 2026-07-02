@@ -57,6 +57,8 @@ export interface AgentOptionsProfile {
   includePartialMessages?: boolean
   /** Setting sources for the SDK. */
   settingSources?: SettingSource[]
+  /** Restrictive settings enforced by the embedding application. */
+  managedSettings?: Options['managedSettings']
   /** Enabled skill IDs. Omit to skip skills config. */
   skills?: string[]
   /** System prompt append text. */
@@ -163,6 +165,9 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   }
   if (profile.settingSources !== undefined) {
     options.settingSources = profile.settingSources
+  }
+  if (profile.managedSettings !== undefined) {
+    options.managedSettings = profile.managedSettings
   }
   if (profile.skills !== undefined) {
     options.skills = profile.skills

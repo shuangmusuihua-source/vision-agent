@@ -23,6 +23,7 @@ interface SidebarProps {
   activeSessionRunning: boolean
   onSessionSelect: (sessionId: string, workspacePath: string) => void
   onDeleteSession: (sessionId: string, workspacePath: string) => void
+  onRenameSession: (sessionId: string, title: string) => Promise<void>
   onNewConversation: (workspacePath: string) => void
   onCancelNewSession: () => void
   creatingSessionIn: string | null
@@ -124,6 +125,7 @@ function Sidebar({
   activeSessionRunning,
   onSessionSelect,
   onDeleteSession,
+  onRenameSession,
   onNewConversation,
   onCancelNewSession,
   creatingSessionIn,
@@ -380,14 +382,14 @@ function Sidebar({
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter' && !e.isComposing) {
                                         const name = renameText.trim()
-                                        if (name) useAgentStore.getState().renameCurrentSession(name)
+                                        if (name) void onRenameSession(session.id, name)
                                         setRenamingId(null)
                                       }
                                       if (e.key === 'Escape') setRenamingId(null)
                                     }}
                                     onBlur={() => {
                                       const name = renameText.trim()
-                                      if (name) useAgentStore.getState().renameCurrentSession(name)
+                                      if (name) void onRenameSession(session.id, name)
                                       setRenamingId(null)
                                     }}
                                     onClick={(e) => e.stopPropagation()}

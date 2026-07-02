@@ -45,6 +45,7 @@ interface ActiveSessionRun {
   abortController: AbortController
   instanceId: number
   envelope: AgentSessionEnvelope
+  completion: Promise<void>
 }
 
 export type SessionRuntimeStart = {
@@ -65,6 +66,7 @@ export class SessionRuntimeController {
   private activeRuns = new Map<string, ActiveSessionRun>()
   private skillOutputBridge = new SkillOutputBridge()
   private skillOutputWindow: BrowserWindow | null = null
+  private completionResolvers = new Map<number, () => void>()
 
   constructor() {
     this.skillOutputBridge.setOutputEmitter((state) => {
@@ -84,12 +86,18 @@ export class SessionRuntimeController {
 
   registerRun(input: SessionRuntimeStart): number {
     const instanceId = ++this.instanceCounter
+    let resolveCompletion!: () => void
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve
+    })
+    this.completionResolvers.set(instanceId, resolveCompletion)
     this.activeRuns.set(input.envelope.sessionId, {
       query: input.query,
       skillId: input.skillId,
       abortController: input.abortController,
       instanceId,
       envelope: input.envelope,
+      completion,
     })
     return instanceId
   }
@@ -344,7 +352,6 @@ export class SessionRuntimeController {
       if (matchedKey) {
         const run = this.activeRuns.get(matchedKey)
         run?.abortController.abort()
-        this.activeRuns.delete(matchedKey)
         rejectAllPendingPermissions(matchedKey)
         rejectAllPendingAskUser(matchedKey)
         discardTextBatch(matchedKey)
@@ -366,6 +373,25 @@ export class SessionRuntimeController {
     discardAllTextBatches()
   }
 
+  async abortAndWait(queryKey: string, timeoutMs = 6500): Promise<void> {
+    const matchedKey = this.findRunKey(queryKey)
+    const run = matchedKey ? this.activeRuns.get(matchedKey) : undefined
+    this.abort(queryKey)
+    if (!run) return
+
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        run.completion,
+        new Promise<void>((_resolve, reject) => {
+          timeout = setTimeout(() => reject(new Error('Agent run did not stop in time')), timeoutMs)
+        }),
+      ])
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+  }
+
   async setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {
     const matchedKey = queryKey ? this.findRunKey(queryKey) : this.findSingleActiveRunKey()
     if (!matchedKey) return false
@@ -384,18 +410,22 @@ export class SessionRuntimeController {
   }
 
   cleanupRun(sessionId: string, instanceId: number): void {
-    discardTextBatch(sessionId)
-    this.skillOutputBridge.cleanup(sessionId)
     const current = this.activeRuns.get(sessionId)
     if (current && current.instanceId === instanceId) {
+      discardTextBatch(sessionId)
+      this.skillOutputBridge.cleanup(sessionId)
       this.activeRuns.delete(sessionId)
+      rejectAllPendingPermissions(sessionId)
+      rejectAllPendingAskUser(sessionId)
     }
-    rejectAllPendingPermissions(sessionId)
-    rejectAllPendingAskUser(sessionId)
+    this.completionResolvers.get(instanceId)?.()
+    this.completionResolvers.delete(instanceId)
   }
 
   finalizeRun(win: BrowserWindow, sessionId: string, instanceId: number): void {
-    this.flushText(sessionId, win)
+    if (this.activeRuns.get(sessionId)?.instanceId === instanceId) {
+      this.flushText(sessionId, win)
+    }
     this.cleanupRun(sessionId, instanceId)
   }
 

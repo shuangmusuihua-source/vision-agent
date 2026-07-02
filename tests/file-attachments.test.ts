@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ATTACHMENT_CONVERSION_CONTEXT_TAG,
+  encodeAttachmentReferencePath,
   encodeFileConvertPath,
   fileExtension,
   formatAttachmentPromptLine,
@@ -10,10 +11,15 @@ import {
 } from '../src/shared/file-attachments'
 import {
   appendAttachmentConversionSummary,
+  claimPromptAttachments,
+  parseAttachmentReferenceRequests,
+  parseAttachmentReferencePaths,
   parseFileConvertPaths,
+  parseFileConvertRequests,
   safeAttachmentSegment,
   stripFileConvertMarker,
 } from '../src/main/attachment-conversion'
+import { createAttachmentPathGrant } from '../src/main/attachment-path-authorization'
 
 describe('file attachment prompt references', () => {
   it('formats normal attachments with an explicit source path', () => {
@@ -56,6 +62,43 @@ describe('file conversion markers', () => {
     const prompt = `<!--FILE_CONVERT:${encodeFileConvertPath(sourcePath)}-->\n附件：report 2026.pdf | 类型：PDF文档 | 原始路径：${sourcePath}`
 
     expect(parseFileConvertPaths(prompt)).toEqual([sourcePath])
+  })
+
+  it('carries a one-turn attachment grant with the conversion path', () => {
+    const sourcePath = '/Users/me/Documents/report 2026.pdf'
+    const prompt = `<!--FILE_CONVERT:${encodeFileConvertPath(sourcePath, 'grant-123')}-->`
+
+    expect(parseFileConvertRequests(prompt)).toEqual([{
+      grantId: 'grant-123',
+      sourcePath,
+    }])
+  })
+
+  it('carries every selected attachment path without parsing visible prose', () => {
+    const sourcePath = '/Users/me/Documents/research notes.md'
+    const prompt = `<!--FILE_ATTACH:${encodeAttachmentReferencePath(sourcePath, 'grant-123')}-->`
+
+    expect(parseAttachmentReferencePaths(prompt)).toEqual([sourcePath])
+    expect(parseAttachmentReferenceRequests(prompt)).toEqual([{
+      grantId: 'grant-123',
+      sourcePath,
+    }])
+    expect(stripInternalAttachmentContext(prompt)).toBe('')
+  })
+
+  it('claims a selected attachment once and authorizes its matching conversion request', () => {
+    const sourcePath = '/Users/me/Documents/report 2026.pdf'
+    const grantId = createAttachmentPathGrant([sourcePath])
+    const prompt = [
+      `<!--FILE_ATTACH:${encodeAttachmentReferencePath(sourcePath, grantId)}-->`,
+      `<!--FILE_CONVERT:${encodeFileConvertPath(sourcePath, grantId)}-->`,
+    ].join('\n')
+
+    expect(claimPromptAttachments(prompt)).toEqual({
+      attachmentPaths: [sourcePath],
+      convertRequests: [{ grantId, sourcePath }],
+    })
+    expect(() => claimPromptAttachments(prompt)).toThrow('附件路径未获得授权')
   })
 
   it('strips conversion markers while preserving user-visible attachment lines', () => {

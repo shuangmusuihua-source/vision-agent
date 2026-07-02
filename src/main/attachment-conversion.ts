@@ -1,12 +1,12 @@
 import { execFile } from 'child_process'
 import { createHash } from 'crypto'
 import { mkdir, writeFile } from 'fs/promises'
-import { basename, extname, join } from 'path'
+import { basename, extname, join, resolve } from 'path'
 import { ATTACHMENT_CONVERSION_CONTEXT_TAG } from '../shared/file-attachments'
 import { getMarkitdownRuntimeManager } from './markitdown-runtime'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
 import { MARKITDOWN_FORMATS } from '../shared/markitdown-runtime'
-import { isAttachmentPathAuthorized } from './attachment-path-authorization'
+import { consumeAttachmentPathGrant } from './attachment-path-authorization'
 
 export interface AttachmentConversionRef {
   sourcePath: string
@@ -23,7 +23,15 @@ export interface AttachmentConversionResult {
   failed: AttachmentConversionFailure[]
 }
 
+export interface AttachmentConversionRequest {
+  sourcePath: string
+  grantId?: string
+}
+
+export type AttachmentReferenceRequest = AttachmentConversionRequest
+
 const FILE_CONVERT_MARKER_REGEX = /<!--FILE_CONVERT:([\s\S]*?)-->\n?/
+const FILE_ATTACHMENT_MARKER_REGEX = /<!--FILE_ATTACH:([\s\S]*?)-->\n?/
 const MARKITDOWN_TIMEOUT_MS = 30000
 const MARKITDOWN_MAX_BUFFER_BYTES = 50 * 1024 * 1024
 
@@ -35,18 +43,84 @@ function safeDecodeURIComponent(value: string): string {
   }
 }
 
-export function parseFileConvertPaths(prompt: string): string[] {
+export function parseFileConvertRequests(prompt: string): AttachmentConversionRequest[] {
   const match = prompt.match(FILE_CONVERT_MARKER_REGEX)
   if (!match) return []
 
   return match[1]
     .split('|')
-    .map(token => safeDecodeURIComponent(token.trim()))
-    .filter(Boolean)
+    .map((rawToken) => {
+      const token = rawToken.trim()
+      const separatorIndex = token.indexOf('@')
+      if (separatorIndex <= 0) {
+        return { sourcePath: safeDecodeURIComponent(token) }
+      }
+      return {
+        grantId: token.slice(0, separatorIndex),
+        sourcePath: safeDecodeURIComponent(token.slice(separatorIndex + 1)),
+      }
+    })
+    .filter((request) => Boolean(request.sourcePath))
+}
+
+export function parseFileConvertPaths(prompt: string): string[] {
+  return parseFileConvertRequests(prompt).map((request) => request.sourcePath)
+}
+
+export function parseAttachmentReferenceRequests(prompt: string): AttachmentReferenceRequest[] {
+  const match = prompt.match(FILE_ATTACHMENT_MARKER_REGEX)
+  if (!match) return []
+  return match[1]
+    .split('|')
+    .map((rawToken) => {
+      const token = rawToken.trim()
+      const separatorIndex = token.indexOf('@')
+      if (separatorIndex <= 0) {
+        return { sourcePath: safeDecodeURIComponent(token) }
+      }
+      return {
+        grantId: token.slice(0, separatorIndex),
+        sourcePath: safeDecodeURIComponent(token.slice(separatorIndex + 1)),
+      }
+    })
+    .filter((request) => Boolean(request.sourcePath))
+}
+
+export function parseAttachmentReferencePaths(prompt: string): string[] {
+  return parseAttachmentReferenceRequests(prompt).map((request) => request.sourcePath)
+}
+
+export function claimPromptAttachments(prompt: string): {
+  attachmentPaths: string[]
+  convertRequests: AttachmentConversionRequest[]
+} {
+  const attachmentRequests = parseAttachmentReferenceRequests(prompt)
+  const attachmentPaths: string[] = []
+  for (const request of attachmentRequests) {
+    if (!consumeAttachmentPathGrant(request.grantId, request.sourcePath)) {
+      throw new Error('附件路径未获得授权，请重新选择文件')
+    }
+    attachmentPaths.push(request.sourcePath)
+  }
+
+  const convertRequests = parseFileConvertRequests(prompt)
+  const authorizedConversions = new Set(attachmentRequests.map((request) => (
+    `${request.grantId || ''}\u0000${resolve(request.sourcePath)}`
+  )))
+  if (convertRequests.some((request) => (
+    !authorizedConversions.has(`${request.grantId || ''}\u0000${resolve(request.sourcePath)}`)
+  ))) {
+    throw new Error('附件转换请求与用户选择的文件不一致')
+  }
+
+  return { attachmentPaths, convertRequests }
 }
 
 export function stripFileConvertMarker(prompt: string): string {
-  return prompt.replace(FILE_CONVERT_MARKER_REGEX, '').trim()
+  return prompt
+    .replace(FILE_CONVERT_MARKER_REGEX, '')
+    .replace(FILE_ATTACHMENT_MARKER_REGEX, '')
+    .trim()
 }
 
 export function safeAttachmentSegment(value: string | undefined, fallback = 'session'): string {
@@ -75,9 +149,6 @@ async function runMarkitdown(filePath: string): Promise<string> {
   if (!MARKITDOWN_FORMATS.includes(format)) {
     throw new Error('不支持的附件格式')
   }
-  if (!isAttachmentPathAuthorized(filePath)) {
-    throw new Error('附件路径未获得授权，请重新选择文件')
-  }
   const runtime = await getMarkitdownRuntimeManager().getStatus([format])
   if (runtime.state !== 'ready') {
     throw new Error('附件解析组件尚未安装')
@@ -105,13 +176,14 @@ async function runMarkitdown(filePath: string): Promise<string> {
 export async function convertAttachmentsToMarkdown(
   workspaceCwd: string,
   sessionKey: string,
-  filePaths: string[]
+  requests: AttachmentConversionRequest[]
 ): Promise<AttachmentConversionResult> {
   const result: AttachmentConversionResult = { converted: [], failed: [] }
   const outDir = join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey))
   await mkdir(outDir, { recursive: true })
 
-  for (const filePath of filePaths) {
+  for (const request of requests) {
+    const filePath = request.sourcePath
     try {
       const markdownPath = convertedMarkdownPath(workspaceCwd, sessionKey, filePath)
       const markdown = await runMarkitdown(filePath)
