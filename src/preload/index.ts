@@ -11,7 +11,6 @@ import type {
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
-import type { UpdateDownloadProgress, UpdateErrorPayload } from '../shared/update-types'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -26,56 +25,70 @@ type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 type SkillsChangedPayload = IPCEventPayload<'skills:changed'>
+type SessionFilesChangedPayload = IPCEventPayload<'agent:sessionFilesChanged'>
+type UpdateAvailablePayload = IPCEventPayload<'update:available'>
+type UpdateDownloadProgressPayload = IPCEventPayload<'update:download-progress'>
+type UpdateErrorEventPayload = IPCEventPayload<'update:error'>
+type MainErrorPayload = IPCEventPayload<'main:error'>
+
+type IPCInvokeArguments<K extends keyof IPCChannelMap> =
+  IPCRequest<K> extends void
+    ? []
+    : IPCRequest<K> extends unknown[]
+      ? number extends IPCRequest<K>['length']
+        ? [IPCRequest<K>]
+        : IPCRequest<K>
+      : [IPCRequest<K>]
 
 function invoke<K extends keyof IPCChannelMap>(
   channel: K,
-  request: IPCRequest<K>
+  ...args: IPCInvokeArguments<K>
 ): Promise<IPCResponse<K>> {
-  return ipcRenderer.invoke(channel, request) as Promise<IPCResponse<K>>
+  return ipcRenderer.invoke(channel, ...args) as Promise<IPCResponse<K>>
 }
 
 const api = {
-  ping: (): Promise<string> => ipcRenderer.invoke('ping'),
-  getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  ping: (): Promise<string> => invoke('ping'),
+  getVersion: (): Promise<string> => invoke('app:getVersion'),
 
   workspace: {
-    readFile: (filePath: string) => ipcRenderer.invoke('workspace:readFile', filePath),
+    readFile: (filePath: string) => invoke('workspace:readFile', filePath),
     writeFile: (filePath: string, content: string) =>
-      ipcRenderer.invoke('workspace:writeFile', filePath, content),
+      invoke('workspace:writeFile', filePath, content),
     addToKnowledge: (sourcePath: string, sessionId?: string) =>
       invoke('workspace:addToKnowledge', { sourcePath, sessionId }),
-    listMarkdownFiles: (dirPath: string) => ipcRenderer.invoke('workspace:listMarkdownFiles', dirPath),
-    openInBrowser: (filePath: string) => ipcRenderer.invoke('workspace:openInBrowser', filePath),
+    listMarkdownFiles: (dirPath: string) => invoke('workspace:listMarkdownFiles', dirPath),
+    openInBrowser: (filePath: string) => invoke('workspace:openInBrowser', filePath),
     saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) =>
-      ipcRenderer.invoke('workspace:saveArtifact', options),
+      invoke('workspace:saveArtifact', options),
     previewArtifact: (options: { fileName: string; content: string }) =>
-      ipcRenderer.invoke('workspace:previewArtifact', options),
-    createWorkspace: (name: string) => ipcRenderer.invoke('workspace:createWorkspace', name),
+      invoke('workspace:previewArtifact', options),
+    createWorkspace: (name: string) => invoke('workspace:createWorkspace', name),
     deleteWorkspace: (dirPath: string) =>
-      ipcRenderer.invoke('workspace:deleteWorkspace', dirPath),
-    knowledgeDir: () => ipcRenderer.invoke('workspace:knowledgeDir'),
-    selectFiles: () => ipcRenderer.invoke('workspace:selectFiles'),
+      invoke('workspace:deleteWorkspace', dirPath),
+    knowledgeDir: () => invoke('workspace:knowledgeDir'),
+    selectFiles: () => invoke('workspace:selectFiles'),
   },
 
   settings: {
-    get: () => ipcRenderer.invoke('settings:get'),
-    addProfile: (profile: ModelProfile) => ipcRenderer.invoke('settings:addProfile', profile),
+    get: () => invoke('settings:get'),
+    addProfile: (profile: ModelProfile) => invoke('settings:addProfile', profile),
     updateProfile: (id: string, updates: Partial<ModelProfile>) =>
-      ipcRenderer.invoke('settings:updateProfile', id, updates),
-    removeProfile: (id: string) => ipcRenderer.invoke('settings:removeProfile', id),
-    setActiveProfile: (id: string) => ipcRenderer.invoke('settings:setActiveProfile', id),
-    addDirectory: (dir: string) => ipcRenderer.invoke('settings:addDirectory', dir),
-    removeDirectory: (dir: string) => ipcRenderer.invoke('settings:removeDirectory', dir),
-    reorderDirectories: (paths: string[]) => ipcRenderer.invoke('settings:reorderDirectories', paths),
-    getTheme: () => ipcRenderer.invoke('settings:getTheme'),
-    setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('settings:setTheme', theme),
+      invoke('settings:updateProfile', id, updates),
+    removeProfile: (id: string) => invoke('settings:removeProfile', id),
+    setActiveProfile: (id: string) => invoke('settings:setActiveProfile', id),
+    addDirectory: (dir: string) => invoke('settings:addDirectory', dir),
+    removeDirectory: (dir: string) => invoke('settings:removeDirectory', dir),
+    reorderDirectories: (paths: string[]) => invoke('settings:reorderDirectories', paths),
+    getTheme: () => invoke('settings:getTheme'),
+    setTheme: (theme: 'light' | 'dark' | 'system') => invoke('settings:setTheme', theme),
     onChanged: (callback: (settings: Record<string, unknown>) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, settings: Record<string, unknown>) => callback(settings)
       ipcRenderer.on('settings:changed', handler)
       return () => { ipcRenderer.removeListener('settings:changed', handler) }
     },
     testConnection: (options: { baseUrl: string; apiKey: string; model: string }) =>
-      ipcRenderer.invoke('settings:testConnection', options)
+      invoke('settings:testConnection', options)
   },
 
   // ─── Agent API (typed, unified event channel) ────────────────────────
@@ -130,7 +143,7 @@ const api = {
       const request: AgentSetPermissionModeRequest = { context, mode }
       return invoke('agent:setPermissionMode', request)
     },
-    selectFolder: () => invoke('agent:selectFolder', undefined),
+    selectFolder: () => invoke('agent:selectFolder'),
     getSessionOutputs: (sessionId: string) => {
       const request: AgentGetSessionOutputsRequest = { sessionId }
       return invoke('agent:getSessionOutputs', request)
@@ -156,8 +169,8 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:sessionCreated', handler) }
     },
 
-    onSessionFilesChanged: (callback: (data: { sessionId: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string }) => callback(data)
+    onSessionFilesChanged: (callback: (data: SessionFilesChangedPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: SessionFilesChangedPayload) => callback(data)
       ipcRenderer.on('agent:sessionFilesChanged', handler)
       return () => { ipcRenderer.removeListener('agent:sessionFilesChanged', handler) }
     },
@@ -200,15 +213,15 @@ const api = {
   },
 
   memory: {
-    list: (workspacePath?: string) => ipcRenderer.invoke('memory:list', workspacePath),
-    read: (filePath: string) => ipcRenderer.invoke('memory:read', filePath),
-    write: (filePath: string, content: string) => ipcRenderer.invoke('memory:write', filePath, content),
-    delete: (filePath: string) => ipcRenderer.invoke('memory:delete', filePath)
+    list: () => invoke('memory:list'),
+    read: (filePath: string) => invoke('memory:read', filePath),
+    write: (filePath: string, content: string) => invoke('memory:write', filePath, content),
+    delete: (filePath: string) => invoke('memory:delete', filePath)
   },
 
   graph: {
-    getData: () => ipcRenderer.invoke('graph:getData'),
-    acknowledgeChanges: (version: number) => ipcRenderer.invoke('graph:acknowledgeChanges', version),
+    getData: () => invoke('graph:getData'),
+    acknowledgeChanges: (version: number) => invoke('graph:acknowledgeChanges', version),
     onFilesChanged: (callback: (data: { count: number; files: string[]; version: number }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: { count: number; files: string[]; version: number }) => callback(data)
       ipcRenderer.on('graph:filesChanged', handler)
@@ -218,10 +231,10 @@ const api = {
 
   cron: {
     register: (cronExpression: string, prompt: string, name?: string) =>
-      ipcRenderer.invoke('cron:register', cronExpression, prompt, name),
-    list: () => ipcRenderer.invoke('cron:list'),
-    remove: (taskId: string) => ipcRenderer.invoke('cron:remove', taskId),
-    execute: (taskId: string) => ipcRenderer.invoke('cron:execute', taskId),
+      invoke('cron:register', cronExpression, prompt, name),
+    list: () => invoke('cron:list'),
+    remove: (taskId: string) => invoke('cron:remove', taskId),
+    execute: (taskId: string) => invoke('cron:execute', taskId),
     onTaskCompleted: (callback: (data: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
       ipcRenderer.on('cron:taskCompleted', handler)
@@ -230,14 +243,14 @@ const api = {
   },
 
   skills: {
-    list: () => ipcRenderer.invoke('skills:list'),
-    toggle: (skillId: string, enabled: boolean) => ipcRenderer.invoke('skills:toggle', skillId, enabled),
-    getEnabled: () => ipcRenderer.invoke('skills:getEnabled'),
-    builtins: () => ipcRenderer.invoke('skills:builtins'),
-    catalog: () => ipcRenderer.invoke('skills:catalog'),
-    install: (skillId: string) => ipcRenderer.invoke('skills:install', skillId),
-    update: (skillId: string) => ipcRenderer.invoke('skills:update', skillId),
-    uninstall: (skillId: string) => ipcRenderer.invoke('skills:uninstall', skillId),
+    list: () => invoke('skills:list'),
+    toggle: (skillId: string, enabled: boolean) => invoke('skills:toggle', skillId, enabled),
+    getEnabled: () => invoke('skills:getEnabled'),
+    builtins: () => invoke('skills:builtins'),
+    catalog: () => invoke('skills:catalog'),
+    install: (skillId: string) => invoke('skills:install', skillId),
+    update: (skillId: string) => invoke('skills:update', skillId),
+    uninstall: (skillId: string) => invoke('skills:uninstall', skillId),
     onChanged: (callback: (change: SkillsChangedPayload) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, change: SkillsChangedPayload) => callback(change)
       ipcRenderer.on('skills:changed', handler)
@@ -247,11 +260,11 @@ const api = {
 
   attachments: {
     runtimeStatus: (formats?: MarkitdownFormat[]) => invoke('attachments:runtimeStatus', { formats }),
-    installRuntime: () => invoke('attachments:installRuntime', undefined),
+    installRuntime: () => invoke('attachments:installRuntime'),
   },
 
   search: {
-    query: (keyword: string) => ipcRenderer.invoke('search:query', keyword)
+    query: (keyword: string) => invoke('search:query', keyword)
   },
 
   menu: {
@@ -263,16 +276,16 @@ const api = {
   },
 
   notification: {
-    getHistory: () => ipcRenderer.invoke('notification:getHistory')
+    getHistory: () => invoke('notification:getHistory')
   },
 
   update: {
-    download: () => ipcRenderer.invoke('update:download'),
-    install: () => ipcRenderer.invoke('update:install'),
-    openLatestRelease: () => ipcRenderer.invoke('update:openLatestRelease'),
-    checkForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
-    onAvailable: (callback: (info: { version: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
+    download: () => invoke('update:download'),
+    install: () => invoke('update:install'),
+    openLatestRelease: () => invoke('update:openLatestRelease'),
+    checkForUpdates: () => invoke('update:checkForUpdates'),
+    onAvailable: (callback: (info: UpdateAvailablePayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, info: UpdateAvailablePayload) => callback(info)
       ipcRenderer.on('update:available', handler)
       return () => { ipcRenderer.removeListener('update:available', handler) }
     },
@@ -281,20 +294,20 @@ const api = {
       ipcRenderer.on('update:downloaded', handler)
       return () => { ipcRenderer.removeListener('update:downloaded', handler) }
     },
-    onDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateDownloadProgress) => callback(progress)
+    onDownloadProgress: (callback: (progress: UpdateDownloadProgressPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateDownloadProgressPayload) => callback(progress)
       ipcRenderer.on('update:download-progress', handler)
       return () => { ipcRenderer.removeListener('update:download-progress', handler) }
     },
-    onError: (callback: (error: UpdateErrorPayload) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, error: UpdateErrorPayload) => callback(error)
+    onError: (callback: (error: UpdateErrorEventPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, error: UpdateErrorEventPayload) => callback(error)
       ipcRenderer.on('update:error', handler)
       return () => { ipcRenderer.removeListener('update:error', handler) }
     }
   },
 
-  onMainError: (callback: (error: { type: string; message: string }) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, error: { type: string; message: string }) => callback(error)
+  onMainError: (callback: (error: MainErrorPayload) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: MainErrorPayload) => callback(error)
     ipcRenderer.on('main:error', handler)
     return () => { ipcRenderer.removeListener('main:error', handler) }
   }

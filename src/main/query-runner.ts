@@ -62,7 +62,8 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       && !mainWindow.isDestroyed()
     ) {
       mainWindow.webContents.send('agent:sessionFilesChanged', {
-        sessionId: hookContext.envelope.sessionId,
+        ...hookContext.envelope,
+        sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
       })
     }
     return {}

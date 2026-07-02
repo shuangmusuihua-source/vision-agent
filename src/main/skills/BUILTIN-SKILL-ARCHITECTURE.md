@@ -1,291 +1,98 @@
-# 内置 Skill 统一架构
+# 内置 Skill 架构
 
-## 设计原则
+本文说明 sumi 自带 Skill 的注册、安装、发现和输出链路。各 Skill 自身的 `SKILL.md` 属于运行时资源，不是项目架构文档。
 
-1. **只打包运行时内容** — 优先同步上游的发行目录，而不是整个仓库；保留 SKILL.md、模板、脚本和 references 的相对路径，排除 README、演示站点、仓库配置、重复压缩包和非运行时素材
-2. **Manifest 驱动** — `skills-manifest.json` 声明内容版本、固定上游提交、许可证和必需资源；sumi 适配必须保持最小且可追溯
-3. **SkillDefinition 统一接口** — `builtin.ts` 定义 id/name/description/icon/promptTemplate/outputMode
-4. **SkillOutputBridge 统一捕获** — main 进程拦截原始 SDK 流事件，无论 Write 工具还是 skill-output 代码块，归一为 `skill:output` IPC 事件
-5. **Renderer 统一消费** — Zustand store 存 skillOutput，MessageBubble 只看 store 不关心通道来源
+## 权威来源
 
----
+- `skills-manifest.json`：打包资源、必需路径、版本和可追溯上游信息
+- `skills-manifest.ts`：manifest 的类型适配
+- `builtin.ts`：UI 展示和调用元数据
+- `<skill-id>/`：实际运行时文件
 
-## 新增内置 Skill 三步流程
+一个内置 Skill 必须同时出现在 manifest 和 `builtin.ts`，且资源目录至少包含 `SKILL.md`。
 
-### Step 1: 同步 Skill 运行时文件
+## 新增流程
 
-```bash
-git clone --depth 1 {repo-url} /tmp/{skill-id}
-rsync -a --delete /tmp/{skill-id}/{runtime-path}/ src/main/skills/{skill-id}/
-```
+1. 将真正运行所需的文件放入 `src/main/skills/<skill-id>/`。保留 Skill 引用的相对路径；不要复制 `.git`、演示站点、发布压缩包等无关内容。
+2. 在 `skills-manifest.json` 中登记 `id`、`requiredPaths`，有可靠来源时再填写版本、固定 commit 和许可证。
+3. 在 `builtin.ts` 中添加名称、说明、图标、prompt template 和可选 `outputMode`。
+4. 运行 `npm test`、`npm run build` 和 `npm run pack`。Pack 会比较源码与 `.app` 中的每个 Skill 文件。
 
-`runtime-path` 优先使用上游提供的插件或发行目录。若上游只提供仓库根目录，逐项选择运行所需资源，不复制 `.git`、`.github`、README、demo/showcase、发布压缩包或维护脚本。
-
-### Step 2: 注册到 manifest
-
-编辑 `src/main/skills/skills-manifest.json`，增加一项：
+Manifest 示例：
 
 ```json
 {
-  "id": "{skill-id}",
+  "id": "example-skill",
   "hasResources": true,
-  "requiredPaths": ["SKILL.md"],
-  "version": "{optional-semver}",
+  "requiredPaths": ["SKILL.md", "scripts/run.sh"],
   "source": {
-    "repositoryUrl": "https://github.com/{owner}/{repo}",
-    "ref": "{40-char-commit}",
+    "repositoryUrl": "https://github.com/owner/repo",
+    "ref": "40-character-commit",
     "license": "MIT"
   }
 }
 ```
 
-没有明确许可证或无法确认来源提交时，不要补猜测值，也不要直接覆盖当前已授权快照。
-
-### Step 3: 添加 SkillDefinition
-
-编辑 `src/main/skills/builtin.ts`，在 `builtinSkills` 数组加一条：
+UI 定义示例：
 
 ```ts
 {
-  id: '{skill-id}',
-  name: '{显示名}',
-  description: '{中文描述}',
-  icon: '{Lucide图标名}',
-  promptTemplate: `使用 {skill-id} skill 接下来... {activeFile}`,
-  outputMode: 'write',  // 或 'skill-output'
-},
-```
-
-**不需要改任何其他文件。** SkillOutputBridge 自动捕获输出，MessageBubble 自动渲染预览卡片。
-
-### outputMode 判断
-
-- Skill 通过 Write/Edit 工具输出文件 → `outputMode: 'write'`
-- Skill 通过 skill-output 代码块输出 → `outputMode: 'skill-output'`
-
----
-
-## 当前内置 Skills
-
-| id | name | outputMode |
-|----|------|------------|
-| kami | Kami · 紙 | write |
-| guizang-ppt-skill | guizang-ppt-skill | write |
-| frontend-slides | frontend-slides | write |
-| huashu-design | 花叔设计 | write |
-| system-cleanup | 系统清理 | default |
-| organize-desktop | 整理桌面 | default |
-| organize-folder | 整理文件夹 | default |
-| perf-optimize | 性能优化 | default |
-
----
-
-## 技术架构
-
-### 数据流全景
-
-```
-SDK Stream ──→ SessionRuntimeController ──→ SkillOutputBridge ──→ IPC skill:output ──→ Zustand store ──→ ChatView
-     │                    │
-     │                    └──→ toAgentIPCMessage() ──→ IPC agent:event ──→ store (messages/toolCalls)
-     │
-     └── 所有 IPC payload 都带 AgentSessionEnvelope（context / app session / SDK session / workspace）
-```
-
-两条 IPC 通道并行：
-- `agent:event` — 常规消息流（对话、工具调用、结果）
-- `skill:output` — 统一输出捕获流（实时内容推送，驱动 SkillOutputCard 预览）
-
-### 1. Skill 文件初始化 — `skill-init.ts`
-
-应用启动时，`skill-init.ts` 读取 manifest，通过 `builtin-skill-installer.ts` 将每个 Skill 从应用资源目录同步到 `{userData}/.claude/skills/{id}/`。所有工作区共享这一份运行时安装；工作区仅创建指向全局安装的目录链接，不再复制资源。
-
-关键逻辑：
-- **源**: 开发环境为 `src/main/skills/{id}/`，正式环境为 `resources/skills/{id}/`
-- **目标**: `{userData}/.claude/skills/{id}/`
-- **递归拷贝**: 保留 SKILL.md、assets/、references/、scripts/、templates/ 等完整目录结构
-- **幂等**: 按每个 Skill 的内容指纹和已安装文件清单判断；内容变化或资源缺失时原子替换
-- **完整性**: `pack` / `dist` 完成后比较源目录与 `.app` 中的全部 Skill 文件，缺失即让发布命令失败
-- **发现**: 工作区会话与 Ask sumi 都使用独立运行目录，通过 `settingSources: ['project']` 从会话内的只读 Skill 链接发现能力；应用数据根目录不作为 Agent cwd
-- **升级**: 修改内置 Skill 内容后会自动生成新指纹；第三方 Skill 同时更新 manifest 中的固定提交和可用版本号，应用仍通过 sumi 发版统一升级
-
-### 2. SkillOutputBridge — `skill-output-bridge.ts`
-
-统一输出捕获层，拦截 **原始 SDK 流事件**（在 `toAgentIPCMessage()` 转换之前）。
-
-#### 核心方法
-
-```ts
-processRawEvent(rawMessage: Record<string, unknown>, activeSkillId: string | null): void
-```
-
-#### 捕获的两个通道
-
-| 通道 | SDK 事件 | 触发条件 | 提取方式 |
-|------|----------|----------|----------|
-| Channel 1: skill-output 代码块 | `content_block_delta` + `text_delta` | 文本流中出现 ` ```skill-output ` 围栏 | 文本缓冲区检测围栏标记，提取围栏内内容 |
-| Channel 2: 写入型工具 | `content_block_start` + `tool_use` + `input_json_delta` | tool_name 为 Write / Edit / MultiEdit / Bash | 累积 `input_json_delta`，按工具语义提取可预览内容：Write.content、Edit.new_string、MultiEdit.edits[].new_string、Bash heredoc HTML/MD |
-
-#### Partial JSON 提取
-
-写入型工具的 input 是流式 JSON，`input_json_delta` 逐片到达。在 `content_block_stop` 之前 JSON 不完整：
-
-```ts
-extractPreviewContentFromPartialJson(toolName: string, json: string): string | null
-// 输入: '{"content": "<!DOCTYPE html><html>...'
-// 输入: '{"new_string": "<section class=\"slide\">...'
-// 输入: '{"command": "cat > deck.html <<'EOF'\n<!DOCTYPE html>...'
-// 输入: '{"content": "<!DOCTYPE html><html><head>...'   (仍在流式中)
-// 输出: '<!DOCTYPE html><html>...' 或 '<!DOCTYPE html><html><head>...'
-```
-
-原理：按工具名选择字段并从 partial JSON 中提取已到达的字符串内容；即使 JSON 未闭合也能提取当前内容。Bash 只预览看起来像 HTML/MD/SVG 产物写入的 heredoc，避免把普通 shell 脚本当成产物内容。
-
-#### 节流推送
-
-`pushOutput()` 内置节流：只有内容增长超过 ~500 字符才推送 IPC 事件，避免高频推送拖慢 renderer。
-
-#### 状态管理
-
-```ts
-// Bridge 内部状态
-writeAccumulators: Map<string, { toolName: string; json: string }>  // key = tool_use block id
-textBuffer: string           // 文本缓冲区，检测跨 delta 分割的围栏标记
-lastPushedLength: number     // 上次推送时的内容长度，用于节流判断
-outputLanguage: string       // 输出语言（html/svg/text）
-
-// 推送的 IPC payload（对应 shared/types.ts SessionRoutedSkillOutputState）
-{
-  skillId: string | null,
-  content: string,
-  isStreaming: boolean,
-  language: string,
-  context: AgentContext,
-  sessionId: string,        // app-owned stable session id
-  clientSessionKey: string, // same app-owned stable route key
-  sdkSessionId?: string,
-  workspacePath: string,
+  id: 'example-skill',
+  name: 'Example',
+  description: '...',
+  icon: 'FileText',
+  promptTemplate: '使用 example-skill skill 处理 {activeFile}',
+  outputMode: 'write',
 }
 ```
 
-### 3. Session Runtime 集成 — `session-runtime.ts` / `query-runner.ts`
+`outputMode: 'write'` 表示主要产物来自会话目录中的文件；`skill-output` 表示 Skill 通过专用围栏输出实时预览。省略时使用普通对话展示。
 
-```ts
-// query-runner.ts 继续负责调用 SDK query()
-// SessionRuntimeController 负责 app session / SDK session / workspace envelope
-sessionRuntime.beginSession(envelope)
-sessionRuntime.registerRun({ query, skillId, abortController, envelope })
+## 安装与发现
+
+应用启动时，`skill-init.ts` 选择 Skill 源目录：
+
+- 开发：`src/main/skills/`
+- 打包：`resources/skills/`
+
+`builtin-skill-installer.ts` 对每个 Skill 计算完整文件清单和内容哈希，然后以 staging/backup 目录原子替换到：
+
+```text
+<app-user-data>/.claude/skills/<skill-id>/
 ```
 
-#### 流式处理中的调用顺序（关键）
+安装状态保存在同目录的 `.sumi-builtin-skills.json`。Manifest 移除的内置 Skill 会在下次同步时删除。
 
-```ts
-for await (const message of messageStream) {
-  // runtime 在同一个入口里完成：
-  // 1. 原始 SDK 事件进入 SkillOutputBridge（转换之前！）
-  // 2. text_delta 批处理，保持顺序
-  // 3. 非文本事件转换为应用级 IPC 消息
-  // 4. 所有跨 IPC payload 附加 AgentSessionEnvelope
-  sessionRuntime.emitSdkMessage(mainWindow, appSessionId, envelope, message)
-}
+Workspace 不复制完整资源；`workspace-skill-links.ts` 在会话工作目录中创建指向全局安装的轻量链接。`query-runner.ts` 将用户启用的 Skill IDs 传给 SDK，并使用 project setting source 发现它们。
+
+## 社区 Skills
+
+社区 Skill 不进入内置 manifest。`community-catalog.ts` 提供受控目录，`community-skill-installer.ts` 负责 staging、校验、安装、更新和卸载；`handlers/skill-handlers.ts` 暴露 renderer API。
+
+社区与内置 Skill 最终共享同一个 app-owned Skill 根目录，但安装记录和升级来源不同。
+
+## 实时输出
+
+```mermaid
+flowchart LR
+  SDK[SDK raw stream] --> Runtime[SessionRuntimeController]
+  Runtime --> Bridge[SkillOutputBridge]
+  Bridge -->|skill:output + envelope| Store[Zustand session slot]
+  Store --> Card[SkillOutputCard]
+  Runtime -->|agent:event + envelope| Messages[Message pipeline]
 ```
 
-**为什么必须在转换之前？** `toAgentIPCMessage()` 会将 SDK 原始事件转换为应用级消息（`assistant`、`tool_use_start` 等），丢失 `content_block_delta`/`input_json_delta` 等流式细节。Bridge 需要这些原始事件来提取实时内容。
+`SkillOutputBridge` 按 app session key 保存独立 accumulator：
 
-### 4. IPC 通道 — Preload 层
+- `processRawEvent(queryKey, rawMessage, activeSkillId)` 在消息转换前接收 SDK 原始事件
+- 捕获 `skill-output` 围栏和 Write/Edit/Bash 等写入型工具的流式输入
+- 将结果规范化为带 `AgentSessionEnvelope` 的 `SessionRoutedSkillOutputState`
+- `reset`、`setSessionEnvelope` 和 `cleanup` 均以 query key 为作用域
 
-```ts
-// src/preload/index.ts
-onSkillOutput: (callback: (state: SessionRoutedSkillOutputState) => void) => {
-  const handler = (_event, state: SessionRoutedSkillOutputState) => callback(state)
-  ipcRenderer.on('skill:output', handler)
-  return () => { ipcRenderer.removeListener('skill:output', handler) }
-},
+Renderer 通过 `window.api.agent.onSkillOutput` 接收事件，`useAgent.ts` 把它路由到对应 session slot。只有当前会话正在流式执行且有内容时才显示实时卡片；任务结束后，正式产物由 `session-file-catalog.ts` 扫描会话工作目录提供。
 
-// sendMessage 增加 skillId 参数
-sendMessage: (prompt, sessionId?, activeFilePath?, skillId?) =>
-  ipcRenderer.invoke('agent:sendMessage', { prompt, sessionId, activeFilePath, skillId }),
-```
+## 打包保证
 
-### 5. Renderer Store — Zustand
+`electron-builder.yml` 将 `src/main/skills` 作为 `extraResources` 放入应用。`scripts/verify-packaged-skills.mjs` 在 `pack`、`dist` 和 `release` 后逐文件比较大小和 SHA-256，并检查 manifest 的 `requiredPaths`。
 
-```ts
-// src/renderer/store/agent-store.ts — 类型
-skillOutput: SkillOutputState | null
-handleSkillOutput: (state: SkillOutputState) => void
-
-// src/renderer/store/agent-store-impl.ts — 实现
-handleSkillOutput(state: SkillOutputState) {
-  set({ skillOutput: state })
-}
-
-// 重置时机
-// - result_success / result_error → skillOutput: null
-// - newSession → skillOutput: null
-```
-
-**重要**: Zustand 的 `create()` 返回的是 hook 函数，外部调用必须用 `store.getState().handleSkillOutput(state)`，不能用 `store.handleSkillOutput(state)`。
-
-### 6. Renderer Hook — `useAgent.ts`
-
-```ts
-// 订阅 skill:output IPC 事件
-const unsubSkillOutput = window.api.agent.onSkillOutput((state) => {
-  store.getState().handleSkillOutput(state)  // 注意: getState() 而非直接调用
-})
-
-// 导出 selector
-export const useSkillOutput = (context) => useAgentStore((s) => s.slots[context].skillOutput)
-```
-
-### 7. UI 渲染 — `ChatView.tsx`
-
-```tsx
-const skillOutput = useSkillOutput(context)
-const showLiveSkillOutput = isStreaming && !!skillOutput?.content
-
-{showLiveSkillOutput && (
-  <SkillOutputCard
-    content={skillOutput.content}
-    isStreaming={skillOutput.isStreaming}
-    language={skillOutput.language}
-  />
-)}
-```
-
-条件：当前会话正在流式输出且该会话有 `skillOutput.content` 时显示 SkillOutputCard。它是会话级实时预览，不依赖最后一条消息是否为 assistant 文本，因此 tool-only / skill-only 的生成流程也能展示。流式结束后 `skillOutput` 被 store 重置为 null，卡片消失，由 artifact 卡片接管。
-
-### 8. 类型定义 — `shared/types.ts`
-
-```ts
-export type SkillOutputState = {
-  skillId: string | null
-  content: string
-  isStreaming: boolean
-  language: string
-}
-```
-
----
-
-## 文件清单
-
-| 文件 | 职责 |
-|------|------|
-| `src/main/skills/skills-manifest.json` | 内置 Skill manifest，声明内容版本和必需资源 |
-| `src/main/builtin-skill-installer.ts` | 全局安装、完整性检查和原子版本升级 |
-| `src/main/workspace-skill-links.ts` | 将工作区 Skill 入口链接到全局安装 |
-| `src/main/skills/builtin.ts` | SkillDefinition 接口 + 定义数组 |
-| `src/main/skills/{id}/` | 各 skill 完整文件（SKILL.md + 资源） |
-| `src/main/skill-init.ts` | 解析应用路径并初始化全局 Skill |
-| `src/main/skill-output-bridge.ts` | 统一输出捕获层（main 进程） |
-| `src/main/agent-manager.ts` | Bridge 集成 + activeSkillId 管理 |
-| `src/main/ipc-handlers.ts` | sendMessage 传递 skillId |
-| `src/preload/index.ts` | skill:output IPC 桥接 + sendMessage skillId |
-| `src/shared/types.ts` | `SkillOutputState` / `SessionRoutedSkillOutputState` 类型 |
-| `src/renderer/store/agent-store.ts` | skillOutput 状态类型 |
-| `src/renderer/store/agent-store-impl.ts` | handleSkillOutput 实现 |
-| `src/renderer/hooks/useAgent.ts` | skill:output 订阅 + useSkillOutput selector |
-| `src/renderer/lib/ipc.ts` | AgentApi 类型定义（onSkillOutput、sendMessage 签名） |
-| `src/renderer/components/chat/ChatView.tsx` | SkillOutputCard 会话级渲染逻辑 |
-| `src/renderer/components/chat/SkillOutputCard.tsx` | 实时预览卡片组件 |
+不要通过扩大 `files` 中的 Node 依赖来打包 Skill；Skill 资源和应用 JavaScript 依赖是两条独立链路。

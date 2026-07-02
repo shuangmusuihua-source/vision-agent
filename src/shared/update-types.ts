@@ -12,6 +12,12 @@ export interface UpdateErrorPayload {
   message: string
 }
 
+export type UpdateCheckResult =
+  | { status: 'available'; version?: string }
+  | { status: 'not-available'; version?: string }
+  | { status: 'skipped'; message: string }
+  | { status: 'error'; message: string }
+
 const SIGNATURE_ERROR_PATTERNS = [
   'code signature at url',
   'code signature did not pass validation',

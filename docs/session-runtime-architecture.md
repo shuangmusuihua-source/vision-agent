@@ -1,39 +1,17 @@
 # Session Runtime Architecture
 
-## Goal
+本文记录当前会话身份、并发执行和事件路由约束。
 
-The product has two session entry points:
+## 两类入口
 
-- Ask sumi: one app-level general assistant session.
-- Workspace sessions: many sessions under many user-created workspaces.
+- `ask`：应用级 Ask sumi 会话
+- `editor`：绑定具体 workspace 的会话
 
-All sessions must be isolated and may run concurrently. A background session's
-messages, permission requests, AskUser questions, skill output, artifacts, and
-completion state must return to that same session, even when the visible UI has
-switched to another workspace or session.
+多个会话可以并行运行。切换当前 workspace 或会话时，后台会话的消息、权限请求、AskUser、Skill 输出和完成状态仍必须回到原会话。
 
-## SDK Primitives We Use
+## 身份模型
 
-Claude Agent SDK remains the agent runtime. The app should not reimplement the
-agent loop.
-
-- `query()` runs the agent and streams SDK messages.
-- `resume` resumes a concrete SDK session.
-- `cwd` / `dir` binds SDK session storage to a workspace/app directory.
-- `canUseTool` handles tool approval and `AskUserQuestion`.
-- `hooks.PostToolUse` records generated file artifacts after successful tool use.
-- `listSessions()`, `getSessionMessages()`, `renameSession()`, `deleteSession()`,
-  and `forkSession()` remain the source for SDK transcript operations.
-- A future `SessionStore` adapter can mirror SDK transcripts to external storage,
-  but it does not replace app-owned product metadata.
-
-## App-Owned Control Plane
-
-The SDK owns execution; the app owns product routing.
-
-### Session Identity
-
-Every live event must carry an `AgentSessionEnvelope`:
+跨进程事件使用 `AgentSessionEnvelope`：
 
 ```ts
 type AgentSessionEnvelope = {
@@ -45,100 +23,117 @@ type AgentSessionEnvelope = {
 }
 ```
 
-- `sessionId` / `clientSessionKey` is the app-owned stable key used by UI slots.
-- `sdkSessionId` is the Claude SDK transcript handle used for resume/history.
-- `workspacePath` is the owner directory for file I/O and session history lookup.
-- Events must be routed by app session id first, never by visible context alone.
+- `sessionId` / `clientSessionKey`：应用拥有的稳定路由 ID
+- `sdkSessionId`：Claude SDK 在首次 materialization 后产生的 transcript ID
+- `workspacePath`：会话所属 workspace；会话生命周期内不得漂移
+- `context`：UI 入口类型，不足以单独标识会话
 
-### SessionRuntimeController
+所有 session-affecting 事件必须按 app session ID 路由，不能根据当前可见面板猜测归属。
 
-`src/main/session-runtime.ts` is the main-process runtime control plane.
+## 执行流程
 
-It owns:
+1. Renderer 为新对话创建临时 app session key，并乐观写入用户消息。
+2. Main 的 `query-runner.ts` 根据 context 创建受管 working directory。
+3. App session 元数据先写入 electron-store。
+4. `query()` 启动后，`SessionRuntimeController.registerRun()` 以 app session ID 注册 Query、AbortController 和 envelope。
+5. SDK 首次返回 `session_id` 时，runtime 将其附加为 `sdkSessionId`，但不改变 app session ID。
+6. 每条 SDK 消息统一经过 `sessionRuntime.emitSdkMessage()`：Skill bridge、文本批次或消息转换，然后附带 envelope 发往 renderer。
+7. Renderer 根据 envelope 更新 live slot 或后台 `sessionSlots[sessionId]`。
+8. 结束时 runtime flush 文本、清理 Skill 状态、pending requests 和 active run。
 
-- active SDK query handles keyed by app session id
-- AbortController lifecycle
-- SDK session materialization into the app envelope
-- SDK-message-to-IPC routing with mandatory session envelope
-- text-delta batching, flush, and cleanup
-- skill-output bridge lifecycle
-- pending permission / AskUser registration, timeout, SDK-abort cleanup, and routing
-- session-scoped abort and pending request cleanup
+## Working directory
 
-It does not own:
+Workspace 会话：
 
-- model/tool option construction
-- renderer UI state
-- persisted session records
-- artifact persistence
+```text
+<workspace>/.sumi/sessions/<sha256(app-session-id)[0..24]>/
+```
 
-The controller intentionally owns SDK message conversion at the routing seam:
-raw SDK events enter once, then the controller fans them out to skill output,
-batched text deltas, and `agent:event`. This keeps ordering and envelope
-attachment in one module.
+Ask 会话：
 
-### Event Protocol
+```text
+<app-data>/.sumi/ask-sessions/<sha256(app-session-id)[0..24]>/
+```
 
-The following main-to-renderer event families must include the envelope:
+SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生成产物通过扫描该目录获得，不存在独立的 artifact store。
+
+## SessionRuntimeController
+
+`src/main/session-runtime.ts` 拥有：
+
+- 活跃 Query 和 AbortController，按 app session ID 注册
+- app ID / SDK ID / context alias 查找
+- SDK session materialization
+- 文本 delta 批处理、flush 和丢弃
+- SkillOutputBridge 生命周期
+- 权限与 AskUser pending Promise、五分钟超时和 abort 清理
+- session-scoped abort 与 completion 等待
+- 带 envelope 的 main-to-renderer 事件
+
+它不拥有：
+
+- SDK options 和 system prompt：`agent-options.ts` / `query-runner.ts`
+- 持久化 session metadata：`persistence/workspace-store.ts`
+- SDK transcript 查询：`session-store.ts`
+- Renderer 状态：`agent-store*`
+- 产物数据库：当前不存在，文件目录就是事实来源
+
+## Event protocol
+
+以下事件必须携带 envelope：
 
 - `agent:event`
 - `agent:sessionCreated`
+- `agent:sessionFilesChanged`
 - `agent:permissionRequest`
 - `agent:permissionTimeout`
 - `agent:askUser`
 - `agent:askUserTimeout`
-- `agent:notification`
+- session-scoped `agent:notification`
 - `skill:output`
 
-If a new event affects a session, it must be emitted through the runtime
-controller or use `withSessionEnvelope()` before crossing IPC.
+App-level 通知（例如 Cron 失败）可以使用不带 session ownership 的 general notification。
 
-Agent request/response IPC should send object payloads matching
-`IPCChannelMap`. Main-process handlers may keep legacy positional-argument
-normalizers only as compatibility shims; new calls should not add new
-positional IPC signatures.
+IPC 请求优先使用 `src/shared/ipc-types.ts` 中的对象 payload。Main 里的位置参数兼容逻辑只用于旧调用，不应继续扩展。
 
-Live IPC event types use session-routed payload aliases such as
-`AgentIPCMessageWithContext`, `SessionRoutedPermissionRequest`, and
-`SessionRoutedAskUserRequest`, and `SessionRoutedSkillOutputState`. SDK
-transcript replay remains allowed to carry plain `AgentIPCMessage` values
-because history loading resolves ownership from the selected session.
+## 权限与用户输入
 
-`agent:notification` is a union: SDK hook notifications that affect an agent
-session must use `SessionRoutedNotification`, while app-level notifications
-such as cron failures can use `GeneralAgentNotification` without session
-ownership.
+`canUseTool` 先执行 session 文件访问判断：
 
-## Persistence Boundaries
+- 会话 working directory 内的允许操作可自动通过
+- 内置 Skill 资源和本次消息显式授权的附件/外部路径按规则处理
+- 其他工具进入 renderer 审批队列
+- `AskUserQuestion` 使用独立的 AskUser 队列
 
-- `workspace-store.ts`: app session metadata, workspace ownership, titles, counts.
-- `session-store.ts`: SDK transcript listing/history/mutation, always dir-scoped
-  when the owning workspace is known.
-- `artifact-store.ts`: app-owned session artifact registry keyed by app session id.
-- `session-persistence-adapter.ts`: the only bridge that persists SDK
-  materialization and SDK compaction IDs from the live runtime into the session
-  stores.
-- `query-runner.ts`: builds SDK options and runs `query()`, but does not own live
-  session routing state or persistence mapping side effects.
+Renderer 回复必须携带 request ID；runtime 根据注册信息找到原 session。超时或 abort 会清理 pending Promise，避免后续响应串到其他会话。
 
-## Invariants
+## Transcript 与产品元数据
 
-1. A session belongs to exactly one workspace/app directory for its lifetime.
-2. App session id is stable; SDK session id is metadata attached after
-   materialization.
-3. Background events never mutate the visible slot unless that session is visible.
-4. Permission and AskUser pending promises are registered by app session id.
-5. Artifacts are recorded by app session id and normalized against the owning
-   workspace path.
-6. Aborting by app session id or SDK session id resolves to the same active run.
-7. Text-delta batching must preserve the same envelope as non-text SDK events.
+Claude SDK JSONL 保存 transcript。electron-store `SessionRecord` 保存：
 
-## Extension Rule
+- app session ID 与 SDK session ID 映射
+- workspace/context/working directory
+- 标题、摘要、标签、时间和消息计数
 
-When adding a new feature, first decide which layer owns it:
+`session-store.ts` 按 working directory 调用 SDK API；历史分页优先直接读取 JSONL 尾部，以保留 compaction 前消息。SDK compaction 产生的内部 session ID 会持久化过滤，不作为独立用户会话展示。
 
-- SDK execution feature: use an SDK option, hook, custom tool, or SessionStore.
-- Product routing feature: add to `SessionRuntimeController` / envelope protocol.
-- Durable product metadata: add to the matching persistence adapter.
-- Renderer presentation only: consume already-routed session data; do not infer
-  session ownership from the currently visible UI.
+## Renderer invariants
+
+1. `slots.editor` 和 `slots.ask` 只表示当前可见 context。
+2. `sessionSlots` 保存每个会话的隔离状态；后台事件只更新对应 entry。
+3. Session materialization 只合并临时 app slot 和 SDK 信息，不重命名 app session key。
+4. 权限、AskUser 和 Skill 输出按 request/session ID 路由。
+5. IPC 静默只能触发非阻断提示，不能作为自动 abort 的依据。
+6. 新查询替换旧查询时必须等待旧 runtime 的 finally 完成，避免旧清理删除新状态。
+
+## 修改检查表
+
+新增会话功能时确认：
+
+- payload 是否进入 `IPCChannelMap`
+- session-affecting event 是否带 envelope
+- 后台 session 是否不会修改当前 live slot
+- app session ID 和 SDK session ID 是否保持分工
+- abort、窗口关闭和超时是否清理资源
+- transcript、产品 metadata 和生成文件的权威来源是否明确
+- 是否增加了跨会话/竞态回归测试

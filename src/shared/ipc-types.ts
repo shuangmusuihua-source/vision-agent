@@ -24,10 +24,21 @@ import type {
   MarkitdownRuntimeInstallResult,
   MarkitdownRuntimeStatus,
 } from './markitdown-runtime'
+import type {
+  UpdateCheckResult,
+  UpdateDownloadProgress,
+  UpdateErrorPayload,
+} from './update-types'
 
 // ─── Request/Response Channels ───────────────────────────────────────
 
 export type IPCChannelMap = {
+  // App
+  'app:getVersion': {
+    request: void
+    response: string
+  }
+
   // Agent
   'agent:sendMessage': {
     request: {
@@ -124,6 +135,18 @@ export type IPCChannelMap = {
   'workspace:createWorkspace': {
     request: string
     response: string | null
+  }
+  'workspace:deleteWorkspace': {
+    request: string
+    response: { success: boolean; error?: string }
+  }
+  'workspace:knowledgeDir': {
+    request: void
+    response: string
+  }
+  'workspace:selectFiles': {
+    request: void
+    response: { canceled: boolean; filePaths: string[]; attachmentGrantId?: string }
   }
   'workspace:openInBrowser': {
     request: string
@@ -286,6 +309,24 @@ export type IPCChannelMap = {
     response: unknown[]
   }
 
+  // Update
+  'update:checkForUpdates': {
+    request: void
+    response: UpdateCheckResult
+  }
+  'update:download': {
+    request: void
+    response: void
+  }
+  'update:install': {
+    request: void
+    response: void
+  }
+  'update:openLatestRelease': {
+    request: void
+    response: void
+  }
+
   // Ping
   'ping': {
     request: void
@@ -298,6 +339,7 @@ export type IPCChannelMap = {
 export type IPCEventMap = {
   'agent:event': AgentIPCMessageWithContext
   'agent:sessionCreated': AgentSessionEnvelope
+  'agent:sessionFilesChanged': AgentSessionEnvelope
   'agent:permissionRequest': SessionRoutedPermissionRequest
   'agent:askUser': SessionRoutedAskUserRequest
   'agent:askUserTimeout': SessionRoutedRequestTimeout
@@ -309,6 +351,11 @@ export type IPCEventMap = {
   'graph:filesChanged': { count: number; files: string[]; version: number }
   'cron:taskCompleted': unknown
   'menu-action': string
+  'main:error': { type: 'unhandledRejection' | 'uncaughtException'; message: string }
+  'update:available': { version: string }
+  'update:downloaded': void
+  'update:download-progress': UpdateDownloadProgress
+  'update:error': UpdateErrorPayload
 }
 
 // ─── Helper: extract request/response types ─────────────────────────

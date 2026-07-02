@@ -24,7 +24,11 @@ import type {
   MarkitdownRuntimeInstallResult,
   MarkitdownRuntimeStatus,
 } from '../../shared/markitdown-runtime'
-import type { UpdateDownloadProgress, UpdateErrorPayload } from '../../shared/update-types'
+import type {
+  UpdateCheckResult,
+  UpdateDownloadProgress,
+  UpdateErrorPayload,
+} from '../../shared/update-types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -144,7 +148,7 @@ interface AgentApi {
 
   // Lifecycle channels
   onSessionCreated: (callback: (data: AgentSessionEnvelope) => void) => () => void
-  onSessionFilesChanged: (callback: (data: { sessionId: string }) => void) => () => void
+  onSessionFilesChanged: (callback: (data: AgentSessionEnvelope) => void) => () => void
   onPermissionRequest: (callback: (data: SessionRoutedPermissionRequest) => void) => () => void
   onAskUser: (callback: (data: SessionRoutedAskUserRequest) => void) => () => void
   onAskUserTimeout: (callback: (data: { requestId: string } & AgentSessionEnvelope) => void) => () => void
@@ -196,12 +200,6 @@ interface NotificationApi {
   getHistory: () => Promise<NotificationHistoryItem[]>
 }
 
-export type UpdateCheckResult =
-  | { status: 'available'; version?: string }
-  | { status: 'not-available'; version?: string }
-  | { status: 'skipped'; message: string }
-  | { status: 'error'; message: string }
-
 interface UpdateApi {
   download: () => Promise<void>
   install: () => Promise<void>
@@ -234,7 +232,7 @@ interface WindowApi {
 }
 
 interface MemoryApi {
-  list: (workspacePath?: string) => Promise<Array<{ name: string; path: string }>>
+  list: () => Promise<Array<{ name: string; path: string }>>
   read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   write: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   delete: (filePath: string) => Promise<{ success: boolean; error?: string }>
@@ -269,3 +267,5 @@ export type {
   GraphEdge,
   CronTask,
 }
+
+export type { UpdateCheckResult }

@@ -1,73 +1,105 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This is the canonical development guide for the repository. Keep it aligned with the code; do not copy architecture descriptions into another root-level guide.
 
-## Build & Run Commands
+## Product
 
-- **Dev**: `npm run dev` (electron-vite dev with HMR)
-- **Build**: `npm run build` (electron-vite build)
-- **Preview**: `npm run preview` (preview production build)
-- **Pack**: `npm run pack` (electron-builder --dir, no installer)
-- **Dist**: `npm run dist` (electron-builder, creates DMG)
-- **Postinstall**: `npm run postinstall` (electron-builder install-app-deps)
+`sumi` is a macOS Electron workspace for AI-assisted research and document work. It combines Markdown editing, isolated workspace sessions, Claude Agent SDK execution, a knowledge graph, scheduled tasks, attachments, and built-in/community Skills.
 
-- **Test**: `npm test` (vitest run), `npm run test:watch` (vitest watch mode)
-- Test files: `tests/**/*.test.ts`, config: `vitest.config.ts`
+## Commands
 
-## Architecture
+- `npm run dev` — Electron development mode with renderer HMR
+- `npm run build` — production bundles for main, preload, and renderer
+- `npm run preview` — preview the production renderer
+- `npm test` / `npm run test:watch` — Vitest tests in `tests/**/*.test.ts`
+- `npm run pack` — unpacked `.app` plus packaged-Skill verification
+- `npm run dist` — DMG/ZIP plus packaged-Skill verification
+- `npm run release` — publish through electron-builder
+- `npm run postinstall` — install Electron native dependencies
 
-Electron three-process app: Main, Preload, Renderer.
+Before handing off a code change, run tests and a production build in proportion to risk. Packaging changes should also run `npm run pack`.
 
-### Main Process (`src/main/`)
-- `index.ts` — Electron entry. Creates BrowserWindow (hiddenInset title bar, sandbox:false), registers IPC and menu.
-- `agent-manager.ts` — Core agent logic. Uses `@anthropic-ai/Codex-agent-sdk` to spawn Codex CLI subprocesses. Manages sessions, permissions (5-min timeout), hooks (audit logging), and streams messages to renderer. `buildOptions()` reads from store to construct SDK Options (model, apiKey, allowedTools, permissionMode, env, skills, systemPrompt).
-- `ipc-handlers.ts` — All `ipcMain.handle()` registrations. Also contains `buildGraphData()` (wikilink graph) and `search:query` (brute-force file search).
-- `store.ts` — `electron-store` for persistent settings (profiles, directories, theme). Schema: `AppSettings`.
-- `cron-manager.ts` — `node-cron` scheduled tasks. Tasks stored in-memory Map (lost on restart). Runs agent queries with `permissionMode: 'acceptEdits'`.
-- `notification-manager.ts` — System notifications for agent/cron completion and permission timeout.
-- `menu.ts` — macOS menu bar. Shortcuts: Cmd+B (sidebar), Cmd+Shift+B (agent panel), Cmd+Shift+F (search), Cmd+/ (source mode), Cmd+\ (focus mode), Cmd+S (save).
+## Runtime architecture
 
-### Preload (`src/preload/index.ts`)
-- `contextBridge.exposeInMainWorld('api', api)` — Exposes namespaced API to renderer.
-- Namespaces: `workspace`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `search`, `menu`.
-- Event channels use `ipcRenderer.on()` with cleanup return functions.
-- Types mirrored in `src/renderer/lib/ipc.ts` on the `Window.api` interface.
+Electron uses two OS process roles plus a preload isolation boundary:
 
-### Renderer (`src/renderer/`)
-- React 19 + TypeScript. No router — single-page layout.
-- `App.tsx` — Root. Theme management (light/dark/system via `data-theme` attribute).
-- `AppShell.tsx` — Main layout orchestrator. Three-column: Sidebar + Editor + AgentPanel. Manages workspace paths, file tabs, editor-agent linking, search, graph view. Local state (not Zustand) for tabs, sidebar collapse, workspaces.
-- **State**: Zustand store at `store/agent-store.ts` (types) + `agent-store-impl.ts` (impl). Shape: messages, isStreaming, currentSessionId, agentStatus, usageInfo, permissionRequest, sessionList, lastEditedFile. Hook: `useAgent()` at `hooks/useAgent.ts` subscribes to IPC events and dispatches store updates.
-- **Editor**: Tiptap with `@tiptap/markdown` (breaks:true for GFM line breaks). Custom extensions in `components/editor/extensions/`: Wikilink (`[[link]]`), CodeBlockEnhanced (language label + copy), FocusMode (dims non-active paragraphs), HeadingAnchor (hover # links), ImagePaste (clipboard images). Supports source mode (Cmd+/), focus mode (Cmd+\), auto-save (1.5s debounce), Cmd+S, context menu (Explain/Edit/Review/Ask agent).
-- **Graph**: D3.js force-directed layout from wikilink parsing. `GraphView.tsx`.
-- **CSS**: Vanilla CSS with custom properties. No framework. Files: `global.css` (variables, theme), `layout.css`, `editor.css`, `chat.css`, `settings.css`, `graph.css`, `drawer.css`, `search.css`. Typography variables in `:root` for future theming.
+- Main process: `src/main/`
+- Renderer process: `src/renderer/`
+- Preload bridge in the renderer's isolated context: `src/preload/index.ts`
+- Cross-process contracts: `src/shared/`
 
-### IPC Pattern
-- **Request/response**: Renderer calls `window.api.namespace.method(args)` → preload `ipcRenderer.invoke('namespace:method', args)` → main `ipcMain.handle('namespace:method', handler)`.
-- **Push events**: Main calls `win.webContents.send('namespace:event', data)` → preload `ipcRenderer.on('namespace:event', handler)` → renderer callback via `window.api.namespace.onEvent(callback)`.
-- Key channels: `agent:message`, `agent:complete`, `agent:error`, `agent:permissionRequest`, `agent:sessionCreated`, `cron:taskCompleted`, `menu-action`.
+The BrowserWindow uses `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, and `webSecurity: true`. Renderer code must access privileged operations only through `window.api`.
 
-### Agent Permission Flow
-1. SDK's `canUseTool` callback fires in main process
-2. Main sends `agent:permissionRequest` to renderer with tool details
-3. Renderer shows PermissionDialog, user approves/denies
-4. Renderer calls `window.api.agent.respondPermission(requestId, behavior)`
-5. Main resolves the pending Promise, SDK continues or aborts
+See `docs/architecture.md` for the current module map and `docs/session-runtime-architecture.md` for session routing invariants.
 
-### Key Configuration
-- Default model: `Codex-sonnet-4-20250514`
-- Default allowed tools (read-only): `['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch']`
-- Permission mode: `'default'` with custom `canUseTool` callback
-- Skills: `'all'` (auto-discovered via probe query)
-- System prompt preset: `'Codex'`
-- Auto-memory directory: `<workspace>/.vision/memory/`
-- Memory files: Markdown in `.vision/memory/`, listed/deleted via sidebar
+### Main process
 
-## Conventions
+- `index.ts` — boot, BrowserWindow, Sentry, updater, indexing, Skill initialization, persisted cron restoration
+- `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
+- `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
+- `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, Skill output routing
+- `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
+- `session-store.ts` — SDK transcript listing, paging, rename, delete, and compaction filtering
+- `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata
+- `file-index-service.ts` — workspace search and knowledge graph index
+- `skill-init.ts`, `builtin-skill-installer.ts`, `community-skill-installer.ts` — Skill installation and discovery
+- `cron-manager.ts` — persisted scheduled tasks with a restricted tool set
 
-- Icons: `lucide-react`
-- CSS variables for all colors and typography. Never hardcode color values in component CSS.
-- Theme switching via `data-theme` attribute on `<html>`. Light/dark/system.
-- File paths use `workspace:listMarkdownFiles` for `.md` discovery, `workspace:readFile`/`workspace:writeFile` for I/O.
-- Agent messages use `react-markdown` + `remark-gfm` for rendering in chat.
-- The `@tiptap/markdown` extension handles md↔ProseMirror conversion. Use `contentType: 'markdown'` for setContent and `editor.getMarkdown()` for serialization. Import as `{ Markdown } from '@tiptap/markdown'` (named export, not default).
+`agent-manager.ts` and `store.ts` are compatibility facades. New main-process code should import from the owning module or persistence adapter.
+
+### IPC
+
+`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. Preload exposes typed methods grouped under `workspace`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, `notification`, and `update`.
+
+New session-affecting push events must carry an `AgentSessionEnvelope`; never infer ownership from the currently visible workspace or panel.
+
+### Renderer
+
+- React 19, TypeScript, Zustand, no router
+- `App.tsx` — application root, settings cache, theme, global providers
+- `components/layout/AppShell.tsx` — main layout and feature orchestration
+- `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state
+- `store/ui-slice.ts` — application UI state
+- `hooks/useAgent.ts` — singleton agent IPC subscriptions and actions
+- `components/editor/MarkdownEditor.tsx` — Tiptap Markdown editor
+- `components/chat/AssistantMarkdown.tsx` — Streamdown chat rendering with Shiki, KaTeX, GFM, and Mermaid
+- `components/graph/GraphView.tsx` — `react-force-graph-2d` visualization
+
+## Agent and session rules
+
+- Claude Agent SDK is the execution runtime; do not reimplement the agent loop.
+- App session IDs are stable UI/product identifiers. SDK session IDs are transcript handles attached after materialization.
+- Workspace sessions write generated files under `<workspace>/.sumi/sessions/<hash>/`; Ask sessions use the app-data `.sumi/ask-sessions/` area.
+- File access must pass the session-scoped authorization checks in `session-file-access.ts`.
+- Tool approval and AskUser requests are session-routed and time out after five minutes.
+- Renderer inactivity is only a notice; it must not automatically abort a healthy long-running task.
+
+## Persistence
+
+`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery.
+
+Do not introduce a second store for the same authority without documenting the ownership boundary.
+
+## Editor and UI conventions
+
+- Use CSS custom properties from `src/renderer/styles/global.css`; do not hardcode component colors.
+- Theme switching uses `data-theme` on `<html>`.
+- Use Lucide React icons.
+- Tiptap Markdown must use `contentType: 'markdown'`, `editor.getMarkdown()`, and the named `Markdown` export from `@tiptap/markdown`.
+- Preserve source-mode save ordering through `SourceSaveController`.
+- Global asynchronous errors should remain recoverable and use the dismissible application error banner.
+
+## File and change discipline
+
+- Treat user worktree changes as owned by the user; do not overwrite unrelated edits.
+- Prefer focused modules over adding behavior to compatibility facades.
+- Update `src/shared/ipc-types.ts`, preload, and renderer types together when changing IPC.
+- Built-in Skill changes must keep `skills-manifest.json`, `builtin.ts`, resources, and packaged verification aligned. See `src/main/skills/BUILTIN-SKILL-ARCHITECTURE.md`.
+- Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.
+
+## Documentation policy
+
+- `AGENTS.md` is the canonical development guide.
+- `README.md` describes the product and setup.
+- `docs/architecture.md` and `docs/session-runtime-architecture.md` describe current implementation.
+- Do not commit point-in-time audit reports or copied SDK manuals as current documentation. Put durable decisions into the canonical documents and rely on Git history for obsolete plans.
