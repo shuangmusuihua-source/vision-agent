@@ -1731,7 +1731,7 @@
   align-items: center;
   justify-content: flex-end;
   font-variant-numeric: tabular-nums;
-  transition: width 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: min-width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .odometer {
@@ -1739,8 +1739,8 @@
   display: inline-block;
   overflow: hidden;
   vertical-align: bottom;
-  height: 1.2em;
-  line-height: 1.2;
+  height: 1.25em;
+  line-height: 1.25;
 }
 
 .odometer-digit {
@@ -1760,7 +1760,7 @@
 }
 
 .odometer-digit.exit {
-  animation: odometer-exit 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: odometer-exit 0.36s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   position: absolute;
   left: 0;
   top: 0;
@@ -1768,7 +1768,7 @@
 }
 
 .odometer-digit.enter {
-  animation: odometer-enter 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: odometer-enter 0.36s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   position: absolute;
   left: 0;
   top: 0;
@@ -1777,13 +1777,12 @@
 
 @keyframes odometer-exit {
   from { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
-  to { transform: translateY(-48%) scale(0.96); opacity: 0; filter: blur(0.8px); }
+  to { transform: translateY(-82%) scale(0.92); opacity: 0; filter: blur(1.5px); }
 }
 
 @keyframes odometer-enter {
-  0% { transform: translateY(58%) scale(0.96); opacity: 0; filter: blur(1px); }
-  72% { transform: translateY(-4%) scale(1); opacity: 1; filter: blur(0); }
-  100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+  from { transform: translateY(82%) scale(0.92); opacity: 0; filter: blur(1.5px); }
+  to { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
 }
 
 .generation-activity-card-status {

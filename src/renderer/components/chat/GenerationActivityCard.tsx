@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState } from 'react'
+import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react'
 import { createLowlight, common } from 'lowlight'
 import type { GenerationActivity } from '../../../shared/types'
 
@@ -50,7 +50,7 @@ type DigitTransition = {
   sequence: number
 }
 
-function OdometerDigit({ digit, place }: { digit: string; place: number }) {
+function OdometerDigit({ digit }: { digit: string }) {
   const currentRef = useRef(digit)
   const sequenceRef = useRef(0)
   const [transition, setTransition] = useState<DigitTransition | null>(null)
@@ -63,27 +63,17 @@ function OdometerDigit({ digit, place }: { digit: string; place: number }) {
     sequenceRef.current += 1
     setTransition({ from, to: digit, sequence: sequenceRef.current })
 
-    const timer = setTimeout(() => setTransition(null), 560)
+    const timer = setTimeout(() => setTransition(null), 360)
     return () => clearTimeout(timer)
   }, [digit])
-
-  const animationDelay = `${Math.min(place, 3) * 18}ms`
 
   return (
     <span className="odometer" aria-hidden="true">
       <span className="odometer-digit placeholder">{digit}</span>
       {transition ? (
         <>
-          <span
-            key={`exit-${transition.sequence}`}
-            className="odometer-digit exit"
-            style={{ animationDelay }}
-          >{transition.from}</span>
-          <span
-            key={`enter-${transition.sequence}`}
-            className="odometer-digit enter"
-            style={{ animationDelay }}
-          >{transition.to}</span>
+          <span key={`exit-${transition.sequence}`} className="odometer-digit exit">{transition.from}</span>
+          <span key={`enter-${transition.sequence}`} className="odometer-digit enter">{transition.to}</span>
         </>
       ) : (
         <span className="odometer-digit static">{digit}</span>
@@ -93,18 +83,24 @@ function OdometerDigit({ digit, place }: { digit: string; place: number }) {
 }
 
 function OdometerNumber({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const maxWidthRef = useRef(0)
   const digits = String(value).split('')
 
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const width = element.getBoundingClientRect().width
+    if (width <= maxWidthRef.current) return
+    maxWidthRef.current = width
+    element.style.minWidth = `${width}px`
+  })
+
   return (
-    <span
-      className="odometer-number"
-      aria-label={String(value)}
-      style={{ width: `${digits.length * 0.62}em` }}
-    >
-      {digits.map((digit, index) => {
-        const place = digits.length - index - 1
-        return <OdometerDigit key={place} digit={digit} place={place} />
-      })}
+    <span className="odometer-number" ref={ref} aria-label={String(value)}>
+      {digits.map((digit, index) => (
+        <OdometerDigit key={digits.length - index - 1} digit={digit} />
+      ))}
     </span>
   )
 }
