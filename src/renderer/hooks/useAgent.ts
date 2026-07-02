@@ -13,7 +13,10 @@ import type {
   SessionRoutedSkillOutputState,
 } from '../../shared/types'
 
-const WATCHDOG_TIMEOUT = 120_000 // 2 minutes
+// This is an inactivity notice, not an execution deadline. A healthy tool can
+// legitimately stay silent for minutes (for example a long Bash command), so
+// renderer-side silence must never be used as proof that the SDK is stuck.
+const WATCHDOG_NOTICE_TIMEOUT = 120_000
 
 type ActiveAgentState = 'thinking' | 'running' | 'compacting'
 
@@ -217,7 +220,8 @@ export function useIPCSubscriptions() {
 type WatchdogEntry = {
   context: AgentContext
   sessionId: string | null
-  timer: ReturnType<typeof setTimeout>
+  timer: ReturnType<typeof setTimeout> | null
+  noticeShown: boolean
 }
 
 const watchdogTimers = new Map<string, WatchdogEntry>()
@@ -250,7 +254,7 @@ function clearWatchdog(ctx: AgentContext, sessionId?: string | null) {
   const key = getWatchdogKey(ctx, sessionId)
   const entry = watchdogTimers.get(key)
   if (!entry) return
-  clearTimeout(entry.timer)
+  if (entry.timer) clearTimeout(entry.timer)
   watchdogTimers.delete(key)
 }
 
@@ -267,7 +271,7 @@ function appendWatchdogStatus(ctx: AgentContext, sessionId?: string | null) {
         id: `watchdog-${Date.now()}`,
         role: 'system' as const,
         phase: 'complete' as const,
-        textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+        textContent: '任务已经 2 分钟没有新进度，但仍在运行。你可以继续等待，或点击停止。',
         createdAt: Date.now(),
       }],
     }
@@ -287,10 +291,19 @@ function appendWatchdogStatus(ctx: AgentContext, sessionId?: string | null) {
 
 function triggerWatchdog(ctx: AgentContext, sessionId?: string | null) {
   const sid = normalizeWatchdogSessionId(sessionId)
-  clearWatchdog(ctx, sid)
-  console.warn(`[Watchdog] agent stuck for 120s in ${ctx}${sid ? ` session ${sid}` : ''}, forcing abort`)
-  window.api.agent.abort(sid || ctx)
-  useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, ctx, sid)
+  const key = getWatchdogKey(ctx, sid)
+  const entry = watchdogTimers.get(key)
+  if (!entry || !isAgentActive(getWatchdogSlot(ctx, sid).agentState)) {
+    clearWatchdog(ctx, sid)
+    return
+  }
+
+  // Keep the task alive. IPC inactivity alone cannot distinguish a hung run
+  // from a healthy long-running tool. Show one notice per run and leave the
+  // explicit stop control to the user.
+  entry.timer = null
+  entry.noticeShown = true
+  console.warn(`[Watchdog] no agent progress for 120s in ${ctx}${sid ? ` session ${sid}` : ''}; task remains active`)
   appendWatchdogStatus(ctx, sid)
 }
 
@@ -303,17 +316,20 @@ function refreshWatchdog(ctx: AgentContext, sessionId?: string | null) {
 
   if (!isAgentActive(slot.agentState)) {
     if (existing) {
-      clearTimeout(existing.timer)
+      if (existing.timer) clearTimeout(existing.timer)
       watchdogTimers.delete(key)
     }
     return
   }
 
-  if (existing) clearTimeout(existing.timer)
+  // Avoid repeating the notice every two minutes during one long run.
+  if (existing?.noticeShown) return
+  if (existing?.timer) clearTimeout(existing.timer)
   watchdogTimers.set(key, {
     context: ctx,
     sessionId: effectiveSid,
-    timer: setTimeout(() => triggerWatchdog(ctx, effectiveSid), WATCHDOG_TIMEOUT),
+    timer: setTimeout(() => triggerWatchdog(ctx, effectiveSid), WATCHDOG_NOTICE_TIMEOUT),
+    noticeShown: false,
   })
 }
 
@@ -413,6 +429,10 @@ export function useAgent(context: AgentContext = 'editor') {
       })
     }
     const clientSessionKey = slotSid
+
+    // A new query starts a new inactivity window, even when it reuses the
+    // same session after replacing an active run.
+    clearWatchdog(context, clientSessionKey)
 
     // Optimistic write: insert the user message directly into the messages array
     // before the SDK processes it. The SDK will later send back a 'user' IPC event

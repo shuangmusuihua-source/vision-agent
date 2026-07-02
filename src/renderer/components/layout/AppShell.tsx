@@ -802,7 +802,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       )}
       {/* ── Banners ── */}
       {updateError && (
-        <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+        <div className="update-banner update-banner-error">
           <span>更新失败: {updateError.slice(0, 60)}{updateError.length > 60 ? '...' : ''}</span>
           <button
             className="update-banner-btn"
@@ -820,7 +820,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         </div>
       )}
       {sessionLoadError && (
-        <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+        <div className="update-banner update-banner-error">
           <span>会话加载失败: {sessionLoadError.message.slice(0, 60)}{sessionLoadError.message.length > 60 ? '...' : ''}</span>
           <button className="update-banner-btn" onClick={() => { void retrySessionLoad() }}>
             <RefreshCw size={14} /> 重试
@@ -829,9 +829,15 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         </div>
       )}
       {mainError && (
-        <div className="update-banner" style={{ background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+        <div className="update-banner update-banner-error" role="alert" title={mainError}>
           <span>应用错误: {mainError.slice(0, 80)}{mainError.length > 80 ? '...' : ''}</span>
-          <button className="update-banner-dismiss" onClick={() => setMainError(null)}>✕</button>
+          <button
+            className="update-banner-dismiss"
+            aria-label="关闭应用错误提示"
+            onClick={() => setMainError(null)}
+          >
+            ✕
+          </button>
         </div>
       )}
       {showSearch && (

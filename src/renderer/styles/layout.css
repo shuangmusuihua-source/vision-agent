@@ -1850,6 +1850,10 @@
 .update-banner-ready {
   border-color: var(--color-accent, #2383e2);
 }
+.update-banner-error {
+  background: color-mix(in srgb, var(--color-error) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-error) 30%, var(--color-border));
+}
 .update-banner-btn {
   display: inline-flex;
   align-items: center;
