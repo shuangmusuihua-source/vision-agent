@@ -34,7 +34,7 @@ export const MathBlock = Node.create({
     return [{ tag: 'div[data-type="math-block"]' }]
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML() {
     return [
       'div',
       mergeAttributes({ 'data-type': 'math-block', class: 'math-block' }),

@@ -4,7 +4,6 @@ import type {
   AgentNotificationEvent,
   AgentSessionEnvelope,
   ModelProfile,
-  SdkSessionInfo,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   SessionRoutedSkillOutputState,

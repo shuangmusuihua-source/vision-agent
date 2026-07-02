@@ -50,7 +50,7 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
   }
 
   const auditPostToolUse: HookCallback = async (input, _toolUseID, _options) => {
-    const { tool_name, tool_input, tool_response } = input as PostToolUseHookInput
+    const { tool_name, tool_response } = input as PostToolUseHookInput
     writeAuditLog({
       event: 'PostToolUse',
       tool: tool_name,

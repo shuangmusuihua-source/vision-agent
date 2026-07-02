@@ -6,10 +6,6 @@ import type {
   SDKResultMessage,
   SDKResultSuccess,
   SDKResultError,
-  SDKSystemMessage,
-  SDKStatusMessage,
-  SDKCompactBoundaryMessage,
-  SDKPermissionDeniedMessage,
   SDKPartialAssistantMessage,
   SDKRateLimitEvent,
   SDKPromptSuggestionMessage,
@@ -27,7 +23,7 @@ type SDKSystemMessageAny = Extract<SDKMessage, { type: 'system' }>
  */
 function narrowSystem<T extends SDKSystemMessageAny['subtype']>(
   message: SDKSystemMessageAny,
-  subtype: T,
+  _subtype: T,
 ): Extract<SDKSystemMessageAny, { subtype: T }> {
   return message as Extract<SDKSystemMessageAny, { subtype: T }>
 }

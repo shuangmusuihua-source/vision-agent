@@ -159,116 +159,6 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-/* --- Session Bar --- */
-
-.session-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  position: relative;
-  height: 28px;
-}
-
-.session-bar-left {
-  flex-shrink: 0;
-}
-
-.session-bar-model {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--color-bg-tertiary);
-}
-
-.session-bar-center {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-
-.session-bar-right {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.session-bar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  color: var(--color-text-primary);
-}
-
-.session-bar-btn:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.session-bar-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 12px;
-  right: 12px;
-  background: var(--color-bg-primary);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  z-index: 10;
-  margin-top: 2px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.session-bar-dropdown-empty {
-  padding: 10px;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  text-align: center;
-}
-
-.session-bar-dropdown-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-primary);
-  width: 100%;
-  text-align: left;
-}
-
-.session-bar-dropdown-item:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.session-bar-dropdown-item.active {
-  background: var(--color-bg-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.session-bar-dropdown-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.session-bar-dropdown-time {
-  font-size: var(--font-size-2xs);
-  color: var(--color-text-tertiary);
-  flex-shrink: 0;
-  margin-left: 8px;
-}
-
 .chat-view {
   display: flex;
   flex-direction: column;
@@ -1348,144 +1238,6 @@
   user-select: none;
 }
 
-/* --- Skill Card --- */
-
-.skill-card {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: 8px;
-  overflow: hidden;
-}
-
-.skill-card-running {
-  border-left: 3px solid var(--color-action);
-}
-
-.skill-card-completed {
-  border-left: 3px solid var(--color-success);
-}
-
-.skill-card-error {
-  border-left: 3px solid var(--color-error);
-}
-
-.skill-card-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  background: var(--color-bg-secondary);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-}
-
-.skill-card-header:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.skill-card-name {
-  flex: 1;
-}
-
-.skill-card-spinner {
-  animation: spin 1s linear infinite;
-}
-
-.skill-card-check {
-  color: var(--color-success);
-}
-
-.skill-card-error-icon {
-  color: var(--color-error);
-}
-
-.skill-card-progress {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-}
-
-.skill-card-steps {
-  padding: 4px 12px;
-}
-
-.skill-card-step {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
-.skill-card-step-completed {
-  color: var(--color-success);
-}
-
-.skill-card-step-error {
-  color: var(--color-error);
-}
-
-.skill-card-step-running {
-  color: var(--color-action);
-}
-
-.skill-card-step-name {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-}
-
-[data-theme="dark"] .skill-card {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .skill-card-running {
-  border-left-color: var(--color-action);
-}
-
-[data-theme="dark"] .skill-card-completed {
-  border-left-color: var(--color-success);
-}
-
-[data-theme="dark"] .skill-card-error {
-  border-left-color: var(--color-error);
-}
-
-[data-theme="dark"] .skill-card-header {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.skill-card-output {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  cursor: pointer;
-  border-top: 1px solid var(--color-border);
-  transition: background 0.15s;
-}
-
-.skill-card-output:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.skill-card-output-name {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-action);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skill-card-output-action {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
 /* --- Artifact Bubble --- */
 
 /* --- Skill Status Bar --- */
@@ -1637,24 +1389,19 @@
   flex-shrink: 0;
 }
 
-.session-bar-btn:focus-visible,
 .chat-send-btn:focus-visible,
 .drawer-permission-btn:focus-visible,
 .drawer-question-option:focus-visible,
 .skill-popup-item:focus-visible,
-.skill-card-header:focus-visible,
 .artifact-bubble:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: -2px;
 }
 
-.session-bar-btn:active,
 .chat-send-btn-active:active,
 .drawer-permission-btn:active,
 .drawer-question-option:active,
 .skill-popup-item:active,
-.skill-card-header:active,
-.skill-card-output:active,
 .artifact-bubble:active {
   opacity: 0.7;
 }
@@ -1664,10 +1411,6 @@
 
 [data-theme="dark"] .chat-input:focus {
   background: rgba(255, 255, 255, 0.03);
-}
-
-[data-theme="dark"] .session-bar-dropdown {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .skill-popup {
@@ -1868,14 +1611,6 @@
 
 .artifact-download-btn:hover {
   background: var(--color-action-hover);
-}
-
-/* --- Skill Card Output Hint --- */
-
-.skill-card-output-hint {
-  font-size: var(--font-size-xs);
-  color: var(--color-action);
-  font-weight: var(--font-weight-medium);
 }
 
 /* --- Dark mode skill output --- */

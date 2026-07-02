@@ -10,15 +10,11 @@ import type {
   AgentState,
   AgentEvent,
   ConversationMessage,
-  TextMessage,
-  ContentBlock,
-  ToolCallState,
   PermissionRequestIPC,
   AskUserRequestIPC,
   SkillOutputState,
   AssistantPayload,
   UserPayload,
-  ResultErrorPayload,
   StreamEventPayloadIPC,
 } from '../../shared/types'
 import { AGENT_TRANSITIONS as TRANSITIONS } from '../../shared/types'
@@ -242,14 +238,7 @@ export { ensureAccumulator, commitAccumulator, extractSkillOutputContent } from 
 
 // ─── Store ─────────────────────────────────────────────────────────────
 
-type StoreApi = {
-  set: (partial: Partial<AgentStore> | ((state: AgentStore) => Partial<AgentStore>)) => void
-  get: () => AgentStore
-}
-
 export const useAgentStore = create<AgentStore>((set, get) => {
-  const store: StoreApi = { set, get }
-
   function dispatchEffectEvents(eventSid: string | null, events: AgentEvent[], ctx: AgentContext) {
     for (const event of events) {
       get().dispatchAgentEvent(event, ctx, eventSid)
@@ -575,7 +564,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // permission or AskUser request belongs to a specific session and may
     // be resident in either location depending on timing.
 
-    handlePermissionResponse(requestId: string, behavior: 'allow' | 'deny') {
+    handlePermissionResponse(requestId: string, _behavior: 'allow' | 'deny') {
       set((state) => {
         // 1) Search active slots
         for (const ctx of ['editor', 'ask'] as AgentContext[]) {

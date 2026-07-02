@@ -1,4 +1,4 @@
-import { Notification, BrowserWindow, app } from 'electron'
+import { Notification, app } from 'electron'
 import { getMainWindow } from './ipc-sender'
 
 const PERMISSION_NOTIFY_THRESHOLD_MS = 30_000
@@ -28,7 +28,7 @@ function showNotification(title: string, body: string, onClick?: () => void, gro
   notification.show()
 }
 
-export function notifyAgentComplete(sessionId: string): void {
+export function notifyAgentComplete(_sessionId: string): void {
   showNotification('Agent 任务完成', '点击返回查看结果', undefined, 'app.sumi.agent')
 }
 

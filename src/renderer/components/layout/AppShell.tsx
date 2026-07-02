@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
-import { useUiStore, type PrimaryView } from '../../store/ui-slice'
+import { useUiStore } from '../../store/ui-slice'
 import { FileText, Download, ArrowLeftRight, ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
@@ -12,7 +12,7 @@ import { ErrorBoundary } from '../common/ErrorBoundary'
 import DaydreamOverlay from './DaydreamOverlay'
 import OverviewPanel from './OverviewPanel'
 import './OverviewPanel.css'
-import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useUsageInfo, useSessionList, useAgentStatus, useLastEditedFile, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useSessionList, useAgentStatus, useActiveSkillId } from '../../hooks/useAgent'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -20,7 +20,7 @@ import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
-import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
+import { isFileTab, OVERVIEW_TAB_ID } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
 import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
@@ -61,7 +61,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const {
     openTabs, activeTab, activeContent, activeFilePath,
     openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
-    saveFile, retryPendingSave, refreshActiveContent, hasFileTab,
+    saveFile, retryPendingSave, refreshActiveContent,
     activeSaveError, activeHasPendingSave,
   } = useTabs()
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
@@ -378,14 +378,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const {
     sendMessage: editorSendMessage,
-    newSession,
     loadSessions,
-    resumeSession,
     respondPermission,
     respondAskUser: editorRespondAskUser,
   } = useAgent('editor')
 
-  const handleDeleteSession = useCallback(async (sessionId: string, workspacePath: string) => {
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
     const ok = await modal.confirm({
       title: '删除会话',
       message: '确定删除此会话？会话中的对话记录和会话文件将被永久删除，此操作不可撤销。',
@@ -444,20 +442,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const editorAskUser = useAskUserRequest('editor')
   const editorAskUserRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
-  const usageInfo = useUsageInfo('editor')
   const sessionList = useSessionList()
   const editorSessionList = sessionList.filter((s) => s.context !== 'ask')
-  const handleAgentPanelSessionSelect = useCallback((sessionId: string) => {
-    const target = editorSessionList.find((session) => session.id === sessionId)
-    if (target?.workspacePath || target?.cwd) {
-      handleSessionSelect(sessionId, target.workspacePath || target.cwd || activeWorkspacePath || '')
-      return
-    }
-    resumeSession(sessionId)
-    setLinkedFile(useAgentStore.getState().slots.editor.linkedFile || null)
-  }, [activeWorkspacePath, editorSessionList, handleSessionSelect, resumeSession, setLinkedFile])
   const agentStatus = useAgentStatus('editor')
-  const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
 
   // ── Agent hooks (ask context) ───────────────────────────────────────
@@ -763,7 +750,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         width={agentWidth}
         edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
         workspacePath={editorWorkspacePath || undefined}
-        usageInfo={usageInfo}
         permissionRequest={editorPermission}
         permissionQueueLength={editorPermissionQueueLen}
         onPermissionRespond={respondPermission}
@@ -772,9 +758,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onAskUserDrawerRespond={(respond) => { editorAskUserRespondRef.current = respond }}
         sessionList={editorSessionList}
         currentSessionId={currentSessionId}
-        onSelectSession={handleAgentPanelSessionSelect}
-        onNewSession={newSession}
-        onRefreshSessions={loadSessions}
         activeSkillId={activeSkillId}
         chatInput={<ChatInput context="editor" onSend={(msg) => {
           if (editorAskUser && editorAskUserRespondRef.current) {

@@ -12,7 +12,6 @@ import type {
   StreamingAccumulator,
   SkillOutputState,
   TodoTaskList,
-  WorkspaceRecord,
   SessionOutputs,
 } from '../../shared/types'
 import type { SessionListAction } from './session-protocol'

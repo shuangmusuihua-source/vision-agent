@@ -1,10 +1,9 @@
 import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk'
 import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './ipc-sender'
 import { getAuthorizedDirectories, getCronTasks, saveCronTasks, type CronTask } from './store'
-import { buildAgentOptions, resolveClaudeCodeExecutable } from './agent-options'
+import { buildAgentOptions } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
 import { extractToolPathInput, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
 

@@ -13,7 +13,6 @@ import type {
   SessionRoutedPermissionRequest,
   SessionRoutedRequestTimeout,
   SessionRoutedSkillOutputState,
-  UsageInfo,
   GraphData,
   BuiltinSkillCatalogItem,
   CommunitySkillCatalogItem,

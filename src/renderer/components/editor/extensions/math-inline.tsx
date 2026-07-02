@@ -1,5 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import { NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer } from '@tiptap/react'
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import katex from 'katex'
 import React from 'react'
 
@@ -34,7 +34,7 @@ export const MathInline = Node.create({
     return [{ tag: 'span[data-type="math-inline"]' }]
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML() {
     return [
       'span',
       mergeAttributes({ 'data-type': 'math-inline', class: 'math-inline' }),

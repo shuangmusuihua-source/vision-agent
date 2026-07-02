@@ -61,7 +61,7 @@ function OverviewPanel({ sessionId, activeFilePath, onOpenFile, onAddToKnowledge
     )
   }
 
-  const getFileMeta = (fileName: string, variant: 'md' | 'skill'): {
+  const getFileMeta = (fileName: string): {
     badge: string
     icon: OverviewFileIcon
     kind: 'slides' | 'md' | 'file'
@@ -80,7 +80,7 @@ function OverviewPanel({ sessionId, activeFilePath, onOpenFile, onAddToKnowledge
   const renderFileList = (files: SessionOutputEntry[], variant: 'md' | 'skill' = 'md') => (
     <div className={`overview-file-list overview-file-list--${variant}`}>
       {files.map((f) => {
-        const meta = getFileMeta(f.fileName, variant)
+        const meta = getFileMeta(f.fileName)
         const FileIcon = meta.icon
         const isActive = activeFilePath === f.filePath
         const isMissing = f.availability === 'missing'

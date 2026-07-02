@@ -52,7 +52,7 @@ function MermaidOverlay({ svg, onClose }: { svg: string; onClose: () => void }):
   )
 }
 
-function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement {
+function CodeBlockView({ node }: ReactNodeViewProps): React.ReactElement {
   const [copied, setCopied] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [mermaidError, setMermaidError] = useState<string | null>(null)
@@ -65,7 +65,6 @@ function CodeBlockView({ node, editor }: ReactNodeViewProps): React.ReactElement
   const [themeKey, setThemeKey] = useState(0)
 
   const nodeText = node.textContent || ''
-  const mermaidCodeRef = useRef(nodeText)
   const [mermaidCode, setMermaidCode] = useState(nodeText)
 
   // Update mermaid code when node content changes (debounced)

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, X } from 'lucide-react'
-import type { UsageInfo, PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
+import { X } from 'lucide-react'
+import type { PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AgentContext } from '../../../shared/types'
-import type { SkillMeta } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
@@ -14,7 +13,6 @@ interface AgentPanelProps {
   width: number
   edgeClass: string
   workspacePath?: string
-  usageInfo: UsageInfo | null
   permissionRequest: PermissionRequest | null
   permissionQueueLength: number
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void
@@ -23,9 +21,6 @@ interface AgentPanelProps {
   onAskUserDrawerRespond?: (respond: (answers: Record<string, string>) => void) => void
   sessionList: SdkSessionInfo[]
   currentSessionId: string | null
-  onSelectSession: (sessionId: string) => void
-  onNewSession: () => void
-  onRefreshSessions: () => void
   activeSkillId: string | null
   children: React.ReactNode
   chatInput: React.ReactNode
@@ -33,7 +28,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, usageInfo, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, onSelectSession, onNewSession, onRefreshSessions, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
