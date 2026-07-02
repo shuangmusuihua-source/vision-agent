@@ -1,5 +1,10 @@
 .main-content-skills {
   overflow: hidden;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.main-content-skills.main-content-cover-sidebar {
+  border-radius: var(--radius-lg);
 }
 
 .skill-library {
