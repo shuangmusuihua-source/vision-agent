@@ -2,7 +2,7 @@ import { Extension, type Editor, type JSONContent } from '@tiptap/core'
 import { DOMSerializer, Fragment } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { replacementContentForDocument } from '../inline-rewrite-selection'
+import { replacementPlanForDocument } from '../inline-rewrite-selection'
 
 export type AiInlineReviewState = {
   phase: 'pending' | 'review'
@@ -15,19 +15,18 @@ export type AiInlineReviewState = {
 export const aiInlineReviewPluginKey = new PluginKey<AiInlineReviewState | null>('aiInlineReview')
 
 function buildSuggestionWidget(state: AiInlineReviewState, editorState: EditorState): HTMLElement {
-  const wrapper = document.createElement('span')
+  const plan = state.replacementDoc
+    ? replacementPlanForDocument(editorState.doc, state.replacementDoc, state.from, state.to)
+    : null
+  const previewParent = editorState.doc.resolve(plan?.previewAt ?? state.to).parent
+  const wrapper = document.createElement(previewParent.isTextblock ? 'span' : 'div')
   wrapper.className = 'ai-inline-review-suggestion'
   wrapper.contentEditable = 'false'
   wrapper.setAttribute('aria-label', 'AI 修改建议')
 
   try {
     if (!state.replacementDoc) throw new Error('Missing replacement document')
-    const previewContent = replacementContentForDocument(
-      editorState.doc,
-      state.replacementDoc,
-      state.from,
-      state.to,
-    )
+    const previewContent = plan?.previewContent || []
     const previewNodes = (Array.isArray(previewContent) ? previewContent : [previewContent])
       .map((node) => editorState.schema.nodeFromJSON(node))
     const rendered = DOMSerializer.fromSchema(editorState.schema)
@@ -78,10 +77,18 @@ export const AiInlineReview = Extension.create({
             ]
 
             if (review.phase === 'review') {
+              const previewAt = review.replacementDoc
+                ? replacementPlanForDocument(
+                    editorState.doc,
+                    review.replacementDoc,
+                    review.from,
+                    review.to,
+                  ).previewAt
+                : review.to
               decorations.push(Decoration.widget(
-                review.to,
+                previewAt,
                 () => buildSuggestionWidget(review, editorState),
-                { side: 1, key: `ai-inline-review-${review.from}-${review.to}` },
+                { side: 1, key: `ai-inline-review-${review.from}-${review.to}-${previewAt}` },
               ))
             }
             return DecorationSet.create(editorState.doc, decorations)

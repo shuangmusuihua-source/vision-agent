@@ -31,7 +31,7 @@ import { AiInlineReview, setAiInlineReview } from './extensions/ai-inline-review
 import {
   captureInlineRewriteSelection,
   parseInlineRewriteMarkdown,
-  replacementContentForSelection,
+  replacementPlanForSelection,
   type InlineRewriteSelectionSnapshot,
 } from './inline-rewrite-selection'
 
@@ -467,7 +467,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     if (!snapshot || !replacement) return
 
     const replacementDoc = replacement.doc
-    const content = replacementContentForSelection(
+    const replacementPlan = replacementPlanForSelection(
       editor,
       replacementDoc,
       snapshot.from,
@@ -481,8 +481,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       chain.deleteRange({ from: snapshot.from, to: snapshot.to }).run()
     } else {
       chain.insertContentAt(
-        { from: snapshot.from, to: snapshot.to },
-        content,
+        { from: replacementPlan.from, to: replacementPlan.to },
+        replacementPlan.content,
         { updateSelection: true },
       ).run()
     }

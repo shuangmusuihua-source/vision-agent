@@ -9,11 +9,50 @@ export type InlineRewriteSelectionSnapshot = {
   afterContext: string
 }
 
+export type InlineRewriteReplacementPlan = {
+  from: number
+  to: number
+  content: JSONContent | JSONContent[]
+  previewAt: number
+  previewContent: JSONContent | JSONContent[]
+}
+
 const CONTEXT_CHARACTER_LIMIT = 1_200
 
+function ancestorDepth(position: ReturnType<ProseMirrorNode['resolve']>, nodeType: string): number | null {
+  for (let depth = position.depth; depth > 0; depth -= 1) {
+    if (position.node(depth).type.name === nodeType) return depth
+  }
+  return null
+}
+
+function normalizeListSelection(document: ProseMirrorNode, from: number, to: number): { from: number; to: number } {
+  const resolvedFrom = document.resolve(from)
+  const resolvedTo = document.resolve(to)
+  const fromItemDepth = ancestorDepth(resolvedFrom, 'listItem')
+  const toItemDepth = ancestorDepth(resolvedTo, 'listItem')
+  if (fromItemDepth === null || toItemDepth === null) return { from, to }
+
+  const fromListDepth = fromItemDepth - 1
+  const toListDepth = toItemDepth - 1
+  const sharesList = fromListDepth === toListDepth
+    && resolvedFrom.node(fromListDepth) === resolvedTo.node(toListDepth)
+  if (!sharesList) return { from, to }
+
+  const staysInsideOneTextblock = resolvedFrom.sameParent(resolvedTo) && resolvedFrom.parent.isTextblock
+  if (staysInsideOneTextblock) return { from, to }
+
+  return {
+    from: resolvedFrom.before(fromItemDepth),
+    to: resolvedTo.after(toItemDepth),
+  }
+}
+
 export function captureInlineRewriteSelection(editor: Editor): InlineRewriteSelectionSnapshot | null {
-  const { from, to, empty } = editor.state.selection
-  if (empty || from >= to) return null
+  const { from: selectedFrom, to: selectedTo, empty } = editor.state.selection
+  if (empty || selectedFrom >= selectedTo) return null
+
+  const { from, to } = normalizeListSelection(editor.state.doc, selectedFrom, selectedTo)
 
   const plainText = editor.state.doc.textBetween(from, to, '\n', '\n')
   if (!plainText.trim()) return null
@@ -48,7 +87,16 @@ export function replacementContentForSelection(
   from: number,
   to: number,
 ): JSONContent | JSONContent[] {
-  return replacementContentForDocument(editor.state.doc, replacementDoc, from, to)
+  return replacementPlanForDocument(editor.state.doc, replacementDoc, from, to).content
+}
+
+export function replacementPlanForSelection(
+  editor: Editor,
+  replacementDoc: JSONContent,
+  from: number,
+  to: number,
+): InlineRewriteReplacementPlan {
+  return replacementPlanForDocument(editor.state.doc, replacementDoc, from, to)
 }
 
 export function replacementContentForDocument(
@@ -57,26 +105,67 @@ export function replacementContentForDocument(
   from: number,
   to: number,
 ): JSONContent | JSONContent[] {
+  return replacementPlanForDocument(document, replacementDoc, from, to).content
+}
+
+export function replacementPlanForDocument(
+  document: ProseMirrorNode,
+  replacementDoc: JSONContent,
+  from: number,
+  to: number,
+): InlineRewriteReplacementPlan {
   const content = replacementDoc.content || []
   const resolvedFrom = document.resolve(from)
   const resolvedTo = document.resolve(to)
   const isInlineSelection = resolvedFrom.sameParent(resolvedTo) && resolvedFrom.parent.isTextblock
 
-  if (!isInlineSelection || content.length !== 1) return content
+  const defaultPlan: InlineRewriteReplacementPlan = {
+    from,
+    to,
+    content,
+    previewAt: to,
+    previewContent: content,
+  }
+
+  if (content.length !== 1) return defaultPlan
+
+  const candidate = content[0]
+  const replacesContentsOfExistingContainer = resolvedFrom.sameParent(resolvedTo)
+    && !resolvedFrom.parent.isTextblock
+    && resolvedFrom.depth > 0
+    && candidate.type === resolvedFrom.parent.type.name
+
+  if (replacesContentsOfExistingContainer) {
+    return {
+      from,
+      to,
+      content: candidate.content || [],
+      previewAt: resolvedTo.after(resolvedTo.depth),
+      previewContent: [candidate],
+    }
+  }
+
+  if (!isInlineSelection) return defaultPlan
 
   // A text selection inside a container (for example blockquote > paragraph)
   // serializes with that complete container chain. If the model preserves the
   // Markdown structure, inserting the chain again would create nested quotes or
   // lists. Peel only the chain that already exists around the selected text.
-  let candidate = content[0]
-  if (candidate.type === resolvedFrom.parent.type.name) return candidate.content || []
-
-  for (let depth = 1; depth <= resolvedFrom.depth; depth += 1) {
-    if (candidate.type !== resolvedFrom.node(depth).type.name) return content
-    if (depth === resolvedFrom.depth) return candidate.content || []
-    if (candidate.content?.length !== 1) return content
-    candidate = candidate.content[0]
+  let nestedCandidate = candidate
+  if (nestedCandidate.type === resolvedFrom.parent.type.name) {
+    const inlineContent = nestedCandidate.content || []
+    return { ...defaultPlan, content: inlineContent, previewContent: inlineContent }
   }
 
-  return content
+  for (let depth = 1; depth <= resolvedFrom.depth; depth += 1) {
+    if (nestedCandidate.type !== resolvedFrom.node(depth).type.name) return defaultPlan
+    if (depth === resolvedFrom.depth) {
+      const inlineContent = nestedCandidate.content || []
+      return { ...defaultPlan, content: inlineContent, previewContent: inlineContent }
+    }
+    if (nestedCandidate.content?.length !== 1) return defaultPlan
+    nestedCandidate = nestedCandidate.content[0]
+  }
+
+  return defaultPlan
 }
