@@ -39,6 +39,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, Skill output routing
 - `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
+- `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
 - `session-store.ts` — SDK transcript listing, paging, rename, delete, and compaction filtering
 - `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata
 - `file-index-service.ts` — workspace search and knowledge graph index
@@ -49,7 +50,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 
 ### IPC
 
-`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. Preload exposes typed methods grouped under `workspace`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, `notification`, and `update`.
+`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. Preload exposes typed methods grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, `notification`, and `update`.
 
 New session-affecting push events must carry an `AgentSessionEnvelope`; never infer ownership from the currently visible workspace or panel.
 
@@ -61,7 +62,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state
 - `store/ui-slice.ts` — application UI state
 - `hooks/useAgent.ts` — singleton agent IPC subscriptions and actions
-- `components/editor/MarkdownEditor.tsx` — Tiptap Markdown editor
+- `components/editor/MarkdownEditor.tsx` — Tiptap Markdown editor, including selection-scoped AI rewrite review
 - `components/chat/AssistantMarkdown.tsx` — Streamdown chat rendering with Shiki, KaTeX, GFM, and Mermaid
 - `components/graph/GraphView.tsx` — `react-force-graph-2d` visualization
 
@@ -83,10 +84,12 @@ Do not introduce a second store for the same authority without documenting the o
 ## Editor and UI conventions
 
 - Use CSS custom properties from `src/renderer/styles/global.css`; do not hardcode component colors.
+- Global element resets must not change button foreground colors in interaction states. Button variants own their hover, active, and focus colors through the `--button-*` tokens so `currentColor` icons retain contrast.
 - Theme switching uses `data-theme` on `<html>`.
 - Use Lucide React icons.
 - Tiptap Markdown must use `contentType: 'markdown'`, `editor.getMarkdown()`, and the named `Markdown` export from `@tiptap/markdown`.
 - Preserve source-mode save ordering through `SourceSaveController`.
+- AI inline rewrites are ephemeral until accepted; preview decorations must never enter Markdown autosave.
 - Global asynchronous errors should remain recoverable and use the dismissible application error banner.
 
 ## File and change discipline

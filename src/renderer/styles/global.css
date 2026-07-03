@@ -66,6 +66,7 @@
   --color-surface: var(--color-bg-primary);
   --color-accent:  #2383e2;
   --color-mark:    rgba(37, 99, 235, 0.15);
+  --color-selection-bg: rgba(14, 21, 58, 0.24);
 
   /* ── Layer 3: Component Tokens ─────────────────────────────── */
 
@@ -229,6 +230,7 @@
   --color-action-text:  #ffffff;
   --color-action-bg:    rgba(123, 143, 212, 0.15);
   --color-action-hover: #99a8e0;
+  --color-selection-bg: rgba(123, 143, 212, 0.38);
 
   --color-border:      #333333;
   --color-border-soft: #2a2a2a;
@@ -299,12 +301,12 @@ button {
   text-box: trim-both cap alphabetic;
 }
 
+/* Interaction colors belong to component variants. A global :hover color
+   overrides class-level foregrounds (including currentColor icons) because
+   `button:hover` is more specific than a single component class. */
+
 .btn-modal, .btn {
   text-box: trim-both cap alphabetic;
-}
-
-button:hover {
-  color: inherit;
 }
 
 input, textarea, select {
@@ -319,12 +321,12 @@ input, textarea, select {
 }
 
 ::selection {
-  background: rgba(14, 21, 58, 0.18);
+  background: var(--color-selection-bg);
   color: inherit;
 }
 
 [data-theme="dark"] ::selection {
-  background: rgba(123, 143, 212, 0.3);
+  background: var(--color-selection-bg);
 }
 
 ::-webkit-scrollbar {

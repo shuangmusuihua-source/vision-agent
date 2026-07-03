@@ -18,6 +18,8 @@ import type {
   BuiltinSkillCatalogItem,
   CommunitySkillCatalogItem,
   CommunitySkillMutationResult,
+  InlineRewriteRequest,
+  InlineRewriteResponse,
 } from '../../shared/types'
 import type {
   MarkitdownFormat,
@@ -111,6 +113,12 @@ interface WorkspaceApi {
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
   previewArtifact: (options: { fileName: string; content: string }) => Promise<{ success: boolean; filePath?: string }>
+}
+
+interface EditorApi {
+  prepareRewrite: (request: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>) => Promise<{ prepared: boolean }>
+  rewriteSelection: (request: InlineRewriteRequest) => Promise<InlineRewriteResponse>
+  cancelRewrite: (requestId: string) => Promise<{ cancelled: boolean }>
 }
 
 interface SettingsApi {
@@ -217,6 +225,7 @@ interface WindowApi {
   ping: () => Promise<string>
   getVersion: () => Promise<string>
   workspace: WorkspaceApi
+  editor: EditorApi
   settings: SettingsApi
   agent: AgentApi
   memory: MemoryApi
@@ -247,6 +256,7 @@ declare global {
 export type {
   WindowApi,
   WorkspaceApi,
+  EditorApi,
   SettingsApi,
   AgentApi,
   MemoryApi,

@@ -5,7 +5,7 @@
 ## 当前能力
 
 - 多工作区与独立会话
-- Tiptap Markdown 编辑器、源码模式、自动保存、表格、任务列表、Mermaid 和 KaTeX
+- Tiptap Markdown 编辑器、选区 AI 改写审阅、源码模式、自动保存、表格、任务列表、Mermaid 和 KaTeX
 - Claude Agent SDK 流式对话、工具审批、AskUser、会话恢复和分页历史
 - 每个会话独立的生成文件目录与产物预览
 - 全局搜索、知识库与双向链接图谱

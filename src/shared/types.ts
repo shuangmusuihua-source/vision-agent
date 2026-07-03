@@ -305,6 +305,22 @@ export type AgentNotificationEvent =
 
 export type AgentIPCMessageWithContext = SessionRoutedAgentIPCMessage
 
+// ─── Editor Inline Rewrite ──────────────────────────────────────────
+
+export type InlineRewriteRequest = {
+  requestId: string
+  filePath: string
+  instruction: string
+  selectedMarkdown: string
+  beforeContext: string
+  afterContext: string
+}
+
+export type InlineRewriteResponse = {
+  requestId: string
+  replacementMarkdown: string
+}
+
 // ─── Usage Info ──────────────────────────────────────────────────────
 
 export type UsageInfo = {

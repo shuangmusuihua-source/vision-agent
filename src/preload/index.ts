@@ -8,6 +8,7 @@ import type {
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   SessionRoutedSkillOutputState,
+  InlineRewriteRequest,
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
@@ -68,6 +69,13 @@ const api = {
       invoke('workspace:deleteWorkspace', dirPath),
     knowledgeDir: () => invoke('workspace:knowledgeDir'),
     selectFiles: () => invoke('workspace:selectFiles'),
+  },
+
+  editor: {
+    prepareRewrite: (request: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>) =>
+      invoke('editor:prepareRewrite', request),
+    rewriteSelection: (request: InlineRewriteRequest) => invoke('editor:rewriteSelection', request),
+    cancelRewrite: (requestId: string) => invoke('editor:cancelRewrite', { requestId }),
   },
 
   settings: {
