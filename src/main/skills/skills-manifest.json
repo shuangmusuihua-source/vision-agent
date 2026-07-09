@@ -11,27 +11,12 @@
     }
   },
   {
-    "id": "guizang-ppt-skill",
-    "hasResources": true,
-    "requiredPaths": ["SKILL.md", "assets/template.html", "scripts/validate-swiss-deck.mjs"]
-  },
-  {
     "id": "frontend-slides",
     "hasResources": true,
     "requiredPaths": ["SKILL.md", "LICENSE", "scripts/extract-pptx.py", "scripts/export-pdf.sh"],
     "source": {
       "repositoryUrl": "https://github.com/zarazhangrui/frontend-slides",
       "ref": "9906a34d640d2111f724544cbc50f7f130569ae1",
-      "license": "MIT"
-    }
-  },
-  {
-    "id": "huashu-design",
-    "hasResources": true,
-    "requiredPaths": ["SKILL.md", "LICENSE", "assets/animations.jsx", "assets/deck_index.html", "references/slide-decks.md", "scripts/gen_deck_thumbs.mjs", "scripts/verify.py"],
-    "source": {
-      "repositoryUrl": "https://github.com/alchaincyf/huashu-design",
-      "ref": "ec9ec0fff8a66a932c4049b200ea4c2b09f8d25b",
       "license": "MIT"
     }
   },

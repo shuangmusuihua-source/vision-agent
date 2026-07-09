@@ -12,6 +12,15 @@ describe('Skill preferences', () => {
       .toEqual(['slides'])
   })
 
+  it('drops stored Skill ids that are no longer available', () => {
+    expect(resolveEnabledSkillIds(
+      ['slides', 'legacy-builtin', 'installed-community', 'missing-community'],
+      ['slides'],
+      [],
+      ['slides', 'installed-community'],
+    )).toEqual(['slides', 'installed-community'])
+  })
+
   it('removes the disabled marker when a Skill is enabled again', () => {
     expect(updateSkillPreference(['slides'], ['documents'], 'documents', true)).toEqual({
       enabledSkillIds: ['slides', 'documents'],

@@ -31,9 +31,7 @@ type PendingAction = 'install' | 'update' | 'uninstall' | null
 
 const builtinSkillIcons = {
   kami: FileText,
-  'guizang-ppt-skill': Presentation,
   'frontend-slides': Presentation,
-  'huashu-design': WandSparkles,
   'system-cleanup': Trash2,
   'organize-desktop': Monitor,
   'organize-folder': FolderOpen,
@@ -48,6 +46,7 @@ const communitySkillIcons: Record<string, typeof Blocks> = {
   Presentation,
   FileText,
   FileSpreadsheet,
+  WandSparkles,
 }
 
 const auditStatusLabels = {

@@ -3,6 +3,7 @@ import { safeStorage } from 'electron'
 import path from 'path'
 import { app } from 'electron'
 import type { ModelProfile, WorkspaceRecord, SessionRecord } from '../../shared/types'
+import type { CronTask } from '../../shared/cron-types'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 import { KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
 import { getAppUserDataDir } from '../app-identity'
@@ -35,16 +36,7 @@ export function maskApiKey(key: string): string {
   return key.slice(0, 4) + '***' + key.slice(-4)
 }
 
-export interface CronTask {
-  id: string
-  name: string
-  cronExpression: string
-  prompt: string
-  createdAt: number
-  lastRunAt: number | null
-  lastResult: string | null
-  status: 'active' | 'paused'
-}
+export type { CronTask }
 
 export interface AppSettings {
   profiles: ModelProfile[]

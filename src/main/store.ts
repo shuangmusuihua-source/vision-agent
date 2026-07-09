@@ -10,6 +10,7 @@
 // importing from the specific persistence/ adapter they need.
 
 export type { AppSettings, CronTask } from './persistence/store-core'
+export type { CronTaskRegistration, CronTaskTarget, CronTaskRun } from '../shared/cron-types'
 export { getKnowledgeBaseDir } from './persistence/store-core'
 
 export {

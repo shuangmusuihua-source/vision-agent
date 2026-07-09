@@ -57,6 +57,13 @@ function encodeRepositoryPath(value: string): string {
   return segments.map(encodeURIComponent).join('/')
 }
 
+function normalizeRepositoryDirectoryPath(value: string): string {
+  if (value === '' || value === '.') return ''
+  const segments = value.split('/')
+  for (const segment of segments) assertSafeSegment(segment, 'repository path')
+  return segments.join('/')
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await lstat(path)
@@ -121,6 +128,10 @@ async function downloadDirectory(
 ): Promise<void> {
   const fetcher = options.fetcher || fetch
   const { owner, repository, path: sourcePath, ref } = options.skill.source
+  const normalizedSourcePath = normalizeRepositoryDirectoryPath(sourcePath)
+  const maxFileCount = options.skill.installLimits?.maxFileCount ?? MAX_FILE_COUNT
+  const maxFileSize = options.skill.installLimits?.maxFileSize ?? MAX_FILE_SIZE
+  const maxTotalSize = options.skill.installLimits?.maxTotalSize ?? MAX_TOTAL_SIZE
   let fileCount = 0
   let totalSize = 0
 
@@ -148,15 +159,15 @@ async function downloadDirectory(
   ))) {
     throw new Error('Skill 下载源数据无效')
   }
-  const sourcePrefix = `${sourcePath}/`
-  if (!entries.some(entry => entry.path === sourcePath && entry.type === 'tree')) {
+  const sourcePrefix = normalizedSourcePath ? `${normalizedSourcePath}/` : ''
+  if (normalizedSourcePath && !entries.some(entry => entry.path === normalizedSourcePath && entry.type === 'tree')) {
     throw new Error('Skill 下载源不是目录')
   }
 
   for (const entry of entries) {
-    if (!entry.path.startsWith(sourcePrefix)) continue
+    if (normalizedSourcePath && !entry.path.startsWith(sourcePrefix)) continue
 
-    const relativePath = entry.path.slice(sourcePrefix.length)
+    const relativePath = normalizedSourcePath ? entry.path.slice(sourcePrefix.length) : entry.path
     const relativeSegments = relativePath.split('/')
     for (const segment of relativeSegments) assertSafeSegment(segment, 'Skill file name')
 
@@ -166,14 +177,14 @@ async function downloadDirectory(
     }
 
     fileCount += 1
-    if (fileCount > MAX_FILE_COUNT) throw new Error('Skill 文件数量超过安全限制')
-    if ((entry.size || 0) > MAX_FILE_SIZE) throw new Error(`Skill 文件过大: ${relativePath}`)
+    if (fileCount > maxFileCount) throw new Error('Skill 文件数量超过安全限制')
+    if ((entry.size || 0) > maxFileSize) throw new Error(`Skill 文件过大: ${relativePath}`)
 
     const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/${encodeURIComponent(ref)}/${encodeRepositoryPath(entry.path)}`
     const content = await downloadFile(fetcher, rawUrl)
-    if (content.byteLength > MAX_FILE_SIZE) throw new Error(`Skill 文件过大: ${relativePath}`)
+    if (content.byteLength > maxFileSize) throw new Error(`Skill 文件过大: ${relativePath}`)
     totalSize += content.byteLength
-    if (totalSize > MAX_TOTAL_SIZE) throw new Error('Skill 总大小超过安全限制')
+    if (totalSize > maxTotalSize) throw new Error('Skill 总大小超过安全限制')
 
     const destination = join(stagingDir, ...relativeSegments)
     await mkdir(dirname(destination), { recursive: true })

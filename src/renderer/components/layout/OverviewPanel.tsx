@@ -95,11 +95,8 @@ function OverviewPanel({
   if (!sessionOutputs || sessionOutputs.sessionId !== sessionId || sessionOutputs.files.length === 0) {
     return (
       <div className="overview-panel">
-        <div className="overview-hero">
-          <div>
-            <h2 className="overview-title">会话概览</h2>
-            <p className="overview-subtitle">本次协作形成的文档与交付产物，会集中归档在这里。</p>
-          </div>
+        <div className="overview-hero overview-hero--compact">
+          <p className="overview-subtitle overview-subtitle--solo">本次协作形成的文档与交付产物，会集中归档在这里。</p>
         </div>
         <div className="overview-empty overview-empty--framed">
           <div className="overview-empty-icon"><FileText size={36} /></div>
@@ -261,11 +258,8 @@ function OverviewPanel({
 
   return (
     <div className="overview-panel">
-      <header className="overview-hero">
-        <div>
-          <h2 className="overview-title">会话概览</h2>
-          <p className="overview-subtitle">从工作文档到最终交付，所有成果都在同一处持续维护。</p>
-        </div>
+      <header className="overview-hero overview-hero--compact">
+        <p className="overview-subtitle overview-subtitle--solo">从工作文档到最终交付，所有成果都在同一处持续维护。</p>
         <div className="overview-summary" aria-label="会话文件统计">
           <span><strong>{documents.length}</strong> 文档</span>
           <span><strong>{skillOutputs.length}</strong> 产物</span>

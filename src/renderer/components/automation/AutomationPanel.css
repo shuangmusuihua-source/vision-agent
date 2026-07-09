@@ -1,0 +1,818 @@
+.automation-panel {
+  --automation-card-radius: 17px;
+  box-sizing: border-box;
+  width: min(100%, 1040px);
+  height: 100%;
+  margin: 0 auto;
+  padding: clamp(18px, 2.2vw, 26px) clamp(24px, 3.4vw, 48px) 56px;
+  overflow-y: auto;
+  color: var(--color-text-primary);
+}
+
+.automation-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xl);
+  padding: 2px 0 12px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.automation-hero h1 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: clamp(22px, 1.9vw, 25px);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.02em;
+}
+
+.automation-hero p {
+  margin: 3px 0 0;
+  max-width: 560px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.automation-hero-stats {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 76%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-secondary) 62%, transparent);
+}
+
+.automation-hero-stats span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.automation-hero-stats span + span {
+  border-left: 1px solid var(--color-border);
+}
+
+.automation-hero-stats strong {
+  margin-right: 3px;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.automation-builder,
+.automation-list-section {
+  margin-bottom: 30px;
+}
+
+.automation-builder {
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--automation-card-radius);
+  background:
+    radial-gradient(circle at 18px 16px, color-mix(in srgb, var(--color-action) 6%, transparent), transparent 88px),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-elevated) 98%, var(--color-text-primary) 2%), var(--color-bg-elevated));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 5%, transparent),
+    0 14px 34px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+
+.automation-create-top {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.automation-section-title {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.automation-section-title > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--color-text-primary);
+}
+
+.automation-section-title h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+}
+
+.automation-section-title p {
+  margin: 3px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.automation-section-title-inline {
+  align-items: center;
+}
+
+.automation-section-title-inline .automation-refresh-button {
+  margin-left: auto;
+}
+
+.automation-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.automation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.automation-field-wide,
+.automation-prompt-field {
+  grid-column: 1 / -1;
+}
+
+.automation-field span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.automation-field input,
+.automation-field select,
+.automation-field textarea,
+.automation-directory-button {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background-color: color-mix(in srgb, var(--color-bg-primary) 86%, transparent);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-md);
+  outline: none;
+  transition:
+    border-color var(--duration-fast) var(--ease-default),
+    box-shadow var(--duration-fast) var(--ease-default),
+    background var(--duration-fast) var(--ease-default);
+}
+
+.automation-field input,
+.automation-field select {
+  padding: 0 12px;
+}
+
+.automation-field select {
+  appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%23787471' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+.automation-field textarea {
+  min-height: 78px;
+  padding: 10px 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.automation-field input:focus,
+.automation-field select:focus,
+.automation-field textarea:focus,
+.automation-directory-button:focus-visible {
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-action) 12%, transparent);
+  background-color: var(--color-bg-primary);
+}
+
+.automation-directory-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 12px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-schedule-input-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.automation-schedule-input-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.automation-resolve-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--color-action) 26%, var(--color-border));
+  border-radius: 12px;
+  background: var(--color-action-bg);
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
+}
+
+.automation-resolve-button:hover:not(:disabled) {
+  border-color: var(--color-action);
+  background: color-mix(in srgb, var(--color-action) 12%, var(--color-bg-elevated));
+}
+
+.automation-resolve-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.automation-schedule-hint,
+.automation-schedule-result,
+.automation-schedule-error {
+  display: block;
+  min-height: 17px;
+  font-size: var(--font-size-xs);
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.automation-schedule-hint {
+  color: var(--color-text-tertiary);
+}
+
+.automation-schedule-result {
+  color: var(--color-action);
+}
+
+.automation-schedule-error {
+  color: var(--color-danger);
+}
+
+.automation-prompt-field {
+  margin-top: 10px;
+}
+
+.automation-builder-footer {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.automation-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  min-width: 0;
+}
+
+.automation-toggle,
+.automation-schedule-preview,
+.automation-create-button,
+.automation-refresh-button,
+.automation-task-actions button,
+.automation-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.automation-toggle,
+.automation-create-button,
+.automation-refresh-button,
+.automation-task-actions button,
+.automation-back-button {
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default),
+    transform var(--duration-fast) var(--ease-default);
+}
+
+.automation-toggle,
+.automation-schedule-preview {
+  height: 32px;
+  padding: 0 10px;
+}
+
+.automation-toggle-active {
+  border-color: color-mix(in srgb, var(--color-action) 24%, var(--color-border));
+  background: var(--color-action-bg);
+  color: var(--color-action);
+}
+
+.automation-create-button {
+  height: 34px;
+  padding: 0 12px;
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-action-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.automation-create-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.automation-toggle:hover,
+.automation-refresh-button:hover,
+.automation-task-actions button:hover,
+.automation-back-button:hover {
+  border-color: color-mix(in srgb, var(--color-action) 18%, transparent);
+  background: var(--color-action-bg);
+  color: var(--color-action);
+}
+
+.automation-create-button:not(:disabled):hover,
+.automation-task-card:hover,
+.automation-new-task-card:hover {
+  transform: translateY(-1px);
+}
+
+.automation-refresh-button {
+  width: 30px;
+  height: 30px;
+}
+
+.automation-error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  border-radius: 12px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.automation-empty {
+  display: flex;
+  min-height: 112px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--automation-card-radius);
+  background: color-mix(in srgb, var(--color-bg-secondary) 54%, transparent);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.automation-empty-compact {
+  min-height: 64px;
+}
+
+.automation-task-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.automation-task-card,
+.automation-new-task-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 154px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--automation-card-radius);
+  background:
+    radial-gradient(circle at 18px 16px, color-mix(in srgb, var(--color-action) 7%, transparent), transparent 86px),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-elevated) 98%, var(--color-text-primary) 2%), var(--color-bg-elevated));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 5%, transparent),
+    0 14px 34px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  transition:
+    border-color var(--duration-fast) var(--ease-default),
+    box-shadow var(--duration-fast) var(--ease-default),
+    transform var(--duration-fast) var(--ease-default);
+}
+
+.automation-task-card {
+  cursor: pointer;
+}
+
+.automation-new-task-card {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-style: dashed;
+  background: var(--color-bg-elevated);
+  background-image: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.automation-new-task-card-empty {
+  min-height: 176px;
+}
+
+.automation-new-task-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-action) 24%, var(--color-border-soft));
+  border-radius: 13px;
+  background: var(--color-action-bg);
+  color: var(--color-action);
+}
+
+.automation-new-task-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.automation-new-task-copy {
+  max-width: 250px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.automation-task-card:hover,
+.automation-new-task-card:hover {
+  border-color: color-mix(in srgb, var(--color-border) 60%, var(--color-action) 40%);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--color-text-primary) 6%, transparent),
+    0 16px 38px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+}
+
+.automation-task-card:focus-visible,
+.automation-new-task-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.automation-task-card-error {
+  border-color: color-mix(in srgb, var(--color-danger) 34%, var(--color-border));
+}
+
+.automation-task-card-paused {
+  border-style: dashed;
+  opacity: 0.82;
+}
+
+.automation-task-card-header,
+.automation-detail-title {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.automation-task-icon {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  margin-top: 1px;
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 76%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-action) 8%, var(--color-bg-elevated));
+  color: var(--color-action);
+}
+
+.automation-task-title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.automation-task-title-block h3,
+.automation-detail-title h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-task-title-block span,
+.automation-detail-title span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-task-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.automation-task-actions button {
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.automation-task-actions button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.automation-task-actions .automation-task-stop-button:hover {
+  border-color: color-mix(in srgb, var(--color-danger) 26%, transparent);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.automation-card-meta,
+.automation-detail-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
+}
+
+.automation-card-meta > div,
+.automation-detail-meta > div {
+  display: flex;
+  min-width: 0;
+  min-height: 19px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.automation-card-meta dt,
+.automation-detail-meta dt {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-2xs);
+}
+
+.automation-card-meta dd,
+.automation-detail-meta dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-task-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.automation-detail-view {
+  display: grid;
+  gap: 14px;
+}
+
+.automation-detail-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--automation-card-radius);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.automation-back-button {
+  height: 30px;
+  padding: 0 10px;
+}
+
+.automation-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.automation-detail-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--automation-card-radius);
+  background: var(--color-bg-elevated);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 5%, transparent),
+    0 12px 30px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+
+.automation-detail-card-wide {
+  grid-column: 1 / -1;
+}
+
+.automation-detail-card h4 {
+  margin: 0 0 10px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.automation-detail-prompt {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.automation-run-list {
+  display: grid;
+  gap: 8px;
+}
+
+.automation-run-item {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg-secondary) 66%, transparent);
+}
+
+.automation-run-item-error {
+  border-color: color-mix(in srgb, var(--color-danger) 26%, var(--color-border));
+  background: var(--color-danger-bg);
+}
+
+.automation-run-item-cancelled {
+  border-color: color-mix(in srgb, var(--color-text-tertiary) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--color-bg-secondary) 72%, transparent);
+}
+
+.automation-run-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: 5px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.automation-run-head em {
+  margin-left: auto;
+  color: var(--color-text-tertiary);
+  font-style: normal;
+}
+
+.automation-run-markdown {
+  overflow-x: auto;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  line-height: 1.55;
+}
+
+.automation-run-markdown > span {
+  white-space: pre-wrap;
+}
+
+.automation-run-markdown p {
+  margin: 0 0 8px;
+}
+
+.automation-run-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.automation-run-markdown table {
+  width: max-content;
+  min-width: 100%;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: var(--font-size-xs);
+}
+
+.automation-run-markdown th,
+.automation-run-markdown td {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 82%, transparent);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.automation-run-markdown th {
+  background: color-mix(in srgb, var(--color-bg-secondary) 76%, transparent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.automation-run-markdown code {
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-bg-secondary) 82%, transparent);
+}
+
+.automation-run-markdown strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.automation-spin {
+  animation: automation-spin 0.8s linear infinite;
+}
+
+@keyframes automation-spin {
+  to { transform: rotate(360deg); }
+}
+
+[data-theme="dark"] .automation-builder,
+[data-theme="dark"] .automation-task-card,
+[data-theme="dark"] .automation-new-task-card,
+[data-theme="dark"] .automation-detail-header,
+[data-theme="dark"] .automation-detail-card,
+[data-theme="dark"] .automation-field input,
+[data-theme="dark"] .automation-field select,
+[data-theme="dark"] .automation-field textarea,
+[data-theme="dark"] .automation-directory-button,
+[data-theme="dark"] .automation-empty,
+[data-theme="dark"] .automation-run-item {
+  background-color: color-mix(in srgb, var(--color-bg-primary) 88%, white 4%);
+}
+
+[data-theme="dark"] .automation-field select {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5' fill='none' stroke='%23d2cec8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+@media (max-width: 980px) {
+  .automation-hero,
+  .automation-builder-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .automation-task-grid,
+  .automation-form-grid,
+  .automation-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .automation-detail-header {
+    grid-template-columns: 1fr;
+  }
+}

@@ -31,6 +31,13 @@ import type {
   UpdateDownloadProgress,
   UpdateErrorPayload,
 } from './update-types'
+import type {
+  CronScheduleParseRequest,
+  CronScheduleParseResponse,
+  CronTask,
+  CronTaskCompletedEvent,
+  CronTaskRegistration,
+} from './cron-types'
 
 // ─── Request/Response Channels ───────────────────────────────────────
 
@@ -262,12 +269,16 @@ export type IPCChannelMap = {
 
   // Cron
   'cron:register': {
-    request: [string, string, string?]
-    response: { success: boolean; task?: unknown; error?: string }
+    request: CronTaskRegistration
+    response: { success: boolean; task?: CronTask; error?: string }
   }
   'cron:list': {
     request: void
-    response: unknown[]
+    response: CronTask[]
+  }
+  'cron:resolveSchedule': {
+    request: CronScheduleParseRequest
+    response: CronScheduleParseResponse
   }
   'cron:remove': {
     request: string
@@ -276,6 +287,14 @@ export type IPCChannelMap = {
   'cron:execute': {
     request: string
     response: { success: boolean; result?: string; error?: string }
+  }
+  'cron:stop': {
+    request: string
+    response: { success: boolean; error?: string }
+  }
+  'cron:setStatus': {
+    request: { taskId: string; status: CronTask['status'] }
+    response: { success: boolean; task?: CronTask; error?: string }
   }
 
   // Skills
@@ -374,7 +393,7 @@ export type IPCEventMap = {
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[]; version: number }
-  'cron:taskCompleted': unknown
+  'cron:taskCompleted': CronTaskCompletedEvent
   'menu-action': string
   'main:error': { type: 'unhandledRejection' | 'uncaughtException'; message: string }
   'update:available': { version: string }

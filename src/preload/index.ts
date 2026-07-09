@@ -33,6 +33,10 @@ type UpdateAvailablePayload = IPCEventPayload<'update:available'>
 type UpdateDownloadProgressPayload = IPCEventPayload<'update:download-progress'>
 type UpdateErrorEventPayload = IPCEventPayload<'update:error'>
 type MainErrorPayload = IPCEventPayload<'main:error'>
+type CronRegisterRequest = IPCRequest<'cron:register'>
+type CronResolveScheduleRequest = IPCRequest<'cron:resolveSchedule'>
+type CronSetStatusRequest = IPCRequest<'cron:setStatus'>
+type CronTaskCompletedPayload = IPCEventPayload<'cron:taskCompleted'>
 
 type IPCInvokeArguments<K extends keyof IPCChannelMap> =
   IPCRequest<K> extends void
@@ -248,13 +252,18 @@ const api = {
   },
 
   cron: {
-    register: (cronExpression: string, prompt: string, name?: string) =>
-      invoke('cron:register', cronExpression, prompt, name),
+    register: (request: CronRegisterRequest) =>
+      invoke('cron:register', request),
     list: () => invoke('cron:list'),
+    resolveSchedule: (request: CronResolveScheduleRequest) =>
+      invoke('cron:resolveSchedule', request),
     remove: (taskId: string) => invoke('cron:remove', taskId),
     execute: (taskId: string) => invoke('cron:execute', taskId),
-    onTaskCompleted: (callback: (data: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data)
+    stop: (taskId: string) => invoke('cron:stop', taskId),
+    setStatus: (taskId: string, status: CronSetStatusRequest['status']) =>
+      invoke('cron:setStatus', { taskId, status }),
+    onTaskCompleted: (callback: (data: CronTaskCompletedPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: CronTaskCompletedPayload) => callback(data)
       ipcRenderer.on('cron:taskCompleted', handler)
       return () => { ipcRenderer.removeListener('cron:taskCompleted', handler) }
     }

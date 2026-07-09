@@ -2,7 +2,7 @@ import type { Options, HookCallbackMatcher, SettingSource } from '@anthropic-ai/
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { getApiKey, getBaseUrl, getModel, getActiveProfile, getAuthorizedDirectories, getEnabledSkills } from './store'
+import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getEnabledSkills } from './store'
 import { getAppSkillsCwd } from './skill-init'
 
 // ─── CLI path resolution (moved from agent-manager) ────────────────────
@@ -71,7 +71,7 @@ export interface AgentOptionsProfile {
   extraEnv?: Record<string, string | undefined>
   /** Prepend homebrew + /usr/local/bin paths to PATH. Default true. */
   prependUserBinPaths?: boolean
-  /** When true, ANTHROPIC_BASE_URL is only set for custom API providers. */
+  /** When true, do not fall back to external provider routing; app settings remain authoritative. */
   restrictiveBaseUrl?: boolean
   /** Session ID to resume. SDK loads conversation history from this session. */
   resume?: string
@@ -94,7 +94,6 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   const apiKey = getApiKey()
   const model = getModel()
   const baseUrl = getBaseUrl()
-  const activeProfile = getActiveProfile()
   const dirs = getAuthorizedDirectories()
   const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
   const cliPath = resolveClaudeCodeExecutable()
@@ -125,14 +124,12 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   }
 
   if (baseUrl) {
-    if (profile.restrictiveBaseUrl) {
-      // Only forward base URL for custom providers (cron safety)
-      if (activeProfile?.apiProvider === 'custom') {
-        env.ANTHROPIC_BASE_URL = baseUrl
-      }
-    } else {
-      env.ANTHROPIC_BASE_URL = baseUrl
-    }
+    // The application model profile is the source of truth for SDK routing.
+    // Do not gate this by apiProvider name: users can type provider labels
+    // freely, while baseUrl is the actual transport contract. If omitted here,
+    // Claude Code may fall back to global ~/.claude settings and route through
+    // an unrelated gateway.
+    env.ANTHROPIC_BASE_URL = baseUrl
   }
 
   // Merge caller-supplied extra env
