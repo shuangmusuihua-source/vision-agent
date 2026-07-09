@@ -18,6 +18,8 @@ import type {
   BuiltinSkillCatalogItem,
   CommunitySkillCatalogItem,
   CommunitySkillMutationResult,
+  InlineRewriteRequest,
+  InlineRewriteResponse,
 } from '../../shared/types'
 import type {
   MarkitdownFormat,
@@ -101,6 +103,7 @@ interface WorkspaceApi {
     filePath?: string
     fileName?: string
     alreadyExists?: boolean
+    updated?: boolean
     error?: string
   }>
   createWorkspace: (name: string) => Promise<string | null>
@@ -111,6 +114,12 @@ interface WorkspaceApi {
   openInBrowser: (filePath: string) => Promise<void>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
   previewArtifact: (options: { fileName: string; content: string }) => Promise<{ success: boolean; filePath?: string }>
+}
+
+interface EditorApi {
+  prepareRewrite: (request: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>) => Promise<{ prepared: boolean }>
+  rewriteSelection: (request: InlineRewriteRequest) => Promise<InlineRewriteResponse>
+  cancelRewrite: (requestId: string) => Promise<{ cancelled: boolean }>
 }
 
 interface SettingsApi {
@@ -140,6 +149,8 @@ interface AgentApi {
   setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean; error?: string }>
   selectFolder: () => Promise<{ canceled: boolean; filePaths: string[] }>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
+  revealSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
+  deleteSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
   removeSessionRecord: (sessionId: string) => Promise<{ success: boolean }>
 
@@ -217,6 +228,7 @@ interface WindowApi {
   ping: () => Promise<string>
   getVersion: () => Promise<string>
   workspace: WorkspaceApi
+  editor: EditorApi
   settings: SettingsApi
   agent: AgentApi
   memory: MemoryApi
@@ -247,6 +259,7 @@ declare global {
 export type {
   WindowApi,
   WorkspaceApi,
+  EditorApi,
   SettingsApi,
   AgentApi,
   MemoryApi,

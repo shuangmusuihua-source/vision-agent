@@ -8,6 +8,7 @@ import type {
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   SessionRoutedSkillOutputState,
+  InlineRewriteRequest,
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
@@ -22,6 +23,8 @@ type AgentUpdateSessionRecordRequest = IPCRequest<'agent:updateSessionRecord'>
 type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
+type AgentRevealSessionOutputRequest = IPCRequest<'agent:revealSessionOutput'>
+type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 type SkillsChangedPayload = IPCEventPayload<'skills:changed'>
@@ -68,6 +71,13 @@ const api = {
       invoke('workspace:deleteWorkspace', dirPath),
     knowledgeDir: () => invoke('workspace:knowledgeDir'),
     selectFiles: () => invoke('workspace:selectFiles'),
+  },
+
+  editor: {
+    prepareRewrite: (request: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>) =>
+      invoke('editor:prepareRewrite', request),
+    rewriteSelection: (request: InlineRewriteRequest) => invoke('editor:rewriteSelection', request),
+    cancelRewrite: (requestId: string) => invoke('editor:cancelRewrite', { requestId }),
   },
 
   settings: {
@@ -147,6 +157,14 @@ const api = {
     getSessionOutputs: (sessionId: string) => {
       const request: AgentGetSessionOutputsRequest = { sessionId }
       return invoke('agent:getSessionOutputs', request)
+    },
+    revealSessionOutput: (sessionId: string, filePath: string) => {
+      const request: AgentRevealSessionOutputRequest = { sessionId, filePath }
+      return invoke('agent:revealSessionOutput', request)
+    },
+    deleteSessionOutput: (sessionId: string, filePath: string) => {
+      const request: AgentDeleteSessionOutputRequest = { sessionId, filePath }
+      return invoke('agent:deleteSessionOutput', request)
     },
     deleteSession: (sessionId: string) => {
       const request: AgentDeleteSessionRequest = { sessionId }

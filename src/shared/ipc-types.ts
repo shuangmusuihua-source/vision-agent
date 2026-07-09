@@ -18,6 +18,8 @@ import type {
   BuiltinSkillCatalogItem,
   CommunitySkillCatalogItem,
   CommunitySkillMutationResult,
+  InlineRewriteRequest,
+  InlineRewriteResponse,
 } from './types'
 import type {
   MarkitdownFormat,
@@ -108,6 +110,28 @@ export type IPCChannelMap = {
     request: { sessionId: string }
     response: SessionOutputs | null
   }
+  'agent:revealSessionOutput': {
+    request: { sessionId: string; filePath: string }
+    response: { success: boolean; error?: string }
+  }
+  'agent:deleteSessionOutput': {
+    request: { sessionId: string; filePath: string }
+    response: { success: boolean; error?: string }
+  }
+
+  // Editor
+  'editor:prepareRewrite': {
+    request: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>
+    response: { prepared: boolean }
+  }
+  'editor:rewriteSelection': {
+    request: InlineRewriteRequest
+    response: InlineRewriteResponse
+  }
+  'editor:cancelRewrite': {
+    request: { requestId: string }
+    response: { cancelled: boolean }
+  }
 
   // Workspace
   'workspace:readFile': {
@@ -125,6 +149,7 @@ export type IPCChannelMap = {
       filePath?: string
       fileName?: string
       alreadyExists?: boolean
+      updated?: boolean
       error?: string
     }
   }

@@ -19,7 +19,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
-import type { AgentContext, TabDescriptor } from '../../../shared/types'
+import type { AgentContext, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
 import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
@@ -522,9 +522,37 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const result = await window.api.workspace.addToKnowledge(filePath, activeSessionId || undefined)
     if (!result.success) {
       await modal.alert({ title: '无法放入知识库', message: result.error || '请稍后重试' })
+    } else if (activeSessionId) {
+      await refreshSessionOutputs(activeSessionId)
     }
     return result
+  }, [activeSessionId, modal, refreshSessionOutputs])
+
+  const handleRevealSessionOutput = useCallback(async (filePath: string) => {
+    if (!activeSessionId) return
+    const result = await window.api.agent.revealSessionOutput(activeSessionId, filePath)
+    if (!result.success) {
+      await modal.alert({ title: '无法打开所在目录', message: result.error || '产物可能已被移动或删除' })
+    }
   }, [activeSessionId, modal])
+
+  const handleDeleteSessionOutput = useCallback(async (file: SessionOutputEntry) => {
+    if (!activeSessionId) return false
+    const confirmed = await modal.confirm({
+      title: '删除产物',
+      message: `确定删除“${file.fileName}”吗？文件会被移到废纸篓。`,
+      variant: 'danger',
+      confirmLabel: '删除',
+    })
+    if (!confirmed) return false
+    const result = await window.api.agent.deleteSessionOutput(activeSessionId, file.filePath)
+    if (!result.success) {
+      await modal.alert({ title: '删除失败', message: result.error || '请稍后重试' })
+      return false
+    }
+    await refreshSessionOutputs(activeSessionId)
+    return true
+  }, [activeSessionId, modal, refreshSessionOutputs])
 
   // ── File operations (bridging workspace + tabs) ─────────────────────
 
@@ -699,6 +727,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             activeFilePath={linkedFile || activeFilePath}
             onOpenFile={handleFileSelect}
             onAddToKnowledge={handleAddToKnowledge}
+            onRevealOutput={handleRevealSessionOutput}
+            onDeleteOutput={handleDeleteSessionOutput}
           />
           </ErrorBoundary>
         ) : (

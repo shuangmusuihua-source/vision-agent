@@ -32,7 +32,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 
 ### IPC 层
 
-`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、settings、agent、memory、graph、cron、skills、attachments、search、notification 和 connection。
+`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、search、notification 和 connection。
 
 `src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/preload/index.ts` 将其适配成 `window.api`。新增 IPC 时必须同时维护这两个边界和 renderer 类型。
 
@@ -44,6 +44,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 - `message-converter.ts`：SDK 消息转换为 renderer 使用的消息协议
 - `session-store.ts`：SDK 会话列表、历史分页、重命名、删除及 compaction 过滤
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
+- `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
 
 `agent-manager.ts` 只是兼容导出层，不是实现中心。
 
@@ -78,10 +79,12 @@ Renderer 是单页 React 应用：
 - `agent-store*`：按 context 与 session 隔离的流式状态
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions
-- `MarkdownEditor.tsx`：Tiptap Markdown 编辑
+- `MarkdownEditor.tsx`：Tiptap Markdown 编辑、自动保存及选区级 AI 改写审阅
 - `AssistantMarkdown.tsx`：Streamdown + Shiki + KaTeX + Mermaid
 
 React 组件错误由 ErrorBoundary 隔离；全局同步错误和未处理 Promise 使用可关闭 banner，不创建阻断式全屏遮罩。
+
+行内 AI 改写通过 ProseMirror decoration 显示原文删除线和 Markdown 建议，只有 Accept 才产生文档 transaction 并进入自动保存；Undo/取消不会修改文件。
 
 ## 打包
 

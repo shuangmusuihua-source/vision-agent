@@ -30,6 +30,11 @@ import {
 } from './session-files'
 import { decideSessionFileAccess, extractExplicitAbsolutePaths } from './session-file-access'
 import { isSessionFileMutationTool } from './session-file-catalog'
+import {
+  captureSessionOutputSnapshot,
+  recordSessionOutputProvenance,
+  type SessionOutputSnapshot,
+} from './session-output-metadata'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -353,6 +358,7 @@ export async function sendMessage(
   })
   let currentSessionId = sessionId
   let queryInstanceId = 0
+  let outputSnapshot: SessionOutputSnapshot = {}
 
   try {
     // ── File conversion (pptx/xlsx/docx/pdf → markdown) ──
@@ -376,6 +382,10 @@ export async function sendMessage(
       }
     } catch (error) {
       throw new Error(`Skill 初始化失败: ${(error as Error).message}`)
+    }
+
+    if (context === 'editor' && skillId) {
+      outputSnapshot = await captureSessionOutputSnapshot(effectiveWorkingDirectory)
     }
 
     const getSessionId = () => currentSessionId
@@ -460,6 +470,24 @@ export async function sendMessage(
       }, toUserFacingQueryError(error))
     }
   } finally {
+    if (context === 'editor' && skillId) {
+      try {
+        const changed = await recordSessionOutputProvenance({
+          workingDirectory: effectiveWorkingDirectory,
+          before: outputSnapshot,
+          skillId,
+          sourceDocumentPath: activeFilePath,
+        })
+        if (changed && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('agent:sessionFilesChanged', {
+            ...runtimeEnvelope,
+            sdkSessionId: currentSessionId || runtimeEnvelope.sdkSessionId,
+          })
+        }
+      } catch (error) {
+        console.error('[SessionOutputMetadata] failed to record Skill provenance:', error)
+      }
+    }
     sessionRuntime.finalizeRun(mainWindow, queryKey, queryInstanceId)
   }
 }

@@ -24,8 +24,16 @@ import { MathInline } from './extensions/math-inline'
 import { MathBlock } from './extensions/math-block'
 import { SourceSaveController } from './source-save-controller'
 import Image from '@tiptap/extension-image'
-import { Extension } from '@tiptap/core'
+import { Extension, type JSONContent } from '@tiptap/core'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
+import AiInlineEditControls, { type InlineEditMode } from './AiInlineEditControls'
+import { AiInlineReview, setAiInlineReview } from './extensions/ai-inline-review'
+import {
+  captureInlineRewriteSelection,
+  parseInlineRewriteMarkdown,
+  replacementPlanForSelection,
+  type InlineRewriteSelectionSnapshot,
+} from './inline-rewrite-selection'
 
 const lowlight = createLowlight(common)
 
@@ -114,6 +122,15 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const sourceSaveControllerRef = useRef<SourceSaveController | null>(null)
   const editorSaveControllerRef = useRef<SourceSaveController | null>(null)
   const sourceFilePathRef = useRef(filePath)
+  const [inlineEditMode, setInlineEditMode] = useState<InlineEditMode>('idle')
+  const [inlineEditInstruction, setInlineEditInstruction] = useState('')
+  const [inlineEditError, setInlineEditError] = useState<string | null>(null)
+  const inlineSelectionRef = useRef<InlineRewriteSelectionSnapshot | null>(null)
+  const inlineReplacementRef = useRef<{ markdown: string; doc: JSONContent } | null>(null)
+  const inlineRequestIdRef = useRef<string | null>(null)
+  const inlineRequestSequenceRef = useRef(0)
+  const beginInlineRewriteRef = useRef<(() => void) | null>(null)
+  const inlineFilePathRef = useRef(filePath)
   const isMemoryFile = filePath.includes('.vision/memory/')
 
   if (!sourceSaveControllerRef.current) {
@@ -200,6 +217,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       Frontmatter,
       MathInline,
       MathBlock,
+      AiInlineReview,
       Placeholder.configure({
         placeholder: '开始输入...'
       }),
@@ -210,6 +228,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
             'Mod-s': () => {
               const md = getFullMarkdown(this.editor)
               onSave(filePath, md)
+              return true
+            },
+            'Mod-k': () => {
+              if (this.editor.state.selection.empty) return false
+              beginInlineRewriteRef.current?.()
               return true
             }
           }
@@ -342,6 +365,152 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     }
   })
 
+  const resetInlineRewriteUi = useCallback((restoreSelection: boolean) => {
+    const snapshot = inlineSelectionRef.current
+    inlineSelectionRef.current = null
+    inlineReplacementRef.current = null
+    inlineRequestIdRef.current = null
+    setInlineEditMode('idle')
+    setInlineEditInstruction('')
+    setInlineEditError(null)
+
+    if (!editor || editor.isDestroyed) return
+    setAiInlineReview(editor, null)
+    editor.setEditable(!isMemoryFile)
+    if (restoreSelection && snapshot) {
+      editor.chain().setTextSelection({ from: snapshot.from, to: snapshot.to }).focus().run()
+    }
+  }, [editor, isMemoryFile])
+
+  const cancelInlineRewrite = useCallback((restoreSelection = true) => {
+    const requestId = inlineRequestIdRef.current
+    if (requestId) {
+      window.api.editor.cancelRewrite(requestId).catch(() => {})
+    }
+    resetInlineRewriteUi(restoreSelection)
+  }, [resetInlineRewriteUi])
+
+  const prepareInlineRewrite = useCallback(() => {
+    inlineRequestSequenceRef.current += 1
+    const requestId = `inline-rewrite-${Date.now()}-${inlineRequestSequenceRef.current}`
+    inlineRequestIdRef.current = requestId
+    window.api.editor.prepareRewrite({ requestId, filePath }).catch(() => {})
+    return requestId
+  }, [filePath])
+
+  const beginInlineRewrite = useCallback(() => {
+    if (!editor || editor.isDestroyed || isMemoryFile || internalSourceMode) return
+    const snapshot = captureInlineRewriteSelection(editor)
+    if (!snapshot) return
+
+    inlineSelectionRef.current = snapshot
+    inlineReplacementRef.current = null
+    prepareInlineRewrite()
+    setInlineEditInstruction('')
+    setInlineEditError(null)
+    setInlineEditMode('prompt')
+    setAiInlineReview(editor, { phase: 'pending', from: snapshot.from, to: snapshot.to })
+    editor.setEditable(false)
+  }, [editor, internalSourceMode, isMemoryFile, prepareInlineRewrite])
+
+  beginInlineRewriteRef.current = beginInlineRewrite
+
+  const submitInlineRewrite = useCallback(async () => {
+    if (!editor || editor.isDestroyed) return
+    const snapshot = inlineSelectionRef.current
+    const instruction = inlineEditInstruction.trim()
+    if (!snapshot || !instruction) return
+
+    const requestId = inlineRequestIdRef.current || prepareInlineRewrite()
+    setInlineEditError(null)
+    setInlineEditMode('loading')
+
+    try {
+      const response = await window.api.editor.rewriteSelection({
+        requestId,
+        filePath,
+        instruction,
+        selectedMarkdown: snapshot.selectedMarkdown,
+        beforeContext: snapshot.beforeContext,
+        afterContext: snapshot.afterContext,
+      })
+      if (inlineRequestIdRef.current !== requestId || editor.isDestroyed) return
+      if (response.requestId !== requestId) throw new Error('AI 改写响应与当前请求不匹配')
+
+      const replacementDoc = parseInlineRewriteMarkdown(editor, response.replacementMarkdown)
+      inlineRequestIdRef.current = null
+      inlineReplacementRef.current = {
+        markdown: response.replacementMarkdown,
+        doc: replacementDoc,
+      }
+      setAiInlineReview(editor, {
+        phase: 'review',
+        from: snapshot.from,
+        to: snapshot.to,
+        replacementDoc,
+        replacementMarkdown: response.replacementMarkdown,
+      })
+      setInlineEditMode('review')
+    } catch (error) {
+      if (inlineRequestIdRef.current !== requestId || editor.isDestroyed) return
+      prepareInlineRewrite()
+      const message = error instanceof Error ? error.message : String(error)
+      setInlineEditError(message.replace(/^Error invoking remote method '[^']+':\s*/i, ''))
+      setInlineEditMode('prompt')
+    }
+  }, [editor, filePath, inlineEditInstruction, prepareInlineRewrite])
+
+  const acceptInlineRewrite = useCallback(() => {
+    if (!editor || editor.isDestroyed) return
+    const snapshot = inlineSelectionRef.current
+    const replacement = inlineReplacementRef.current
+    if (!snapshot || !replacement) return
+
+    const replacementDoc = replacement.doc
+    const replacementPlan = replacementPlanForSelection(
+      editor,
+      replacementDoc,
+      snapshot.from,
+      snapshot.to,
+    )
+
+    setAiInlineReview(editor, null)
+    editor.setEditable(!isMemoryFile)
+    const chain = editor.chain().focus()
+    if (replacement.markdown.length === 0) {
+      chain.deleteRange({ from: snapshot.from, to: snapshot.to }).run()
+    } else {
+      chain.insertContentAt(
+        { from: replacementPlan.from, to: replacementPlan.to },
+        replacementPlan.content,
+        { updateSelection: true },
+      ).run()
+    }
+    inlineSelectionRef.current = null
+    inlineReplacementRef.current = null
+    setInlineEditMode('idle')
+    setInlineEditInstruction('')
+    setInlineEditError(null)
+  }, [editor, isMemoryFile])
+
+  useEffect(() => {
+    return () => {
+      const requestId = inlineRequestIdRef.current
+      if (requestId) window.api.editor.cancelRewrite(requestId).catch(() => {})
+      if (editor && !editor.isDestroyed) setAiInlineReview(editor, null)
+    }
+  }, [editor])
+
+  useEffect(() => {
+    if (inlineFilePathRef.current === filePath) return
+    inlineFilePathRef.current = filePath
+    if (inlineSelectionRef.current) cancelInlineRewrite(false)
+  }, [cancelInlineRewrite, filePath])
+
+  useEffect(() => {
+    if (internalSourceMode && inlineEditMode !== 'idle') cancelInlineRewrite(false)
+  }, [cancelInlineRewrite, inlineEditMode, internalSourceMode])
+
   // Sync source mode from parent
   useEffect(() => {
     if (sourceMode !== internalSourceMode) {
@@ -399,6 +568,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       return
     }
     if (normalizeMd(content) !== normalizeMd(getFullMarkdown(editor))) {
+      if (inlineSelectionRef.current) cancelInlineRewrite(false)
       const { frontmatter, body } = extractFrontmatter(content)
       editor.commands.setContent(body || '\n\n', { contentType: 'markdown', emitUpdate: false })
       if (frontmatter) {
@@ -407,7 +577,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
         editor.commands.removeFrontmatter()
       }
     }
-  }, [content, editor])
+  }, [cancelInlineRewrite, content, editor])
 
   // Sync editable state when filePath changes (memory files are read-only)
   useEffect(() => {
@@ -509,6 +679,17 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 
   return (
     <div className="editor-wrapper" onContextMenu={handleContextMenu}>
+      <AiInlineEditControls
+        editor={editor}
+        mode={inlineEditMode}
+        instruction={inlineEditInstruction}
+        error={inlineEditError}
+        onInstructionChange={setInlineEditInstruction}
+        onOpen={beginInlineRewrite}
+        onSubmit={submitInlineRewrite}
+        onCancel={() => cancelInlineRewrite(true)}
+        onAccept={acceptInlineRewrite}
+      />
       <EditorContent editor={editor} />
     </div>
   )
