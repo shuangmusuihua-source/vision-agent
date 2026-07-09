@@ -23,6 +23,8 @@ type AgentUpdateSessionRecordRequest = IPCRequest<'agent:updateSessionRecord'>
 type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
+type AgentRevealSessionOutputRequest = IPCRequest<'agent:revealSessionOutput'>
+type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 type SkillsChangedPayload = IPCEventPayload<'skills:changed'>
@@ -155,6 +157,14 @@ const api = {
     getSessionOutputs: (sessionId: string) => {
       const request: AgentGetSessionOutputsRequest = { sessionId }
       return invoke('agent:getSessionOutputs', request)
+    },
+    revealSessionOutput: (sessionId: string, filePath: string) => {
+      const request: AgentRevealSessionOutputRequest = { sessionId, filePath }
+      return invoke('agent:revealSessionOutput', request)
+    },
+    deleteSessionOutput: (sessionId: string, filePath: string) => {
+      const request: AgentDeleteSessionOutputRequest = { sessionId, filePath }
+      return invoke('agent:deleteSessionOutput', request)
     },
     deleteSession: (sessionId: string) => {
       const request: AgentDeleteSessionRequest = { sessionId }

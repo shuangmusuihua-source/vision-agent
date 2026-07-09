@@ -702,11 +702,25 @@ export function tabKey(t: TabDescriptor): string { return isFileTab(t) ? t.path 
 export interface SessionOutputEntry {
   fileName: string
   filePath: string
+  relativePath: string
   fileType: ArtifactFileType
   category: 'document' | 'skill_output' | 'other'
   availability: 'available' | 'missing'
   size?: number
   createdAt: number
+  modifiedAt: number
+  knowledge?: {
+    status: 'not_added' | 'synced' | 'update_available'
+    filePath?: string
+    fileName?: string
+    addedAt?: number
+    syncedAt?: number
+  }
+  provenance?: {
+    skillId?: string
+    sourceDocumentPath?: string
+    sourceDocumentName?: string
+  }
 }
 
 export interface SessionOutputs {

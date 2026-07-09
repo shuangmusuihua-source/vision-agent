@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, shell } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, abortActiveQueryAndWait, deleteSdkSession, setPermissionMode } from '../agent-manager'
 import { getSessionRecords, getSessionRecordById, updateSessionRecord, removeSessionRecord, getSessionFileOutputs } from '../store'
@@ -7,6 +7,7 @@ import type { IPCRequest } from '../../shared/ipc-types'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import { removeSessionWorkingDirectory } from '../session-files'
 import { createAttachmentPathGrant } from '../attachment-path-authorization'
+import { removeSessionOutputMetadataEntry } from '../session-output-metadata'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -18,6 +19,8 @@ type AgentUpdateSessionRecordRequest = IPCRequest<'agent:updateSessionRecord'>
 type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
+type AgentRevealSessionOutputRequest = IPCRequest<'agent:revealSessionOutput'>
+type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 
@@ -181,6 +184,33 @@ export function registerAgentHandlers(): void {
     } catch (e) {
       console.error('[agent:getSessionOutputs] failed:', e)
       return null
+    }
+  })
+
+  ipcMain.handle('agent:revealSessionOutput', async (_event, request: AgentRevealSessionOutputRequest) => {
+    const record = getSessionRecordById(request.sessionId)
+    if (!record?.workingDirectory) return { success: false, error: '会话文件目录不可用' }
+    const output = (await getSessionFileOutputs(request.sessionId))
+      .find((file) => file.filePath === request.filePath && file.availability === 'available')
+    if (!output) return { success: false, error: '产物不存在或不属于当前会话' }
+    shell.showItemInFolder(output.filePath)
+    return { success: true }
+  })
+
+  ipcMain.handle('agent:deleteSessionOutput', async (_event, request: AgentDeleteSessionOutputRequest) => {
+    const record = getSessionRecordById(request.sessionId)
+    if (!record?.workingDirectory) return { success: false, error: '会话文件目录不可用' }
+    const output = (await getSessionFileOutputs(request.sessionId))
+      .find((file) => file.filePath === request.filePath && file.availability === 'available')
+    if (!output || output.category !== 'skill_output') {
+      return { success: false, error: '只能删除当前会话中的 Skill 产物' }
+    }
+    try {
+      await shell.trashItem(output.filePath)
+      await removeSessionOutputMetadataEntry(record.workingDirectory, output.filePath)
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
     }
   })
 

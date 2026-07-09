@@ -110,6 +110,14 @@ export type IPCChannelMap = {
     request: { sessionId: string }
     response: SessionOutputs | null
   }
+  'agent:revealSessionOutput': {
+    request: { sessionId: string; filePath: string }
+    response: { success: boolean; error?: string }
+  }
+  'agent:deleteSessionOutput': {
+    request: { sessionId: string; filePath: string }
+    response: { success: boolean; error?: string }
+  }
 
   // Editor
   'editor:prepareRewrite': {
@@ -141,6 +149,7 @@ export type IPCChannelMap = {
       filePath?: string
       fileName?: string
       alreadyExists?: boolean
+      updated?: boolean
       error?: string
     }
   }

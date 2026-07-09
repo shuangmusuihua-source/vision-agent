@@ -103,6 +103,7 @@ interface WorkspaceApi {
     filePath?: string
     fileName?: string
     alreadyExists?: boolean
+    updated?: boolean
     error?: string
   }>
   createWorkspace: (name: string) => Promise<string | null>
@@ -148,6 +149,8 @@ interface AgentApi {
   setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean; error?: string }>
   selectFolder: () => Promise<{ canceled: boolean; filePaths: string[] }>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
+  revealSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
+  deleteSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
   removeSessionRecord: (sessionId: string) => Promise<{ success: boolean }>
 
