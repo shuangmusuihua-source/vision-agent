@@ -19,27 +19,11 @@ const builtinSkills: SkillDefinition[] = [
     outputMode: 'write',
   },
   {
-    id: 'guizang-ppt-skill',
-    name: 'guizang-ppt-skill',
-    description: '生成横向翻页网页 PPT：电子杂志风 / 瑞士国际主义风',
-    icon: 'PresentationChart',
-    promptTemplate: `使用 guizang-ppt-skill skill 接下来制作 PPT... {activeFile}`,
-    outputMode: 'write',
-  },
-  {
     id: 'frontend-slides',
     name: 'frontend-slides',
     description: '创建动画丰富的 HTML 演示文稿，支持 PPT 转换和 34 种风格模板',
     icon: 'PresentationChart',
     promptTemplate: `使用 frontend-slides skill 接下来制作演示文稿... {activeFile}`,
-    outputMode: 'write',
-  },
-  {
-    id: 'huashu-design',
-    name: '花叔设计',
-    description: '高保真原型/交互Demo/幻灯片/动画/信息图/设计评审，40种CSS风格，支持MP4/GIF/PPTX/PDF导出',
-    icon: '',
-    promptTemplate: `使用 huashu-design skill 制作 {activeFile}`,
     outputMode: 'write',
   },
   {

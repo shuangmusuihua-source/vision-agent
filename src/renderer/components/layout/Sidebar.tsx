@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks, Workflow } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -40,9 +40,11 @@ interface SidebarProps {
   onDaydream: (mode: string) => void
   onAskZuovis: () => void
   onOpenSkills: () => void
+  onOpenAutomation: () => void
   onAskZuovisBack: () => void
   isAskZuovisActive: boolean
   isSkillsActive: boolean
+  isAutomationActive: boolean
   isAskZuovisInChat: boolean
   isAskZuovisRunning: boolean
   showGraph: boolean
@@ -142,9 +144,11 @@ function Sidebar({
   onDaydream,
   onAskZuovis,
   onOpenSkills,
+  onOpenAutomation,
   onAskZuovisBack,
   isAskZuovisActive,
   isSkillsActive,
+  isAutomationActive,
   isAskZuovisInChat,
   isAskZuovisRunning,
   showGraph,
@@ -279,6 +283,16 @@ function Sidebar({
         >
           <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Blocks size={13} /></div>
           <span className="sidebar-ask-zuovis-label">技能</span>
+        </div>
+
+        <div
+          className={`sidebar-ask-zuovis sidebar-skills-entry${isAutomationActive ? ' sidebar-ask-zuovis-active' : ''}`}
+          onClick={onOpenAutomation}
+          role="button" tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenAutomation() } }}
+        >
+          <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Workflow size={13} /></div>
+          <span className="sidebar-ask-zuovis-label">自动化</span>
         </div>
 
         {/* Workspaces with sessions */}

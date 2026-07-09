@@ -3,6 +3,7 @@ import type { PermissionMode, Query, SDKMessage } from '@anthropic-ai/claude-age
 import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 import type {
   AgentIPCMessage,
+  AgentNotificationPayload,
   AgentSessionEnvelope,
   AskUserRequestIPC,
   PermissionRequestIPC,
@@ -336,11 +337,18 @@ export class SessionRuntimeController {
   emitNotification(
     win: BrowserWindow,
     envelope: AgentSessionEnvelope,
-    notification: { type: string; message: string; title: string }
+    notification: AgentNotificationPayload
   ): void {
     if (win.isDestroyed()) return
     const payload: SessionRoutedNotification & { workspaceCwd: string } = {
-      ...withSessionEnvelope(envelope, notification),
+      ...withSessionEnvelope(envelope, {
+        ...notification,
+        target: notification.target ?? {
+          view: envelope.context === 'ask' ? 'ask' : 'editor',
+          sessionId: envelope.sessionId,
+          workspacePath: envelope.workspacePath,
+        },
+      }),
       workspaceCwd: envelope.workspacePath,
     }
     win.webContents.send('agent:notification', payload)

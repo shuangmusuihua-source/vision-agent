@@ -84,6 +84,49 @@ function createTruncatedTreeFetcher(): typeof fetch {
   }) as unknown as typeof fetch
 }
 
+function createRootSkillFetcher(): typeof fetch {
+  return vi.fn(async (input: string | URL | Request) => {
+    const url = String(input)
+    if (url.includes('/git/trees/')) {
+      return new Response(JSON.stringify({
+        truncated: false,
+        tree: [
+          { path: 'SKILL.md', type: 'blob', mode: '100644', size: 8 },
+          { path: 'assets', type: 'tree', mode: '040000' },
+          { path: 'assets/template.html', type: 'blob', mode: '100644', size: 9 },
+        ],
+      }), { status: 200 })
+    }
+    if (url.endsWith('/SKILL.md')) {
+      return new Response('---\nname: frontend-design\ndescription: Design frontend interfaces\n---\n\n# Skill\n', { status: 200 })
+    }
+    if (url.endsWith('/template.html')) return new Response('<main />', { status: 200 })
+    return new Response('not found', { status: 404 })
+  }) as unknown as typeof fetch
+}
+
+function createLargeSkillFetcher(): typeof fetch {
+  const largeContent = 'x'.repeat(3 * 1024 * 1024)
+  return vi.fn(async (input: string | URL | Request) => {
+    const url = String(input)
+    if (url.includes('/git/trees/')) {
+      return new Response(JSON.stringify({
+        truncated: false,
+        tree: [
+          { path: 'skills/frontend-design', type: 'tree', mode: '040000' },
+          { path: 'skills/frontend-design/SKILL.md', type: 'blob', mode: '100644', size: 72 },
+          { path: 'skills/frontend-design/assets/large.bin', type: 'blob', mode: '100644', size: largeContent.length },
+        ],
+      }), { status: 200 })
+    }
+    if (url.endsWith('/SKILL.md')) {
+      return new Response('---\nname: frontend-design\ndescription: Design frontend interfaces\n---\n\n# Skill\n', { status: 200 })
+    }
+    if (url.endsWith('/large.bin')) return new Response(largeContent, { status: 200 })
+    return new Response('not found', { status: 404 })
+  }) as unknown as typeof fetch
+}
+
 afterEach(async () => {
   vi.restoreAllMocks()
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
@@ -99,6 +142,42 @@ describe('community Skill installer', () => {
     expect(await readFile(join(targetRoot, skill.id, 'assets', 'guide.txt'), 'utf8')).toBe('guide')
     expect(await inspectCommunitySkillInstallation(targetRoot, skill.id)).toMatchObject({
       installedAt: expect.any(String),
+      sourceRef: 'main',
+    })
+  })
+
+  it('downloads a reviewed Skill from a repository root', async () => {
+    const targetRoot = await createTempDir()
+
+    await installCommunitySkill({
+      targetRoot,
+      skill: { ...skill, source: { ...skill.source, path: '' } },
+      fetcher: createRootSkillFetcher(),
+    })
+
+    expect(await readFile(join(targetRoot, skill.id, 'SKILL.md'), 'utf8')).toContain('name: frontend-design')
+    expect(await readFile(join(targetRoot, skill.id, 'assets', 'template.html'), 'utf8')).toBe('<main />')
+  })
+
+  it('allows reviewed catalog entries to declare tighter scoped install limits', async () => {
+    const targetRoot = await createTempDir()
+
+    await expect(installCommunitySkill({ targetRoot, skill, fetcher: createLargeSkillFetcher() }))
+      .rejects.toThrow('文件过大')
+
+    await installCommunitySkill({
+      targetRoot,
+      skill: {
+        ...skill,
+        installLimits: {
+          maxFileSize: 4 * 1024 * 1024,
+          maxTotalSize: 5 * 1024 * 1024,
+        },
+      },
+      fetcher: createLargeSkillFetcher(),
+    })
+
+    expect(await inspectCommunitySkillInstallation(targetRoot, skill.id)).toMatchObject({
       sourceRef: 'main',
     })
   })

@@ -34,7 +34,7 @@ export function notifyAgentComplete(sessionId: string): void {
 
 export function notifyCronTaskComplete(taskName: string, result: string): void {
   const preview = result.length > 100 ? result.substring(0, 100) + '...' : result
-  showNotification(`定时任务完成: ${taskName}`, preview, undefined, 'app.sumi.cron')
+  showNotification(`自动化完成: ${taskName}`, preview, undefined, 'app.sumi.cron')
 }
 
 export function schedulePermissionNotification(requestId: string, toolName: string): void {

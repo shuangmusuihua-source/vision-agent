@@ -20,7 +20,6 @@ describe('built-in skill manifest', () => {
     expect(sourcedSkills.map(item => item.id)).toEqual([
       'kami',
       'frontend-slides',
-      'huashu-design',
     ])
     for (const skill of sourcedSkills) {
       expect(skill.source?.repositoryUrl).toMatch(/^https:\/\/github\.com\//)

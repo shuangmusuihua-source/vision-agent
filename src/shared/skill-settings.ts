@@ -11,9 +11,12 @@ export function resolveEnabledSkillIds(
   storedEnabledSkillIds: string[],
   builtinSkillIds: string[],
   disabledSkillIds: string[],
+  availableSkillIds?: string[],
 ): string[] {
   const disabled = new Set(disabledSkillIds)
-  const resolved = unique(storedEnabledSkillIds).filter(skillId => !disabled.has(skillId))
+  const available = availableSkillIds ? new Set(availableSkillIds) : null
+  const resolved = unique(storedEnabledSkillIds)
+    .filter(skillId => !disabled.has(skillId) && (!available || available.has(skillId)))
 
   for (const skillId of builtinSkillIds) {
     if (!disabled.has(skillId) && !resolved.includes(skillId)) resolved.push(skillId)

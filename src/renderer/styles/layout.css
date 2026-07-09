@@ -1147,7 +1147,7 @@
   height: 40px;
   padding: 4px 0 6px;
   pointer-events: auto;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border-soft);
 }
 
@@ -1200,7 +1200,7 @@
 /* --- Agent Panel --- */
 
 .agent-panel {
-  background: linear-gradient(180deg, #fafaf9 0%, #f3f3f1 100%);
+  background: var(--color-bg-primary);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1644,7 +1644,7 @@
 }
 
 [data-theme="dark"] .agent-panel {
-  background: linear-gradient(180deg, #1e1e1e 0%, #181818 100%);
+  background: var(--color-bg-primary);
 }
 
 [data-theme="dark"] .agent-panel-footer {
@@ -1827,7 +1827,351 @@
   color: rgba(0,255,0,0.2);
 }
 
-/* --- Update banner --- */
+/* --- App toast / Update banner --- */
+
+.app-toast {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  z-index: 420;
+  display: flex;
+  width: min(360px, calc(100vw - 44px));
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 94%, white 6%);
+  box-shadow:
+    0 16px 42px color-mix(in srgb, var(--color-text-primary) 12%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  animation: app-toast-enter 180ms var(--ease-default);
+}
+
+.app-toast:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.app-toast-success {
+  border-color: color-mix(in srgb, var(--color-success) 34%, var(--color-border));
+}
+
+.app-toast-error {
+  border-color: color-mix(in srgb, var(--color-error) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-error) 7%, var(--color-bg-elevated));
+}
+
+.app-toast-info {
+  border-color: color-mix(in srgb, var(--color-action) 24%, var(--color-border));
+}
+
+.app-toast-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  flex: 1;
+}
+
+.app-toast-copy strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-toast-markdown {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.app-toast-markdown :where(p, ul, ol, table, pre) {
+  margin: 0;
+}
+
+.app-toast-markdown :where(ul, ol) {
+  padding-left: 16px;
+}
+
+.app-toast-markdown :where(table) {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.app-toast-close {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.app-toast-close:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+@keyframes app-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notification-inbox-area {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  z-index: 410;
+}
+
+.notification-inbox-button {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 94%, white 6%);
+  color: var(--color-action);
+  cursor: pointer;
+  box-shadow:
+    0 10px 26px color-mix(in srgb, var(--color-text-primary) 9%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+}
+
+.notification-inbox-button:hover,
+.notification-inbox-button-active {
+  border-color: color-mix(in srgb, var(--color-action) 30%, var(--color-border));
+  background: var(--color-action-bg);
+}
+
+.notification-inbox-button span {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--color-bg-primary);
+  border-radius: 999px;
+  background: var(--color-error);
+  color: var(--color-white);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 14px;
+}
+
+.notification-inbox-panel {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  width: min(420px, calc(100vw - 44px));
+  max-height: min(520px, calc(100vh - 86px));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 96%, white 4%);
+  box-shadow:
+    0 22px 60px color-mix(in srgb, var(--color-text-primary) 13%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+
+.notification-inbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 64%, transparent);
+}
+
+.notification-inbox-head strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-inbox-head button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+
+.notification-inbox-head button:hover:not(:disabled) {
+  background: var(--color-action-bg);
+  color: var(--color-action);
+}
+
+.notification-inbox-head button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.notification-inbox-list {
+  display: grid;
+  max-height: 450px;
+  overflow: auto;
+  padding: 8px;
+  gap: 8px;
+}
+
+.notification-inbox-item {
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 68%, transparent);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+}
+
+.notification-inbox-item:hover,
+.notification-inbox-item:focus-visible {
+  border-color: color-mix(in srgb, var(--color-action) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--color-action) 5%, var(--color-bg-elevated));
+  outline: none;
+}
+
+.notification-inbox-item-error {
+  border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border));
+}
+
+.notification-inbox-item-success {
+  border-color: color-mix(in srgb, var(--color-success) 26%, var(--color-border));
+}
+
+.notification-inbox-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.notification-inbox-item-head strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-inbox-item-head span {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.notification-inbox-markdown {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.notification-inbox-markdown :where(p, ul, ol) {
+  margin: 0 0 6px;
+}
+
+.notification-inbox-markdown :where(p, ul, ol):last-child {
+  margin-bottom: 0;
+}
+
+.notification-detail {
+  display: grid;
+  min-height: 0;
+}
+
+.notification-detail-head {
+  padding: 10px 12px;
+}
+
+.notification-detail-back,
+.notification-detail-source {
+  color: var(--color-text-secondary);
+}
+
+.notification-detail-card {
+  display: grid;
+  gap: 12px;
+  max-height: 458px;
+  overflow: auto;
+  padding: 14px;
+}
+
+.notification-detail-title {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent);
+}
+
+.notification-detail-title strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+}
+
+.notification-detail-title span {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.notification-detail-markdown {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.65;
+}
+
+.notification-detail-markdown :where(p, ul, ol, table, pre) {
+  margin-top: 0;
+}
+
+.notification-detail-markdown :where(p, ul, ol, table, pre):last-child {
+  margin-bottom: 0;
+}
+
+.notification-inbox-empty {
+  padding: 28px 14px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
 
 .update-banner {
   position: fixed;

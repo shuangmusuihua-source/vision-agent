@@ -1,5 +1,8 @@
+import { existsSync, readdirSync, statSync } from 'fs'
+import { join } from 'path'
 import { store, type CronTask } from './store-core'
 import { getBuiltinSkills } from '../skills/builtin'
+import { getAppSkillsDir } from '../skill-init'
 import { resolveEnabledSkillIds, updateSkillPreference } from '../../shared/skill-settings'
 
 // ─── Theme ──────────────────────────────────────────────────────────────
@@ -24,11 +27,32 @@ export function saveCronTasks(tasks: CronTask[]): void {
 
 // ─── Enabled skills ─────────────────────────────────────────────────────
 
+function getInstalledCommunitySkillIds(builtinSkillIds: string[]): string[] {
+  const builtin = new Set(builtinSkillIds)
+  try {
+    return readdirSync(getAppSkillsDir(), { withFileTypes: true })
+      .filter(entry => (
+        entry.isDirectory()
+        && !entry.name.startsWith('.')
+        && !entry.name.includes('.staging-')
+        && !entry.name.includes('.backup-')
+        && !builtin.has(entry.name)
+        && existsSync(join(getAppSkillsDir(), entry.name, 'SKILL.md'))
+        && statSync(join(getAppSkillsDir(), entry.name, 'SKILL.md')).isFile()
+      ))
+      .map(entry => entry.name)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
+  }
+}
+
 export function getEnabledSkills(): string[] {
   const stored = store.get('enabledSkills') || []
   const disabled = store.get('disabledSkills') || []
   const builtins = getBuiltinSkills().map((s: { id: string }) => s.id)
-  const resolved = resolveEnabledSkillIds(stored, builtins, disabled)
+  const available = [...builtins, ...getInstalledCommunitySkillIds(builtins)]
+  const resolved = resolveEnabledSkillIds(stored, builtins, disabled, available)
   if (resolved.length !== stored.length || resolved.some((skillId, index) => skillId !== stored[index])) {
     store.set('enabledSkills', resolved)
   }

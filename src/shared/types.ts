@@ -291,12 +291,21 @@ export type SessionRoutedAgentIPCMessage = AgentIPCMessage & AgentSessionEnvelop
 export type SessionRoutedPermissionRequest = PermissionRequestIPC & AgentSessionEnvelope
 export type SessionRoutedAskUserRequest = AskUserRequestIPC & AgentSessionEnvelope
 export type SessionRoutedRequestTimeout = { requestId: string } & AgentSessionEnvelope
-export type SessionRoutedNotification = { type: string; message: string; title: string } & AgentSessionEnvelope
-export type SessionRoutedSkillOutputState = SkillOutputState & AgentSessionEnvelope
-export type GeneralAgentNotification = {
+export type AgentNotificationTarget = {
+  view: 'ask' | 'editor' | 'skills' | 'automation'
+  sessionId?: string | null
+  workspacePath?: string | null
+  taskId?: string | null
+}
+export type AgentNotificationPayload = {
   type: string
   message: string
   title: string
+  target?: AgentNotificationTarget
+}
+export type SessionRoutedNotification = AgentNotificationPayload & AgentSessionEnvelope
+export type SessionRoutedSkillOutputState = SkillOutputState & AgentSessionEnvelope
+export type GeneralAgentNotification = AgentNotificationPayload & {
   workspaceCwd?: string
 }
 export type AgentNotificationEvent =

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
-import { FileText, Download, ArrowLeftRight, ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react'
+import { Bell, CheckCheck, FileText, Download, ArrowLeftRight, ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
@@ -19,7 +19,7 @@ import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { emptySlot } from '../../store/agent-store'
-import type { AgentContext, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
+import type { AgentContext, AgentNotificationEvent, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
 import { isFileTab, isOverviewTab, OVERVIEW_TAB_ID, type SdkSessionInfo } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
@@ -32,11 +32,72 @@ import type { MarkdownEditorHandle } from '../editor/MarkdownEditor'
 
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
+const AssistantMarkdown = lazy(() => import('../chat/AssistantMarkdown'))
 const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 const SkillLibrary = lazy(() => import('../skills/SkillLibrary'))
+const AutomationPanel = lazy(() => import('../automation/AutomationPanel'))
+
+type AppNotification = AgentNotificationEvent & {
+  id: string
+  receivedAt: number
+  read: boolean
+}
 
 interface AppShellProps {
   onOpenSettings: () => void
+}
+
+const MAX_IN_APP_NOTIFICATIONS = 30
+const TOAST_AUTO_DISMISS_MS = 5200
+const NOTIFICATION_STORAGE_KEY = 'sumi.inAppNotifications.v1'
+
+function notificationTimeLabel(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function notificationDateTimeLabel(timestamp: number): string {
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function getNotificationTargetLabel(notification: AppNotification): string | null {
+  const target = notification.target
+  if (target?.view === 'automation') return '自动化'
+  if (target?.view === 'skills') return '技能'
+  if (target?.view === 'ask') return 'Ask sumi'
+  if (target?.view === 'editor') return '工作区会话'
+  if ('context' in notification && notification.context === 'ask') return 'Ask sumi'
+  if ('context' in notification && notification.context === 'editor') return '工作区会话'
+  return null
+}
+
+function loadStoredNotifications(): AppNotification[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(NOTIFICATION_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item): item is AppNotification => (
+        item
+        && typeof item.id === 'string'
+        && typeof item.title === 'string'
+        && typeof item.message === 'string'
+        && typeof item.receivedAt === 'number'
+        && typeof item.read === 'boolean'
+      ))
+      .slice(0, MAX_IN_APP_NOTIFICATIONS)
+  } catch {
+    return []
+  }
 }
 
 function SidebarToggleIcon({ collapsed }: { collapsed: boolean }): React.ReactElement {
@@ -66,6 +127,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   } = useTabs()
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const [isRetryingSave, setIsRetryingSave] = useState(false)
+  const [toastNotification, setToastNotification] = useState<AppNotification | null>(null)
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => loadStoredNotifications())
+  const [notificationListOpen, setNotificationListOpen] = useState(false)
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null)
+  const [automationFocusTaskId, setAutomationFocusTaskId] = useState<string | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeFilePathRef = useRef(activeFilePath)
   activeFilePathRef.current = activeFilePath
 
@@ -113,6 +180,77 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   useEffect(() => {
     setIsRetryingSave(false)
   }, [activeFilePath])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        NOTIFICATION_STORAGE_KEY,
+        JSON.stringify(notifications.slice(0, MAX_IN_APP_NOTIFICATIONS)),
+      )
+    } catch {
+      // Notification history is helpful but non-critical.
+    }
+  }, [notifications])
+
+  useEffect(() => {
+    const clearToastTimer = () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = null
+      }
+    }
+
+    const unsubscribe = window.api.agent.onNotification((notification) => {
+      clearToastTimer()
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const nextNotification: AppNotification = {
+        ...notification,
+        id,
+        receivedAt: Date.now(),
+        read: false,
+      }
+      setNotifications((current) => [nextNotification, ...current].slice(0, MAX_IN_APP_NOTIFICATIONS))
+      setToastNotification(nextNotification)
+      toastTimerRef.current = setTimeout(() => {
+        setToastNotification((current) => current?.id === id ? null : current)
+        toastTimerRef.current = null
+      }, TOAST_AUTO_DISMISS_MS)
+    })
+
+    return () => {
+      clearToastTimer()
+      unsubscribe()
+    }
+  }, [])
+
+  const clearToastNotification = useCallback((notificationId?: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+    setToastNotification((current) => {
+      if (!notificationId || current?.id === notificationId) return null
+      return current
+    })
+  }, [])
+
+  const markNotificationRead = useCallback((notificationId: string) => {
+    setNotifications((current) => current.map((notification) => (
+      notification.id === notificationId ? { ...notification, read: true } : notification
+    )))
+  }, [])
+
+  const dismissToastNotification = useCallback(() => {
+    const notificationId = toastNotification?.id
+    clearToastNotification(notificationId)
+    if (notificationId) markNotificationRead(notificationId)
+  }, [clearToastNotification, markNotificationRead, toastNotification?.id])
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })))
+    setSelectedNotificationId(null)
+    setNotificationListOpen(false)
+  }, [])
 
   const handleRetrySave = useCallback(async () => {
     if (isRetryingSave) return
@@ -263,6 +401,68 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const overviewTab = openTabs.find(t => t.type === 'fixed')
     if (overviewTab) switchTab(overviewTab)
   }, [activeWorkspacePath, view, openTabs, switchTab, setLinkedFile])
+
+  const handleNotificationOpen = useCallback((notification: AppNotification) => {
+    markNotificationRead(notification.id)
+    clearToastNotification(notification.id)
+    setNotificationListOpen(false)
+    setSelectedNotificationId(null)
+
+    const target = notification.target
+    if (target?.view === 'automation') {
+      setAutomationFocusTaskId(target.taskId || null)
+      clearTab()
+      setView('automation')
+      return
+    }
+    if (target?.view === 'skills') {
+      clearTab()
+      setView('skills')
+      return
+    }
+    if (target?.view === 'ask') {
+      useAgentStore.setState({ context: 'ask' })
+      clearTab()
+      setView('ask')
+      return
+    }
+    if (target?.view === 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
+      if (target.sessionId && target.workspacePath) {
+        handleSessionSelect(target.sessionId, target.workspacePath)
+      }
+      return
+    }
+
+    if ('context' in notification && notification.context === 'ask') {
+      useAgentStore.setState({ context: 'ask' })
+      clearTab()
+      setView('ask')
+      return
+    }
+    if ('context' in notification && notification.context === 'editor') {
+      useAgentStore.setState({ context: 'editor' })
+      setView('editor')
+      if (notification.sessionId && notification.workspacePath) {
+        handleSessionSelect(notification.sessionId, notification.workspacePath)
+      }
+    }
+  }, [clearTab, clearToastNotification, handleSessionSelect, markNotificationRead, setView])
+
+  const handleNotificationInboxToggle = useCallback(() => {
+    setNotificationListOpen((open) => {
+      const nextOpen = !open
+      if (nextOpen) setSelectedNotificationId(null)
+      return nextOpen
+    })
+  }, [])
+
+  const handleNotificationDetailSelect = useCallback((notification: AppNotification) => {
+    clearToastNotification(notification.id)
+    markNotificationRead(notification.id)
+    setSelectedNotificationId(notification.id)
+  }, [clearToastNotification, markNotificationRead])
 
   const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
   const newSessionInputRef = useRef<HTMLInputElement>(null)
@@ -459,6 +659,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const agentStatus = useAgentStatus('editor')
   const lastEditedFile = useLastEditedFile('editor')
   const activeSkillId = useActiveSkillId('editor')
+  const toastTone = toastNotification?.type === 'error'
+    ? 'error'
+    : toastNotification?.type === 'success'
+      ? 'success'
+      : 'info'
+  const unreadNotifications = notifications.filter((notification) => !notification.read)
+  const unreadNotificationCount = unreadNotifications.length
+  const selectedNotification = selectedNotificationId
+    ? notifications.find((notification) => notification.id === selectedNotificationId) || null
+    : null
 
   // ── Agent hooks (ask context) ───────────────────────────────────────
 
@@ -668,6 +878,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         isAskZuovisActive={view === 'ask'}
         onOpenSkills={() => setView('skills')}
         isSkillsActive={view === 'skills'}
+        onOpenAutomation={() => setView('automation')}
+        isAutomationActive={view === 'automation'}
         onAskZuovisBack={handleAskZuovisBack}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
@@ -676,9 +888,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         collapsed={sidebarCollapsed}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' ? ' main-content-skills' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' || view === 'automation' ? ' main-content-skills' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
-           aria-label={view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
+           aria-label={view === 'automation' ? '自动化' : view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
         {view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
@@ -688,6 +900,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <ErrorBoundary onReset={() => {}}>
             <Suspense fallback={<div className="skill-library-loading">正在加载技能...</div>}>
               <SkillLibrary />
+            </Suspense>
+          </ErrorBoundary>
+        ) : view === 'automation' ? (
+          <ErrorBoundary onReset={() => {}}>
+            <Suspense fallback={<div className="skill-library-loading">正在加载自动化...</div>}>
+              <AutomationPanel
+                workspacePaths={workspace.workspacePaths}
+                sessions={editorSessionList}
+                activeSessionId={activeSessionId}
+                activeWorkspacePath={activeWorkspacePath}
+                focusTaskId={automationFocusTaskId}
+                onFocusTaskConsumed={() => setAutomationFocusTaskId(null)}
+              />
             </Suspense>
           </ErrorBoundary>
         ) : (
@@ -831,6 +1056,138 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       </>
       )}
       {/* ── Banners ── */}
+      {!toastNotification && (unreadNotificationCount > 0 || notificationListOpen) && (
+        <div className="notification-inbox-area">
+          <button
+            className={`notification-inbox-button${notificationListOpen ? ' notification-inbox-button-active' : ''}`}
+            onClick={handleNotificationInboxToggle}
+            aria-label={`未读通知 ${unreadNotificationCount} 条`}
+            title={`未读通知 ${unreadNotificationCount} 条`}
+          >
+            <Bell size={16} />
+            {unreadNotificationCount > 0 && <span>{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>}
+          </button>
+          {notificationListOpen && (
+            <div className="notification-inbox-panel" role="dialog" aria-label="未读通知">
+              {selectedNotification ? (
+                <div className="notification-detail">
+                  <div className="notification-inbox-head notification-detail-head">
+                    <button
+                      className="notification-detail-back"
+                      onClick={() => setSelectedNotificationId(null)}
+                    >
+                      <ChevronLeft size={14} />
+                      返回
+                    </button>
+                    {getNotificationTargetLabel(selectedNotification) && (
+                      <button
+                        className="notification-detail-source"
+                        onClick={() => handleNotificationOpen(selectedNotification)}
+                      >
+                        <ExternalLink size={14} />
+                        查看来源
+                      </button>
+                    )}
+                  </div>
+                  <article className={`notification-detail-card notification-inbox-item-${selectedNotification.type === 'error' ? 'error' : selectedNotification.type === 'success' ? 'success' : 'info'}`}>
+                    <div className="notification-detail-title">
+                      <strong>{selectedNotification.title || '通知'}</strong>
+                      <span>
+                        {notificationDateTimeLabel(selectedNotification.receivedAt)}
+                        {getNotificationTargetLabel(selectedNotification) ? ` · ${getNotificationTargetLabel(selectedNotification)}` : ''}
+                      </span>
+                    </div>
+                    <div className="notification-detail-markdown message-markdown">
+                      <Suspense fallback={<span>{selectedNotification.message}</span>}>
+                        <AssistantMarkdown text={selectedNotification.message} isStreaming={false} />
+                      </Suspense>
+                    </div>
+                  </article>
+                </div>
+              ) : (
+                <>
+                  <div className="notification-inbox-head">
+                    <strong>未读通知</strong>
+                    <button
+                      onClick={markAllNotificationsRead}
+                      disabled={unreadNotificationCount === 0}
+                      title="全部标记已读"
+                    >
+                      <CheckCheck size={14} />
+                      全部已读
+                    </button>
+                  </div>
+                  {unreadNotificationCount > 0 ? (
+                    <div className="notification-inbox-list">
+                      {unreadNotifications.map((notification) => (
+                        <article
+                          key={notification.id}
+                          className={`notification-inbox-item notification-inbox-item-${notification.type === 'error' ? 'error' : notification.type === 'success' ? 'success' : 'info'}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleNotificationDetailSelect(notification)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              handleNotificationDetailSelect(notification)
+                            }
+                          }}
+                        >
+                          <div className="notification-inbox-item-head">
+                            <strong>{notification.title || '通知'}</strong>
+                            <span>{notificationTimeLabel(notification.receivedAt)}</span>
+                          </div>
+                          <div className="notification-inbox-markdown message-markdown">
+                            <Suspense fallback={<span>{notification.message}</span>}>
+                              <AssistantMarkdown text={notification.message} isStreaming={false} />
+                            </Suspense>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="notification-inbox-empty">没有未读通知</div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {toastNotification && (
+        <div
+          className={`app-toast app-toast-${toastTone}`}
+          role="button"
+          aria-live={toastTone === 'error' ? 'assertive' : 'polite'}
+          tabIndex={0}
+          onClick={() => handleNotificationOpen(toastNotification)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              handleNotificationOpen(toastNotification)
+            }
+          }}
+        >
+          <div className="app-toast-copy">
+            <strong>{toastNotification.title || '通知'}</strong>
+            <div className="app-toast-markdown message-markdown">
+              <Suspense fallback={<span>{toastNotification.message}</span>}>
+                <AssistantMarkdown text={toastNotification.message} isStreaming={false} />
+              </Suspense>
+            </div>
+          </div>
+          <button
+            className="app-toast-close"
+            aria-label="关闭通知"
+            onClick={(event) => {
+              event.stopPropagation()
+              dismissToastNotification()
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {updateError && (
         <div className="update-banner update-banner-error">
           <span>更新失败: {updateError.slice(0, 60)}{updateError.length > 60 ? '...' : ''}</span>

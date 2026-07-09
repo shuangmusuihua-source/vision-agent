@@ -2,10 +2,16 @@ import type { CommunitySkillAudit } from '../../shared/types'
 
 const ANTHROPIC_SKILLS_REF = '35414756ca55738e050562e272a6bbc6273aa926'
 const ANTHROPIC_KNOWLEDGE_WORK_REF = '73b2b2dc0cf8467da112d0ef6b555ab022ee219d'
+const GUIZANG_PPT_SKILL_REF = '82fe5ae129e8c2a12e1155fcabed6703342749d6'
+const HUASHU_DESIGN_REF = '0e7ec8aca0058184c1a9e06e57697e84f68a3f0f'
 const AUDIT_PROVIDERS = ['Gen Agent Trust Hub', 'Socket', 'Snyk', 'Runlayer', 'ZeroLeaks'] as const
 
 function audits(overrides: Partial<Record<(typeof AUDIT_PROVIDERS)[number], CommunitySkillAudit['status']>> = {}): CommunitySkillAudit[] {
   return AUDIT_PROVIDERS.map(name => ({ name, status: overrides[name] || 'passed' }))
+}
+
+function sumiReviewed(): CommunitySkillAudit[] {
+  return [{ name: 'sumi 精选复核', status: 'reviewed' }]
 }
 
 export interface CuratedCommunitySkill {
@@ -26,6 +32,11 @@ export interface CuratedCommunitySkill {
     repository: string
     path: string
     ref: string
+  }
+  installLimits?: {
+    maxFileCount?: number
+    maxFileSize?: number
+    maxTotalSize?: number
   }
 }
 
@@ -56,6 +67,51 @@ export const CURATED_COMMUNITY_SKILLS: readonly CuratedCommunitySkill[] = [
       repository: 'skills',
       path: 'skills/frontend-design',
       ref: ANTHROPIC_SKILLS_REF,
+    },
+  },
+  {
+    id: 'guizang-ppt-skill',
+    name: 'guizang-ppt-skill',
+    author: '歸藏',
+    category: '文档与交付',
+    summary: '生成电子杂志风和瑞士国际主义风格的横向翻页网页 PPT',
+    description: '面向分享、演讲和发布会场景的 HTML 演示文稿 Skill，提供电子杂志、电子墨水和瑞士国际主义两套视觉体系，包含模板、布局、主题、截图适配和质量检查流程。',
+    tags: ['网页 PPT', '演示文稿', '电子杂志', '瑞士风'],
+    sourcePageUrl: 'https://github.com/op7418/guizang-ppt-skill',
+    repositoryUrl: 'https://github.com/op7418/guizang-ppt-skill',
+    icon: 'Presentation',
+    audits: sumiReviewed(),
+    promptTemplate: '使用 guizang-ppt-skill skill 接下来制作 PPT... {activeFile}',
+    source: {
+      owner: 'op7418',
+      repository: 'guizang-ppt-skill',
+      path: '',
+      ref: GUIZANG_PPT_SKILL_REF,
+    },
+  },
+  {
+    id: 'huashu-design',
+    name: '花叔设计',
+    author: '花叔',
+    category: '设计与界面',
+    summary: '用 HTML 做高保真原型、交互 Demo、幻灯片、动画和设计评审',
+    description: '面向视觉产出和设计探索的综合 Skill，覆盖高保真原型、设计变体、HTML 演示、动画 Demo、信息图、导出视频以及专家评审，强调从真实上下文出发并避免模板化 AI 视觉。',
+    tags: ['高保真原型', 'HTML 演示', '动画', '设计评审'],
+    sourcePageUrl: 'https://github.com/alchaincyf/huashu-design',
+    repositoryUrl: 'https://github.com/alchaincyf/huashu-design',
+    icon: 'WandSparkles',
+    audits: sumiReviewed(),
+    promptTemplate: '使用 huashu-design skill 制作 {activeFile}',
+    source: {
+      owner: 'alchaincyf',
+      repository: 'huashu-design',
+      path: '',
+      ref: HUASHU_DESIGN_REF,
+    },
+    installLimits: {
+      maxFileCount: 220,
+      maxFileSize: 6 * 1024 * 1024,
+      maxTotalSize: 40 * 1024 * 1024,
     },
   },
   {

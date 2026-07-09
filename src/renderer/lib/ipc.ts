@@ -31,6 +31,14 @@ import type {
   UpdateDownloadProgress,
   UpdateErrorPayload,
 } from '../../shared/update-types'
+import type {
+  CronScheduleParseRequest,
+  CronScheduleParseResponse,
+  CronTask,
+  CronTaskCompletedEvent,
+  CronTaskRegistration,
+  CronTaskTarget,
+} from '../../shared/cron-types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -69,19 +77,6 @@ interface SearchResult {
   workspaceName: string
   line: number
   content: string
-}
-
-// ─── Cron Task ──────────────────────────────────────────────────────
-
-interface CronTask {
-  id: string
-  name: string
-  cronExpression: string
-  prompt: string
-  createdAt: number
-  lastRunAt: number | null
-  lastResult: string | null
-  status: 'active' | 'paused'
 }
 
 // ─── Notification History ────────────────────────────────────────────
@@ -175,11 +170,14 @@ interface GraphApi {
 }
 
 interface CronApi {
-  register: (cronExpression: string, prompt: string, name?: string) => Promise<{ success: boolean; task?: CronTask; error?: string }>
+  register: (request: CronTaskRegistration) => Promise<{ success: boolean; task?: CronTask; error?: string }>
   list: () => Promise<CronTask[]>
+  resolveSchedule: (request: CronScheduleParseRequest) => Promise<CronScheduleParseResponse>
   remove: (taskId: string) => Promise<boolean>
   execute: (taskId: string) => Promise<{ success: boolean; result?: string; error?: string }>
-  onTaskCompleted: (callback: (data: unknown) => void) => () => void
+  stop: (taskId: string) => Promise<{ success: boolean; error?: string }>
+  setStatus: (taskId: string, status: CronTask['status']) => Promise<{ success: boolean; task?: CronTask; error?: string }>
+  onTaskCompleted: (callback: (data: CronTaskCompletedEvent) => void) => () => void
 }
 
 interface SkillsApi {
@@ -279,6 +277,11 @@ export type {
   GraphNode,
   GraphEdge,
   CronTask,
+  CronTaskRegistration,
+  CronScheduleParseRequest,
+  CronScheduleParseResponse,
+  CronTaskCompletedEvent,
+  CronTaskTarget,
 }
 
 export type { UpdateCheckResult }
