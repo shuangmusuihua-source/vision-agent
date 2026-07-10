@@ -133,13 +133,11 @@
     0 1px 2px color-mix(in srgb, var(--color-text-primary) 5%, transparent),
     0 14px 34px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
   transition:
-    border-color var(--duration-fast) var(--ease-default),
     box-shadow var(--duration-fast) var(--ease-default),
     transform var(--duration-fast) var(--ease-default);
 }
 
 .overview-card:hover {
-  border-color: color-mix(in srgb, var(--color-border) 60%, var(--color-action) 40%);
   box-shadow:
     0 2px 4px color-mix(in srgb, var(--color-text-primary) 6%, transparent),
     0 16px 38px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
@@ -147,10 +145,18 @@
 }
 
 .overview-card--active {
-  border-color: var(--color-action);
+  border-color: color-mix(in srgb, var(--color-border) 78%, transparent);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--color-bg-elevated) 86%, var(--color-action) 14%) 0%,
+      color-mix(in srgb, var(--color-bg-elevated) 93%, var(--color-action) 7%) 54%,
+      var(--color-bg-elevated) 100%
+    );
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-action) 16%, transparent),
-    0 16px 38px color-mix(in srgb, var(--color-action) 8%, transparent);
+    0 2px 5px color-mix(in srgb, var(--color-text-primary) 7%, transparent),
+    0 18px 42px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  transform: translateY(-1px);
 }
 
 .overview-card-head {
