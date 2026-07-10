@@ -205,7 +205,6 @@ function SkillLibrary(): React.ReactElement {
     <div className="skill-library">
       <header className="skill-library-header">
         <div>
-          <h1>技能</h1>
           <p>启用内置能力，或按需安装社区精选。</p>
         </div>
         <div className="skill-library-summary" aria-label="技能概况">
