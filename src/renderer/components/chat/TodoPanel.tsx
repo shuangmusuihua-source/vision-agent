@@ -65,7 +65,7 @@ export default function TodoPanel({ todoList, onClose }: TodoPanelProps) {
       {/* Expanded timeline */}
       {expanded && (
         <div className={styles.timeline}>
-          {todoList.tasks.map((task, i) => (
+          {todoList.tasks.map((task) => (
             <div key={task.taskId} className={`${styles.task} ${styles[`task-${task.status}`]}`}>
               <span className={styles.taskIcon}>{statusIcon(task.status)}</span>
               <span className={styles.taskLabel}>{statusLabel(task.status)}</span>

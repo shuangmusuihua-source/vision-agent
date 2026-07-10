@@ -2,7 +2,7 @@ import type { Options, HookCallbackMatcher, SettingSource } from '@anthropic-ai/
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { getApiKey, getBaseUrl, getModel, getAuthorizedDirectories, getEnabledSkills } from './store'
+import { getApiKey, getBaseUrl, getModel } from './store'
 import { getAppSkillsCwd } from './skill-init'
 
 // ─── CLI path resolution (moved from agent-manager) ────────────────────
@@ -94,8 +94,6 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   const apiKey = getApiKey()
   const model = getModel()
   const baseUrl = getBaseUrl()
-  const dirs = getAuthorizedDirectories()
-  const workspaceCwd = dirs.length > 0 ? dirs[0] : process.cwd()
   const cliPath = resolveClaudeCodeExecutable()
 
   // Base environment — only forward whitelisted vars (not entire process.env)

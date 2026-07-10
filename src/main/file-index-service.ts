@@ -320,7 +320,7 @@ export class FileIndexService {
     const edges: GraphEdge[] = []
     const filePathToId = new Map<string, string>()
 
-    for (const [filePath, data] of this.knowledgeIndex) {
+    for (const [filePath] of this.knowledgeIndex) {
       const label = path.basename(filePath, '.md')
       const isMemory = filePath.includes(`${path.sep}.vision${path.sep}memory${path.sep}`)
       const id = isMemory ? `memory:${label}` : filePath

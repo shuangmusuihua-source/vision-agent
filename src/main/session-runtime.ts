@@ -13,7 +13,7 @@ import type {
   SessionRoutedPermissionRequest,
   SessionRoutedRequestTimeout,
 } from '../shared/types'
-import { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
+import { withSessionEnvelope } from './session-envelope'
 import { SkillOutputBridge } from './skill-output-bridge'
 import { toAgentIPCMessage } from './message-converter'
 import {

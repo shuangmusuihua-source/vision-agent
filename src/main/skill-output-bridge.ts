@@ -115,7 +115,6 @@ export class SkillOutputBridge {
         }
 
         if (deltaType === 'input_json_delta') {
-          const blockIndex = (event as { index: number }).index || 0
           this.handleJsonDelta(s, queryKey, (delta as { partial_json: string }).partial_json || '', activeSkillId)
         }
         return

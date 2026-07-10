@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
-import { CornerDownLeft, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { CornerDownLeft, Check, ChevronLeft } from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
 import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
 
@@ -14,7 +14,6 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
   const [step, setStep] = useState(0)
   const [selections, setSelections] = useState<Record<string, Set<string>>>({})
   const [textInputs, setTextInputs] = useState<Record<string, string>>({})
-  const [freeText, setFreeText] = useState('')
 
   const questions = request.questions.length > 0 ? request.questions : [{
     question: request.question,
@@ -28,7 +27,6 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
   const totalSteps = questions.length
 
   const currentSelected = selections[currentQ?.question] || new Set<string>()
-  const currentText = textInputs[currentQ?.question] || ''
 
   const handleToggle = useCallback((label: string) => {
     setSelections((prev) => {
@@ -42,10 +40,6 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
       }
       return { ...prev, [qKey]: nextSet }
     })
-  }, [currentQ?.question])
-
-  const handleTextInput = useCallback((text: string) => {
-    setTextInputs((prev) => ({ ...prev, [currentQ.question]: text }))
   }, [currentQ?.question])
 
   const handleSingleSelect = useCallback((label: string) => {
@@ -82,29 +76,12 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
     }
   }, [currentQ?.question, isLastStep, selections, textInputs, questions, onRespond])
 
-  const handleFreeTextSubmit = useCallback(() => {
-    const text = freeText.trim()
-    if (!text) return
-    const qKey = currentQ.question
-    const updatedTextInputs = { ...textInputs, [qKey]: text }
-    if (isLastStep) {
-      const answers = buildAnswers(selections, updatedTextInputs, questions)
-      onRespond(answers)
-    } else {
-      setTextInputs(updatedTextInputs)
-      setFreeText('')
-      setStep((s) => s + 1)
-    }
-  }, [freeText, currentQ?.question, isLastStep, selections, textInputs, questions, onRespond])
-
   const handlePrev = useCallback(() => {
     setStep((s) => Math.max(0, s - 1))
-    setFreeText('')
   }, [])
 
   const hasOptions = currentQ?.options && currentQ.options.length > 0
   const canSubmitMulti = currentQ?.multiSelect && currentSelected.size > 0
-  const canSubmitText = freeText.trim().length > 0
 
   return (
     <InputDrawer open={open} onClose={onClose}>

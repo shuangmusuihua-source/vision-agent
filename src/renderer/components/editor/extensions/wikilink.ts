@@ -70,7 +70,7 @@ export const Wikilink = Node.create<WikilinkOptions>({
     ]
   },
 
-  renderMarkdown(node, helpers, context) {
+  renderMarkdown(node) {
     return `[[${node.attrs?.target || ''}]]`
   },
 
@@ -86,7 +86,7 @@ export const Wikilink = Node.create<WikilinkOptions>({
     start(src: string) {
       return src.indexOf('[[')
     },
-    tokenize(src: string, tokens, helpers) {
+    tokenize(src: string) {
       const match = src.match(/^\[\[([^\]]+)\]\]/)
       if (match) {
         return { type: 'wikilink', raw: match[0], text: match[1] }
@@ -133,7 +133,7 @@ export const Wikilink = Node.create<WikilinkOptions>({
       new Plugin({
         key: WikilinkPluginKey,
         props: {
-          handleClick(view, _pos, event) {
+          handleClick(_view, _pos, event) {
             const target = (event.target as HTMLElement).closest('.wikilink')
             if (target) {
               const linkTarget = target.getAttribute('data-target')

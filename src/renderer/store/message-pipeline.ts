@@ -1,5 +1,4 @@
 import type {
-  AgentContext,
   AgentIPCMessage,
   AgentEvent,
   ConversationMessage,

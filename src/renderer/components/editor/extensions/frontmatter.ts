@@ -187,7 +187,7 @@ export const Frontmatter = Node.create<FrontmatterOptions>({
       new Plugin({
         key: FrontmatterPluginKey,
         props: {
-          handleClick(view, _pos, event) {
+          handleClick(_view, _pos, event) {
             const target = event.target as HTMLElement
             const toggle = target.closest('.frontmatter-toggle')
             if (toggle) return true

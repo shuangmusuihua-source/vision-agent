@@ -113,7 +113,7 @@ function SuggestionList({ items, command, selectedIndex }: {
 }
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMode, onOpenFile, onSave, onAskAgent, onStatsUpdate }, ref): React.ReactElement {
-  const [markdownFiles, setMarkdownFiles] = useState<MarkdownFile[]>([])
+  const [, setMarkdownFiles] = useState<MarkdownFile[]>([])
   const filesRef = useRef<MarkdownFile[]>([])
   const [internalSourceMode, setInternalSourceMode] = useState(sourceMode)
   const [sourceText, setSourceText] = useState('')
@@ -357,7 +357,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       attributes: {
         class: `markdown-editor${focusMode ? ' focus-mode' : ''}`
       },
-      handleClick: (view, pos) => {
+      handleClick: (view) => {
         if (!view.hasFocus()) {
           view.focus()
         }
