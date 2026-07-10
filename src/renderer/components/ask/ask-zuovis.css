@@ -335,18 +335,40 @@
 }
 
 .ask-zuovis-capsule {
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--color-bg-elevated) 96%, var(--color-bg-tertiary) 4%);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
   border-radius: 22px;
   padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 20px 46px color-mix(in srgb, var(--color-text-primary) 8%, transparent),
+    0 2px 8px color-mix(in srgb, var(--color-text-primary) 4%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-white) 92%, transparent);
   -electron-corner-smoothing: system-ui;
   pointer-events: auto;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.ask-zuovis-capsule:hover {
+  background: var(--color-bg-elevated);
+  box-shadow:
+    0 22px 50px color-mix(in srgb, var(--color-text-primary) 9%, transparent),
+    0 2px 8px color-mix(in srgb, var(--color-text-primary) 4%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-white) 94%, transparent);
+}
+
+.ask-zuovis-capsule:focus-within {
+  background: var(--color-bg-elevated);
+  box-shadow:
+    0 22px 50px color-mix(in srgb, var(--color-text-primary) 9%, transparent),
+    0 2px 8px color-mix(in srgb, var(--color-text-primary) 4%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-white) 94%, transparent);
 }
 
 .ask-zuovis-input:focus {
@@ -518,9 +540,12 @@
 }
 
 [data-theme="dark"] .ask-zuovis-capsule {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-bg-elevated) 94%, var(--color-white) 3%);
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 [data-theme="dark"] .ask-zuovis-send-btn {

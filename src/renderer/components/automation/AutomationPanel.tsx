@@ -405,7 +405,6 @@ function AutomationPanel({
     <div className="automation-panel">
       <header className="automation-hero">
         <div>
-          <h1>自动化</h1>
           <p>创建周期任务，按需关联会话、工作区或目录，并记录每次运行结果。</p>
         </div>
         <div className="automation-hero-stats" aria-label="自动化任务统计">
