@@ -9,6 +9,7 @@ import {
   FileClock,
   Folder,
   Globe2,
+  Link2,
   Loader2,
   Play,
   Plus,
@@ -19,10 +20,12 @@ import {
   Trash2,
   WifiOff,
   Workflow,
+  X,
   XCircle,
 } from 'lucide-react'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { CronTask, CronTaskRegistration, CronTaskTarget } from '../../lib/ipc'
+import { MAX_CRON_LINKED_URLS, normalizeCronLinkedUrls } from '../../../shared/cron-linked-urls'
 import './AutomationPanel.css'
 
 const AssistantMarkdown = lazy(() => import('../chat/AssistantMarkdown'))
@@ -175,6 +178,7 @@ function AutomationPanel({
   const [selectedSessionId, setSelectedSessionId] = useState(defaultSessionId)
   const [selectedWorkspacePath, setSelectedWorkspacePath] = useState(defaultWorkspace)
   const [selectedDirectoryPath, setSelectedDirectoryPath] = useState('')
+  const [linkedUrlInputs, setLinkedUrlInputs] = useState<string[]>([''])
   const [allowNetwork, setAllowNetwork] = useState(false)
   const [notifyOnCompletion, setNotifyOnCompletion] = useState(true)
 
@@ -207,6 +211,14 @@ function AutomationPanel({
         ? '等待解析执行频率'
         : '描述执行频率'
     : scheduleLabel
+
+  const linkedUrlValidation = useMemo(() => {
+    try {
+      return { urls: normalizeCronLinkedUrls(linkedUrlInputs), error: null }
+    } catch (err) {
+      return { urls: [] as string[], error: (err as Error).message || '关联网址格式不正确' }
+    }
+  }, [linkedUrlInputs])
 
   const refreshTasks = useCallback(async () => {
     setLoading(true)
@@ -304,6 +316,7 @@ function AutomationPanel({
   }, [customCron, customCronSource, customScheduleText])
 
   const handleCreate = useCallback(async () => {
+    if (linkedUrlValidation.error) return
     const target = buildTarget()
     let nextCronExpression = cronExpression.trim()
     if (frequencyMode === 'custom') {
@@ -319,7 +332,8 @@ function AutomationPanel({
         prompt,
         cronExpression: nextCronExpression,
         target,
-        allowNetwork,
+        linkedUrls: linkedUrlValidation.urls,
+        allowNetwork: allowNetwork || linkedUrlValidation.urls.length > 0,
         notifyOnCompletion,
       }
       const result = await window.api.cron.register(registration)
@@ -330,6 +344,7 @@ function AutomationPanel({
       setCustomCron('')
       setCustomCronSource('')
       setCustomScheduleError(null)
+      setLinkedUrlInputs([''])
       setAllowNetwork(false)
       setNotifyOnCompletion(true)
       await refreshTasks()
@@ -339,7 +354,7 @@ function AutomationPanel({
     } finally {
       setCreating(false)
     }
-  }, [allowNetwork, buildTarget, cronExpression, frequencyMode, name, notifyOnCompletion, prompt, refreshTasks, resolveCustomSchedule])
+  }, [allowNetwork, buildTarget, cronExpression, frequencyMode, linkedUrlValidation, name, notifyOnCompletion, prompt, refreshTasks, resolveCustomSchedule])
 
   const handleRun = useCallback(async (taskId: string) => {
     setRunningTaskId(taskId)
@@ -398,6 +413,7 @@ function AutomationPanel({
   const canCreate = Boolean(
     prompt.trim() &&
     (frequencyMode === 'custom' ? customScheduleText.trim() : cronExpression.trim()) &&
+    !linkedUrlValidation.error &&
     !resolvingSchedule
   )
 
@@ -405,7 +421,7 @@ function AutomationPanel({
     <div className="automation-panel">
       <header className="automation-hero">
         <div>
-          <p>创建周期任务，按需关联会话、工作区或目录，并记录每次运行结果。</p>
+          <p>创建周期任务，按需关联会话、工作区、目录或网址，并记录每次运行结果。</p>
         </div>
         <div className="automation-hero-stats" aria-label="自动化任务统计">
           <span><strong>{tasks.length}</strong> 任务</span>
@@ -547,6 +563,57 @@ function AutomationPanel({
               </button>
             </div>
           )}
+
+          <div className="automation-field automation-field-wide automation-url-field">
+            <div className="automation-url-field-head">
+              <span>关联网址（可选）</span>
+              <button
+                className="automation-add-url-button"
+                type="button"
+                onClick={() => setLinkedUrlInputs((current) => [...current, ''])}
+                disabled={linkedUrlInputs.length >= MAX_CRON_LINKED_URLS}
+              >
+                <Plus size={13} />
+                添加网址
+                <em>{linkedUrlValidation.urls.length}/{MAX_CRON_LINKED_URLS}</em>
+              </button>
+            </div>
+            <div className="automation-url-list">
+              {linkedUrlInputs.map((url, index) => (
+                <div className="automation-url-row" key={index}>
+                  <Link2 size={15} aria-hidden="true" />
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={url}
+                    onChange={(event) => setLinkedUrlInputs((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                    placeholder="https://example.com/report"
+                    aria-label={`关联网址 ${index + 1}`}
+                    aria-invalid={Boolean(linkedUrlValidation.error)}
+                  />
+                  {(linkedUrlInputs.length > 1 || url) && (
+                    <button
+                      className="automation-remove-url-button"
+                      type="button"
+                      onClick={() => setLinkedUrlInputs((current) => {
+                        const next = current.filter((_, itemIndex) => itemIndex !== index)
+                        return next.length > 0 ? next : ['']
+                      })}
+                      title={`移除网址 ${index + 1}`}
+                      aria-label={`移除网址 ${index + 1}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {linkedUrlValidation.error ? (
+              <em className="automation-schedule-error">{linkedUrlValidation.error}</em>
+            ) : (
+              <em className="automation-schedule-hint">最多 3 个；未填写协议时默认使用 https://。关联网址后会自动允许联网。</em>
+            )}
+          </div>
         </div>
 
         <label className="automation-field automation-prompt-field">
@@ -561,12 +628,14 @@ function AutomationPanel({
         <div className="automation-builder-footer">
           <div className="automation-option-row">
             <button
-              className={`automation-toggle ${allowNetwork ? 'automation-toggle-active' : ''}`}
+              className={`automation-toggle ${allowNetwork || linkedUrlValidation.urls.length > 0 ? 'automation-toggle-active' : ''}`}
               onClick={() => setAllowNetwork((value) => !value)}
               type="button"
+              disabled={linkedUrlValidation.urls.length > 0}
+              title={linkedUrlValidation.urls.length > 0 ? '关联网址需要联网能力' : undefined}
             >
-              {allowNetwork ? <Globe2 size={16} /> : <WifiOff size={16} />}
-              {allowNetwork ? '允许联网' : '不联网'}
+              {allowNetwork || linkedUrlValidation.urls.length > 0 ? <Globe2 size={16} /> : <WifiOff size={16} />}
+              {linkedUrlValidation.urls.length > 0 ? '网址需要联网' : allowNetwork ? '允许联网' : '不联网'}
             </button>
             <button
               className={`automation-toggle ${notifyOnCompletion ? 'automation-toggle-active' : ''}`}
@@ -662,6 +731,7 @@ function AutomationPanel({
                   <div><dt>Cron</dt><dd>{selectedTask.cronExpression}</dd></div>
                   <div><dt>目标</dt><dd>{targetLabel(selectedTask.target)}</dd></div>
                   <div><dt>位置</dt><dd title={targetDetail(selectedTask.target)}>{targetDetail(selectedTask.target)}</dd></div>
+                  <div><dt>网址</dt><dd>{selectedTask.linkedUrls?.length ? `${selectedTask.linkedUrls.length} 个` : '未关联'}</dd></div>
                   <div><dt>联网</dt><dd>{selectedTask.allowNetwork ? '允许' : '不联网'}</dd></div>
                   <div><dt>通知</dt><dd>{selectedTask.notifyOnCompletion === false ? '不通知' : '应用内通知'}</dd></div>
                   <div><dt>创建</dt><dd>{formatTime(selectedTask.createdAt)}</dd></div>
@@ -674,6 +744,20 @@ function AutomationPanel({
                 <h4>任务提示词</h4>
                 <p className="automation-detail-prompt">{selectedTask.prompt}</p>
               </section>
+
+              {selectedTask.linkedUrls && selectedTask.linkedUrls.length > 0 && (
+                <section className="automation-detail-card automation-detail-card-wide">
+                  <h4>关联网址</h4>
+                  <div className="automation-linked-url-list">
+                    {selectedTask.linkedUrls.map((url) => (
+                      <div className="automation-linked-url" key={url} title={url}>
+                        <Link2 size={14} />
+                        <span>{url}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <section className="automation-detail-card automation-detail-card-wide">
                 <h4>运行结果</h4>
@@ -798,6 +882,7 @@ function AutomationPanel({
 
                   <dl className="automation-card-meta">
                     <div><dt>目标</dt><dd>{targetLabel(task.target)}</dd></div>
+                    <div><dt>网址</dt><dd>{task.linkedUrls?.length ? `${task.linkedUrls.length} 个` : '未关联'}</dd></div>
                     <div><dt>配置</dt><dd>{task.allowNetwork ? '联网' : '不联网'} · {task.notifyOnCompletion === false ? '不通知' : '通知'}</dd></div>
                     <div><dt>最近</dt><dd>{isRunning ? '正在运行' : task.lastStatus ? formatTime(task.lastRunAt) : '尚未运行'}</dd></div>
                   </dl>

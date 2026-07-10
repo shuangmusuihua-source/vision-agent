@@ -123,7 +123,8 @@ describe('cron manager automation tasks', () => {
     const task = manager.registerTask({
       cronExpression: '0 9 * * *',
       prompt: 'summarize updates',
-      allowNetwork: true,
+      linkedUrls: ['https://example.com/updates'],
+      allowNetwork: false,
       target: {
         type: 'directory',
         directoryPath: '/tmp/automation-target',
@@ -134,17 +135,21 @@ describe('cron manager automation tasks', () => {
 
     expect(buildAgentOptions).toHaveBeenCalledWith(expect.objectContaining({
       cwd: '/tmp/automation-target',
-      allowedTools: expect.arrayContaining(['Read', 'Write', 'WebSearch', 'WebFetch']),
+      allowedTools: [],
       settingSources: [],
       skills: [],
     }))
+    const profile = buildAgentOptions.mock.calls[0][0]
+    await expect(profile.canUseTool('WebFetch', {})).resolves.toEqual(expect.objectContaining({ behavior: 'allow' }))
+    await expect(profile.canUseTool('Bash', {})).resolves.toEqual(expect.objectContaining({ behavior: 'deny' }))
     expect(query).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: expect.stringContaining('summarize updates'),
+      prompt: expect.stringMatching(/https:\/\/example\.com\/updates[\s\S]*只能使用 WebFetch 或 WebSearch[\s\S]*summarize updates/),
       options: expect.objectContaining({
         cwd: '/tmp/automation-target',
         abortController: expect.any(AbortController),
       }),
     }))
+    expect(task.allowNetwork).toBe(true)
     expect(task.lastStatus).toBe('success')
     expect(task.runCount).toBe(1)
     expect(task.resultHistory?.[0]).toEqual(expect.objectContaining({

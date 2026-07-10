@@ -593,8 +593,8 @@ function Sidebar({
             ref={quickMenuBtnRef}
             className={`sidebar-app-btn${showQuickMenu ? ' sidebar-app-btn-active' : ''}`}
             onClick={toggleQuickMenu}
-            title="sumi 快捷设置"
-            aria-label="sumi 快捷设置"
+            title="工作有问题，Ask sumi"
+            aria-label="工作有问题，Ask sumi"
             aria-expanded={showQuickMenu}
           >
             <img src={appLogo} alt="" />
@@ -623,7 +623,7 @@ function Sidebar({
             <img src={appLogo} alt="" />
           </span>
           <span>
-            <span className="sidebar-quick-title">sumi 快捷设置</span>
+            <span className="sidebar-quick-title">工作有问题，Ask sumi</span>
             <span className="sidebar-quick-subtitle">
               {activeProfile ? `当前模型 · ${activeProfile.name}` : '尚未选择模型配置'}
             </span>

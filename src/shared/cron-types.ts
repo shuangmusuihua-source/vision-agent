@@ -25,6 +25,7 @@ export interface CronTaskRegistration {
   cronExpression: string
   prompt: string
   target?: CronTaskTarget | null
+  linkedUrls?: string[]
   allowNetwork?: boolean
   notifyOnCompletion?: boolean
 }
@@ -53,6 +54,7 @@ export interface CronTask {
   lastResult: string | null
   status: CronTaskStatus
   target?: CronTaskTarget | null
+  linkedUrls?: string[]
   allowNetwork?: boolean
   notifyOnCompletion?: boolean
   lastStatus?: CronTaskRunStatus | null

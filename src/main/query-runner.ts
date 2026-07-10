@@ -66,7 +66,9 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       tool: tool_name,
       result: JSON.stringify(tool_response).substring(0, 500)
     })
-    sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'completed')
+    if (toolUseID) {
+      sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'completed')
+    }
     if (
       hookContext.envelope.context === 'editor'
       && isSessionFileMutationTool(tool_name)
@@ -87,7 +89,9 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       tool: tool_name,
       result: error.substring(0, 500),
     })
-    sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'failed')
+    if (toolUseID) {
+      sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'failed')
+    }
     return {}
   }
 
@@ -170,7 +174,9 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
   return buildAgentOptions({
     permissionMode: 'default',
-    allowedTools: ['WebSearch', 'WebFetch'],
+    // Bare allow-list entries bypass canUseTool in recent SDK versions. Keep
+    // this empty so every tool request reaches the session authorization gate.
+    allowedTools: [],
     includePartialMessages: true,
     settingSources: ['project'],
     managedSettings: {

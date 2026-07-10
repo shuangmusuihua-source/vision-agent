@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import yaml from 'js-yaml'
+import { load as parseYaml } from 'js-yaml'
 
 export const FrontmatterPluginKey = new PluginKey('frontmatter')
 
@@ -130,7 +130,7 @@ export const Frontmatter = Node.create<FrontmatterOptions>({
         if (!raw) return
 
         try {
-          const parsed = yaml.load(raw) as Record<string, unknown> | null
+          const parsed = parseYaml(raw) as Record<string, unknown> | null
           if (parsed && typeof parsed === 'object') {
             const table = document.createElement('table')
             table.className = 'frontmatter-table'

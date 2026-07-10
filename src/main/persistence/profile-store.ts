@@ -67,7 +67,8 @@ export function addProfile(profile: ModelProfile): void {
   const profiles = store.get('profiles')
   const newProfiles = [...profiles, encryptedProfile]
   const newActiveId = store.get('activeProfileId') || profile.id
-  store.set({ profiles: newProfiles, activeProfileId: newActiveId })
+  store.set('profiles', newProfiles)
+  store.set('activeProfileId', newActiveId)
 }
 
 export function updateProfile(id: string, updates: Partial<ModelProfile>): void {
@@ -90,7 +91,8 @@ export function removeProfile(id: string): void {
   const newActiveId = currentActiveId === id
     ? (newProfiles.length > 0 ? newProfiles[0].id : null)
     : currentActiveId
-  store.set({ profiles: newProfiles, activeProfileId: newActiveId })
+  store.set('profiles', newProfiles)
+  store.set('activeProfileId', newActiveId)
 }
 
 export function setActiveProfile(id: string): void {

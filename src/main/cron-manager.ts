@@ -13,6 +13,7 @@ import {
 import { buildAgentOptions } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
 import { extractToolPathInput, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
+import { normalizeCronLinkedUrls, sanitizeCronLinkedUrls } from '../shared/cron-linked-urls'
 
 const MAX_RUN_HISTORY = 10
 
@@ -28,11 +29,13 @@ function createRunId(taskId: string): string {
 }
 
 function normalizeTask(task: CronTask): CronTask {
+  const linkedUrls = sanitizeCronLinkedUrls(task.linkedUrls)
   return {
     ...task,
     status: task.status || 'active',
     target: task.target ?? null,
-    allowNetwork: task.allowNetwork ?? false,
+    linkedUrls,
+    allowNetwork: linkedUrls.length > 0 || (task.allowNetwork ?? false),
     notifyOnCompletion: task.notifyOnCompletion ?? true,
     lastStatus: task.lastStatus ?? null,
     lastError: task.lastError ?? null,
@@ -95,6 +98,11 @@ function buildTaskPrompt(task: CronTask): string {
     context.push(`关联目录：${target.directoryPath}`)
   }
 
+  if (task.linkedUrls?.length) {
+    context.push(`关联网址：\n${task.linkedUrls.map((url) => `- ${url}`).join('\n')}`)
+    context.push('请优先访问并参考以上关联网址，再完成任务要求。访问关联网址时只能使用 WebFetch 或 WebSearch；禁止使用 Bash、curl、wget、浏览器 CLI 或其他命令行联网方式。')
+  }
+
   context.push(task.allowNetwork ? '本任务允许联网检索。' : '本任务不允许联网检索。')
 
   return `${context.join('\n')}\n\n任务要求：\n${task.prompt}`
@@ -152,6 +160,7 @@ export function restorePersistedTasks(): void {
 export function registerTask(registration: CronTaskRegistration): CronTask {
   const id = `cron-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
   const prompt = registration.prompt.trim()
+  const linkedUrls = normalizeCronLinkedUrls(registration.linkedUrls)
   const task: CronTask = normalizeTask({
     id,
     name: registration.name?.trim() || prompt.substring(0, 30) || '未命名自动化',
@@ -162,7 +171,8 @@ export function registerTask(registration: CronTaskRegistration): CronTask {
     lastResult: null,
     status: 'active',
     target: registration.target ?? null,
-    allowNetwork: registration.allowNetwork ?? false,
+    linkedUrls,
+    allowNetwork: linkedUrls.length > 0 || (registration.allowNetwork ?? false),
     notifyOnCompletion: registration.notifyOnCompletion ?? true,
   })
 
@@ -207,16 +217,23 @@ export async function executeTask(task: CronTask): Promise<void> {
     const allowedTools = task.allowNetwork
       ? ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'WebSearch', 'WebFetch']
       : ['Read', 'Glob', 'Grep', 'Write', 'Edit']
+    const allowedToolNames = new Set(allowedTools)
 
     const options = buildAgentOptions({
       cwd,
       permissionMode: 'acceptEdits',
-      allowedTools,
+      // Bare allowedTools entries bypass canUseTool in recent SDK versions.
+      // Keep this empty so every automation tool call reaches our whitelist
+      // and session-scoped path authorization below.
+      allowedTools: [],
       restrictiveBaseUrl: true,
       settingSources: [],
       skills: [],
       prependUserBinPaths: false,
       canUseTool: async (toolName, input) => {
+        if (!allowedToolNames.has(toolName)) {
+          return { behavior: 'deny' as const, message: 'Tool not allowed for automation task' }
+        }
         const toolInput = typeof input === 'object' && input !== null ? input : {}
         const filePath = extractToolPathInput(toolName, toolInput)
         if (!filePath && toolRequiresPath(toolName)) {
