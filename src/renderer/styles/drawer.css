@@ -4,7 +4,7 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 8px 4px;
 }
 
 .drawer {
@@ -21,11 +21,11 @@
   width: 100%;
   min-width: 0;
   padding: 0 8px 0 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-soft);
   border-radius: 999px;
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-secondary);
   color: var(--color-text-secondary);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 .drawer-lip-left {

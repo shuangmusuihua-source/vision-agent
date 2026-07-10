@@ -1838,26 +1838,26 @@
 
 /* --- Ask sumi Sidebar Entry --- */
 
+.sidebar-primary-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 0 8px;
+}
+
 .sidebar-ask-zuovis {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: calc(100% - 16px);
-  margin: 0 8px 12px;
+  width: 100%;
+  margin: 0;
   padding: 8px 12px;
   border-radius: 14px;
   -electron-corner-smoothing: system-ui;
   cursor: pointer;
   transition: background 0.2s, box-shadow 0.2s;
   -webkit-app-region: no-drag;
-}
-
-.sidebar-ask-zuovis:not(.sidebar-skills-entry) {
-  margin-bottom: 4px;
-}
-
-.sidebar-skills-entry {
-  margin-bottom: 12px;
 }
 
 .sidebar-skills-icon {

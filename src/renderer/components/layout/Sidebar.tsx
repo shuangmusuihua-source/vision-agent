@@ -316,38 +316,40 @@ function Sidebar({
       <div className="sidebar-header" aria-hidden="true" />
 
       <div className="sidebar-content">
-        {/* Ask sumi */}
-        <div
-          className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`}
-          onClick={onAskZuovis}
-          role="button" tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
-        >
-          <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
-          <span className="sidebar-ask-zuovis-label">Ask {ASK_ASSISTANT_NAME}</span>
-          {isAskZuovisActive && isAskZuovisInChat && (
-            <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
-          )}
-        </div>
+        <div className="sidebar-primary-nav" aria-label="主要功能">
+          {/* Ask sumi */}
+          <div
+            className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`}
+            onClick={onAskZuovis}
+            role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
+          >
+            <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
+            <span className="sidebar-ask-zuovis-label">Ask {ASK_ASSISTANT_NAME}</span>
+            {isAskZuovisActive && isAskZuovisInChat && (
+              <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
+            )}
+          </div>
 
-        <div
-          className={`sidebar-ask-zuovis sidebar-skills-entry${isSkillsActive ? ' sidebar-ask-zuovis-active' : ''}`}
-          onClick={onOpenSkills}
-          role="button" tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSkills() } }}
-        >
-          <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Blocks size={13} /></div>
-          <span className="sidebar-ask-zuovis-label">技能</span>
-        </div>
+          <div
+            className={`sidebar-ask-zuovis sidebar-skills-entry${isSkillsActive ? ' sidebar-ask-zuovis-active' : ''}`}
+            onClick={onOpenSkills}
+            role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSkills() } }}
+          >
+            <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Blocks size={13} /></div>
+            <span className="sidebar-ask-zuovis-label">技能</span>
+          </div>
 
-        <div
-          className={`sidebar-ask-zuovis sidebar-skills-entry${isAutomationActive ? ' sidebar-ask-zuovis-active' : ''}`}
-          onClick={onOpenAutomation}
-          role="button" tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenAutomation() } }}
-        >
-          <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Workflow size={13} /></div>
-          <span className="sidebar-ask-zuovis-label">自动化</span>
+          <div
+            className={`sidebar-ask-zuovis sidebar-skills-entry${isAutomationActive ? ' sidebar-ask-zuovis-active' : ''}`}
+            onClick={onOpenAutomation}
+            role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenAutomation() } }}
+          >
+            <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Workflow size={13} /></div>
+            <span className="sidebar-ask-zuovis-label">自动化</span>
+          </div>
         </div>
 
         {/* Workspaces with sessions */}
