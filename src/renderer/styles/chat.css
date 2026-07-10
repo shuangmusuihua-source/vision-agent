@@ -1421,9 +1421,9 @@
   background: var(--color-bg-secondary);
 }
 
-/* --- Skill Output Card --- */
+/* --- Live Generation Activity Card --- */
 
-.skill-output-card {
+.generation-activity-card {
   width: 100%;
   max-width: 100%;
   border: none;
@@ -1433,12 +1433,6 @@
   background: var(--color-bg-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   min-width: 0;
-}
-
-.skill-output-card-streaming {
-}
-
-.skill-output-card-completed {
 }
 
 @keyframes generating-dots {
@@ -1451,7 +1445,7 @@
 .generating-dots span:nth-child(2) { animation: generating-dots 1.4s ease-in-out 0.2s infinite; }
 .generating-dots span:nth-child(3) { animation: generating-dots 1.4s ease-in-out 0.4s infinite; }
 
-.skill-output-card-header {
+.generation-activity-card-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1462,15 +1456,12 @@
   color: var(--color-text-secondary);
 }
 
-.skill-output-card-lang {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  background: var(--color-bg-tertiary);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
+.generation-activity-card-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
-.skill-output-card-lines {
+.generation-activity-card-lines {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   display: inline-flex;
@@ -1481,6 +1472,9 @@
 .odometer-number {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+  transition: min-width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .odometer {
@@ -1488,10 +1482,14 @@
   display: inline-block;
   overflow: hidden;
   vertical-align: bottom;
+  height: 1.25em;
+  line-height: 1.25;
 }
 
 .odometer-digit {
   display: inline-block;
+  min-width: 0.62em;
+  text-align: center;
 }
 
 .odometer-digit.placeholder {
@@ -1505,40 +1503,38 @@
 }
 
 .odometer-digit.exit {
-  animation: odometer-exit 0.3s ease-in forwards;
+  animation: odometer-exit 0.36s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   position: absolute;
   left: 0;
   top: 0;
+  will-change: transform, opacity, filter;
 }
 
 .odometer-digit.enter {
-  animation: odometer-enter 0.3s ease-out forwards;
+  animation: odometer-enter 0.36s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   position: absolute;
   left: 0;
   top: 0;
+  will-change: transform, opacity, filter;
 }
 
 @keyframes odometer-exit {
-  from { transform: translateY(0); opacity: 1; }
-  to { transform: translateY(-100%); opacity: 0; }
+  from { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+  to { transform: translateY(-82%) scale(0.92); opacity: 0; filter: blur(1.5px); }
 }
 
 @keyframes odometer-enter {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(82%) scale(0.92); opacity: 0; filter: blur(1.5px); }
+  to { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
 }
 
-.skill-output-card-status {
+.generation-activity-card-status {
   margin-left: auto;
   font-size: var(--font-size-xs);
   color: var(--color-action);
 }
 
-.skill-output-card-status.done {
-  color: var(--color-success);
-}
-
-.skill-output-card-body {
+.generation-activity-card-body {
   background: var(--color-bg-secondary);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
@@ -1547,13 +1543,10 @@
   padding: 6px 12px 8px;
   overflow: hidden;
   border-top: 1px solid var(--color-border-soft);
-}
-
-.skill-output-card-streaming .skill-output-card-body {
   height: calc(var(--font-size-xs) * 1.5 * 5 + 14px); /* 5 lines + padding */
 }
 
-.skill-output-card-body pre {
+.generation-activity-card-body pre {
   margin: 0;
   white-space: pre;
   tab-size: 2;
@@ -1564,13 +1557,13 @@
 }
 
 /* Lowlight syntax highlighting */
-.skill-output-card-body .hljs-tag { color: var(--color-action); }
-.skill-output-card-body .hljs-attr { color: var(--color-success); }
-.skill-output-card-body .hljs-string { color: #c4882d; }
-.skill-output-card-body .hljs-comment { color: var(--color-text-tertiary); }
-.skill-output-card-body .hljs-name { color: var(--color-action); }
-.skill-output-card-body .hljs-keyword { color: #b05fd4; }
-.skill-output-card-body .hljs-number { color: #c07a4e; }
+.generation-activity-card-body .hljs-tag { color: var(--color-action); }
+.generation-activity-card-body .hljs-attr { color: var(--color-success); }
+.generation-activity-card-body .hljs-string { color: #c4882d; }
+.generation-activity-card-body .hljs-comment { color: var(--color-text-tertiary); }
+.generation-activity-card-body .hljs-name { color: var(--color-action); }
+.generation-activity-card-body .hljs-keyword { color: #b05fd4; }
+.generation-activity-card-body .hljs-number { color: #c07a4e; }
 
 /* --- Artifact Action Buttons --- */
 
@@ -1615,26 +1608,47 @@
 
 /* --- Dark mode skill output --- */
 
-[data-theme="dark"] .skill-output-card {
+[data-theme="dark"] .generation-activity-card {
   background: var(--color-bg-elevated);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .skill-output-card-header {
+[data-theme="dark"] .generation-activity-card-header {
   background: var(--color-bg-elevated);
 }
 
-[data-theme="dark"] .skill-output-card-body {
+[data-theme="dark"] .generation-activity-card-body {
   background: rgba(0, 0, 0, 0.45);
 }
 
-[data-theme="dark"] .skill-output-card-body .hljs-tag { color: #56b6c2; }
-[data-theme="dark"] .skill-output-card-body .hljs-attr { color: #98c379; }
-[data-theme="dark"] .skill-output-card-body .hljs-name { color: #61afef; }
-[data-theme="dark"] .skill-output-card-body .hljs-comment { color: #5c6370; }
-[data-theme="dark"] .skill-output-card-body .hljs-string { color: #e5c07b; }
-[data-theme="dark"] .skill-output-card-body .hljs-keyword { color: #c678dd; }
-[data-theme="dark"] .skill-output-card-body .hljs-number { color: #d19a66; }
+[data-theme="dark"] .generation-activity-card-body .hljs-tag { color: #56b6c2; }
+[data-theme="dark"] .generation-activity-card-body .hljs-attr { color: #98c379; }
+[data-theme="dark"] .generation-activity-card-body .hljs-name { color: #61afef; }
+[data-theme="dark"] .generation-activity-card-body .hljs-comment { color: #5c6370; }
+[data-theme="dark"] .generation-activity-card-body .hljs-string { color: #e5c07b; }
+[data-theme="dark"] .generation-activity-card-body .hljs-keyword { color: #c678dd; }
+[data-theme="dark"] .generation-activity-card-body .hljs-number { color: #d19a66; }
+
+@media (prefers-reduced-motion: reduce) {
+  .generating-dots span {
+    animation: none;
+  }
+
+  .odometer-number {
+    transition: none;
+  }
+
+  .odometer-digit.exit {
+    display: none;
+  }
+
+  .odometer-digit.enter {
+    animation: none;
+    transform: none;
+    opacity: 1;
+    filter: none;
+  }
+}
 
 [data-theme="dark"] .skill-status-bar {
   background: rgba(255, 255, 255, 0.06);

@@ -291,6 +291,7 @@ export type SessionRoutedAgentIPCMessage = AgentIPCMessage & AgentSessionEnvelop
 export type SessionRoutedPermissionRequest = PermissionRequestIPC & AgentSessionEnvelope
 export type SessionRoutedAskUserRequest = AskUserRequestIPC & AgentSessionEnvelope
 export type SessionRoutedRequestTimeout = { requestId: string } & AgentSessionEnvelope
+export type SessionRoutedGenerationActivity = GenerationActivity & AgentSessionEnvelope
 export type AgentNotificationTarget = {
   view: 'ask' | 'editor' | 'skills' | 'automation'
   sessionId?: string | null
@@ -304,7 +305,6 @@ export type AgentNotificationPayload = {
   target?: AgentNotificationTarget
 }
 export type SessionRoutedNotification = AgentNotificationPayload & AgentSessionEnvelope
-export type SessionRoutedSkillOutputState = SkillOutputState & AgentSessionEnvelope
 export type GeneralAgentNotification = AgentNotificationPayload & {
   workspaceCwd?: string
 }
@@ -498,20 +498,26 @@ export type StreamingAccumulator = {
   thinkingText: string
 }
 
-// ─── Skill Output State (unified capture layer) ─────────────────────
+// ─── Live Generation Activity ───────────────────────────────────────
 
-export type SkillOutputState = {
+export type GenerationActivityPhase =
+  | 'preparing'
+  | 'generating'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
+export type GenerationActivity = {
+  /** Stable within one streamed content block. */
+  activityId: string
   skillId: string | null
+  phase: GenerationActivityPhase
+  source: 'tool-input' | 'skill-output'
+  toolName?: string
+  label: string
   content: string
-  isStreaming: boolean
   language: string
-  context?: AgentContext
-  /** App-owned stable session key used for renderer routing. */
-  sessionId?: string
-  clientSessionKey?: string
-  /** Claude SDK session_id, when already materialized. */
-  sdkSessionId?: string
-  workspacePath?: string
 }
 
 // ─── Permission / AskUser ────────────────────────────────────────────

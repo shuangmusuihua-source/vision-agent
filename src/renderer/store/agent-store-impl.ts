@@ -12,7 +12,7 @@ import type {
   ConversationMessage,
   PermissionRequestIPC,
   AskUserRequestIPC,
-  SkillOutputState,
+  SessionRoutedGenerationActivity,
   AssistantPayload,
   UserPayload,
   StreamEventPayloadIPC,
@@ -289,7 +289,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates._acc = null
           slotUpdates._firstContentSeen = false
           slotUpdates.activeSkillId = null
-          slotUpdates.skillOutput = null
+          slotUpdates.generationActivity = null
           slotUpdates.todoList = null
           slotUpdates.permissionRequest = null
           slotUpdates.permissionQueue = []
@@ -329,7 +329,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates._acc = null
           slotUpdates._firstContentSeen = false
           slotUpdates.activeSkillId = null
-          slotUpdates.skillOutput = null
+          slotUpdates.generationActivity = null
           slotUpdates.todoList = null
           slotUpdates.permissionRequest = null
           slotUpdates.permissionQueue = []
@@ -358,7 +358,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           slotUpdates._acc = null
           slotUpdates._firstContentSeen = false
           slotUpdates.activeSkillId = null
-          slotUpdates.skillOutput = null
+          slotUpdates.generationActivity = null
           slotUpdates.todoList = null
           slotUpdates.permissionRequest = null
           slotUpdates.permissionQueue = []
@@ -762,10 +762,14 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       })
     },
 
-    handleSkillOutput(skillState: SkillOutputState) {
-      const skillSid = skillState.sessionId || null
-      const ctx = skillState.context || get().context
-      set((s) => updateSessionScopedSlot(s, ctx, { skillOutput: skillState }, skillSid))
+    handleGenerationActivity(activity: SessionRoutedGenerationActivity) {
+      const terminal = activity.phase === 'completed' || activity.phase === 'failed' || activity.phase === 'cancelled'
+      set((s) => updateSessionScopedSlot(
+        s,
+        activity.context,
+        { generationActivity: terminal ? null : activity },
+        activity.sessionId,
+      ))
     },
 
     setPrefill(context: AgentContext, text: string) {

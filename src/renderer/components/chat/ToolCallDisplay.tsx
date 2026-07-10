@@ -50,7 +50,7 @@ function detailText(toolName: string, input: Record<string, unknown>): string | 
       return String(input.command || '')
     case 'Write':
     case 'Edit':
-      return null // file content handled by SkillOutputCard
+      return null // file content is projected by GenerationActivityCard
     default:
       const vals = Object.entries(input)
         .filter(([, v]) => v !== undefined && v !== '')

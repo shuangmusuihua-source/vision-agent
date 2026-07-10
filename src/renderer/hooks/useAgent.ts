@@ -10,7 +10,7 @@ import type {
   ConversationMessage,
   PermissionRequestIPC,
   SessionRoutedRequestTimeout,
-  SessionRoutedSkillOutputState,
+  SessionRoutedGenerationActivity,
 } from '../../shared/types'
 
 // This is an inactivity notice, not an execution deadline. A healthy tool can
@@ -135,7 +135,7 @@ export function useIPCSubscriptions() {
           permissionQueue: permissionItems.slice(1),
           askUserRequest: askUserItems[0] || null,
           askUserQueue: askUserItems.slice(1),
-          skillOutput: realSlot?.skillOutput || sourceSlot?.skillOutput || null,
+          generationActivity: realSlot?.generationActivity || sourceSlot?.generationActivity || null,
           activeSkillId: realSlot?.activeSkillId || sourceSlot?.activeSkillId || null,
           lastEditedFile: realSlot?.lastEditedFile || sourceSlot?.lastEditedFile || null,
           usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
@@ -197,8 +197,8 @@ export function useIPCSubscriptions() {
       refreshWatchdogAfterState(data.context, clientSessionKey)
     })
 
-    const unsubSkillOutput = window.api.agent.onSkillOutput((state: SessionRoutedSkillOutputState) => {
-      store.getState().handleSkillOutput(state)
+    const unsubGenerationActivity = window.api.agent.onGenerationActivity((state: SessionRoutedGenerationActivity) => {
+      store.getState().handleGenerationActivity(state)
       const ctx = state.context as AgentContext | undefined
       if (ctx) refreshWatchdogAfterState(ctx, state.sessionId)
     })
@@ -210,7 +210,7 @@ export function useIPCSubscriptions() {
       unsubAskTimeout()
       unsubPermTimeout()
       unsubSession()
-      unsubSkillOutput()
+      unsubGenerationActivity()
     }
   }, [])
 }
@@ -634,7 +634,7 @@ export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) =>
 export const useTtftMs = (context: AgentContext) => useAgentStore((s) => s.slots[context].ttftMs)
 export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
-export const useSkillOutput = (context: AgentContext) => useAgentStore((s) => s.slots[context].skillOutput)
+export const useGenerationActivity = (context: AgentContext) => useAgentStore((s) => s.slots[context].generationActivity)
 export const useHasMoreSdkMessages = (context: AgentContext) =>
   useAgentStore((s) => s.slots[context]._needsSdkLoad)
 export const useIsLoadingMoreMessages = (context: AgentContext) =>

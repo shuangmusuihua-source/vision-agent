@@ -6,8 +6,8 @@ import type {
   ModelProfile,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
-  SessionRoutedSkillOutputState,
   InlineRewriteRequest,
+  SessionRoutedGenerationActivity,
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
@@ -220,10 +220,10 @@ const api = {
       return () => { ipcRenderer.removeListener('agent:permissionTimeout', handler) }
     },
 
-    onSkillOutput: (callback: (state: SessionRoutedSkillOutputState) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, state: SessionRoutedSkillOutputState) => callback(state)
-      ipcRenderer.on('skill:output', handler)
-      return () => { ipcRenderer.removeListener('skill:output', handler) }
+    onGenerationActivity: (callback: (state: SessionRoutedGenerationActivity) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: SessionRoutedGenerationActivity) => callback(state)
+      ipcRenderer.on('agent:generationActivity', handler)
+      return () => { ipcRenderer.removeListener('agent:generationActivity', handler) }
     },
 
     onNotification: (callback: (data: AgentNotificationEvent) => void) => {

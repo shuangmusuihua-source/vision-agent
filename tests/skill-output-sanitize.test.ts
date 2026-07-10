@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { treeToSafeHtml } from '../src/renderer/components/chat/SkillOutputCard'
+import { treeToSafeHtml } from '../src/renderer/components/chat/GenerationActivityCard'
 
 describe('treeToSafeHtml', () => {
   it('escapes highlighted text so code is not parsed as DOM', () => {

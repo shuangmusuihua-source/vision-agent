@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import { sessionListReducer } from '../src/renderer/store/session-protocol'
-import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SessionRoutedSkillOutputState } from '../src/shared/types'
+import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SessionRoutedGenerationActivity } from '../src/shared/types'
 
 function resetStore() {
   useAgentStore.setState({
@@ -148,13 +148,17 @@ describe('session-scoped store routing', () => {
     expect(state.sessionSlots['background-session'].agentState).toBe('error')
   })
 
-  it('routes skill output by session id instead of always writing to the visible context slot', () => {
+  it('routes generation activity by session id instead of always writing to the visible context slot', () => {
     const active = { ...emptySlot(), currentSessionId: 'active-session' }
     const background = { ...emptySlot(), currentSessionId: 'background-session' }
-    const output: SessionRoutedSkillOutputState = {
+    const output: SessionRoutedGenerationActivity = {
+      activityId: 'tool:write-background',
       skillId: 'skill-1',
+      phase: 'generating',
+      source: 'tool-input',
+      toolName: 'Write',
+      label: '正在生成内容',
       content: '<html></html>',
-      isStreaming: true,
       language: 'html',
       context: 'editor',
       sessionId: 'background-session',
@@ -169,11 +173,14 @@ describe('session-scoped store routing', () => {
       sessionAccessOrder: ['background-session'],
     })
 
-    useAgentStore.getState().handleSkillOutput(output)
+    useAgentStore.getState().handleGenerationActivity(output)
 
     const state = useAgentStore.getState()
-    expect(state.slots.editor.skillOutput).toBeNull()
-    expect(state.sessionSlots['background-session'].skillOutput).toEqual(output)
+    expect(state.slots.editor.generationActivity).toBeNull()
+    expect(state.sessionSlots['background-session'].generationActivity).toEqual(output)
+
+    useAgentStore.getState().handleGenerationActivity({ ...output, phase: 'completed' })
+    expect(useAgentStore.getState().sessionSlots['background-session'].generationActivity).toBeNull()
   })
 
   it('routes background assistant messages from the cached session when the visible editor slot is empty', async () => {
@@ -517,10 +524,14 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
     })
-    useAgentStore.getState().handleSkillOutput({
+    useAgentStore.getState().handleGenerationActivity({
+      activityId: 'tool:write-a',
       skillId: 'slides',
+      phase: 'generating',
+      source: 'tool-input',
+      toolName: 'Write',
+      label: '正在生成内容',
       content: '<html>workspace A slides</html>',
-      isStreaming: false,
       language: 'html',
       context: 'editor',
       sessionId: 'editor-a',
@@ -587,7 +598,7 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['user-b', 'assistant-b'])
     expect(state.slots.editor.permissionRequest).toBeNull()
     expect(state.slots.editor.askUserRequest).toBeNull()
-    expect(state.slots.editor.skillOutput).toBeNull()
+    expect(state.slots.editor.generationActivity).toBeNull()
     expect(state.slots.editor.agentState).toBe('idle')
     expect(state.slots.editor.isStreaming).toBe(false)
 
@@ -596,7 +607,7 @@ describe('session-scoped store routing', () => {
     expect(sessionA.messages.map((m) => m.id)).toEqual(['user-a', 'assistant-a'])
     expect(sessionA.permissionRequest?.id).toBe('perm-a')
     expect(sessionA.askUserRequest?.id).toBe('ask-user-a')
-    expect(sessionA.skillOutput?.content).toBe('<html>workspace A slides</html>')
+    expect(sessionA.generationActivity?.content).toBe('<html>workspace A slides</html>')
     expect(sessionA.agentState).toBe('waitingForUserInput')
     expect(sessionA.isStreaming).toBe(true)
 
