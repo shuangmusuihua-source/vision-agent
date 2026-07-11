@@ -78,6 +78,10 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 - Renderer 状态：`agent-store*`
 - 产物数据库：当前不存在，文件目录就是事实来源
 
+权限与 AskUser 的具体 pending 生命周期由 `pending-interactions.ts` 实现，
+`SessionRuntimeController` 只提供带 envelope 的事件回调和 session 级终止意图。
+生产通知与测试 fake 通过同一 notification adapter seam。
+
 ## Event protocol
 
 以下事件必须携带 envelope：

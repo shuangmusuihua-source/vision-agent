@@ -17,21 +17,9 @@ import { withSessionEnvelope } from './session-envelope'
 import { GenerationActivityProjector } from './generation-activity-projector'
 import { toAgentIPCMessage } from './message-converter'
 import {
-  deletePendingAskUser,
-  deletePendingPermission,
-  hasPendingAskUser,
-  hasPendingPermission,
-  registerPendingAskUser,
-  registerPendingPermission,
-  rejectAllPendingAskUser,
-  rejectAllPendingPermissions,
-  resolveAskUser as resolvePendingAskUser,
-  resolvePermission as resolvePendingPermission,
-} from './agent-permissions'
-import {
-  cancelPermissionNotification,
-  schedulePermissionNotification,
-} from './notification-manager'
+  PendingInteractionController,
+  type PermissionResponseOptions,
+} from './pending-interactions'
 import {
   discardAllTextBatches,
   discardTextBatch,
@@ -58,14 +46,13 @@ export type SessionRuntimeStart = {
 
 type PermissionRequestInput = Omit<PermissionRequestIPC, keyof AgentSessionEnvelope | 'id'>
 type AskUserRequestInput = Omit<AskUserRequestIPC, keyof AgentSessionEnvelope | 'id'>
-type PermissionResponseOptions = Parameters<typeof resolvePendingPermission>[2]
-
 export { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 
 export class SessionRuntimeController {
   private instanceCounter = 0
   private activeRuns = new Map<string, ActiveSessionRun>()
   private generationProjector = new GenerationActivityProjector()
+  private pendingInteractions = new PendingInteractionController()
   private generationWindow: BrowserWindow | null = null
   private completionResolvers = new Map<number, () => void>()
 
@@ -245,28 +232,14 @@ export class SessionRuntimeController {
     request: AskUserRequestInput,
     originalInput: Record<string, unknown>
   ): Promise<PermissionResult> {
-    const requestId = this.createRequestId('ask')
-
-    return new Promise<PermissionResult>((resolve) => {
-      let settled = false
-      const settle = (result: PermissionResult) => {
-        if (settled) return
-        settled = true
-        resolve(result)
-      }
-
-      const timeout = setTimeout(() => {
-        if (!hasPendingAskUser(requestId)) return
-        deletePendingAskUser(requestId)
-        this.emitAskUserTimeout(win, envelope, requestId)
-        settle({ behavior: 'deny', message: 'AskUserQuestion timed out — user did not respond' })
-      }, 300000)
-
-      registerPendingAskUser(requestId, settle, originalInput, timeout, envelope.context, envelope.sessionId)
-      this.emitAskUserRequest(win, envelope, {
+    return this.pendingInteractions.requestAskUser({
+      sessionId: envelope.sessionId,
+      originalInput,
+      onRequest: (requestId) => this.emitAskUserRequest(win, envelope, {
         id: requestId,
         ...request,
-      })
+      }),
+      onTimeout: (requestId) => this.emitAskUserTimeout(win, envelope, requestId),
     })
   }
 
@@ -276,58 +249,17 @@ export class SessionRuntimeController {
     request: PermissionRequestInput,
     signal?: AbortSignal
   ): Promise<PermissionResult> {
-    const requestId = this.createRequestId('perm')
-
-    return new Promise<PermissionResult>((resolve) => {
-      let settled = false
-      let abortHandler: (() => void) | null = null
-
-      const settle = (result: PermissionResult) => {
-        if (settled) return
-        settled = true
-        if (signal && abortHandler) {
-          signal.removeEventListener('abort', abortHandler)
-        }
-        resolve(result)
-      }
-
-      const cleanup = () => {
-        if (hasPendingPermission(requestId)) {
-          deletePendingPermission(requestId)
-          cancelPermissionNotification(requestId)
-          clearTimeout(timeout)
-        }
-      }
-
-      const timeout = setTimeout(() => {
-        if (!hasPendingPermission(requestId)) return
-        deletePendingPermission(requestId)
-        cancelPermissionNotification(requestId)
-        this.emitPermissionTimeout(win, envelope, requestId)
-        settle({ behavior: 'deny', message: 'Permission request timed out' })
-      }, 300000)
-
-      registerPendingPermission(requestId, settle, request.input, timeout, envelope.context, envelope.sessionId)
-
-      abortHandler = () => {
-        cleanup()
-        this.emitPermissionTimeout(win, envelope, requestId)
-        settle({ behavior: 'deny', message: 'Tool use cancelled by SDK' })
-      }
-
-      if (signal) {
-        if (signal.aborted) {
-          abortHandler()
-          return
-        }
-        signal.addEventListener('abort', abortHandler, { once: true })
-      }
-
-      this.emitPermissionRequest(win, envelope, {
+    return this.pendingInteractions.requestPermission({
+      sessionId: envelope.sessionId,
+      toolName: request.toolName,
+      input: request.input,
+      signal,
+      onRequest: (requestId) => this.emitPermissionRequest(win, envelope, {
         id: requestId,
         ...request,
-      })
-      schedulePermissionNotification(requestId, request.toolName)
+      }),
+      onTimeout: (requestId) => this.emitPermissionTimeout(win, envelope, requestId),
+      onCancelled: (requestId) => this.emitPermissionTimeout(win, envelope, requestId),
     })
   }
 
@@ -336,11 +268,11 @@ export class SessionRuntimeController {
     behavior: 'allow' | 'deny',
     options?: PermissionResponseOptions
   ): void {
-    resolvePendingPermission(requestId, behavior, options)
+    this.pendingInteractions.resolvePermission(requestId, behavior, options)
   }
 
   resolveAskUser(requestId: string, answers: Record<string, string>): void {
-    resolvePendingAskUser(requestId, answers)
+    this.pendingInteractions.resolveAskUser(requestId, answers)
   }
 
   emitNotification(
@@ -370,14 +302,12 @@ export class SessionRuntimeController {
         const run = this.activeRuns.get(matchedKey)
         this.generationProjector.finishSession(matchedKey, 'cancelled')
         run?.abortController.abort()
-        rejectAllPendingPermissions(matchedKey)
-        rejectAllPendingAskUser(matchedKey)
+        this.pendingInteractions.reject(matchedKey)
         discardTextBatch(matchedKey)
         return
       }
 
-      rejectAllPendingPermissions(queryKey)
-      rejectAllPendingAskUser(queryKey)
+      this.pendingInteractions.reject(queryKey)
       discardTextBatch(queryKey)
       return
     }
@@ -387,8 +317,7 @@ export class SessionRuntimeController {
       run.abortController.abort()
     }
     this.activeRuns.clear()
-    rejectAllPendingPermissions()
-    rejectAllPendingAskUser()
+    this.pendingInteractions.reject()
     discardAllTextBatches()
   }
 
@@ -423,8 +352,7 @@ export class SessionRuntimeController {
   }
 
   handleWindowDestroy(): void {
-    rejectAllPendingPermissions()
-    rejectAllPendingAskUser()
+    this.pendingInteractions.reject()
     discardAllTextBatches()
     this.generationProjector.cleanupAll()
   }
@@ -435,8 +363,7 @@ export class SessionRuntimeController {
       discardTextBatch(sessionId)
       this.generationProjector.cleanup(sessionId)
       this.activeRuns.delete(sessionId)
-      rejectAllPendingPermissions(sessionId)
-      rejectAllPendingAskUser(sessionId)
+      this.pendingInteractions.reject(sessionId)
     }
     this.completionResolvers.get(instanceId)?.()
     this.completionResolvers.delete(instanceId)
@@ -464,9 +391,6 @@ export class SessionRuntimeController {
     return this.activeRuns.keys().next().value ?? null
   }
 
-  private createRequestId(prefix: 'ask' | 'perm'): string {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  }
 }
 
 export const sessionRuntime = new SessionRuntimeController()

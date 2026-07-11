@@ -40,6 +40,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 - `query-runner.ts`：准备会话目录、构建 prompt/options、执行 `query()`、消费 SDK 流
 - `agent-options.ts`：模型 Profile、环境变量白名单、Claude CLI 路径、SDK Options
 - `session-runtime.ts`：活跃运行注册、AbortController、权限/AskUser、文本批次、实时生成活动和会话事件
+- `pending-interactions.ts`：权限与 AskUser 的注册、超时、SDK 取消、通知清理、响应和按 session 拒绝
 - `generation-activity-projector.ts`：将 SDK 内容块和工具输入流投影为会话级生成活动；Renderer 不接触 SDK 原始事件
 - `message-converter.ts`：SDK 消息转换为 renderer 使用的消息协议
 - `session-store.ts`：SDK 会话列表、历史分页、重命名、删除及 compaction 过滤
