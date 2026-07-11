@@ -282,10 +282,6 @@ export function transition(current: AgentState, event: AgentEvent): AgentState {
   return allowed
 }
 
-// ─── Re-exports from pipeline (backward-compatible) ─────────────────────
-
-export { ensureAccumulator, commitAccumulator, extractSkillOutputContent } from './message-pipeline'
-
 // ─── Store ─────────────────────────────────────────────────────────────
 
 export const useAgentStore = create<AgentStore>((set, get) => {

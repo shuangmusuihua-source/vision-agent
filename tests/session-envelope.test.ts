@@ -611,10 +611,6 @@ describe('session runtime event routing', () => {
         options: [{ label: 'A', description: 'First' }],
         multiSelect: false,
       }],
-      question: 'Pick one',
-      header: 'Choice',
-      options: [{ label: 'A', description: 'First' }],
-      multiSelect: false,
     }, { questions: [] })
 
     expect(sent).toHaveLength(1)
@@ -624,7 +620,7 @@ describe('session runtime event routing', () => {
       sessionId: 'app-session-ask-user',
       sdkSessionId: 'sdk-ask-user',
       workspacePath: '/workspace/ask-user',
-      question: 'Pick one',
+      questions: [{ question: 'Pick one' }],
     })
 
     const requestId = (sent[0].payload as { id: string }).id
@@ -656,9 +652,6 @@ describe('session runtime event routing', () => {
         options: [{ label: 'Yes' }],
         multiSelect: false,
       }],
-      question: 'Continue?',
-      options: [{ label: 'Yes' }],
-      multiSelect: false,
     }, { questions: [] })
 
     const askEvent = sent.find((event) => event.channel === 'agent:askUser')

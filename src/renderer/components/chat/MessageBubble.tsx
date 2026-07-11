@@ -92,9 +92,7 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
   )
 }
 
-const LEGACY_ATTACH_REGEX = /^(📄|🖼️|📕)\s+(.+?)[：:]\s*(.+)$/
 const ATTACHMENT_LINE_REGEX = /^附件[：:]\s*(.+?)\s+\|\s+类型[：:]\s*(.+?)\s+\|\s+(?:路径|原始路径)[：:]\s*(.+)$/
-const ATTACH_PATH_SUFFIX_REGEX = /\s+\|\s+(?:路径|原始路径)[：:]\s*(.+)$/
 const IMAGE_ATTACHMENT_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'])
 
 interface ParsedAttachment {
@@ -105,19 +103,10 @@ interface ParsedAttachment {
   convertible: boolean
 }
 
-function parseLegacyAttachmentDisplay(value: string): { name: string; path?: string } {
-  const pathMatch = value.match(ATTACH_PATH_SUFFIX_REGEX)
-  if (!pathMatch || pathMatch.index === undefined) return { name: value }
-  return {
-    name: value.slice(0, pathMatch.index).trim(),
-    path: pathMatch[1],
-  }
-}
-
-function attachmentTypeFor(name: string, path?: string, label?: string, legacyIcon?: string): AttachmentKind {
+function attachmentTypeFor(name: string, path?: string, label?: string): AttachmentKind {
   const ext = fileExtension(path || name)
-  if (legacyIcon === '🖼️' || label?.includes('图片') || IMAGE_ATTACHMENT_EXTENSIONS.has(ext)) return 'image'
-  if (legacyIcon === '📕' || label?.toLowerCase().includes('pdf') || ext === 'pdf') return 'pdf'
+  if (label?.includes('图片') || IMAGE_ATTACHMENT_EXTENSIONS.has(ext)) return 'image'
+  if (label?.toLowerCase().includes('pdf') || ext === 'pdf') return 'pdf'
   return 'text'
 }
 
@@ -138,18 +127,7 @@ function parseAttachmentLine(line: string): ParsedAttachment | null {
     }
   }
 
-  const legacyMatch = line.match(LEGACY_ATTACH_REGEX)
-  if (!legacyMatch) return null
-
-  const display = parseLegacyAttachmentDisplay(legacyMatch[3])
-  const type = attachmentTypeFor(display.name, display.path, legacyMatch[2], legacyMatch[1])
-  return {
-    name: display.name,
-    path: display.path,
-    label: legacyMatch[2],
-    type,
-    convertible: isConvertibleAttachmentPath(display.path || display.name),
-  }
+  return null
 }
 
 function parseAttachments(text: string): { attachments: ParsedAttachment[]; body: string } {

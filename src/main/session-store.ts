@@ -194,11 +194,11 @@ export async function getSdkSessionTotalMessageCount(
 
 /**
  * Read session JSONL directly from disk, bypassing the SDK API which
- * truncates pre-compaction messages. SDK stores sessions at:
- *   {userData}/.claude/projects/{workspacePath with /→-}/{sessionId}.jsonl
+ * truncates pre-compaction messages. SDK project directory encoding is an
+ * implementation detail, so resolution scans the current projects root by ID.
  */
 function getSessionJsonlPath(sessionId: string): string | null {
-  return resolveClaudeSessionJsonlPath(getSdkSessionId(sessionId), getSessionDir(sessionId))
+  return resolveClaudeSessionJsonlPath(getSdkSessionId(sessionId))
 }
 
 export async function loadSdkSessionMessagesPaginated(

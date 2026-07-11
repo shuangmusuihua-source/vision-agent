@@ -577,16 +577,8 @@ export type AskUserQuestionItem = {
 
 export type AskUserRequestIPC = {
   id: string
-  /** All questions from SDK (1-4). Use this for multi-question UI. */
+  /** Questions from SDK (1-4). */
   questions: AskUserQuestionItem[]
-  /** Convenience: first question text (for backward compat) */
-  question: string
-  /** Convenience: first question header */
-  header?: string
-  /** Convenience: first question options */
-  options: AskUserQuestionOption[]
-  /** Convenience: first question multiSelect */
-  multiSelect: boolean
   context?: AgentContext
   /** App-owned stable session key used for renderer routing. */
   sessionId?: string

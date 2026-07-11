@@ -247,13 +247,8 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
           }
         })
 
-        const firstQ = questionItems[0]
         return sessionRuntime.requestAskUserAnswer(mainWindow, currentEnvelope(), {
           questions: questionItems,
-          question: firstQ?.question || '',
-          header: firstQ?.header || '',
-          options: firstQ?.options || [],
-          multiSelect: firstQ?.multiSelect || false,
         }, input)
       }
 

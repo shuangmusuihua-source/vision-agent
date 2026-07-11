@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   extractSkillOutputContent,
-} from '../src/renderer/store/agent-store-impl'
+} from '../src/renderer/store/message-pipeline'
 
 describe('extractSkillOutputContent', () => {
   it('extracts content from a complete skill-output code block', () => {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { ShieldAlert, Check, X, ShieldCheck } from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
-import type { PermissionRequest } from '../../store/agent-store'
+import type { PermissionRequestIPC as PermissionRequest } from '../../../shared/types'
 
 interface PermissionDialogProps {
   request: PermissionRequest

@@ -163,24 +163,3 @@ export type AgentStore = {
   clearSessionLoadError: () => void
   retrySessionLoad: () => Promise<void>
 }
-
-// ─── Backward-compatible type aliases ────────────────────────────────────
-
-export type {
-  ConversationMessage as ChatMessage,
-  ToolCallState as ToolCall,
-  SkillMeta as SkillInfo,
-  ArtifactData,
-  MessagePhase,
-  UsageInfo,
-  PermissionRequestIPC as PermissionRequest,
-  AskUserRequestIPC as AskUserRequest,
-  SdkSessionInfo as SdkSessionInfo,
-} from '../../shared/types'
-
-// Re-export types that components reference from this module
-export type {
-  AgentContext,
-  AskUserQuestionOption,
-  GenerationActivity,
-} from '../../shared/types'

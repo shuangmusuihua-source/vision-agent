@@ -23,7 +23,6 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 `src/main/index.ts` 负责：
 
 - 配置应用身份和 Sentry
-- 迁移 electron-store
 - 注册 IPC
 - 初始化知识库和文件索引
 - 同步内置 Skills

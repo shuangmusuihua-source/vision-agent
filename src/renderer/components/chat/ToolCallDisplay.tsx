@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, Check, Loader2, FileText, FilePenLine, Terminal, Search, FolderSearch, Globe, MessageCircle, Sparkles, Wrench } from 'lucide-react'
 import { useState, type ReactElement } from 'react'
-import type { ToolCall } from '../../store/agent-store'
+import type { ToolCallState as ToolCall } from '../../../shared/types'
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall

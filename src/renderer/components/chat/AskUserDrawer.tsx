@@ -15,12 +15,7 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
   const [selections, setSelections] = useState<Record<string, Set<string>>>({})
   const [textInputs, setTextInputs] = useState<Record<string, string>>({})
 
-  const questions = request.questions.length > 0 ? request.questions : [{
-    question: request.question,
-    header: request.header,
-    options: request.options,
-    multiSelect: request.multiSelect,
-  }]
+  const questions = request.questions
 
   const currentQ = questions[step]
   const isLastStep = step >= questions.length - 1

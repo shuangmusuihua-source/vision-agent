@@ -169,22 +169,6 @@ describe('file conversion markers', () => {
     ])
   })
 
-  it('strips legacy visible conversion summaries from replayed messages', () => {
-    const prompt = [
-      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf',
-      '',
-      '---',
-      '附件转换结果：',
-      '以下文件已转换为 Markdown。请优先使用 Read 工具读取 Markdown 路径，而不是直接读取原始文件：',
-      '- 源文件: /tmp/a.pdf',
-      '  Markdown路径: /tmp/work/.vision/attachments/a.md',
-    ].join('\n')
-
-    expect(stripInternalAttachmentContext(prompt)).toBe(
-      '附件：a.pdf | 类型：PDF文档 | 原始路径：/tmp/a.pdf'
-    )
-  })
-
   it('sanitizes session path segments', () => {
     expect(safeAttachmentSegment('new/editor:123')).toBe('new-editor-123')
   })

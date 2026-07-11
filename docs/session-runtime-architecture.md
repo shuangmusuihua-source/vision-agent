@@ -94,7 +94,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 
 App-level 通知（例如 Cron 失败）可以使用不带 session ownership 的 general notification。
 
-IPC 请求优先使用 `src/shared/ipc-types.ts` 中的对象 payload。Main 里的位置参数兼容逻辑只用于旧调用，不应继续扩展。
+Agent IPC 请求使用 `src/shared/ipc-types.ts` 中定义的对象 payload；Main、preload 与 Renderer 必须共同维护同一 interface。
 
 ## 权限与用户输入
 

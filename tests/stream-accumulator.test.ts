@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ensureAccumulator, commitAccumulator } from '../src/renderer/store/agent-store-impl'
+import { ensureAccumulator, commitAccumulator } from '../src/renderer/store/message-pipeline'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import type { ContentBlock, TextMessage } from '../src/shared/types'
 

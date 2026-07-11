@@ -67,7 +67,7 @@ export async function readSessionOutputMetadata(workingDirectory: string): Promi
     const parsed = JSON.parse(await readFile(join(workingDirectory, METADATA_FILE_NAME), 'utf8')) as SessionOutputMetadataFile
     if (parsed.version === 1 && parsed.files && typeof parsed.files === 'object') return parsed
   } catch {
-    // First use or malformed legacy metadata: rebuild from the file system.
+    // First use or malformed metadata: rebuild from the file system.
   }
   return { version: 1, files: {} }
 }

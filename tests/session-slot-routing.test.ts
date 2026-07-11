@@ -56,9 +56,6 @@ function askUser(id: string, sessionId: string): AskUserRequestIPC {
   return {
     id,
     questions: [{ question: 'Pick one', options: [], multiSelect: false }],
-    question: 'Pick one',
-    options: [],
-    multiSelect: false,
     context: 'editor',
     sessionId,
   }
