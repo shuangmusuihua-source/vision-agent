@@ -61,6 +61,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `App.tsx` — application root, settings cache, theme, global providers
 - `components/layout/AppShell.tsx` — main layout and feature orchestration
 - `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state
+- `store/session-slot-state.ts` — app/SDK session ID resolution, live/cache slot routing, mirroring, and LRU ownership
 - `store/ui-slice.ts` — application UI state
 - `hooks/useAgent.ts` — singleton agent IPC subscriptions and actions
 - `components/editor/MarkdownEditor.tsx` — Tiptap Markdown editor, including selection-scoped AI rewrite review

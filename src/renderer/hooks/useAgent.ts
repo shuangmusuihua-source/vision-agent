@@ -2,7 +2,13 @@ import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
 import { stripInternalAttachmentContext } from '../../shared/file-attachments'
 import { getSkillInvocationDisplayText } from '../../shared/skill-invocation'
-import type { AgentStore } from '../store/agent-store'
+import {
+  findAskUserTarget,
+  resolveSessionSlot,
+  selectAskUserRequest,
+  selectPermissionQueueLength,
+  selectPermissionRequest,
+} from '../store/session-slot-state'
 import type {
   AgentContext,
   AgentSessionEnvelope,
@@ -127,8 +133,7 @@ function getWatchdogKey(ctx: AgentContext, sessionId?: string | null): string {
 function getWatchdogSlot(ctx: AgentContext, sessionId?: string | null) {
   const state = useAgentStore.getState()
   const sid = normalizeWatchdogSessionId(sessionId)
-  if (sid && state.sessionSlots[sid]) return state.sessionSlots[sid]
-  return state.slots[ctx]
+  return resolveSessionSlot(state, ctx, sid)
 }
 
 function clearWatchdog(ctx: AgentContext, sessionId?: string | null) {
@@ -192,43 +197,6 @@ function refreshWatchdogAfterState(ctx: AgentContext, sessionId?: string | null)
   setTimeout(() => refreshWatchdog(ctx, sessionId), 0)
 }
 
-function findAskUserTarget(
-  state: AgentStore,
-  requestId: string,
-  fallbackContext: AgentContext
-): { context: AgentContext; sessionId: string | null } | null {
-  for (const ctx of ['ask', 'editor'] as AgentContext[]) {
-    const slot = state.slots[ctx]
-    const req = slot.askUserRequest
-    if (req?.id === requestId) {
-      return {
-        context: ctx,
-        sessionId: req.sessionId || slot.currentSessionId || state.activeSessionId[ctx],
-      }
-    }
-    const queued = slot.askUserQueue.find((item) => item.id === requestId)
-    if (queued) {
-      return {
-        context: ctx,
-        sessionId: queued.sessionId || slot.currentSessionId || state.activeSessionId[ctx],
-      }
-    }
-  }
-
-  for (const [sid, slot] of Object.entries(state.sessionSlots)) {
-    const req = slot.askUserRequest
-    if (req?.id === requestId) {
-      return { context: req.context || fallbackContext, sessionId: req.sessionId || sid }
-    }
-    const queued = slot.askUserQueue.find((item) => item.id === requestId)
-    if (queued) {
-      return { context: queued.context || fallbackContext, sessionId: queued.sessionId || sid }
-    }
-  }
-
-  return null
-}
-
 export function useAgent(context: AgentContext = 'editor') {
   const store = useAgentStore
 
@@ -279,7 +247,7 @@ export function useAgent(context: AgentContext = 'editor') {
     const skillId = store.getState().slots[context].activeSkillId
     // Don't pass frontend-only temp IDs as SDK sessionId — the SDK doesn't
     // recognize them, would create an untracked duplicate session.
-    const currentSlot = store.getState().sessionSlots[slotSid] || store.getState().slots[context]
+    const currentSlot = resolveSessionSlot(store.getState(), context, slotSid)
     const workspacePath = context === 'ask'
       ? undefined
       : (currentSlot.workspacePath || store.getState().activeWorkspacePath || undefined)
@@ -374,27 +342,12 @@ export const useUsageInfo = (context: AgentContext) => useAgentStore((s) => s.sl
 // belongs to the context's current session.  Fall back to sessionSlots for
 // the context's own sessionId — NOT global activeSessionId which conflates
 // editor and ask contexts.
-export const usePermissionRequest = (context: AgentContext) => useAgentStore((s) => {
-  const live = s.slots[context].permissionRequest
-  if (live) return live
-  const slotSid = s.slots[context]?.currentSessionId
-  if (slotSid && s.sessionSlots[slotSid]?.permissionRequest) return s.sessionSlots[slotSid].permissionRequest
-  return null
-})
-export const usePermissionQueueLength = (context: AgentContext) => useAgentStore((s) => {
-  const live = s.slots[context].permissionQueue.length
-  if (live > 0) return live
-  const slotSid = s.slots[context]?.currentSessionId
-  if (slotSid && s.sessionSlots[slotSid]) return s.sessionSlots[slotSid].permissionQueue.length
-  return 0
-})
-export const useAskUserRequest = (context: AgentContext) => useAgentStore((s) => {
-  const live = s.slots[context].askUserRequest
-  if (live) return live
-  const slotSid = s.slots[context]?.currentSessionId
-  if (slotSid && s.sessionSlots[slotSid]?.askUserRequest) return s.sessionSlots[slotSid].askUserRequest
-  return null
-})
+export const usePermissionRequest = (context: AgentContext) =>
+  useAgentStore((state) => selectPermissionRequest(state, context))
+export const usePermissionQueueLength = (context: AgentContext) =>
+  useAgentStore((state) => selectPermissionQueueLength(state, context))
+export const useAskUserRequest = (context: AgentContext) =>
+  useAgentStore((state) => selectAskUserRequest(state, context))
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) => s.slots[context].lastEditedFile)
 export const useTtftMs = (context: AgentContext) => useAgentStore((s) => s.slots[context].ttftMs)

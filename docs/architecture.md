@@ -75,6 +75,7 @@ Renderer 是单页 React 应用：
 - `App.tsx`：主题、设置缓存、更新订阅和全局 provider
 - `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱编排
 - `agent-store*`：按 context 与 session 隔离的流式状态
+- `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、镜像写入与 LRU 淘汰
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions
 - `MarkdownEditor.tsx`：Tiptap Markdown 编辑、自动保存及选区级 AI 改写审阅

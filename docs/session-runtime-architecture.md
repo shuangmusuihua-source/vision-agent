@@ -126,6 +126,9 @@ Claude SDK JSONL 保存 transcript。electron-store `SessionRecord` 保存：
 5. IPC 静默只能触发非阻断提示，不能作为自动 abort 的依据。
 6. 新查询替换旧查询时必须等待旧 runtime 的 finally 完成，避免旧清理删除新状态。
 
+Renderer 的双表示规则由 `store/session-slot-state.ts` 独占：caller 不应自行在
+`slots[context]` 与 `sessionSlots[sessionId]` 之间回退，也不应自行维护 LRU 顺序。
+
 ## 修改检查表
 
 新增会话功能时确认：
