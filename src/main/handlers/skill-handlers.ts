@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { getEnabledSkills, toggleSkill } from '../store'
+import { getEnabledSkills, toggleSkill } from '../persistence/settings-store'
 import { getBuiltinSkills } from '../skills/builtin'
 import { getAppSkillsDir } from '../skill-init'
 import {
@@ -65,10 +65,6 @@ export function registerSkillHandlers(): void {
     const result = toggleSkill(skillId, enabled)
     emitSkillsChanged(skillId, 'toggled')
     return result
-  })
-
-  ipcMain.handle('skills:getEnabled', async () => {
-    return getEnabledSkills()
   })
 
   ipcMain.handle('skills:builtins', async () => {

@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { basename } from 'path'
 import { fileIndexService } from '../file-index-service'
-import { getAuthorizedDirectories } from '../store'
+import { getAuthorizedDirectories } from '../persistence/workspace-store'
 import { findContainingWorkspacePath } from '../../shared/workspace-paths'
 
 export function registerSearchHandlers(): void {

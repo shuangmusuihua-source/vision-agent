@@ -47,11 +47,11 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `skill-init.ts`, `builtin-skill-installer.ts`, `community-skill-installer.ts` — Skill installation and discovery
 - `cron-manager.ts` — persisted scheduled tasks with a restricted tool set
 
-`agent-manager.ts` and `store.ts` are compatibility facades. New main-process code should import from the owning module or persistence adapter.
+Main-process code imports directly from the owning runtime module or persistence adapter; do not add pass-through facades.
 
 ### IPC
 
-`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. Preload exposes typed methods grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, `notification`, and `update`.
+`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. Preload exposes typed methods grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, and `update`.
 
 New session-affecting push events must carry an `AgentSessionEnvelope`; never infer ownership from the currently visible workspace or panel.
 
@@ -96,7 +96,7 @@ Do not introduce a second store for the same authority without documenting the o
 ## File and change discipline
 
 - Treat user worktree changes as owned by the user; do not overwrite unrelated edits.
-- Prefer focused modules over adding behavior to compatibility facades.
+- Prefer focused owning modules; do not introduce pass-through facades.
 - Update `src/shared/ipc-types.ts`, preload, and renderer types together when changing IPC.
 - Built-in Skill changes must keep `skills-manifest.json`, `builtin.ts`, resources, and packaged verification aligned. See `src/main/skills/BUILTIN-SKILL-ARCHITECTURE.md`.
 - Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.

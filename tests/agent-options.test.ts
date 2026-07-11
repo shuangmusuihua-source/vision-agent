@@ -3,12 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 async function loadAgentOptions() {
   vi.resetModules()
 
-  vi.doMock('../src/main/store', () => ({
+  vi.doMock('../src/main/persistence/profile-store', () => ({
     getApiKey: () => 'sk-app-profile',
     getBaseUrl: () => 'https://api.deepseek.com/anthropic',
     getModel: () => 'deepseek-v4-flash',
-    getAuthorizedDirectories: () => ['/tmp/authorized'],
-    getEnabledSkills: () => [],
   }))
   vi.doMock('../src/main/skill-init', () => ({
     getAppSkillsCwd: () => '/tmp/sumi',

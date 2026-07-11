@@ -1,11 +1,10 @@
 import { ipcMain } from 'electron'
-import { join, extname, dirname } from 'path'
-import { readFile, mkdir, unlink, readdir } from 'fs/promises'
+import { join, extname } from 'path'
+import { unlink, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { resolve, sep } from 'path'
-import { getAuthorizedDirectories } from '../store'
+import { getAuthorizedDirectories } from '../persistence/workspace-store'
 import { isPathAuthorized } from '../path-validator'
-import { atomicWriteTextFile } from '../atomic-write'
 
 function isMemoryPathAuthorized(filePath: string): boolean {
   const dirs = getAuthorizedDirectories()
@@ -36,24 +35,6 @@ export function registerMemoryHandlers(): void {
       } catch (e) { console.error('[memory:list] failed:', memoryDir, e) }
     }
     return results
-  })
-
-  ipcMain.handle('memory:read', async (_event, filePath: string) => {
-    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
-    if (!isMemoryPathAuthorized(filePath)) return { success: false, error: 'Path must be within .vision/memory/' }
-    try { const content = await readFile(filePath, 'utf-8'); return { success: true, content } }
-    catch (err) { return { success: false, error: (err as Error).message } }
-  })
-
-  ipcMain.handle('memory:write', async (_event, filePath: string, content: string) => {
-    if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
-    if (!isMemoryPathAuthorized(filePath)) return { success: false, error: 'Path must be within .vision/memory/' }
-    try {
-      const dir = dirname(filePath)
-      if (!existsSync(dir)) await mkdir(dir, { recursive: true })
-      await atomicWriteTextFile(filePath, content)
-      return { success: true }
-    } catch (err) { return { success: false, error: (err as Error).message } }
   })
 
   ipcMain.handle('memory:delete', async (_event, filePath: string) => {

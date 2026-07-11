@@ -36,24 +36,6 @@ describe('ensureWorkspaceSkillLinks', () => {
     expect(resolve(join(linkPath, '..'), await readlink(linkPath))).toBe(resolve(globalRoot, 'slides'))
   })
 
-  it('replaces legacy app-managed copies with links', async () => {
-    const root = await createTempDir()
-    const globalRoot = join(root, 'app-data', '.claude', 'skills')
-    const workspaceRoot = join(root, 'workspace')
-    const legacyMarker = join(workspaceRoot, '.vision', '.claude-skills-version')
-    await mkdir(join(globalRoot, 'slides'), { recursive: true })
-    await mkdir(join(workspaceRoot, '.claude', 'skills', 'slides'), { recursive: true })
-    await mkdir(join(workspaceRoot, '.vision'), { recursive: true })
-    await writeFile(join(globalRoot, 'slides', 'SKILL.md'), '# global\n', 'utf8')
-    await writeFile(join(workspaceRoot, '.claude', 'skills', 'slides', 'SKILL.md'), '# legacy\n', 'utf8')
-    await writeFile(legacyMarker, 'slides', 'utf8')
-
-    await ensureWorkspaceSkillLinks({ globalSkillsRoot: globalRoot, workspaceRoot, skillIds: ['slides'], legacyMarkerPath: legacyMarker })
-
-    expect((await lstat(join(workspaceRoot, '.claude', 'skills', 'slides'))).isSymbolicLink()).toBe(true)
-    await expect(lstat(legacyMarker)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
-
   it('preserves unmanaged workspace Skill directories', async () => {
     const root = await createTempDir()
     const globalRoot = join(root, 'app-data', '.claude', 'skills')

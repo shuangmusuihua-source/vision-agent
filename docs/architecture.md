@@ -32,7 +32,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 
 ### IPC 层
 
-`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、search、notification 和 connection。
+`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、search 和 connection。
 
 `src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/preload/index.ts` 将其适配成 `window.api`。新增 IPC 时必须同时维护这两个边界和 renderer 类型。
 
@@ -46,8 +46,6 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 - `session-store.ts`：SDK 会话列表、历史分页、重命名、删除及 compaction 过滤
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
 - `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
-
-`agent-manager.ts` 只是兼容导出层，不是实现中心。
 
 ### 文件与授权
 

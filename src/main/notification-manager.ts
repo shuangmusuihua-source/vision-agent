@@ -66,20 +66,3 @@ export function cancelPermissionNotification(requestId: string): void {
     pendingPermissionTimers.delete(requestId)
   }
 }
-
-export async function getNotificationHistory(): Promise<
-  Array<{ id: string; groupId: string; title: string; body: string }>
-> {
-  if (process.platform !== 'darwin') return []
-  try {
-    const history = await Notification.getHistory()
-    return history.map((n) => ({
-      id: n.id,
-      groupId: n.groupId ?? '',
-      title: n.title,
-      body: n.body
-    }))
-  } catch {
-    return []
-  }
-}

@@ -5,11 +5,13 @@ import { ensureWorkspaceSkills, getAppSkillsCwd, getAppSkillsDir } from './skill
 import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import {
   getApiKey,
+} from './persistence/profile-store'
+import {
   getAuthorizedDirectories,
-  getEnabledSkills,
   getSessionRecordById,
   updateSessionRecord,
-} from './store'
+} from './persistence/workspace-store'
+import { getEnabledSkills } from './persistence/settings-store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { buildSumiContextPrompt, buildSumiIdentityPrompt } from './agent-identity'

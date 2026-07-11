@@ -225,10 +225,6 @@ export type IPCChannelMap = {
     request: string[]
     response: { success: boolean }
   }
-  'settings:getTheme': {
-    request: void
-    response: 'light' | 'dark' | 'system'
-  }
   'settings:setTheme': {
     request: 'light' | 'dark' | 'system'
     response: { success: boolean }
@@ -242,14 +238,6 @@ export type IPCChannelMap = {
   'memory:list': {
     request: void
     response: Array<{ name: string; path: string }>
-  }
-  'memory:read': {
-    request: string
-    response: { success: boolean; content?: string; error?: string }
-  }
-  'memory:write': {
-    request: [string, string]
-    response: { success: boolean; error?: string }
   }
   'memory:delete': {
     request: string
@@ -305,10 +293,6 @@ export type IPCChannelMap = {
     request: [string, boolean]
     response: string[]
   }
-  'skills:getEnabled': {
-    request: void
-    response: string[]
-  }
   'skills:builtins': {
     request: void
     response: BuiltinSkillCatalogItem[]
@@ -346,12 +330,6 @@ export type IPCChannelMap = {
     response: unknown[]
   }
 
-  // Notification
-  'notification:getHistory': {
-    request: void
-    response: unknown[]
-  }
-
   // Update
   'update:checkForUpdates': {
     request: void
@@ -368,12 +346,6 @@ export type IPCChannelMap = {
   'update:openLatestRelease': {
     request: void
     response: void
-  }
-
-  // Ping
-  'ping': {
-    request: void
-    response: string
   }
 }
 

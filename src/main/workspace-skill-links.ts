@@ -5,7 +5,6 @@ export interface WorkspaceSkillLinkOptions {
   globalSkillsRoot: string
   workspaceRoot: string
   skillIds: string[]
-  legacyMarkerPath?: string
 }
 
 export interface WorkspaceSkillLinkResult {
@@ -24,11 +23,6 @@ async function pathType(path: string): Promise<'missing' | 'link' | 'directory' 
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'missing'
     throw error
   }
-}
-
-async function hasLegacyMarker(path?: string): Promise<boolean> {
-  if (!path) return false
-  return await pathType(path) !== 'missing'
 }
 
 function isInside(parent: string, child: string): boolean {
@@ -57,7 +51,6 @@ export async function ensureWorkspaceSkillLinks(options: WorkspaceSkillLinkOptio
   if (resolve(options.workspaceRoot) === resolve(join(options.globalSkillsRoot, '..', '..'))) return result
 
   const workspaceSkillsRoot = join(options.workspaceRoot, '.claude', 'skills')
-  const canReplaceLegacyCopies = await hasLegacyMarker(options.legacyMarkerPath)
   await mkdir(workspaceSkillsRoot, { recursive: true })
   const desiredSkillIds = new Set(options.skillIds)
   await removeStaleManagedLinks(workspaceSkillsRoot, options.globalSkillsRoot, desiredSkillIds)
@@ -75,19 +68,12 @@ export async function ensureWorkspaceSkillLinks(options: WorkspaceSkillLinkOptio
       }
       await rm(targetDir, { force: true })
     } else if (targetType !== 'missing') {
-      if (!canReplaceLegacyCopies) {
-        result.conflicts.push(skillId)
-        continue
-      }
-      await rm(targetDir, { recursive: true, force: true })
+      result.conflicts.push(skillId)
+      continue
     }
 
     await symlink(sourceDir, targetDir, process.platform === 'win32' ? 'junction' : 'dir')
     result.linked.push(skillId)
-  }
-
-  if (canReplaceLegacyCopies && options.legacyMarkerPath) {
-    await rm(options.legacyMarkerPath, { force: true })
   }
 
   return result

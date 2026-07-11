@@ -4,7 +4,6 @@ import * as Sentry from '@sentry/electron/renderer'
 import App from './App'
 import { getGlobalErrorMessage, isExpectedCancellation } from './lib/global-errors'
 import { useUiStore } from './store/ui-slice'
-import './styles/global.css'
 
 window.addEventListener('error', (event) => {
   console.error(

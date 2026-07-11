@@ -6,8 +6,8 @@ import { getMainWindow } from '../ipc-sender'
 import {
   removeAuthorizedDirectory,
   getAuthorizedDirectories,
-  getKnowledgeBaseDir,
-} from '../store'
+} from '../persistence/workspace-store'
+import { getKnowledgeBaseDir } from '../persistence/store-core'
 import { fileIndexService } from '../file-index-service'
 import { isPathAuthorized, sanitizeFileName } from '../path-validator'
 import { atomicWriteTextFile } from '../atomic-write'

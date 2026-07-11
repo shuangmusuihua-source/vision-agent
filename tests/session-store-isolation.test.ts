@@ -29,12 +29,14 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   deleteSession: mocks.deleteSession,
 }))
 
-vi.mock('../src/main/store', () => ({
+vi.mock('../src/main/persistence/workspace-store', () => ({
   getSessionRecords: () => mocks.records,
   removeSessionRecord: mocks.removeSessionRecord,
   updateSessionRecord: mocks.updateSessionRecord,
+}))
+
+vi.mock('../src/main/persistence/settings-store', () => ({
   getCompactionSessionIds: () => [],
-  addCompactionSessionId: vi.fn(),
   deleteCompactionSessionId: mocks.deleteCompactionSessionId,
 }))
 

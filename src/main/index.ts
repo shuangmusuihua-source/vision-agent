@@ -7,12 +7,12 @@ import * as Sentry from '@sentry/electron/main'
 import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
-import { getSettings, getAuthorizedDirectories, ensureKnowledgeBase } from './store'
-import { migrateStore } from './store-migration'
+import { getSettings } from './persistence/profile-store'
+import { getAuthorizedDirectories, ensureKnowledgeBase } from './persistence/workspace-store'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
 import { restorePersistedTasks } from './cron-manager'
-import { setGenerationWindow, handleWindowDestroy, abortActiveQuery } from './agent-manager'
+import { setGenerationWindow, handleWindowDestroy, abortActiveQuery } from './query-runner'
 import { inlineRewriteRunner } from './inline-rewrite-runner'
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
@@ -192,13 +192,6 @@ app.whenReady().then(async () => {
 
   // Ensure knowledge base directory exists and is registered
   const knowledgeDir = ensureKnowledgeBase()
-
-  // Complete data migration before IPC/session discovery can expose stale sessions.
-  try {
-    await migrateStore()
-  } catch (err) {
-    console.error('[Init] store migration failed:', err)
-  }
 
   registerIpcHandlers()
   try {

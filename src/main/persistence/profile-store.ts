@@ -2,24 +2,7 @@ import type { ModelProfile } from '../../shared/types'
 import { store, encryptValue, decryptValue, maskApiKey, type AppSettings } from './store-core'
 import { filterUserWorkspacePaths } from '../../shared/workspace-paths'
 
-let migrationDone = false
-function migrateApiKeys(): void {
-  if (migrationDone) return
-  migrationDone = true
-  const profiles = store.get('profiles')
-  const updated = profiles.map((p) => {
-    if (p.apiKey && !p.apiKey.startsWith('enc:')) {
-      return { ...p, apiKey: encryptValue(p.apiKey) }
-    }
-    return p
-  })
-  if (updated.some((p, i) => p.apiKey !== profiles[i].apiKey)) {
-    store.set('profiles', updated)
-  }
-}
-
 export function getSettings(): AppSettings {
-  migrateApiKeys()
   const settings = store.store
   const authorizedDirectories = filterUserWorkspacePaths(settings.authorizedDirectories, settings.fixedDirectories)
   return {
@@ -33,13 +16,11 @@ export function getSettings(): AppSettings {
 }
 
 export function getActiveProfile(): ModelProfile | null {
-  migrateApiKeys()
   const settings = store.store
   return settings.profiles.find((p) => p.id === settings.activeProfileId) || null
 }
 
 export function getApiKey(): string {
-  migrateApiKeys()
   const profile = getActiveProfileRaw()
   if (!profile) return ''
   return decryptValue(profile.apiKey)
@@ -51,13 +32,11 @@ function getActiveProfileRaw(): ModelProfile | null {
 }
 
 export function getBaseUrl(): string {
-  migrateApiKeys()
   const profile = getActiveProfileRaw()
   return profile?.baseUrl || ''
 }
 
 export function getModel(): string {
-  migrateApiKeys()
   const profile = getActiveProfileRaw()
   return profile?.model || 'claude-sonnet-4-20250514'
 }

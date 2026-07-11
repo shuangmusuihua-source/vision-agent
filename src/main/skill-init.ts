@@ -50,7 +50,6 @@ export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<Works
     globalSkillsRoot: appSkillsDir,
     workspaceRoot: workspaceCwd,
     skillIds: await getInstalledSkillNames(),
-    legacyMarkerPath: join(workspaceCwd, '.vision', '.claude-skills-version'),
   })
   if (result.conflicts.length > 0) {
     console.warn('[SkillInit] workspace Skill conflicts preserved:', result.conflicts)

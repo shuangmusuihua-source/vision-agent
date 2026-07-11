@@ -54,7 +54,6 @@ function invoke<K extends keyof IPCChannelMap>(
 }
 
 const api = {
-  ping: (): Promise<string> => invoke('ping'),
   getVersion: (): Promise<string> => invoke('app:getVersion'),
 
   workspace: {
@@ -93,7 +92,6 @@ const api = {
     addDirectory: (dir: string) => invoke('settings:addDirectory', dir),
     removeDirectory: (dir: string) => invoke('settings:removeDirectory', dir),
     reorderDirectories: (paths: string[]) => invoke('settings:reorderDirectories', paths),
-    getTheme: () => invoke('settings:getTheme'),
     setTheme: (theme: 'light' | 'dark' | 'system') => invoke('settings:setTheme', theme),
     onChanged: (callback: (settings: Record<string, unknown>) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, settings: Record<string, unknown>) => callback(settings)
@@ -235,8 +233,6 @@ const api = {
 
   memory: {
     list: () => invoke('memory:list'),
-    read: (filePath: string) => invoke('memory:read', filePath),
-    write: (filePath: string, content: string) => invoke('memory:write', filePath, content),
     delete: (filePath: string) => invoke('memory:delete', filePath)
   },
 
@@ -271,7 +267,6 @@ const api = {
   skills: {
     list: () => invoke('skills:list'),
     toggle: (skillId: string, enabled: boolean) => invoke('skills:toggle', skillId, enabled),
-    getEnabled: () => invoke('skills:getEnabled'),
     builtins: () => invoke('skills:builtins'),
     catalog: () => invoke('skills:catalog'),
     install: (skillId: string) => invoke('skills:install', skillId),
@@ -299,10 +294,6 @@ const api = {
       ipcRenderer.on('menu-action', handler)
       return () => { ipcRenderer.removeListener('menu-action', handler) }
     }
-  },
-
-  notification: {
-    getHistory: () => invoke('notification:getHistory')
   },
 
   update: {

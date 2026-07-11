@@ -1,8 +1,10 @@
 import { ipcMain, dialog, shell } from 'electron'
 import { getMainWindow } from '../ipc-sender'
-import { sendMessage, resolvePermission, resolveAskUser, listSdkSessions, loadSdkSessionMessagesPaginated, renameSdkSession, abortActiveQuery, abortActiveQueryAndWait, deleteSdkSession, setPermissionMode } from '../agent-manager'
-import { getSessionRecords, getSessionRecordById, updateSessionRecord, removeSessionRecord, getSessionFileOutputs } from '../store'
-import type { AgentContext } from '../../shared/types'
+import { sendMessage, abortActiveQuery, abortActiveQueryAndWait, setPermissionMode } from '../query-runner'
+import { resolvePermission, resolveAskUser } from '../session-runtime'
+import { listSdkSessions, loadSdkSessionMessagesPaginated, renameSdkSession, deleteSdkSession } from '../session-store'
+import { getSessionRecords, getSessionRecordById, updateSessionRecord, removeSessionRecord } from '../persistence/workspace-store'
+import { getSessionFileOutputs } from '../session-file-catalog'
 import type { IPCRequest } from '../../shared/ipc-types'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import { removeSessionWorkingDirectory } from '../session-files'
@@ -24,15 +26,6 @@ type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 
-function isObjectRequest<T extends object>(value: T | string | undefined): value is T {
-  return typeof value === 'object' && value !== null
-}
-
-function requireArg<T>(value: T | undefined, name: string): T {
-  if (value === undefined) throw new Error(`Missing IPC argument: ${name}`)
-  return value
-}
-
 function isPermissionMode(value: string): value is PermissionMode {
   return value === 'default' ||
     value === 'acceptEdits' ||
@@ -41,103 +34,43 @@ function isPermissionMode(value: string): value is PermissionMode {
     value === 'auto'
 }
 
-function normalizeSendMessageRequest(
-  requestOrPrompt: AgentSendMessageRequest | string,
-  sessionId?: string,
-  activeFilePath?: string,
-  skillId?: string,
-  context?: AgentContext,
-  workspacePath?: string,
-  title?: string,
-  clientSessionKey?: string
-): AgentSendMessageRequest {
-  if (typeof requestOrPrompt === 'object' && requestOrPrompt !== null) {
-    return requestOrPrompt
-  }
-  return {
-    prompt: requestOrPrompt,
-    sessionId,
-    activeFilePath,
-    skillId,
-    context,
-    workspacePath,
-    title,
-    clientSessionKey,
-  }
-}
-
 export function registerAgentHandlers(): void {
-  ipcMain.handle('agent:sendMessage', async (_event, requestOrPrompt: AgentSendMessageRequest | string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string, clientSessionKey?: string) => {
+  ipcMain.handle('agent:sendMessage', async (_event, request: AgentSendMessageRequest) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    const request = normalizeSendMessageRequest(
-      requestOrPrompt,
-      sessionId,
-      activeFilePath,
-      skillId,
-      context,
-      workspacePath,
-      title,
-      clientSessionKey
-    )
     sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey, request.title)
     return { started: true }
   })
 
-  ipcMain.handle('agent:permissionResponse', (_event, requestOrId: AgentPermissionResponseRequest | string, behavior?: 'allow' | 'deny', options?: AgentPermissionResponseRequest['options']) => {
-    const request: AgentPermissionResponseRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { requestId: requestOrId, behavior: requireArg(behavior, 'behavior'), options }
+  ipcMain.handle('agent:permissionResponse', (_event, request: AgentPermissionResponseRequest) => {
     resolvePermission(request.requestId, request.behavior, request.options as Parameters<typeof resolvePermission>[2])
     return { success: true }
   })
 
-  ipcMain.handle('agent:respondAskUser', (_event, requestOrId: AgentRespondAskUserRequest | string, answers?: Record<string, string>) => {
-    const request: AgentRespondAskUserRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { requestId: requestOrId, answers: requireArg(answers, 'answers') }
+  ipcMain.handle('agent:respondAskUser', (_event, request: AgentRespondAskUserRequest) => {
     resolveAskUser(request.requestId, request.answers)
     return { success: true }
   })
 
-  ipcMain.handle('agent:listSdkSessions', async (_event, requestOrWorkspace?: AgentListSdkSessionsRequest | string) => {
-    const workspaceCwd = isObjectRequest(requestOrWorkspace)
-      ? requestOrWorkspace.workspaceCwd
-      : requestOrWorkspace
-    return await listSdkSessions(workspaceCwd)
+  ipcMain.handle('agent:listSdkSessions', async (_event, request: AgentListSdkSessionsRequest) => {
+    return await listSdkSessions(request.workspaceCwd)
   })
 
-  ipcMain.handle('agent:loadSessionMessagesPaginated', async (_event, requestOrId: AgentLoadSessionMessagesPaginatedRequest | string, limit?: number, offset?: number) => {
-    const request: AgentLoadSessionMessagesPaginatedRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : {
-          sessionId: requestOrId,
-          limit: requireArg(limit, 'limit'),
-          offset: requireArg(offset, 'offset'),
-        }
+  ipcMain.handle('agent:loadSessionMessagesPaginated', async (_event, request: AgentLoadSessionMessagesPaginatedRequest) => {
     return await loadSdkSessionMessagesPaginated(request.sessionId, request.limit, request.offset)
   })
 
-  ipcMain.handle('agent:renameSession', async (_event, requestOrId: AgentRenameSessionRequest | string, title?: string) => {
-    const request: AgentRenameSessionRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId, title: requireArg(title, 'title') }
+  ipcMain.handle('agent:renameSession', async (_event, request: AgentRenameSessionRequest) => {
     await renameSdkSession(request.sessionId, request.title)
     return { success: true }
   })
 
-  ipcMain.handle('agent:updateSessionRecord', (_event, requestOrId: AgentUpdateSessionRecordRequest | string, patch?: Record<string, unknown>) => {
-    const request: AgentUpdateSessionRecordRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId, patch: requireArg(patch, 'patch') }
+  ipcMain.handle('agent:updateSessionRecord', (_event, request: AgentUpdateSessionRecordRequest) => {
     updateSessionRecord(request.sessionId, request.patch as any)
     return { success: true }
   })
 
-  ipcMain.handle('agent:removeSessionRecord', async (_event, requestOrId: AgentRemoveSessionRecordRequest | string) => {
-    const request: AgentRemoveSessionRecordRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId }
+  ipcMain.handle('agent:removeSessionRecord', async (_event, request: AgentRemoveSessionRecordRequest) => {
     await abortActiveQueryAndWait(request.sessionId)
     const record = getSessionRecordById(request.sessionId)
     if (record) {
@@ -147,19 +80,13 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:abort', (_event, requestOrContext?: AgentAbortRequest | string) => {
-    const contextOrSessionId = isObjectRequest(requestOrContext)
-      ? requestOrContext.contextOrSessionId
-      : requestOrContext
+  ipcMain.handle('agent:abort', (_event, request: AgentAbortRequest) => {
     // Supports both AgentContext ('editor'|'ask') and sessionId for parallel streaming
-    abortActiveQuery(contextOrSessionId)
+    abortActiveQuery(request.contextOrSessionId)
     return { success: true }
   })
 
-  ipcMain.handle('agent:deleteSession', async (_event, requestOrId: AgentDeleteSessionRequest | string) => {
-    const request: AgentDeleteSessionRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId }
+  ipcMain.handle('agent:deleteSession', async (_event, request: AgentDeleteSessionRequest) => {
     // Abort any running query for this session before deletion — prevents
     // resource leaks (orphaned subprocess, pending permissions) and avoids
     // the SDK recreating the session file from a still-running query.
@@ -168,10 +95,7 @@ export function registerAgentHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('agent:getSessionOutputs', async (_event, requestOrId: AgentGetSessionOutputsRequest | string) => {
-    const request: AgentGetSessionOutputsRequest = isObjectRequest(requestOrId)
-      ? requestOrId
-      : { sessionId: requestOrId }
+  ipcMain.handle('agent:getSessionOutputs', async (_event, request: AgentGetSessionOutputsRequest) => {
     try {
       // Find session record to get workspacePath
       const records = getSessionRecords()
@@ -214,11 +138,7 @@ export function registerAgentHandlers(): void {
     }
   })
 
-  ipcMain.handle('agent:setPermissionMode', async (_event, requestOrContext: AgentSetPermissionModeRequest | AgentContext, mode?: string) => {
-    const request: AgentSetPermissionModeRequest = isObjectRequest(requestOrContext)
-      ? requestOrContext
-      : { context: requestOrContext, mode: requireArg(mode, 'mode') }
-
+  ipcMain.handle('agent:setPermissionMode', async (_event, request: AgentSetPermissionModeRequest) => {
     if (!isPermissionMode(request.mode)) {
       return { success: false, error: `Unsupported permission mode: ${request.mode}` }
     }

@@ -11,7 +11,7 @@
  * 4. `id` is app-owned and stable. `sdkSessionId` is the Claude SDK handle.
  *    Materialization attaches `sdkSessionId`; it must not rename `id`.
  * 5. `messageCount` carries real SDK data (populated by `listSdkSessions` in
- *    agent-manager.ts). It flows through CREATE_TEMP (set to 0), MATERIALIZE
+ *    session-store.ts). It flows through CREATE_TEMP (set to 0), MATERIALIZE
  *    (spread-preserved), and REPLACE_SDK (passed through from SDK sessions)
  *    unchanged — the reducer never mutates it.
  */

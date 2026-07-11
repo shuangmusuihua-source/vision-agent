@@ -167,13 +167,3 @@ export function ensureKnowledgeBase(): string {
 
   return kbDir
 }
-
-// ─── Store version ─────────────────────────────────────────────────────
-
-export function getStoreVersion(): number {
-  return store.get('storeVersion')
-}
-
-export function setStoreVersion(version: number): void {
-  store.set('storeVersion', version)
-}

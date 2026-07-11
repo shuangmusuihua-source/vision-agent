@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { getApiKey, getBaseUrl } from '../store'
+import { getApiKey, getBaseUrl } from '../persistence/profile-store'
 
 export function registerConnectionHandlers(): void {
   ipcMain.handle('settings:testConnection', async (_event, options: { baseUrl: string; apiKey: string; model: string }) => {

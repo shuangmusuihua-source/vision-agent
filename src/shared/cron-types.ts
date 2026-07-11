@@ -53,16 +53,16 @@ export interface CronTask {
   lastRunAt: number | null
   lastResult: string | null
   status: CronTaskStatus
-  target?: CronTaskTarget | null
-  linkedUrls?: string[]
-  allowNetwork?: boolean
-  notifyOnCompletion?: boolean
-  lastStatus?: CronTaskRunStatus | null
-  lastError?: string | null
-  lastStartedAt?: number | null
-  lastFinishedAt?: number | null
-  runCount?: number
-  resultHistory?: CronTaskRun[]
+  target: CronTaskTarget | null
+  linkedUrls: string[]
+  allowNetwork: boolean
+  notifyOnCompletion: boolean
+  lastStatus: CronTaskRunStatus | null
+  lastError: string | null
+  lastStartedAt: number | null
+  lastFinishedAt: number | null
+  runCount: number
+  resultHistory: CronTaskRun[]
   isRunning?: boolean
 }
 

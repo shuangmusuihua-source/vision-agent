@@ -1,6 +1,7 @@
 import type { AgentContext } from '../shared/types'
 import { addCompactionId } from './session-store'
-import { addCompactionSessionId, addSessionRecord, getSessionRecordById } from './store'
+import { addCompactionSessionId } from './persistence/settings-store'
+import { addSessionRecord, getSessionRecordById } from './persistence/workspace-store'
 
 type MaterializedSessionInput = {
   appSessionId: string

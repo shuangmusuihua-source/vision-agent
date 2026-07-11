@@ -2,14 +2,9 @@ import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './ipc-sender'
-import {
-  getAuthorizedDirectories,
-  getCronTasks,
-  saveCronTasks,
-  type CronTask,
-  type CronTaskRegistration,
-  type CronTaskRun,
-} from './store'
+import { getAuthorizedDirectories } from './persistence/workspace-store'
+import { getCronTasks, saveCronTasks } from './persistence/settings-store'
+import type { CronTask, CronTaskRegistration, CronTaskRun } from '../shared/cron-types'
 import { buildAgentOptions } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
 import { extractToolPathInput, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
@@ -32,19 +27,9 @@ function normalizeTask(task: CronTask): CronTask {
   const linkedUrls = sanitizeCronLinkedUrls(task.linkedUrls)
   return {
     ...task,
-    status: task.status || 'active',
-    target: task.target ?? null,
     linkedUrls,
-    allowNetwork: linkedUrls.length > 0 || (task.allowNetwork ?? false),
-    notifyOnCompletion: task.notifyOnCompletion ?? true,
-    lastStatus: task.lastStatus ?? null,
-    lastError: task.lastError ?? null,
-    lastStartedAt: task.lastStartedAt ?? null,
-    lastFinishedAt: task.lastFinishedAt ?? null,
-    runCount: task.runCount ?? (task.lastRunAt ? 1 : 0),
-    resultHistory: Array.isArray(task.resultHistory)
-      ? task.resultHistory.slice(0, MAX_RUN_HISTORY)
-      : [],
+    allowNetwork: linkedUrls.length > 0 || task.allowNetwork,
+    resultHistory: task.resultHistory.slice(0, MAX_RUN_HISTORY),
   }
 }
 
@@ -174,6 +159,12 @@ export function registerTask(registration: CronTaskRegistration): CronTask {
     linkedUrls,
     allowNetwork: linkedUrls.length > 0 || (registration.allowNetwork ?? false),
     notifyOnCompletion: registration.notifyOnCompletion ?? true,
+    lastStatus: null,
+    lastError: null,
+    lastStartedAt: null,
+    lastFinishedAt: null,
+    runCount: 0,
+    resultHistory: [],
   })
 
   const job = scheduleTask(task)

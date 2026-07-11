@@ -1,9 +1,12 @@
 import { ipcMain, nativeTheme } from 'electron'
 import {
   getSettings, addProfile, updateProfile, removeProfile, setActiveProfile,
+} from '../persistence/profile-store'
+import {
   addAuthorizedDirectory, removeAuthorizedDirectory, reorderAuthorizedDirectories,
-  getAuthorizedDirectories, getTheme, setTheme,
-} from '../store'
+  getAuthorizedDirectories,
+} from '../persistence/workspace-store'
+import { setTheme } from '../persistence/settings-store'
 import { fileIndexService } from '../file-index-service'
 
 export function registerSettingsHandlers(pushSettingsToRenderer: () => void): void {
@@ -57,8 +60,6 @@ export function registerSettingsHandlers(pushSettingsToRenderer: () => void): vo
     pushSettingsToRenderer()
     return { success: true }
   })
-
-  ipcMain.handle('settings:getTheme', () => getTheme())
 
   ipcMain.handle('settings:setTheme', (_event, theme: 'light' | 'dark' | 'system') => {
     setTheme(theme)

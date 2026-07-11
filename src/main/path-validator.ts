@@ -1,6 +1,7 @@
 import path from 'path'
 import { app } from 'electron'
-import { getAuthorizedDirectories, getKnowledgeBaseDir } from './store'
+import { getAuthorizedDirectories } from './persistence/workspace-store'
+import { getKnowledgeBaseDir } from './persistence/store-core'
 import { isPathAuthorized as isPathInsideAuthorizedRoots } from './agent-path-utils'
 import { getAppUserDataDir } from './app-identity'
 

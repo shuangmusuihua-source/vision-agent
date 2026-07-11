@@ -4,11 +4,8 @@ import { resolveCronSchedule } from '../cron-schedule-parser'
 import type { CronScheduleParseRequest, CronTaskRegistration } from '../../shared/cron-types'
 
 export function registerCronHandlers(): void {
-  ipcMain.handle('cron:register', async (_event, requestOrCron: CronTaskRegistration | string, prompt?: string, name?: string) => {
+  ipcMain.handle('cron:register', async (_event, registration: CronTaskRegistration) => {
     try {
-      const registration: CronTaskRegistration = typeof requestOrCron === 'string'
-        ? { cronExpression: requestOrCron, prompt: prompt || '', name }
-        : requestOrCron
       const task = registerTask(registration)
       return { success: true, task }
     }

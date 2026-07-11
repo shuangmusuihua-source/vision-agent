@@ -41,8 +41,10 @@ async function loadCronManager(options?: {
       },
     }),
   }))
-  vi.doMock('../src/main/store', () => ({
+  vi.doMock('../src/main/persistence/workspace-store', () => ({
     getAuthorizedDirectories: () => options?.authorizedDirectories || ['/tmp/authorized'],
+  }))
+  vi.doMock('../src/main/persistence/settings-store', () => ({
     getCronTasks: () => options?.persisted || [],
     saveCronTasks: (tasks: CronTask[]) => { savedTasks = tasks },
   }))
@@ -94,28 +96,6 @@ describe('cron manager automation tasks', () => {
     expect(savedTasks()).toHaveLength(1)
     expect(savedTasks()[0].target?.workspacePath).toBe('/tmp/workspace')
     expect(schedule).toHaveBeenCalledWith('0 9 * * 1', expect.any(Function), { scheduled: true })
-  })
-
-  it('normalizes legacy persisted tasks on restore', async () => {
-    const legacyTask = {
-      id: 'legacy',
-      name: 'legacy task',
-      cronExpression: '0 * * * *',
-      prompt: 'do old thing',
-      createdAt: 1,
-      lastRunAt: null,
-      lastResult: null,
-      status: 'active',
-    } as CronTask
-    const { manager, savedTasks } = await loadCronManager({ persisted: [legacyTask] })
-
-    manager.restorePersistedTasks()
-
-    const [task] = manager.listTasks()
-    expect(task.allowNetwork).toBe(false)
-    expect(task.notifyOnCompletion).toBe(true)
-    expect(task.resultHistory).toEqual([])
-    expect(savedTasks()[0].notifyOnCompletion).toBe(true)
   })
 
   it('executes with target cwd, network tools, and run history', async () => {

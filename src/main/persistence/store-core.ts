@@ -46,7 +46,6 @@ export interface AppSettings {
   workspaces: WorkspaceRecord[]
   sessions: SessionRecord[]
   compactionSessionIds: string[]
-  storeVersion: number
   theme: 'light' | 'dark' | 'system'
   cronTasks: CronTask[]
   enabledSkills: string[]
@@ -63,7 +62,6 @@ export const store = new Store<AppSettings>({
     workspaces: [],
     sessions: [],
     compactionSessionIds: [],
-    storeVersion: 0,
     theme: 'system',
     cronTasks: [],
     enabledSkills: [],

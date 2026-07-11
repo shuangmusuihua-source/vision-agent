@@ -2,7 +2,7 @@ import type { Options, HookCallbackMatcher, SettingSource } from '@anthropic-ai/
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { getApiKey, getBaseUrl, getModel } from './store'
+import { getApiKey, getBaseUrl, getModel } from './persistence/profile-store'
 import { getAppSkillsCwd } from './skill-init'
 
 // ─── CLI path resolution (moved from agent-manager) ────────────────────

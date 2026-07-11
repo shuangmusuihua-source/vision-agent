@@ -48,7 +48,6 @@ interface AppSettings {
   fixedDirectories: string[]
   workspaces?: import('../../shared/types').WorkspaceRecord[]
   sessions?: import('../../shared/types').SessionRecord[]
-  storeVersion?: number
   theme: 'light' | 'dark' | 'system'
 }
 
@@ -74,15 +73,6 @@ interface SearchResult {
   workspaceName: string
   line: number
   content: string
-}
-
-// ─── Notification History ────────────────────────────────────────────
-
-interface NotificationHistoryItem {
-  id: string
-  groupId: string
-  title: string
-  body: string
 }
 
 // ─── API Interfaces ──────────────────────────────────────────────────
@@ -123,7 +113,6 @@ interface SettingsApi {
   addDirectory: (dir: string) => Promise<{ success: boolean }>
   removeDirectory: (dir: string) => Promise<{ success: boolean }>
   reorderDirectories: (paths: string[]) => Promise<{ success: boolean }>
-  getTheme: () => Promise<'light' | 'dark' | 'system'>
   setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
   onChanged: (callback: (settings: Record<string, unknown>) => void) => () => void
   testConnection: (options: { baseUrl: string; apiKey: string; model: string }) => Promise<{ success: boolean; message: string }>
@@ -180,7 +169,6 @@ interface CronApi {
 interface SkillsApi {
   list: () => Promise<SkillDefinition[]>
   toggle: (skillId: string, enabled: boolean) => Promise<string[]>
-  getEnabled: () => Promise<string[]>
   builtins: () => Promise<BuiltinSkillCatalogItem[]>
   catalog: () => Promise<CommunitySkillCatalogItem[]>
   install: (skillId: string) => Promise<CommunitySkillMutationResult>
@@ -202,10 +190,6 @@ interface MenuApi {
   onAction: (callback: (action: string) => void) => () => void
 }
 
-interface NotificationApi {
-  getHistory: () => Promise<NotificationHistoryItem[]>
-}
-
 interface UpdateApi {
   download: () => Promise<void>
   install: () => Promise<void>
@@ -220,7 +204,6 @@ interface UpdateApi {
 // ─── Window API ──────────────────────────────────────────────────────
 
 interface WindowApi {
-  ping: () => Promise<string>
   getVersion: () => Promise<string>
   workspace: WorkspaceApi
   editor: EditorApi
@@ -233,15 +216,12 @@ interface WindowApi {
   attachments: AttachmentsApi
   search: SearchApi
   menu: MenuApi
-  notification: NotificationApi
   update: UpdateApi
   onMainError: (callback: (error: { type: string; message: string }) => void) => () => void
 }
 
 interface MemoryApi {
   list: () => Promise<Array<{ name: string; path: string }>>
-  read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
-  write: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   delete: (filePath: string) => Promise<{ success: boolean; error?: string }>
 }
 
@@ -264,9 +244,7 @@ export type {
   AttachmentsApi,
   SearchApi,
   MenuApi,
-  NotificationApi,
   UpdateApi,
-  NotificationHistoryItem,
   ModelProfile,
   AppSettings,
   SkillDefinition,
