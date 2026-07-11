@@ -17,8 +17,9 @@ import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
+import { useNotificationInbox } from '../../hooks/useNotificationInbox'
 import { useAgentStore } from '../../store/agent-store-impl'
-import type { AgentContext, AgentNotificationEvent, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
+import type { AgentContext, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
 import { isFileTab, OVERVIEW_TAB_ID } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
@@ -28,6 +29,12 @@ import type { SkillDefinition } from '../../lib/ipc'
 import { buildSkillInvocationPrompt } from '../../../shared/skill-invocation'
 import { checkForAppUpdates, getUpdateProgressLabel, performPrimaryUpdateAction } from '../../lib/app-update'
 import type { MarkdownEditorHandle } from '../editor/MarkdownEditor'
+import {
+  getNotificationTargetLabel,
+  notificationDateTimeLabel,
+  notificationTimeLabel,
+  type AppNotification,
+} from '../../notifications/notification-inbox'
 
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
@@ -36,67 +43,8 @@ const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 const SkillLibrary = lazy(() => import('../skills/SkillLibrary'))
 const AutomationPanel = lazy(() => import('../automation/AutomationPanel'))
 
-type AppNotification = AgentNotificationEvent & {
-  id: string
-  receivedAt: number
-  read: boolean
-}
-
 interface AppShellProps {
   onOpenSettings: () => void
-}
-
-const MAX_IN_APP_NOTIFICATIONS = 30
-const TOAST_AUTO_DISMISS_MS = 5200
-const NOTIFICATION_STORAGE_KEY = 'sumi.inAppNotifications.v1'
-
-function notificationTimeLabel(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function notificationDateTimeLabel(timestamp: number): string {
-  return new Date(timestamp).toLocaleString('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function getNotificationTargetLabel(notification: AppNotification): string | null {
-  const target = notification.target
-  if (target?.view === 'automation') return '自动化'
-  if (target?.view === 'skills') return '技能'
-  if (target?.view === 'ask') return 'Ask sumi'
-  if (target?.view === 'editor') return '工作区会话'
-  if ('context' in notification && notification.context === 'ask') return 'Ask sumi'
-  if ('context' in notification && notification.context === 'editor') return '工作区会话'
-  return null
-}
-
-function loadStoredNotifications(): AppNotification[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(NOTIFICATION_STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((item): item is AppNotification => (
-        item
-        && typeof item.id === 'string'
-        && typeof item.title === 'string'
-        && typeof item.message === 'string'
-        && typeof item.receivedAt === 'number'
-        && typeof item.read === 'boolean'
-      ))
-      .slice(0, MAX_IN_APP_NOTIFICATIONS)
-  } catch {
-    return []
-  }
 }
 
 function SidebarToggleIcon({ collapsed }: { collapsed: boolean }): React.ReactElement {
@@ -132,12 +80,20 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   } = useTabs()
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const [isRetryingSave, setIsRetryingSave] = useState(false)
-  const [toastNotification, setToastNotification] = useState<AppNotification | null>(null)
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => loadStoredNotifications())
-  const [notificationListOpen, setNotificationListOpen] = useState(false)
-  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null)
   const [automationFocusTaskId, setAutomationFocusTaskId] = useState<string | null>(null)
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const {
+    toast: toastNotification,
+    listOpen: notificationListOpen,
+    selected: selectedNotification,
+    unreadNotifications,
+    unreadCount: unreadNotificationCount,
+    openNotification,
+    dismissToast: dismissToastNotification,
+    toggleList: handleNotificationInboxToggle,
+    selectNotification,
+    clearSelection: clearNotificationSelection,
+    markAllRead: markAllNotificationsRead,
+  } = useNotificationInbox()
   const activeFilePathRef = useRef(activeFilePath)
   activeFilePathRef.current = activeFilePath
 
@@ -185,77 +141,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   useEffect(() => {
     setIsRetryingSave(false)
   }, [activeFilePath])
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        NOTIFICATION_STORAGE_KEY,
-        JSON.stringify(notifications.slice(0, MAX_IN_APP_NOTIFICATIONS)),
-      )
-    } catch {
-      // Notification history is helpful but non-critical.
-    }
-  }, [notifications])
-
-  useEffect(() => {
-    const clearToastTimer = () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current)
-        toastTimerRef.current = null
-      }
-    }
-
-    const unsubscribe = window.api.agent.onNotification((notification) => {
-      clearToastTimer()
-      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const nextNotification: AppNotification = {
-        ...notification,
-        id,
-        receivedAt: Date.now(),
-        read: false,
-      }
-      setNotifications((current) => [nextNotification, ...current].slice(0, MAX_IN_APP_NOTIFICATIONS))
-      setToastNotification(nextNotification)
-      toastTimerRef.current = setTimeout(() => {
-        setToastNotification((current) => current?.id === id ? null : current)
-        toastTimerRef.current = null
-      }, TOAST_AUTO_DISMISS_MS)
-    })
-
-    return () => {
-      clearToastTimer()
-      unsubscribe()
-    }
-  }, [])
-
-  const clearToastNotification = useCallback((notificationId?: string) => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-    }
-    setToastNotification((current) => {
-      if (!notificationId || current?.id === notificationId) return null
-      return current
-    })
-  }, [])
-
-  const markNotificationRead = useCallback((notificationId: string) => {
-    setNotifications((current) => current.map((notification) => (
-      notification.id === notificationId ? { ...notification, read: true } : notification
-    )))
-  }, [])
-
-  const dismissToastNotification = useCallback(() => {
-    const notificationId = toastNotification?.id
-    clearToastNotification(notificationId)
-    if (notificationId) markNotificationRead(notificationId)
-  }, [clearToastNotification, markNotificationRead, toastNotification?.id])
-
-  const markAllNotificationsRead = useCallback(() => {
-    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })))
-    setSelectedNotificationId(null)
-    setNotificationListOpen(false)
-  }, [])
 
   const handleRetrySave = useCallback(async () => {
     if (isRetryingSave) return
@@ -391,10 +276,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [activeWorkspacePath, view, openTabs, switchTab, setAgentContext, setLinkedFile])
 
   const handleNotificationOpen = useCallback((notification: AppNotification) => {
-    markNotificationRead(notification.id)
-    clearToastNotification(notification.id)
-    setNotificationListOpen(false)
-    setSelectedNotificationId(null)
+    openNotification(notification.id)
 
     const target = notification.target
     if (target?.view === 'automation') {
@@ -436,21 +318,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         handleSessionSelect(notification.sessionId, notification.workspacePath)
       }
     }
-  }, [clearTab, clearToastNotification, handleSessionSelect, markNotificationRead, setAgentContext, setView])
-
-  const handleNotificationInboxToggle = useCallback(() => {
-    setNotificationListOpen((open) => {
-      const nextOpen = !open
-      if (nextOpen) setSelectedNotificationId(null)
-      return nextOpen
-    })
-  }, [])
+  }, [clearTab, handleSessionSelect, openNotification, setAgentContext, setView])
 
   const handleNotificationDetailSelect = useCallback((notification: AppNotification) => {
-    clearToastNotification(notification.id)
-    markNotificationRead(notification.id)
-    setSelectedNotificationId(notification.id)
-  }, [clearToastNotification, markNotificationRead])
+    selectNotification(notification.id)
+  }, [selectNotification])
 
   const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
   const newSessionInputRef = useRef<HTMLInputElement>(null)
@@ -623,12 +495,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     : toastNotification?.type === 'success'
       ? 'success'
       : 'info'
-  const unreadNotifications = notifications.filter((notification) => !notification.read)
-  const unreadNotificationCount = unreadNotifications.length
-  const selectedNotification = selectedNotificationId
-    ? notifications.find((notification) => notification.id === selectedNotificationId) || null
-    : null
-
   // ── Agent hooks (ask context) ───────────────────────────────────────
 
   const askIsStreaming = useIsStreaming('ask')
@@ -1016,7 +882,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                   <div className="notification-inbox-head notification-detail-head">
                     <button
                       className="notification-detail-back"
-                      onClick={() => setSelectedNotificationId(null)}
+                      onClick={clearNotificationSelection}
                     >
                       <ChevronLeft size={14} />
                       返回

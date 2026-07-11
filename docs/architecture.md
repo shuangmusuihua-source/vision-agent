@@ -79,6 +79,7 @@ Renderer 是单页 React 应用：
 - `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、镜像写入与 LRU 淘汰
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions
+- `notification-inbox.ts`：应用内通知的保留、持久化、toast 计时、已读状态和详情选择
 - `MarkdownEditor.tsx`：Tiptap Markdown 编辑、自动保存及选区级 AI 改写审阅
 - `AssistantMarkdown.tsx`：Streamdown + Shiki + KaTeX + Mermaid
 
