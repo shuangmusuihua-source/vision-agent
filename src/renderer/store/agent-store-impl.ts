@@ -203,6 +203,32 @@ function updateSessionScopedSlot(
   return updateSlot(state, contextForSession(state, sid, fallbackContext), patch, sid)
 }
 
+/**
+ * Update the visible context slot and its active session cache together.
+ * UI-facing actions use this helper so callers never need to know that the
+ * renderer keeps both a live context slot and a per-session cached slot.
+ */
+function updateActiveContextSlot(
+  state: AgentStore,
+  context: AgentContext,
+  patch: Partial<ContextSlot>,
+): Partial<AgentStore> {
+  const sessionId = state.activeSessionId[context] || state.slots[context].currentSessionId
+  const liveSlot = { ...state.slots[context], ...patch }
+  if (!sessionId) {
+    return { slots: { ...state.slots, [context]: liveSlot } }
+  }
+
+  const cachedSlot = state.sessionSlots[sessionId] || state.slots[context]
+  return {
+    slots: { ...state.slots, [context]: liveSlot },
+    sessionSlots: {
+      ...state.sessionSlots,
+      [sessionId]: { ...cachedSlot, ...patch },
+    },
+  }
+}
+
 function mergeLoadedMessages(
   loadedMessages: ConversationMessage[],
   currentMessages: ConversationMessage[]
@@ -213,6 +239,30 @@ function mergeLoadedMessages(
     if (seen.has(message.id)) continue
     seen.add(message.id)
     merged.push(message)
+  }
+  return merged
+}
+
+function mergeMessages(...groups: ConversationMessage[][]): ConversationMessage[] {
+  const seen = new Set<string>()
+  const merged: ConversationMessage[] = []
+  for (const group of groups) {
+    for (const message of group) {
+      if (seen.has(message.id)) continue
+      seen.add(message.id)
+      merged.push(message)
+    }
+  }
+  return merged
+}
+
+function mergeById<T extends { id: string }>(items: Array<T | null | undefined>): T[] {
+  const seen = new Set<string>()
+  const merged: T[] = []
+  for (const item of items) {
+    if (!item || seen.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
   }
   return merged
 }
@@ -772,12 +822,245 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       ))
     },
 
+    setContext(context: AgentContext) {
+      set({ context })
+    },
+
     setPrefill(context: AgentContext, text: string) {
       set((s) => updateSlot(s, context, { prefillText: text }))
     },
 
     consumePrefill(context: AgentContext) {
       set((s) => updateSlot(s, context, { prefillText: null }))
+    },
+
+    setLinkedFile(context: AgentContext, path: string | null) {
+      set((state) => updateActiveContextSlot(state, context, { linkedFile: path }))
+    },
+
+    dismissTodo(context: AgentContext) {
+      set((state) => updateActiveContextSlot(state, context, { todoList: null }))
+    },
+
+    markArtifactSaved(context: AgentContext, messageId: string, filePath: string) {
+      set((state) => {
+        const slot = state.slots[context]
+        const messageIndex = slot.messages.findIndex((message) => message.id === messageId)
+        if (messageIndex < 0 || slot.messages[messageIndex].kind !== 'artifact') return {}
+
+        const messages = [...slot.messages]
+        const message = messages[messageIndex]
+        if (message.kind !== 'artifact') return {}
+        messages[messageIndex] = {
+          ...message,
+          artifact: { ...message.artifact, filePath, content: undefined },
+        }
+        return updateActiveContextSlot(state, context, { messages })
+      })
+    },
+
+    clearContextSession(context: AgentContext) {
+      set((state) => ({
+        activeSessionId: { ...state.activeSessionId, [context]: null },
+        slots: {
+          ...state.slots,
+          [context]: {
+            ...emptySlot(),
+            workspacePath: context === 'editor'
+              ? (state.slots.editor.workspacePath || state.activeWorkspacePath)
+              : null,
+          },
+        },
+        ...(context === 'editor' ? { sessionOutputs: null, sessionOutputsLoading: false } : {}),
+      }))
+    },
+
+    materializeSession(envelope: AgentSessionEnvelope) {
+      const clientSessionKey = envelope.clientSessionKey || envelope.sessionId
+      const sdkSessionId = envelope.sdkSessionId || envelope.sessionId
+      const sessionTitle = get().sessionList.find((session) => session.id === clientSessionKey)?.title
+
+      set((state) => {
+        const nextSessionSlots = { ...state.sessionSlots }
+        const currentActiveId = state.activeSessionId[envelope.context]
+        const clientSlot = nextSessionSlots[clientSessionKey]
+        const sdkSlot = clientSessionKey !== sdkSessionId ? nextSessionSlots[sdkSessionId] : undefined
+        const activeSlotIsClient = currentActiveId === clientSessionKey || currentActiveId === sdkSessionId
+        const sourceSlot = clientSlot || (activeSlotIsClient ? state.slots[envelope.context] : undefined)
+        const realSlot = sdkSlot
+        const baseSlot = sourceSlot || realSlot || emptySlot()
+        const permissionItems = mergeById<PermissionRequestIPC>([
+          sourceSlot?.permissionRequest,
+          ...(sourceSlot?.permissionQueue || []),
+          realSlot?.permissionRequest,
+          ...(realSlot?.permissionQueue || []),
+        ])
+        const askUserItems = mergeById<AskUserRequestIPC>([
+          sourceSlot?.askUserRequest,
+          ...(sourceSlot?.askUserQueue || []),
+          realSlot?.askUserRequest,
+          ...(realSlot?.askUserQueue || []),
+        ])
+        const materializedSlot: ContextSlot = {
+          ...baseSlot,
+          ...(sourceSlot || {}),
+          ...(realSlot || {}),
+          messages: mergeMessages(sourceSlot?.messages || [], realSlot?.messages || []),
+          isStreaming: Boolean(sourceSlot?.isStreaming || realSlot?.isStreaming),
+          agentState: realSlot?.agentState && realSlot.agentState !== 'idle'
+            ? realSlot.agentState
+            : (sourceSlot?.agentState || baseSlot.agentState),
+          _acc: realSlot?._acc || sourceSlot?._acc || null,
+          _firstContentSeen: Boolean(realSlot?._firstContentSeen || sourceSlot?._firstContentSeen),
+          _processedArtifactIds: new Set([
+            ...(sourceSlot?._processedArtifactIds || []),
+            ...(realSlot?._processedArtifactIds || []),
+          ]),
+          _queryGeneration: Math.max(sourceSlot?._queryGeneration || 0, realSlot?._queryGeneration || 0),
+          _resultGuardGen: Math.max(sourceSlot?._resultGuardGen || 0, realSlot?._resultGuardGen || 0),
+          permissionRequest: permissionItems[0] || null,
+          permissionQueue: permissionItems.slice(1),
+          askUserRequest: askUserItems[0] || null,
+          askUserQueue: askUserItems.slice(1),
+          generationActivity: realSlot?.generationActivity || sourceSlot?.generationActivity || null,
+          activeSkillId: realSlot?.activeSkillId || sourceSlot?.activeSkillId || null,
+          lastEditedFile: realSlot?.lastEditedFile || sourceSlot?.lastEditedFile || null,
+          usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
+          todoList: realSlot?.todoList || sourceSlot?.todoList || null,
+          currentSessionId: clientSessionKey,
+          sdkSessionId,
+          workspacePath: envelope.workspacePath || sourceSlot?.workspacePath || realSlot?.workspacePath || null,
+        }
+
+        nextSessionSlots[clientSessionKey] = materializedSlot
+        if (sdkSessionId !== clientSessionKey) delete nextSessionSlots[sdkSessionId]
+
+        const sessionAccessOrder = state.sessionAccessOrder
+          .filter((id) => id !== clientSessionKey && id !== sdkSessionId)
+        sessionAccessOrder.push(clientSessionKey)
+
+        const isStillActiveSession =
+          currentActiveId === clientSessionKey ||
+          currentActiveId === sdkSessionId ||
+          currentActiveId === null
+
+        const next: Partial<AgentStore> = {
+          sessionSlots: nextSessionSlots,
+          sessionAccessOrder,
+        }
+        if (isStillActiveSession) {
+          next.activeSessionId = { ...state.activeSessionId, [envelope.context]: clientSessionKey }
+          next.slots = { ...state.slots, [envelope.context]: materializedSlot }
+        }
+        if (envelope.context === 'editor') {
+          next.sessionList = sessionListReducer(state.sessionList, {
+            type: 'MATERIALIZE',
+            tempId: clientSessionKey,
+            realId: sdkSessionId,
+            context: envelope.context,
+            workspacePath: envelope.workspacePath,
+            title: sessionTitle,
+          })
+          if (envelope.workspacePath && !state.activeWorkspacePath) {
+            next.activeWorkspacePath = envelope.workspacePath
+          }
+        }
+        return next
+      })
+
+      return { clientSessionKey, sdkSessionId, sessionTitle }
+    },
+
+    appendInactivityNotice(context: AgentContext, sessionId?: string | null) {
+      const normalizedSessionId = normalizeSessionId(sessionId)
+      set((state) => {
+        const target = resolveSlot(state, context, normalizedSessionId)
+        return updateSessionScopedSlot(state, context, {
+          messages: [...target.messages, {
+            kind: 'status',
+            id: `watchdog-${Date.now()}`,
+            role: 'system',
+            phase: 'complete',
+            textContent: '任务已经 2 分钟没有新进度，但仍在运行。你可以继续等待，或点击停止。',
+            createdAt: Date.now(),
+          }],
+        }, normalizedSessionId)
+      })
+    },
+
+    beginMessage(
+      context: AgentContext,
+      visibleText: string,
+      skill?: { id: string; name: string; icon: string },
+    ) {
+      let sessionId = get().slots[context].currentSessionId
+      if (!sessionId) sessionId = `new-${context}-${Date.now()}`
+      const clientSessionKey = sessionId
+
+      set((state) => {
+        const isNewSession = !state.slots[context].currentSessionId
+        const baseSlot = isNewSession
+          ? { ...state.slots[context], currentSessionId: clientSessionKey, sdkSessionId: null }
+          : state.slots[context]
+        const nextSlot: ContextSlot = {
+          ...baseSlot,
+          messages: [...baseSlot.messages, {
+            kind: 'user',
+            id: `user-${Date.now()}`,
+            role: 'user',
+            textContent: visibleText,
+            ...(skill ? {
+              skillMeta: {
+                id: skill.id,
+                name: skill.name,
+                icon: skill.icon,
+                status: 'running',
+              },
+            } : {}),
+            createdAt: Date.now(),
+          }],
+          ...(skill ? { activeSkillId: skill.id } : {}),
+          isStreaming: true,
+        }
+        const sessionAccessOrder = state.sessionAccessOrder.filter((id) => id !== clientSessionKey)
+        sessionAccessOrder.push(clientSessionKey)
+        const cachedSlot = state.sessionSlots[clientSessionKey] || baseSlot
+        const nextCachedSlot: ContextSlot = {
+          ...cachedSlot,
+          messages: nextSlot.messages,
+          ...(skill ? { activeSkillId: skill.id } : {}),
+          isStreaming: true,
+          currentSessionId: clientSessionKey,
+        }
+        return {
+          ...(isNewSession
+            ? { activeSessionId: { ...state.activeSessionId, [context]: clientSessionKey } }
+            : {}),
+          slots: { ...state.slots, [context]: nextSlot },
+          sessionSlots: { ...state.sessionSlots, [clientSessionKey]: nextCachedSlot },
+          sessionAccessOrder,
+        }
+      })
+
+      return clientSessionKey
+    },
+
+    startNewSession(context: AgentContext) {
+      set((state) => {
+        const currentSlot = state.slots[context]
+        const currentSessionId = currentSlot.currentSessionId || state.activeSessionId[context]
+        const sessionSlots = { ...state.sessionSlots }
+        if (currentSessionId) sessionSlots[currentSessionId] = { ...currentSlot }
+        return {
+          activeSessionId: { ...state.activeSessionId, [context]: null },
+          ...(context === 'editor' ? { sessionOutputs: null, sessionOutputsLoading: false } : {}),
+          sessionSlots,
+          slots: {
+            ...state.slots,
+            [context]: { ...emptySlot(), workspacePath: currentSlot.workspacePath },
+          },
+        }
+      })
     },
 
     // ─── Workspace Actions ────────────────────────────────────────────────
@@ -805,8 +1088,23 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       set({ sessionOutputs: outputs, sessionOutputsLoading: false })
     },
 
+    setSessionOutputsLoading(loading: boolean) {
+      set({ sessionOutputsLoading: loading })
+    },
+
     dispatchSessionList(action: SessionListAction) {
       set(state => ({ sessionList: sessionListReducer(state.sessionList, action) }))
+    },
+
+    removeSessionState(sessionId: string) {
+      set((state) => {
+        const { [sessionId]: _removed, ...sessionSlots } = state.sessionSlots
+        return {
+          sessionList: sessionListReducer(state.sessionList, { type: 'DELETE', sessionId }),
+          sessionSlots,
+          sessionAccessOrder: state.sessionAccessOrder.filter((id) => id !== sessionId),
+        }
+      })
     },
 
     ensureSessionSlot(sessionId: string) {

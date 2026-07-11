@@ -33,6 +33,7 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
   context: 'editor' | 'ask'
 }) {
   const Icon = artifact.fileType === 'html' ? FileCode : FileText
+  const markArtifactSaved = useAgentStore((s) => s.markArtifactSaved)
 
   const handleOpen = () => {
     if (artifact.filePath) {
@@ -58,17 +59,7 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
       defaultPath: workspacePath
     })
     if (result.success && result.filePath) {
-      const msgs = [...useAgentStore.getState().slots[context].messages]
-      const idx = msgs.findIndex((m) => m.id === messageId)
-      if (idx >= 0 && msgs[idx].kind === 'artifact') {
-        msgs[idx] = {
-          ...msgs[idx],
-          artifact: { ...msgs[idx].artifact, filePath: result.filePath, content: undefined }
-        }
-        useAgentStore.setState((s) => ({
-          slots: { ...s.slots, [context]: { ...s.slots[context], messages: msgs } }
-        }))
-      }
+      markArtifactSaved(context, messageId, result.filePath)
     }
   }
 

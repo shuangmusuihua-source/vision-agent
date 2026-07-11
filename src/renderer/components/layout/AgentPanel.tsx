@@ -33,6 +33,7 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, permi
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
   const todoList = useAgentStore((s) => s.slots[context].todoList)
+  const dismissTodo = useAgentStore((s) => s.dismissTodo)
 
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
@@ -122,11 +123,7 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, permi
               <div style={{ padding: '0 8px 4px 8px' }}>
                 <TodoPanel
                   todoList={todoList}
-                  onClose={() => {
-                    useAgentStore.setState((s) => ({
-                      slots: { ...s.slots, [context]: { ...s.slots[context], todoList: null } },
-                    }))
-                  }}
+                  onClose={() => dismissTodo(context)}
                 />
               </div>
             )}

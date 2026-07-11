@@ -50,21 +50,17 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const popupRef = useRef<HTMLDivElement>(null)
   const preparingAttachmentsRef = useRef(false)
   const modal = useModal()
+  const consumePrefill = useAgentStore((s) => s.consumePrefill)
 
   // Prefill from store slot — context-aware
   const prefillText = useAgentStore((s) => s.slots[context]?.prefillText)
   useEffect(() => {
     if (prefillText) {
       setText(prefillText)
-      useAgentStore.setState((prev) => ({
-        slots: {
-          ...prev.slots,
-          [context]: { ...prev.slots[context], prefillText: null },
-        },
-      }))
+      consumePrefill(context)
       ;(variant === 'capsule' ? inputRef.current : textareaRef.current)?.focus()
     }
-  }, [prefillText, context, variant])
+  }, [consumePrefill, prefillText, context, variant])
 
   // Keep the slash menu in sync with runtime installs and uninstalls.
   useEffect(() => {

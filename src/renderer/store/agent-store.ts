@@ -2,6 +2,7 @@ import type {
   AgentContext,
   AgentIPCMessage,
   AgentIPCMessageWithContext,
+  AgentSessionEnvelope,
   AgentState,
   AgentEvent,
   ConversationMessage,
@@ -130,12 +131,31 @@ export type AgentStore = {
   handleAskUserTimeout: (requestId: string) => void
   handlePermissionTimeout: (requestId: string) => void
   handleGenerationActivity: (state: SessionRoutedGenerationActivity) => void
+  setContext: (context: AgentContext) => void
   setPrefill: (context: AgentContext, text: string) => void
   consumePrefill: (context: AgentContext) => void
+  setLinkedFile: (context: AgentContext, path: string | null) => void
+  dismissTodo: (context: AgentContext) => void
+  markArtifactSaved: (context: AgentContext, messageId: string, filePath: string) => void
+  clearContextSession: (context: AgentContext) => void
+  materializeSession: (envelope: AgentSessionEnvelope) => {
+    clientSessionKey: string
+    sdkSessionId: string
+    sessionTitle?: string
+  }
+  appendInactivityNotice: (context: AgentContext, sessionId?: string | null) => void
+  beginMessage: (
+    context: AgentContext,
+    visibleText: string,
+    skill?: { id: string; name: string; icon: string },
+  ) => string
+  startNewSession: (context: AgentContext) => void
   setActiveWorkspace: (path: string | null) => void
   setActiveSession: (sessionId: string | null, context?: AgentContext) => void
   setSessionOutputs: (outputs: SessionOutputs | null) => void
+  setSessionOutputsLoading: (loading: boolean) => void
   dispatchSessionList: (action: SessionListAction) => void
+  removeSessionState: (sessionId: string) => void
   switchToSession: (sessionId: string, context?: AgentContext, workspacePath?: string | null) => void
   ensureSessionSlot: (sessionId: string) => void
   loadInitialSessionMessages: (sessionId: string, context?: AgentContext) => Promise<void>

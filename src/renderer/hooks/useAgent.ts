@@ -2,12 +2,11 @@ import { useEffect, useCallback } from 'react'
 import { useAgentStore } from '../store/agent-store-impl'
 import { stripInternalAttachmentContext } from '../../shared/file-attachments'
 import { getSkillInvocationDisplayText } from '../../shared/skill-invocation'
-import { emptySlot, type AgentStore } from '../store/agent-store'
+import type { AgentStore } from '../store/agent-store'
 import type {
   AgentContext,
   AgentSessionEnvelope,
   AskUserRequestIPC,
-  ConversationMessage,
   PermissionRequestIPC,
   SessionRoutedRequestTimeout,
   SessionRoutedGenerationActivity,
@@ -24,30 +23,6 @@ const ACTIVE_STATES: Set<string> = new Set(['thinking', 'running', 'compacting']
 
 function isAgentActive(state: string): state is ActiveAgentState {
   return ACTIVE_STATES.has(state)
-}
-
-function mergeMessages(...groups: ConversationMessage[][]): ConversationMessage[] {
-  const seen = new Set<string>()
-  const merged: ConversationMessage[] = []
-  for (const group of groups) {
-    for (const message of group) {
-      if (seen.has(message.id)) continue
-      seen.add(message.id)
-      merged.push(message)
-    }
-  }
-  return merged
-}
-
-function mergeById<T extends { id: string }>(items: Array<T | null | undefined>): T[] {
-  const seen = new Set<string>()
-  const merged: T[] = []
-  for (const item of items) {
-    if (!item || seen.has(item.id)) continue
-    seen.add(item.id)
-    merged.push(item)
-  }
-  return merged
 }
 
 // ─── Singleton IPC subscription ────────────────────────────────────────
@@ -90,102 +65,8 @@ export function useIPCSubscriptions() {
       // The creating query carries its app-owned session key. Do not infer it
       // from the currently active session; the user may have switched away
       // while the SDK was still creating the real session.
-      const clientSessionKey = data.clientSessionKey || data.sessionId
-      const sdkSessionId = data.sdkSessionId || data.sessionId
-      const sessionTitle = store.getState().sessionList.find(s => s.id === clientSessionKey)?.title
-
-      store.setState((state) => {
-        const nextSessionSlots = { ...state.sessionSlots }
-        const currentActiveId = state.activeSessionId[data.context]
-        const clientSlot = nextSessionSlots[clientSessionKey]
-        const sdkSlot = clientSessionKey !== sdkSessionId ? nextSessionSlots[sdkSessionId] : undefined
-        const activeSlotIsClient = currentActiveId === clientSessionKey || currentActiveId === sdkSessionId
-        const sourceSlot = clientSlot || (activeSlotIsClient ? state.slots[data.context] : undefined)
-        const realSlot = sdkSlot
-        const baseSlot = sourceSlot || realSlot || emptySlot()
-        const permissionItems = mergeById<PermissionRequestIPC>([
-          sourceSlot?.permissionRequest,
-          ...(sourceSlot?.permissionQueue || []),
-          realSlot?.permissionRequest,
-          ...(realSlot?.permissionQueue || []),
-        ])
-        const askUserItems = mergeById<AskUserRequestIPC>([
-          sourceSlot?.askUserRequest,
-          ...(sourceSlot?.askUserQueue || []),
-          realSlot?.askUserRequest,
-          ...(realSlot?.askUserQueue || []),
-        ])
-        const materializedSlot = {
-          ...(sourceSlot || {}),
-          ...(realSlot || {}),
-          messages: mergeMessages(sourceSlot?.messages || [], realSlot?.messages || []),
-          isStreaming: Boolean(sourceSlot?.isStreaming || realSlot?.isStreaming),
-          agentState: realSlot?.agentState && realSlot.agentState !== 'idle'
-            ? realSlot.agentState
-            : (sourceSlot?.agentState || baseSlot.agentState),
-          _acc: realSlot?._acc || sourceSlot?._acc || null,
-          _firstContentSeen: Boolean(realSlot?._firstContentSeen || sourceSlot?._firstContentSeen),
-          _processedArtifactIds: new Set([
-            ...(sourceSlot?._processedArtifactIds || []),
-            ...(realSlot?._processedArtifactIds || []),
-          ]),
-          _queryGeneration: Math.max(sourceSlot?._queryGeneration || 0, realSlot?._queryGeneration || 0),
-          _resultGuardGen: Math.max(sourceSlot?._resultGuardGen || 0, realSlot?._resultGuardGen || 0),
-          permissionRequest: permissionItems[0] || null,
-          permissionQueue: permissionItems.slice(1),
-          askUserRequest: askUserItems[0] || null,
-          askUserQueue: askUserItems.slice(1),
-          generationActivity: realSlot?.generationActivity || sourceSlot?.generationActivity || null,
-          activeSkillId: realSlot?.activeSkillId || sourceSlot?.activeSkillId || null,
-          lastEditedFile: realSlot?.lastEditedFile || sourceSlot?.lastEditedFile || null,
-          usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
-          todoList: realSlot?.todoList || sourceSlot?.todoList || null,
-          currentSessionId: clientSessionKey,
-          sdkSessionId,
-          workspacePath: data.workspacePath || sourceSlot?.workspacePath || realSlot?.workspacePath || null,
-        }
-
-        nextSessionSlots[clientSessionKey] = materializedSlot
-        if (sdkSessionId !== clientSessionKey) {
-          delete nextSessionSlots[sdkSessionId]
-        }
-
-        const accessOrder = state.sessionAccessOrder
-          .filter((id) => id !== clientSessionKey && id !== sdkSessionId)
-        accessOrder.push(clientSessionKey)
-
-        const isStillActiveSession =
-          currentActiveId === clientSessionKey ||
-          currentActiveId === sdkSessionId ||
-          currentActiveId === null
-
-        if (isStillActiveSession) {
-          return {
-            activeSessionId: { ...state.activeSessionId, [data.context]: clientSessionKey },
-            sessionSlots: nextSessionSlots,
-            sessionAccessOrder: accessOrder,
-            slots: {
-              ...state.slots,
-              [data.context]: materializedSlot,
-            },
-          }
-        }
-        return { sessionSlots: nextSessionSlots, sessionAccessOrder: accessOrder }
-      })
-      if (data.context === 'editor' && data.workspacePath && !store.getState().activeWorkspacePath) {
-        store.setState({ activeWorkspacePath: data.workspacePath })
-      }
-      // Session list stores app-owned ids. Materialization attaches the SDK
-      // id but never renames the user-facing session.
+      const { clientSessionKey, sdkSessionId, sessionTitle } = store.getState().materializeSession(data)
       if (data.context === 'editor') {
-        store.getState().dispatchSessionList({
-          type: 'MATERIALIZE',
-          tempId: clientSessionKey,
-          realId: sdkSessionId,
-          context: data.context,
-          workspacePath: data.workspacePath,
-          title: sessionTitle,
-        })
         // Rename the newly materialized SDK session with the user-chosen title.
         // Persist to BOTH the SDK (customTitle) and electron-store (survives restarts).
         if (sessionTitle) {
@@ -259,34 +140,7 @@ function clearWatchdog(ctx: AgentContext, sessionId?: string | null) {
 }
 
 function appendWatchdogStatus(ctx: AgentContext, sessionId?: string | null) {
-  const sid = normalizeWatchdogSessionId(sessionId)
-  useAgentStore.setState((state) => {
-    const target = sid && state.sessionSlots[sid]
-      ? state.sessionSlots[sid]
-      : state.slots[ctx]
-    const nextSlot = {
-      ...target,
-      messages: [...target.messages, {
-        kind: 'status' as const,
-        id: `watchdog-${Date.now()}`,
-        role: 'system' as const,
-        phase: 'complete' as const,
-        textContent: '任务已经 2 分钟没有新进度，但仍在运行。你可以继续等待，或点击停止。',
-        createdAt: Date.now(),
-      }],
-    }
-    if (sid) {
-      return {
-        sessionSlots: { ...state.sessionSlots, [sid]: nextSlot },
-        ...(state.activeSessionId[ctx] === sid
-          ? { slots: { ...state.slots, [ctx]: nextSlot } }
-          : {}),
-      }
-    }
-    return {
-      slots: { ...state.slots, [ctx]: nextSlot },
-    }
-  })
+  useAgentStore.getState().appendInactivityNotice(ctx, sessionId)
 }
 
 function triggerWatchdog(ctx: AgentContext, sessionId?: string | null) {
@@ -409,84 +263,17 @@ export function useAgent(context: AgentContext = 'editor') {
       return
     }
 
-    if (!slotSid) {
-      const tempKey = `new-${context}-${Date.now()}`
-      slotSid = tempKey
-      store.setState((s) => {
-        const preparedSlot = {
-          ...s.slots[context],
-          currentSessionId: tempKey,
-          sdkSessionId: null,
-        }
-        const accessOrder = s.sessionAccessOrder.filter((id) => id !== tempKey)
-        accessOrder.push(tempKey)
-        return {
-          activeSessionId: { ...s.activeSessionId, [context]: tempKey },
-          sessionSlots: { ...s.sessionSlots, [tempKey]: preparedSlot },
-          sessionAccessOrder: accessOrder,
-          slots: { ...s.slots, [context]: preparedSlot },
-        }
-      })
-    }
+    const visibleText = options?.skill
+      ? `执行 Skill: ${options.skill.name}`
+      : (getSkillInvocationDisplayText(prompt) || stripInternalAttachmentContext(prompt))
+    slotSid = store.getState().beginMessage(context, visibleText, options?.skill)
     const clientSessionKey = slotSid
 
     // A new query starts a new inactivity window, even when it reuses the
     // same session after replacing an active run.
     clearWatchdog(context, clientSessionKey)
 
-    // Optimistic write: insert the user message directly into the messages array
-    // before the SDK processes it. The SDK will later send back a 'user' IPC event
-    // (routed through processIPCMessage → handleUserMessage) which processes
-    // associated tool results. During live operation handleUserMessage skips
-    // re-adding the user message (it only does so on replay with dedup), so this
-    // optimistic insert is the canonical source for user messages during live sessions.
-    //
-    // Mirror to the context's session slot so the optimistic message
-    // survives a session switch → switch back cycle.
-    store.setState((s) => {
-      const visibleText = options?.skill
-        ? `执行 Skill: ${options.skill.name}`
-        : (getSkillInvocationDisplayText(prompt) || stripInternalAttachmentContext(prompt))
-      const patch = {
-        messages: [...s.slots[context].messages, {
-          kind: 'user' as const,
-          id: `user-${Date.now()}`,
-          role: 'user',
-          textContent: visibleText,
-          ...(options?.skill ? {
-            skillMeta: {
-              id: options.skill.id,
-              name: options.skill.name,
-              icon: options.skill.icon,
-              status: 'running' as const,
-            },
-          } : {}),
-          createdAt: Date.now(),
-        }],
-        ...(options?.skill ? { activeSkillId: options.skill.id } : {}),
-        isStreaming: true,
-      }
-      const result: Record<string, unknown> = {
-        slots: {
-          ...s.slots,
-          [context]: { ...s.slots[context], ...patch },
-        },
-      }
-      // Mirror to session-scoped cache so the message persists across switches.
-      // Use the context's own sessionId (slotSid), NOT activeSessionId because
-      // activeSessionId is a global singleton shared by editor + ask contexts.
-      // When the user switches from editor to Ask sumi, activeSessionId still
-      // points to the editor's session — writing ask data there corrupts the
-      // editor's cached slot.
-      if (slotSid) {
-        const cached = s.sessionSlots[slotSid] || s.slots[context]
-        result.sessionSlots = {
-          ...s.sessionSlots,
-          [slotSid]: { ...cached, ...patch, currentSessionId: slotSid },
-        }
-      }
-      return result as Partial<AgentStore>
-    })
+    // The store owns the optimistic message and live/cache mirroring.
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context, slotSid)
     refreshWatchdog(context, slotSid)
     const skillId = store.getState().slots[context].activeSkillId
@@ -519,28 +306,7 @@ export function useAgent(context: AgentContext = 'editor') {
   }, [context, store])
 
   const newSession = useCallback(() => {
-    const state = store.getState()
-    const slot = state.slots[context]
-    // Save current slot to sessionSlots before clearing, so the old
-    // session's messages are not lost if the user navigates back.
-    // Prefer the context slot's own sessionId.
-    const saveSid = slot.currentSessionId || state.activeSessionId[context]
-    store.setState((s) => {
-      const nextSessionSlots = { ...s.sessionSlots }
-      if (saveSid) {
-        nextSessionSlots[saveSid] = { ...s.slots[context] }
-      }
-      return {
-        activeSessionId: { ...s.activeSessionId, [context]: null },
-        sessionOutputs: null,
-        sessionOutputsLoading: false,
-        sessionSlots: nextSessionSlots,
-        slots: {
-          ...s.slots,
-          [context]: { ...emptySlot(), workspacePath: s.slots[context].workspacePath },
-        },
-      }
-    })
+    store.getState().startNewSession(context)
   }, [context, store])
 
   const loadSessions = useCallback(async () => {

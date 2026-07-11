@@ -18,7 +18,6 @@ import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
-import { emptySlot } from '../../store/agent-store'
 import type { AgentContext, AgentNotificationEvent, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
 import { isFileTab, OVERVIEW_TAB_ID } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
@@ -115,6 +114,12 @@ function SidebarToggleIcon({ collapsed }: { collapsed: boolean }): React.ReactEl
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const modal = useModal()
+  const setAgentContext = useAgentStore((state) => state.setContext)
+  const setAgentLinkedFile = useAgentStore((state) => state.setLinkedFile)
+  const setSessionOutputsLoading = useAgentStore((state) => state.setSessionOutputsLoading)
+  const removeSessionState = useAgentStore((state) => state.removeSessionState)
+  const clearContextSession = useAgentStore((state) => state.clearContextSession)
+  const setAgentPrefill = useAgentStore((state) => state.setPrefill)
 
   // ── Hooks: workspace, tabs ──────────────────────────────────────────
 
@@ -264,25 +269,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const setEditorLinkedFile = useCallback((path: string | null) => {
     setLinkedFile(path)
-    useAgentStore.setState((state) => {
-      const sessionId = state.activeSessionId.editor || state.slots.editor.currentSessionId
-      const nextEditorSlot = { ...state.slots.editor, linkedFile: path }
-      if (!sessionId) {
-        return {
-          slots: { ...state.slots, editor: nextEditorSlot },
-        }
-      }
-
-      const existingSlot = state.sessionSlots[sessionId] || nextEditorSlot
-      return {
-        slots: { ...state.slots, editor: nextEditorSlot },
-        sessionSlots: {
-          ...state.sessionSlots,
-          [sessionId]: { ...existingSlot, linkedFile: path },
-        },
-      }
-    })
-  }, [setLinkedFile])
+    setAgentLinkedFile('editor', path)
+  }, [setAgentLinkedFile, setLinkedFile])
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────
 
@@ -318,7 +306,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const refreshSessionOutputs = useCallback((sessionId: string, showLoading = false) => {
     const requestVersion = (sessionOutputRequestVersions.current.get(sessionId) || 0) + 1
     sessionOutputRequestVersions.current.set(sessionId, requestVersion)
-    if (showLoading) useAgentStore.setState({ sessionOutputsLoading: true })
+    if (showLoading) setSessionOutputsLoading(true)
 
     return window.api.agent.getSessionOutputs(sessionId).then((outputs) => {
       const isLatestRequest = sessionOutputRequestVersions.current.get(sessionId) === requestVersion
@@ -333,7 +321,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         useAgentStore.getState().setSessionOutputs(null)
       }
     })
-  }, [])
+  }, [setSessionOutputsLoading])
 
   const scheduleSessionOutputsRefresh = useCallback((sessionId: string) => {
     const existing = sessionOutputRefreshTimers.current.get(sessionId)
@@ -395,12 +383,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
     // session outputs loaded by useEffect on activeSessionId change
     if (view !== 'editor') {
-      useAgentStore.setState({ context: 'editor' })
+      setAgentContext('editor')
       setView('editor')
     }
     const overviewTab = openTabs.find(t => t.type === 'fixed')
     if (overviewTab) switchTab(overviewTab)
-  }, [activeWorkspacePath, view, openTabs, switchTab, setLinkedFile])
+  }, [activeWorkspacePath, view, openTabs, switchTab, setAgentContext, setLinkedFile])
 
   const handleNotificationOpen = useCallback((notification: AppNotification) => {
     markNotificationRead(notification.id)
@@ -421,13 +409,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       return
     }
     if (target?.view === 'ask') {
-      useAgentStore.setState({ context: 'ask' })
+      setAgentContext('ask')
       clearTab()
       setView('ask')
       return
     }
     if (target?.view === 'editor') {
-      useAgentStore.setState({ context: 'editor' })
+      setAgentContext('editor')
       setView('editor')
       if (target.sessionId && target.workspacePath) {
         handleSessionSelect(target.sessionId, target.workspacePath)
@@ -436,19 +424,19 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
 
     if ('context' in notification && notification.context === 'ask') {
-      useAgentStore.setState({ context: 'ask' })
+      setAgentContext('ask')
       clearTab()
       setView('ask')
       return
     }
     if ('context' in notification && notification.context === 'editor') {
-      useAgentStore.setState({ context: 'editor' })
+      setAgentContext('editor')
       setView('editor')
       if (notification.sessionId && notification.workspacePath) {
         handleSessionSelect(notification.sessionId, notification.workspacePath)
       }
     }
-  }, [clearTab, clearToastNotification, handleSessionSelect, markNotificationRead, setView])
+  }, [clearTab, clearToastNotification, handleSessionSelect, markNotificationRead, setAgentContext, setView])
 
   const handleNotificationInboxToggle = useCallback(() => {
     setNotificationListOpen((open) => {
@@ -509,17 +497,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (wsPath !== activeWorkspacePath) {
       useAgentStore.getState().setActiveWorkspace(wsPath)
     }
-    // Store the user-chosen title in the session slot so sidebar can show it
-    useAgentStore.setState((s) => ({
-      sessionSlots: {
-        ...s.sessionSlots,
-        [tempSessionId]: {
-          ...(s.sessionSlots[tempSessionId] || s.slots.editor),
-          currentSessionId: tempSessionId,
-          sdkSessionId: null,
-        },
-      },
-    }))
     // Add to sessionList via the protocol — single write path
     useAgentStore.getState().dispatchSessionList({
       type: 'CREATE_TEMP',
@@ -529,10 +506,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     })
     setCreatingSessionIn(null)
     if (view !== 'editor') {
-      useAgentStore.setState({ context: 'editor' })
+      setAgentContext('editor')
       setView('editor')
     }
-  }, [newSessionName, activeWorkspacePath, view, setEditorLinkedFile, modal])
+  }, [newSessionName, activeWorkspacePath, view, setAgentContext, setEditorLinkedFile, modal])
 
   useEffect(() => {
     return window.api.onMainError((error) => {
@@ -608,12 +585,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       await modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
       return
     }
-    useAgentStore.getState().dispatchSessionList({ type: 'DELETE', sessionId })
-    // Remove the deleted session's cached slot from sessionSlots
-    useAgentStore.setState((s) => {
-      const { [sessionId]: _, ...rest } = s.sessionSlots
-      return { sessionSlots: rest }
-    })
+    removeSessionState(sessionId)
     if (wasActive) {
       useAgentStore.getState().switchToSession('')
       useAgentStore.getState().setSessionOutputs(null)
@@ -622,7 +594,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         setView('editor')
       }
     }
-  }, [modal, view, loadSessions, setEditorLinkedFile])
+  }, [modal, view, loadSessions, removeSessionState, setEditorLinkedFile])
 
   const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
     try {
@@ -686,11 +658,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'ask', askSid)
       window.api.agent.abort(askSid || 'ask')
     }
-    useAgentStore.setState((prev) => ({
-      slots: { ...prev.slots, ask: emptySlot() },
-      activeSessionId: { ...prev.activeSessionId, ask: null },
-    }))
-  }, [askIsStreaming])
+    clearContextSession('ask')
+  }, [askIsStreaming, clearContextSession])
 
   // ── File selection (bridges workspace + tabs) ───────────────────────
 
@@ -702,7 +671,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       return
     }
     if (view !== 'editor') {
-      useAgentStore.setState({ context: 'editor' })
+      setAgentContext('editor')
       setView('editor')
     }
     const wsPath = findContainingWorkspacePath(path, [
@@ -713,7 +682,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       useAgentStore.getState().setActiveWorkspace(wsPath)
     }
     await openFile(path)
-  }, [openFile, view, workspace.fixedWorkspacePaths, workspace.workspacePaths])
+  }, [openFile, setAgentContext, view, workspace.fixedWorkspacePaths, workspace.workspacePaths])
 
   const handleAddToKnowledge = useCallback(async (filePath: string) => {
     const result = await window.api.workspace.addToKnowledge(filePath, activeSessionId || undefined)
@@ -781,13 +750,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const handleSelectText = useCallback((text: string, sourceContext?: string) => {
     const target: AgentContext = sourceContext === 'ask' ? 'ask' : 'editor'
-    useAgentStore.setState((prev) => ({
-      slots: {
-        ...prev.slots,
-        [target]: { ...prev.slots[target], prefillText: text },
-      },
-    }))
-  }, [])
+    setAgentPrefill(target, text)
+  }, [setAgentPrefill])
 
   const handleAskAgent = useCallback(
     (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => {
@@ -800,17 +764,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       }
       if (action === 'ask') {
         const target: AgentContext = view === 'ask' ? 'ask' : 'editor'
-        useAgentStore.setState((prev) => ({
-          slots: {
-            ...prev.slots,
-            [target]: { ...prev.slots[target], prefillText: prompts.ask },
-          },
-        }))
+        setAgentPrefill(target, prompts.ask)
       } else {
         editorSendMessage(prompts[action], filePath)
       }
     },
-    [editorSendMessage, view]
+    [editorSendMessage, setAgentPrefill, view]
   )
 
   const handleStatsUpdate = useCallback((words: number, chars: number) => {
@@ -858,7 +817,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => openDaydream(mode)}
         onAskZuovis={() => {
-            useAgentStore.setState({ context: 'ask' })
+            setAgentContext('ask')
             clearTab()
             setView('ask')
           }}
