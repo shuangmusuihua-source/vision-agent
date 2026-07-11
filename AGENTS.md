@@ -66,6 +66,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `store/ui-slice.ts` — application UI state
 - `hooks/useAgent.ts` — singleton agent IPC subscriptions and actions
 - `notifications/notification-inbox.ts` — in-app notification retention, persistence, toast timing, read state, and detail selection
+- `automation/automation-task-draft.ts` — automation draft transitions, schedule derivation, target construction, linked-URL policy, and task registration
 - `components/editor/MarkdownEditor.tsx` — Tiptap Markdown editor, including selection-scoped AI rewrite review
 - `components/chat/AssistantMarkdown.tsx` — Streamdown chat rendering with Shiki, KaTeX, GFM, and Mermaid
 - `components/graph/GraphView.tsx` — `react-force-graph-2d` visualization

@@ -80,6 +80,7 @@ Renderer 是单页 React 应用：
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions
 - `notification-inbox.ts`：应用内通知的保留、持久化、toast 计时、已读状态和详情选择
+- `automation-task-draft.ts`：自动化草稿状态、频率派生、目标构建、网址规则和任务注册
 - `MarkdownEditor.tsx`：Tiptap Markdown 编辑、自动保存及选区级 AI 改写审阅
 - `AssistantMarkdown.tsx`：Streamdown + Shiki + KaTeX + Mermaid
 

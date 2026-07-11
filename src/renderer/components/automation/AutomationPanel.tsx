@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import {
   ArrowLeft,
   Bell,
@@ -24,14 +24,29 @@ import {
   XCircle,
 } from 'lucide-react'
 import type { SdkSessionInfo } from '../../../shared/types'
-import type { CronTask, CronTaskRegistration, CronTaskTarget } from '../../lib/ipc'
-import { MAX_CRON_LINKED_URLS, normalizeCronLinkedUrls } from '../../../shared/cron-linked-urls'
+import type { CronTask } from '../../lib/ipc'
+import { MAX_CRON_LINKED_URLS } from '../../../shared/cron-linked-urls'
+import {
+  automationTaskDraftReducer,
+  buildAutomationRegistration,
+  createAutomationTaskDraft,
+  cronToNaturalLanguage,
+  deriveAutomationTaskDraft,
+  fileName,
+  formatHour,
+  formatTime,
+  resolvedCustomCron,
+  runStatusLabel,
+  targetDetail,
+  targetLabel,
+  WEEKDAYS,
+  type AutomationTaskDraft,
+  type FrequencyMode,
+  type TargetMode,
+} from '../../automation/automation-task-draft'
 import './AutomationPanel.css'
 
 const AssistantMarkdown = lazy(() => import('../chat/AssistantMarkdown'))
-
-type FrequencyMode = 'daily' | 'weekly' | 'hourly' | 'thirty' | 'custom'
-type TargetMode = 'none' | 'session' | 'workspace' | 'directory'
 
 interface AutomationPanelProps {
   workspacePaths: string[]
@@ -40,102 +55,6 @@ interface AutomationPanelProps {
   activeWorkspacePath: string | null
   focusTaskId?: string | null
   onFocusTaskConsumed?: () => void
-}
-
-const WEEKDAYS = [
-  { value: 1, label: '周一' },
-  { value: 2, label: '周二' },
-  { value: 3, label: '周三' },
-  { value: 4, label: '周四' },
-  { value: 5, label: '周五' },
-  { value: 6, label: '周六' },
-  { value: 0, label: '周日' },
-]
-
-function fileName(path: string): string {
-  return path.split('/').filter(Boolean).pop() || path
-}
-
-function formatHour(hour: number): string {
-  if (hour < 12) return `上午 ${hour}:00`
-  if (hour === 12) return '下午 12:00'
-  return `下午 ${hour - 12}:00`
-}
-
-function formatClock(hour: number, minute: number): string {
-  const suffix = `${String(minute).padStart(2, '0')}`
-  if (hour < 12) return `上午 ${hour}:${suffix}`
-  if (hour === 12) return `下午 12:${suffix}`
-  return `下午 ${hour - 12}:${suffix}`
-}
-
-function formatTime(timestamp?: number | null): string {
-  if (!timestamp) return '尚未运行'
-  return new Date(timestamp).toLocaleString('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function cronToNaturalLanguage(cron: string): string {
-  const parts = cron.trim().split(/\s+/)
-  if (parts.length !== 5) return cron
-  const [minute, hour, dayOfMonth, month, weekday] = parts
-  if (minute.startsWith('*/') && hour === '*') return `每 ${minute.slice(2)} 分钟`
-  if (minute === '0' && hour.startsWith('*/')) return `每 ${hour.slice(2)} 小时`
-  if (minute === '0' && hour === '*') return '每小时'
-  const parsedHour = Number.parseInt(hour, 10)
-  const parsedMinute = Number.parseInt(minute, 10)
-  const time = Number.isNaN(parsedHour) || Number.isNaN(parsedMinute)
-    ? cron
-    : formatClock(parsedHour, parsedMinute)
-  if (dayOfMonth !== '*' && month === '*') return `每月 ${dayOfMonth} 日 ${time}`
-  if (weekday === '1-5') return `每个工作日 ${time}`
-  if (weekday === '6,0' || weekday === '0,6') return `每个周末 ${time}`
-  if (weekday !== '*') {
-    const day = weekday
-      .split(',')
-      .map((value) => WEEKDAYS.find((item) => item.value === Number.parseInt(value, 10))?.label || `周${value}`)
-      .join('、')
-    return `每${day} ${time}`
-  }
-  return `每天 ${time}`
-}
-
-function buildCron(mode: FrequencyMode, hour: number, weekday: number, customCron: string): string {
-  if (mode === 'daily') return `0 ${hour} * * *`
-  if (mode === 'weekly') return `0 ${hour} * * ${weekday}`
-  if (mode === 'hourly') return '0 * * * *'
-  if (mode === 'thirty') return '*/30 * * * *'
-  return customCron.trim()
-}
-
-function targetLabel(target?: CronTaskTarget | null): string {
-  if (!target) return '未关联目标'
-  if (target.type === 'session') return target.sessionTitle || target.sessionId || '工作区会话'
-  if (target.type === 'workspace') return target.workspaceName || (target.workspacePath ? fileName(target.workspacePath) : '工作区目录')
-  if (target.type === 'directory') return target.directoryPath ? fileName(target.directoryPath) : '自选目录'
-  return '未关联目标'
-}
-
-function targetDetail(target?: CronTaskTarget | null): string {
-  if (!target) return '任务会在默认授权目录中运行'
-  if (target.type === 'session') {
-    const workspace = target.workspacePath ? ` · ${fileName(target.workspacePath)}` : ''
-    return `会话${workspace}`
-  }
-  if (target.type === 'workspace') return target.workspacePath || '工作区目录'
-  if (target.type === 'directory') return target.directoryPath || '自选目录'
-  return ''
-}
-
-function runStatusLabel(status: CronTask['lastStatus'] | undefined): string {
-  if (status === 'success') return '成功'
-  if (status === 'cancelled') return '已停止'
-  if (status === 'error') return '失败'
-  return '运行中'
 }
 
 function AutomationPanel({
@@ -163,32 +82,55 @@ function AutomationPanel({
 
   const defaultSessionId = activeSessionId || editorSessions[0]?.id || ''
   const defaultWorkspace = activeWorkspacePath || workspacePaths[0] || ''
-
-  const [name, setName] = useState('')
-  const [prompt, setPrompt] = useState('')
-  const [frequencyMode, setFrequencyMode] = useState<FrequencyMode>('daily')
-  const [hour, setHour] = useState(9)
-  const [weekday, setWeekday] = useState(1)
-  const [customScheduleText, setCustomScheduleText] = useState('')
-  const [customCron, setCustomCron] = useState('')
-  const [customCronSource, setCustomCronSource] = useState('')
-  const [customScheduleError, setCustomScheduleError] = useState<string | null>(null)
-  const [resolvingSchedule, setResolvingSchedule] = useState(false)
-  const [targetMode, setTargetMode] = useState<TargetMode>('none')
-  const [selectedSessionId, setSelectedSessionId] = useState(defaultSessionId)
-  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState(defaultWorkspace)
-  const [selectedDirectoryPath, setSelectedDirectoryPath] = useState('')
-  const [linkedUrlInputs, setLinkedUrlInputs] = useState<string[]>([''])
-  const [allowNetwork, setAllowNetwork] = useState(false)
-  const [notifyOnCompletion, setNotifyOnCompletion] = useState(true)
+  const [draft, dispatchDraft] = useReducer(
+    automationTaskDraftReducer,
+    undefined,
+    () => createAutomationTaskDraft(defaultSessionId, defaultWorkspace),
+  )
+  const setDraftField = useCallback(<K extends keyof AutomationTaskDraft,>(
+    field: K,
+    value: AutomationTaskDraft[K],
+  ) => {
+    dispatchDraft({ type: 'set', field, value })
+  }, [])
+  const {
+    name,
+    prompt,
+    frequencyMode,
+    hour,
+    weekday,
+    customScheduleText,
+    customCron,
+    customCronSource,
+    customScheduleError,
+    resolvingSchedule,
+    targetMode,
+    selectedSessionId,
+    selectedWorkspacePath,
+    selectedDirectoryPath,
+    linkedUrlInputs,
+    allowNetwork,
+    notifyOnCompletion,
+  } = draft
+  const derivedDraft = useMemo(() => deriveAutomationTaskDraft(draft), [draft])
+  const resolvedCustomCronValue = resolvedCustomCron(draft)
+  const {
+    cronExpression,
+    schedulePreviewLabel,
+    canCreate,
+  } = derivedDraft
+  const linkedUrlValidation = {
+    urls: derivedDraft.linkedUrls,
+    error: derivedDraft.linkedUrlError,
+  }
 
   useEffect(() => {
-    if (!selectedSessionId && defaultSessionId) setSelectedSessionId(defaultSessionId)
-  }, [defaultSessionId, selectedSessionId])
-
-  useEffect(() => {
-    if (!selectedWorkspacePath && defaultWorkspace) setSelectedWorkspacePath(defaultWorkspace)
-  }, [defaultWorkspace, selectedWorkspacePath])
+    dispatchDraft({
+      type: 'syncDefaults',
+      sessionId: defaultSessionId,
+      workspacePath: defaultWorkspace,
+    })
+  }, [defaultSessionId, defaultWorkspace])
 
   useEffect(() => {
     if (!focusTaskId) return
@@ -196,29 +138,6 @@ function AutomationPanel({
     setSelectedTaskId(focusTaskId)
     onFocusTaskConsumed?.()
   }, [focusTaskId, onFocusTaskConsumed])
-
-  const resolvedCustomCron = customCronSource === customScheduleText.trim() ? customCron : ''
-  const cronExpression = useMemo(
-    () => buildCron(frequencyMode, hour, weekday, resolvedCustomCron),
-    [frequencyMode, hour, weekday, resolvedCustomCron]
-  )
-
-  const scheduleLabel = useMemo(() => cronToNaturalLanguage(cronExpression), [cronExpression])
-  const schedulePreviewLabel = frequencyMode === 'custom'
-    ? resolvedCustomCron
-      ? scheduleLabel
-      : customScheduleText.trim()
-        ? '等待解析执行频率'
-        : '描述执行频率'
-    : scheduleLabel
-
-  const linkedUrlValidation = useMemo(() => {
-    try {
-      return { urls: normalizeCronLinkedUrls(linkedUrlInputs), error: null }
-    } catch (err) {
-      return { urls: [] as string[], error: (err as Error).message || '关联网址格式不正确' }
-    }
-  }, [linkedUrlInputs])
 
   const refreshTasks = useCallback(async () => {
     setLoading(true)
@@ -247,53 +166,22 @@ function AutomationPanel({
     })
   }, [refreshTasks])
 
-  const buildTarget = useCallback((): CronTaskTarget | null => {
-    if (targetMode === 'none') return null
-    if (targetMode === 'session') {
-      const session = editorSessions.find((item) => item.id === selectedSessionId)
-      if (!session) return null
-      const workspacePath = session.workspacePath || session.cwd || activeWorkspacePath || null
-      return {
-        type: 'session',
-        sessionId: session.id,
-        sessionTitle: session.title || '未命名会话',
-        workspacePath,
-        workspaceName: workspacePath ? fileName(workspacePath) : null,
-      }
-    }
-    if (targetMode === 'workspace') {
-      if (!selectedWorkspacePath) return null
-      return {
-        type: 'workspace',
-        workspacePath: selectedWorkspacePath,
-        workspaceName: fileName(selectedWorkspacePath),
-      }
-    }
-    if (!selectedDirectoryPath) return null
-    return {
-      type: 'directory',
-      directoryPath: selectedDirectoryPath,
-      workspaceName: fileName(selectedDirectoryPath),
-    }
-  }, [activeWorkspacePath, editorSessions, selectedDirectoryPath, selectedSessionId, selectedWorkspacePath, targetMode])
-
   const handleSelectDirectory = useCallback(async () => {
     const result = await window.api.agent.selectFolder()
     if (!result.canceled && result.filePaths[0]) {
-      setSelectedDirectoryPath(result.filePaths[0])
+      setDraftField('selectedDirectoryPath', result.filePaths[0])
     }
-  }, [])
+  }, [setDraftField])
 
   const resolveCustomSchedule = useCallback(async (): Promise<string | null> => {
     const input = customScheduleText.trim()
     if (!input) {
-      setCustomScheduleError('请先描述执行频率')
+      dispatchDraft({ type: 'scheduleError', message: '请先描述执行频率' })
       return null
     }
     if (customCronSource === input && customCron) return customCron
 
-    setResolvingSchedule(true)
-    setCustomScheduleError(null)
+    dispatchDraft({ type: 'scheduleStart' })
     try {
       const result = await window.api.cron.resolveSchedule({
         input,
@@ -303,50 +191,34 @@ function AutomationPanel({
       if (!result.success || !result.cronExpression) {
         throw new Error(result.error || '无法解析执行频率')
       }
-      setCustomCron(result.cronExpression)
-      setCustomCronSource(input)
+      dispatchDraft({ type: 'scheduleResolved', input, cronExpression: result.cronExpression })
       return result.cronExpression
     } catch (err) {
       const message = (err as Error).message || '无法解析执行频率'
-      setCustomScheduleError(message)
+      dispatchDraft({ type: 'scheduleError', message })
       return null
-    } finally {
-      setResolvingSchedule(false)
     }
   }, [customCron, customCronSource, customScheduleText])
 
   const handleCreate = useCallback(async () => {
-    if (linkedUrlValidation.error) return
-    const target = buildTarget()
+    if (derivedDraft.linkedUrlError) return
     let nextCronExpression = cronExpression.trim()
     if (frequencyMode === 'custom') {
       const resolved = await resolveCustomSchedule()
       if (!resolved) return
       nextCronExpression = resolved
     }
-    if (!prompt.trim() || !nextCronExpression) return
     setCreating(true)
     try {
-      const registration: CronTaskRegistration = {
-        name,
-        prompt,
-        cronExpression: nextCronExpression,
-        target,
-        linkedUrls: linkedUrlValidation.urls,
-        allowNetwork: allowNetwork || linkedUrlValidation.urls.length > 0,
-        notifyOnCompletion,
-      }
+      const registration = buildAutomationRegistration(
+        draft,
+        editorSessions,
+        activeWorkspacePath,
+        nextCronExpression,
+      )
       const result = await window.api.cron.register(registration)
       if (!result.success) throw new Error(result.error || '创建自动化失败')
-      setName('')
-      setPrompt('')
-      setCustomScheduleText('')
-      setCustomCron('')
-      setCustomCronSource('')
-      setCustomScheduleError(null)
-      setLinkedUrlInputs([''])
-      setAllowNetwork(false)
-      setNotifyOnCompletion(true)
+      dispatchDraft({ type: 'reset', sessionId: defaultSessionId, workspacePath: defaultWorkspace })
       await refreshTasks()
       setShowCreateForm(false)
     } catch (err) {
@@ -354,7 +226,7 @@ function AutomationPanel({
     } finally {
       setCreating(false)
     }
-  }, [allowNetwork, buildTarget, cronExpression, frequencyMode, linkedUrlValidation, name, notifyOnCompletion, prompt, refreshTasks, resolveCustomSchedule])
+  }, [activeWorkspacePath, cronExpression, defaultSessionId, defaultWorkspace, derivedDraft.linkedUrlError, draft, editorSessions, frequencyMode, refreshTasks, resolveCustomSchedule])
 
   const handleRun = useCallback(async (taskId: string) => {
     setRunningTaskId(taskId)
@@ -410,13 +282,6 @@ function AutomationPanel({
     [selectedTaskId, tasks]
   )
 
-  const canCreate = Boolean(
-    prompt.trim() &&
-    (frequencyMode === 'custom' ? customScheduleText.trim() : cronExpression.trim()) &&
-    !linkedUrlValidation.error &&
-    !resolvingSchedule
-  )
-
   return (
     <div className="automation-panel">
       <header className="automation-hero">
@@ -451,11 +316,11 @@ function AutomationPanel({
         <div className="automation-form-grid">
           <label className="automation-field">
             <span>任务名称</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：每周整理市场动态" />
+            <input value={name} onChange={(event) => setDraftField('name', event.target.value)} placeholder="例如：每周整理市场动态" />
           </label>
           <label className="automation-field">
             <span>执行频率</span>
-            <select value={frequencyMode} onChange={(event) => setFrequencyMode(event.target.value as FrequencyMode)}>
+            <select value={frequencyMode} onChange={(event) => setDraftField('frequencyMode', event.target.value as FrequencyMode)}>
               <option value="daily">每天</option>
               <option value="weekly">每周</option>
               <option value="hourly">每小时</option>
@@ -467,7 +332,7 @@ function AutomationPanel({
           {(frequencyMode === 'daily' || frequencyMode === 'weekly') && (
             <label className="automation-field">
               <span>执行时间</span>
-              <select value={hour} onChange={(event) => setHour(Number.parseInt(event.target.value, 10))}>
+              <select value={hour} onChange={(event) => setDraftField('hour', Number.parseInt(event.target.value, 10))}>
                 {Array.from({ length: 24 }, (_, index) => (
                   <option key={index} value={index}>{formatHour(index)}</option>
                 ))}
@@ -478,7 +343,7 @@ function AutomationPanel({
           {frequencyMode === 'weekly' && (
             <label className="automation-field">
               <span>星期</span>
-              <select value={weekday} onChange={(event) => setWeekday(Number.parseInt(event.target.value, 10))}>
+              <select value={weekday} onChange={(event) => setDraftField('weekday', Number.parseInt(event.target.value, 10))}>
                 {WEEKDAYS.map((item) => (
                   <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
@@ -493,8 +358,8 @@ function AutomationPanel({
                 <input
                   value={customScheduleText}
                   onChange={(event) => {
-                    setCustomScheduleText(event.target.value)
-                    setCustomScheduleError(null)
+                    setDraftField('customScheduleText', event.target.value)
+                    setDraftField('customScheduleError', null)
                   }}
                   placeholder="例如：每个工作日上午九点"
                 />
@@ -510,9 +375,9 @@ function AutomationPanel({
               </div>
               {customScheduleError ? (
                 <em className="automation-schedule-error">{customScheduleError}</em>
-              ) : resolvedCustomCron ? (
+              ) : resolvedCustomCronValue ? (
                 <em className="automation-schedule-result">
-                  已解析为 {cronToNaturalLanguage(resolvedCustomCron)} · {resolvedCustomCron}
+                  已解析为 {cronToNaturalLanguage(resolvedCustomCronValue)} · {resolvedCustomCronValue}
                 </em>
               ) : (
                 <em className="automation-schedule-hint">用自然语言描述重复频率，系统会转换为 Cron。</em>
@@ -522,7 +387,7 @@ function AutomationPanel({
 
           <label className="automation-field">
             <span>关联目标（可选）</span>
-            <select value={targetMode} onChange={(event) => setTargetMode(event.target.value as TargetMode)}>
+            <select value={targetMode} onChange={(event) => setDraftField('targetMode', event.target.value as TargetMode)}>
               <option value="none">不关联</option>
               <option value="session" disabled={editorSessions.length === 0}>工作区会话</option>
               <option value="workspace" disabled={workspacePaths.length === 0}>工作区目录</option>
@@ -533,7 +398,7 @@ function AutomationPanel({
           {targetMode === 'session' && (
             <label className="automation-field automation-field-wide">
               <span>会话</span>
-              <select value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)}>
+              <select value={selectedSessionId} onChange={(event) => setDraftField('selectedSessionId', event.target.value)}>
                 {editorSessions.map((session) => (
                   <option key={session.id} value={session.id}>
                     {session.title || '未命名会话'}{session.workspacePath ? ` · ${fileName(session.workspacePath)}` : ''}
@@ -546,7 +411,7 @@ function AutomationPanel({
           {targetMode === 'workspace' && (
             <label className="automation-field automation-field-wide">
               <span>工作区</span>
-              <select value={selectedWorkspacePath} onChange={(event) => setSelectedWorkspacePath(event.target.value)}>
+              <select value={selectedWorkspacePath} onChange={(event) => setDraftField('selectedWorkspacePath', event.target.value)}>
                 {workspacePaths.map((path) => (
                   <option key={path} value={path}>{fileName(path)}</option>
                 ))}
@@ -570,7 +435,7 @@ function AutomationPanel({
               <button
                 className="automation-add-url-button"
                 type="button"
-                onClick={() => setLinkedUrlInputs((current) => [...current, ''])}
+                onClick={() => dispatchDraft({ type: 'addUrl' })}
                 disabled={linkedUrlInputs.length >= MAX_CRON_LINKED_URLS}
               >
                 <Plus size={13} />
@@ -586,7 +451,7 @@ function AutomationPanel({
                     type="url"
                     inputMode="url"
                     value={url}
-                    onChange={(event) => setLinkedUrlInputs((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                    onChange={(event) => dispatchDraft({ type: 'updateUrl', index, value: event.target.value })}
                     placeholder="https://example.com/report"
                     aria-label={`关联网址 ${index + 1}`}
                     aria-invalid={Boolean(linkedUrlValidation.error)}
@@ -595,10 +460,7 @@ function AutomationPanel({
                     <button
                       className="automation-remove-url-button"
                       type="button"
-                      onClick={() => setLinkedUrlInputs((current) => {
-                        const next = current.filter((_, itemIndex) => itemIndex !== index)
-                        return next.length > 0 ? next : ['']
-                      })}
+                      onClick={() => dispatchDraft({ type: 'removeUrl', index })}
                       title={`移除网址 ${index + 1}`}
                       aria-label={`移除网址 ${index + 1}`}
                     >
@@ -620,7 +482,7 @@ function AutomationPanel({
           <span>任务提示词</span>
           <textarea
             value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={(event) => setDraftField('prompt', event.target.value)}
             placeholder="例如：阅读关联目录中新增资料，整理三条值得关注的变化，并写入 research-digest.md"
           />
         </label>
@@ -629,7 +491,7 @@ function AutomationPanel({
           <div className="automation-option-row">
             <button
               className={`automation-toggle ${allowNetwork || linkedUrlValidation.urls.length > 0 ? 'automation-toggle-active' : ''}`}
-              onClick={() => setAllowNetwork((value) => !value)}
+              onClick={() => setDraftField('allowNetwork', !allowNetwork)}
               type="button"
               disabled={linkedUrlValidation.urls.length > 0}
               title={linkedUrlValidation.urls.length > 0 ? '关联网址需要联网能力' : undefined}
@@ -639,7 +501,7 @@ function AutomationPanel({
             </button>
             <button
               className={`automation-toggle ${notifyOnCompletion ? 'automation-toggle-active' : ''}`}
-              onClick={() => setNotifyOnCompletion((value) => !value)}
+              onClick={() => setDraftField('notifyOnCompletion', !notifyOnCompletion)}
               type="button"
             >
               {notifyOnCompletion ? <Bell size={16} /> : <BellOff size={16} />}
