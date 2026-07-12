@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
-import { ArrowUp, Check, ChevronDown, LoaderCircle, Sparkles, Undo2, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, LoaderCircle, PenLine, Undo2, X } from 'lucide-react'
 
 export type InlineEditMode = 'idle' | 'prompt' | 'loading' | 'review'
 type BlockStyle = 'paragraph' | 'heading-1' | 'heading-2' | 'heading-3' | 'ordered-list' | 'bullet-list'
@@ -172,7 +172,7 @@ export default function AiInlineEditControls({
             onMouseDown={(event) => event.preventDefault()}
             onClick={onOpen}
           >
-            <Sparkles size={15} />
+            <PenLine size={14} />
             <span>AI 修改</span>
             <kbd>⌘ K</kbd>
           </button>
@@ -206,7 +206,7 @@ export default function AiInlineEditControls({
               onClick={() => setStyleMenuOpen((open) => !open)}
             >
               <span>{activeBlockStyle.compactLabel}</span>
-              <ChevronDown size={14} aria-hidden="true" />
+              <ChevronDown size={12} aria-hidden="true" />
             </button>
             {styleMenuOpen && (
               <div className="ai-inline-style-menu" role="menu" aria-label="文本样式">
@@ -233,7 +233,7 @@ export default function AiInlineEditControls({
       {mode === 'prompt' && (
         <div className="ai-inline-prompt-shell">
           <div className="ai-inline-prompt-row">
-            <Sparkles size={16} aria-hidden="true" />
+            <PenLine size={14} aria-hidden="true" />
             <input
               ref={inputRef}
               value={instruction}
@@ -250,10 +250,10 @@ export default function AiInlineEditControls({
               disabled={!instruction.trim()}
               aria-label="提交修改要求"
             >
-              <ArrowUp size={17} />
+              <ArrowUp size={15} />
             </button>
             <button type="button" className="ai-inline-close" onClick={onCancel} aria-label="取消">
-              <X size={15} />
+              <X size={14} />
             </button>
           </div>
           {error && <div className="ai-inline-error" role="alert">{error}</div>}
@@ -262,7 +262,7 @@ export default function AiInlineEditControls({
 
       {mode === 'loading' && (
         <div className="ai-inline-loading" role="status" aria-live="polite">
-          <LoaderCircle size={16} className="ai-inline-spinner" />
+          <LoaderCircle size={14} className="ai-inline-spinner" />
           <span>正在改写选中内容…</span>
           <button type="button" onClick={onCancel}>取消</button>
         </div>
@@ -271,11 +271,11 @@ export default function AiInlineEditControls({
       {mode === 'review' && (
         <div className="ai-inline-review-actions" role="toolbar" aria-label="审阅 AI 修改">
           <button type="button" className="ai-inline-undo" onClick={onCancel}>
-            <Undo2 size={15} />
+            <Undo2 size={14} />
             <span>撤销</span>
           </button>
           <button type="button" className="ai-inline-accept" onClick={onAccept}>
-            <Check size={15} />
+            <Check size={14} />
             <span>接受</span>
           </button>
         </div>

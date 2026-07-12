@@ -35,12 +35,33 @@ describe('FileIndexService knowledge graph identity', () => {
       await index.initKnowledgeIndex(knowledgePath)
       const graph = index.getKnowledgeGraphData()
 
-      expect(graph.edges).toContainEqual({
-        source: join(firstDir, 'source.md'),
-        target: join(firstDir, 'note.md'),
-        type: 'reference',
-      })
+      expect(graph.edges.some((edge) => new Set([edge.source, edge.target]).size === 2
+        && [edge.source, edge.target].includes(join(firstDir, 'source.md'))
+        && [edge.source, edge.target].includes(join(firstDir, 'note.md')))).toBe(true)
       expect(graph.edges.some(edge => edge.source === join(knowledgePath, 'ambiguous.md'))).toBe(false)
+    } finally {
+      await index.destroy()
+    }
+  })
+
+  it('collapses reciprocal and repeated wikilinks into one undirected relationship', async () => {
+    const knowledgePath = await mkdtemp(join(tmpdir(), 'sumi-knowledge-index-'))
+    tempDirs.push(knowledgePath)
+    const alphaPath = join(knowledgePath, 'alpha.md')
+    const betaPath = join(knowledgePath, 'beta.md')
+    await writeFile(alphaPath, '[[beta]]\n[[beta|Beta alias]]')
+    await writeFile(betaPath, '[[alpha]]')
+    const index = new FileIndexService()
+
+    try {
+      await index.initKnowledgeIndex(knowledgePath)
+      const graph = index.getKnowledgeGraphData()
+
+      expect(graph.edges).toEqual([{
+        source: alphaPath,
+        target: betaPath,
+        type: 'reference',
+      }])
     } finally {
       await index.destroy()
     }

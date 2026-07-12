@@ -318,12 +318,13 @@ export class FileIndexService {
   getKnowledgeGraphData(): GraphData {
     const nodes: GraphNode[] = []
     const edges: GraphEdge[] = []
+    const edgeKeys = new Set<string>()
     const filePathToId = new Map<string, string>()
 
     for (const [filePath] of this.knowledgeIndex) {
       const label = path.basename(filePath, '.md')
       const isMemory = filePath.includes(`${path.sep}.vision${path.sep}memory${path.sep}`)
-      const id = isMemory ? `memory:${label}` : filePath
+      const id = filePath
       nodes.push({ id, label, type: isMemory ? 'memory' : 'file' })
       filePathToId.set(filePath, id)
     }
@@ -353,7 +354,14 @@ export class FileIndexService {
           || (labelMatches.length === 1 ? labelMatches[0] : undefined)
         if (targetId) {
           if (sourceId !== targetId) {
-            edges.push({ source: sourceId, target: targetId, type: 'reference' })
+            const [source, target] = sourceId < targetId
+              ? [sourceId, targetId]
+              : [targetId, sourceId]
+            const edgeKey = JSON.stringify([source, target])
+            if (!edgeKeys.has(edgeKey)) {
+              edgeKeys.add(edgeKey)
+              edges.push({ source, target, type: 'reference' })
+            }
           }
         }
       }

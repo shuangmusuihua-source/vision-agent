@@ -1,0 +1,229 @@
+.knowledge-panel {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 10px 14px 14px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+}
+
+.knowledge-panel-shell {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.knowledge-toolbar {
+  display: flex;
+  min-height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--space-xs);
+}
+
+.knowledge-toolbar-context,
+.knowledge-view-label,
+.knowledge-toolbar-meta,
+.knowledge-toolbar-actions,
+.knowledge-refresh-button,
+.knowledge-error {
+  display: flex;
+  align-items: center;
+}
+
+.knowledge-toolbar-context {
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: var(--space-xs);
+  color: var(--color-text-primary);
+}
+
+.knowledge-toolbar-context > svg {
+  color: var(--color-action);
+}
+
+.knowledge-toolbar-context h1 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.knowledge-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 var(--space-2xs);
+  background: var(--color-border);
+}
+
+.knowledge-view-label {
+  gap: var(--space-2xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.knowledge-toolbar-meta {
+  min-width: 0;
+  gap: var(--space-md);
+  margin-left: auto;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.knowledge-toolbar-meta span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3xs);
+}
+
+.knowledge-toolbar-meta strong {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.knowledge-toolbar-actions {
+  flex: 0 0 auto;
+  gap: var(--space-xs);
+}
+
+.knowledge-refresh-button,
+.knowledge-change-button,
+.knowledge-error button {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-default), background var(--duration-fast) var(--ease-default);
+}
+
+.knowledge-refresh-button {
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-md);
+}
+
+.knowledge-change-button,
+.knowledge-error button {
+  padding: 5px 9px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+}
+
+.knowledge-refresh-button:hover:not(:disabled),
+.knowledge-change-button:hover,
+.knowledge-error button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.knowledge-refresh-button:focus-visible,
+.knowledge-change-button:focus-visible,
+.knowledge-error button:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.knowledge-refresh-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.knowledge-graph-section {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.knowledge-graph-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.knowledge-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  font-size: var(--font-size-sm);
+}
+
+.knowledge-error {
+  min-height: 180px;
+  flex: 1;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  color: var(--color-text-secondary);
+}
+
+.knowledge-error > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.knowledge-error strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+}
+
+.knowledge-error span {
+  font-size: var(--font-size-xs);
+}
+
+.is-spinning {
+  animation: knowledge-spin 0.8s linear infinite;
+}
+
+@keyframes knowledge-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 820px) {
+  .knowledge-panel {
+    padding: 8px 10px 10px;
+  }
+
+  .knowledge-toolbar {
+    gap: var(--space-sm);
+  }
+
+  .knowledge-toolbar-meta span:nth-child(2) {
+    display: none;
+  }
+
+}
+
+@media (max-width: 640px) {
+  .knowledge-toolbar-context h1,
+  .knowledge-toolbar-divider,
+  .knowledge-toolbar-meta {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-spinning {
+    animation: none;
+  }
+}

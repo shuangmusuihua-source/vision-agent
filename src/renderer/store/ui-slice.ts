@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { UpdateDownloadProgress } from '../../shared/update-types'
 
-export type PrimaryView = 'ask' | 'editor' | 'skills' | 'automation'
+export type PrimaryView = 'ask' | 'editor' | 'skills' | 'automation' | 'knowledge'
 
 export type AppUpdateStatus =
   | 'idle'

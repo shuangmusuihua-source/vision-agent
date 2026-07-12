@@ -23,7 +23,7 @@ import type { AgentContext, SessionOutputEntry, TabDescriptor } from '../../../s
 import { isFileTab, OVERVIEW_TAB_ID } from '../../../shared/types'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
-import { useGraphStore, useShowGraph, useChangedFileCount } from '../../store/graph-store'
+import { useChangedFileCount, useGraphStore } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
 import { buildSkillInvocationPrompt } from '../../../shared/skill-invocation'
@@ -39,9 +39,9 @@ import {
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
 const AssistantMarkdown = lazy(() => import('../chat/AssistantMarkdown'))
-const GraphFloat = lazy(() => import('../graph/GraphFloat'))
 const SkillLibrary = lazy(() => import('../skills/SkillLibrary'))
 const AutomationPanel = lazy(() => import('../automation/AutomationPanel'))
+const KnowledgePanel = lazy(() => import('../knowledge/KnowledgePanel'))
 
 interface AppShellProps {
   onOpenSettings: () => void
@@ -116,7 +116,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   // ── Editor / UI state ───────────────────────────────────────────────
 
-  const showGraph = useShowGraph()
   const {
     showSearch, searchQuery, openSearch, closeSearch: closeSearchPanel,
     sourceMode, setSourceMode, focusMode, setFocusMode,
@@ -288,6 +287,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (target?.view === 'skills') {
       clearTab()
       setView('skills')
+      return
+    }
+    if (target?.view === 'knowledge') {
+      clearTab()
+      setView('knowledge')
       return
     }
     if (target?.view === 'ask') {
@@ -680,7 +684,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onReorderWorkspaces={workspace.handleReorderWorkspaces}
         onOpenSettings={onOpenSettings}
         onOpenSearch={() => openSearch()}
-        onToggleGraph={() => useGraphStore.getState().toggleGraph()}
         onDaydream={(mode: string) => openDaydream(mode)}
         onAskZuovis={() => {
             setAgentContext('ask')
@@ -692,17 +695,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         isSkillsActive={view === 'skills'}
         onOpenAutomation={() => setView('automation')}
         isAutomationActive={view === 'automation'}
+        onOpenKnowledge={() => setView('knowledge')}
+        isKnowledgeActive={view === 'knowledge'}
         onAskZuovisBack={handleAskZuovisBack}
         isAskZuovisInChat={askMessages.length > 0}
         isAskZuovisRunning={askIsStreaming}
-        showGraph={showGraph}
         changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' || view === 'automation' ? ' main-content-skills' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' || view === 'automation' || view === 'knowledge' ? ' main-content-module' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
-           aria-label={view === 'automation' ? '自动化' : view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
+           aria-label={view === 'knowledge' ? '知识库' : view === 'automation' ? '自动化' : view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
         {view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
@@ -724,6 +728,17 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                 activeWorkspacePath={activeWorkspacePath}
                 focusTaskId={automationFocusTaskId}
                 onFocusTaskConsumed={() => setAutomationFocusTaskId(null)}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        ) : view === 'knowledge' ? (
+          <ErrorBoundary onReset={() => {}}>
+            <Suspense fallback={<div className="skill-library-loading">正在加载知识库...</div>}>
+              <KnowledgePanel
+                knowledgePath={workspace.fixedWorkspacePaths[0] || null}
+                activeFile={activeFilePath}
+                onOpenFile={handleFileSelect}
+                onSearchEntity={openSearch}
               />
             </Suspense>
           </ErrorBoundary>
@@ -1041,24 +1056,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           onClose={() => closeSearchPanel()}
           initialQuery={searchQuery}
         />
-      )}
-      {showGraph && (
-        <Suspense fallback={null}>
-        <GraphFloat
-          show={showGraph}
-          onClose={() => useGraphStore.getState().setShowGraph(false)}
-          activeFile={activeFilePath}
-          onNodeClick={(nodeId, nodeType) => {
-            if (nodeType === 'entity') {
-              const entityName = nodeId.replace(/^entity:/, '')
-              openSearch(entityName)
-            } else {
-              handleFileSelect(nodeId)
-            }
-            // Don't auto-close on node click — user can keep browsing
-          }}
-        />
-        </Suspense>
       )}
       {!updateError && ['available', 'downloading', 'downloaded', 'installing'].includes(updateState.status) && (
         <div className="update-action-area">

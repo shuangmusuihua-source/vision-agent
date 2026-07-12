@@ -673,26 +673,6 @@
   user-select: none;
 }
 
-.sidebar-knowledge-entry {
-  width: calc(100% - 12px);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sidebar-knowledge-entry:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
-.sidebar-knowledge-entry:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
-}
-
 .sidebar-workspace-module-actions {
   display: flex;
   align-items: center;
@@ -1831,15 +1811,6 @@
   margin: 12px 8px 16px;
 }
 
-.sidebar-workspace-fixed {
-  padding-bottom: 8px;
-  margin-bottom: 4px;
-}
-
-.sidebar-workspace-fixed-icon {
-  color: var(--color-accent);
-}
-
 /* --- Ask sumi Sidebar Entry --- */
 
 .sidebar-primary-nav {
@@ -1895,6 +1866,22 @@
   justify-content: center;
   color: var(--color-action);
   flex-shrink: 0;
+}
+
+.sidebar-primary-badge {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--color-action);
+  background: var(--color-action-bg);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 .sidebar-history-icon {

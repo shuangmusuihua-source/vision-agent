@@ -293,7 +293,7 @@ export type SessionRoutedAskUserRequest = AskUserRequestIPC & AgentSessionEnvelo
 export type SessionRoutedRequestTimeout = { requestId: string } & AgentSessionEnvelope
 export type SessionRoutedGenerationActivity = GenerationActivity & AgentSessionEnvelope
 export type AgentNotificationTarget = {
-  view: 'ask' | 'editor' | 'skills' | 'automation'
+  view: 'ask' | 'editor' | 'skills' | 'automation' | 'knowledge'
   sessionId?: string | null
   workspacePath?: string | null
   taskId?: string | null
@@ -628,6 +628,7 @@ export type GraphNode = {
 }
 
 export type GraphEdge = {
+  /** Canonically ordered endpoints of an undirected knowledge relationship. */
   source: string
   target: string
   label?: string

@@ -1,6 +1,6 @@
-import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { Info, ChevronDown, Share2 } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Info } from 'lucide-react'
 import type { GraphNode } from '../../../shared/types'
 import { useGraphStore } from '../../store/graph-store'
 
@@ -10,8 +10,6 @@ interface GraphViewProps {
 }
 
 interface FGNode extends GraphNode {
-  val?: number
-  color?: string
   x?: number
   y?: number
 }
@@ -21,220 +19,325 @@ interface FGLink {
   target: FGNode | string
 }
 
-const FILE_COLOR = '#2383e2'
-const MEMORY_COLOR = '#7c3aed'
-const EDGE_COLOR = '#555555'
-const HIGHLIGHT_COLOR = '#f59e0b'
+interface GraphPalette {
+  file: string
+  memory: string
+  active: string
+  selected: string
+  edge: string
+  label: string
+}
 
-function getNodeColor(node: FGNode, highlighted: boolean): string {
-  if (highlighted) return HIGHLIGHT_COLOR
-  if (node.type === 'memory') return MEMORY_COLOR
-  return FILE_COLOR
+const DEFAULT_PALETTE: GraphPalette = {
+  file: '#2383e2',
+  memory: '#7c3aed',
+  active: '#1d4ed8',
+  selected: '#f59e0b',
+  edge: '#8b8b8b',
+  label: '#737373',
+}
+const MAX_AUTO_ZOOM = 1.6
+const LARGE_GRAPH_NODE_COUNT = 150
+const nodePositionCache = new Map<string, { x: number; y: number }>()
+
+function getNodeColor(node: FGNode, isActive: boolean, palette: GraphPalette): string {
+  if (isActive) return palette.active
+  return node.type === 'memory' ? palette.memory : palette.file
+}
+
+function cacheNodePosition(node: FGNode): void {
+  if (typeof node.x !== 'number' || typeof node.y !== 'number') return
+  nodePositionCache.set(node.id, { x: node.x, y: node.y })
+}
+
+function readGraphPalette(): GraphPalette {
+  const styles = getComputedStyle(document.documentElement)
+  const read = (name: string, fallback: string): string => styles.getPropertyValue(name).trim() || fallback
+  return {
+    file: read('--graph-node-file', DEFAULT_PALETTE.file),
+    memory: read('--graph-node-memory', DEFAULT_PALETTE.memory),
+    active: read('--graph-node-active', DEFAULT_PALETTE.active),
+    selected: read('--graph-node-selected', DEFAULT_PALETTE.selected),
+    edge: read('--graph-edge', DEFAULT_PALETTE.edge),
+    label: read('--graph-label', DEFAULT_PALETTE.label),
+  }
 }
 
 function GraphView({ onNodeClick, activeFile }: GraphViewProps): React.ReactElement {
-  const store = useGraphStore
   const fgRef = useRef<any>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
-  const [legendCollapsed, setLegendCollapsed] = useState(false)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const hasFitRef = useRef(false)
+  const hoverClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resizeFitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastFittedDimensionsRef = useRef<{ width: number; height: number } | null>(null)
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  const [palette, setPalette] = useState<GraphPalette>(DEFAULT_PALETTE)
+  const [legendCollapsed, setLegendCollapsed] = useState(true)
+  const [layoutSettled, setLayoutSettled] = useState(false)
   const [hoveredNode, setHoveredNode] = useState<FGNode | null>(null)
-  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [selectedNode, setSelectedNode] = useState<FGNode | null>(null)
 
-  const filteredData = store(s => s.filteredData)
-  const searchQuery = store(s => s.searchQuery)
-  const changedFileCount = store(s => s.changedFileCount)
+  const graphData = useGraphStore((state) => state.graphData)
 
-  // Resize
   useEffect(() => {
-    const handleResize = () => {
-      if (containerRef.current) {
-        const { width, height } = containerRef.current.getBoundingClientRect()
-        setDimensions({ width, height })
-      }
+    const updatePalette = (): void => setPalette(readGraphPalette())
+    updatePalette()
+    const observer = new MutationObserver(updatePalette)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [])
+
+  // Observe only the canvas host. Observing the whole graph (toolbar included) caused
+  // the canvas height to feed back into its parent and grow on every resize pass.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const updateDimensions = (width: number, height: number): void => {
+      const next = { width: Math.round(width), height: Math.round(height) }
+      if (next.width <= 0 || next.height <= 0) return
+      setDimensions((current) => current.width === next.width && current.height === next.height
+        ? current
+        : next)
     }
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+
+    const bounds = canvas.getBoundingClientRect()
+    updateDimensions(bounds.width, bounds.height)
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) updateDimensions(entry.contentRect.width, entry.contentRect.height)
+    })
+    observer.observe(canvas)
+    return () => observer.disconnect()
   }, [])
 
-  // Load graph data on mount
+  const fgData = useMemo(() => ({
+    nodes: graphData.nodes.map((node) => ({
+      ...node,
+      ...nodePositionCache.get(node.id),
+    })) as FGNode[],
+    links: graphData.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+    })) as FGLink[],
+  }), [graphData.nodes, graphData.edges])
+
   useEffect(() => {
-    store.getState().loadGraphData()
+    hasFitRef.current = false
+    setLayoutSettled(false)
+    setHoveredNode(null)
+    setSelectedNode(null)
+  }, [graphData.nodes, graphData.edges])
+
+  useEffect(() => () => {
+    if (hoverClearTimerRef.current) clearTimeout(hoverClearTimerRef.current)
+    if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
+    fgData.nodes.forEach(cacheNodePosition)
+  }, [fgData.nodes])
+
+  const keepHoverCardOpen = useCallback(() => {
+    if (!hoverClearTimerRef.current) return
+    clearTimeout(hoverClearTimerRef.current)
+    hoverClearTimerRef.current = null
   }, [])
 
-  // Search highlighting
-  const highlightedIds = useMemo(() => {
-    if (!searchQuery.trim()) return new Set<string>()
-    const q = searchQuery.toLowerCase()
-    return new Set(filteredData.nodes.filter(n => n.label.toLowerCase().includes(q)).map(n => n.id))
-  }, [searchQuery, filteredData.nodes])
+  const handleNodeHover = useCallback((node: FGNode | null) => {
+    keepHoverCardOpen()
+    if (node) {
+      setHoveredNode(node)
+      return
+    }
+    hoverClearTimerRef.current = setTimeout(() => {
+      setHoveredNode(null)
+      hoverClearTimerRef.current = null
+    }, 180)
+  }, [keepHoverCardOpen])
 
-  // Prepare force-graph data
-  const fgData = useMemo(() => {
-    const fgNodes: FGNode[] = filteredData.nodes.map(n => ({
-      ...n,
-      val: highlightedIds.has(n.id) ? 20 : 12,
-      color: getNodeColor(n as FGNode, highlightedIds.has(n.id)),
-    }))
-
-    const fgLinks: FGLink[] = filteredData.edges.map(e => ({
-      source: e.source,
-      target: e.target,
-    }))
-
-    return { nodes: fgNodes, links: fgLinks }
-  }, [filteredData, highlightedIds])
-
-  // Custom node rendering
   const nodeCanvasObject = useCallback((node: FGNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    const isHighlighted = highlightedIds.has(node.id)
-    const size = isHighlighted ? 10 : 7
+    if (typeof node.x !== 'number' || typeof node.y !== 'number') return
+    const isActive = activeFile === node.id
+    const isHovered = hoveredNode?.id === node.id
+    const isSelected = selectedNode?.id === node.id
+    const isEmphasized = isActive || isHovered || isSelected
+    const radius = (isEmphasized ? 8 : 6) / globalScale
 
     ctx.save()
-
     ctx.beginPath()
-    ctx.arc(node.x!, node.y!, size, 0, Math.PI * 2)
-    ctx.fillStyle = getNodeColor(node, isHighlighted)
+    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2)
+    ctx.fillStyle = getNodeColor(node, isActive, palette)
     ctx.fill()
-    if (isHighlighted) {
-      ctx.strokeStyle = HIGHLIGHT_COLOR
-      ctx.lineWidth = 2
+
+    if (isActive || isSelected) {
+      ctx.strokeStyle = isSelected ? palette.selected : palette.active
+      ctx.lineWidth = 2 / globalScale
+      ctx.beginPath()
+      ctx.arc(node.x, node.y, radius + 3 / globalScale, 0, Math.PI * 2)
       ctx.stroke()
     }
 
-    // Label
-    const fontSize = Math.max(10 / globalScale, 6)
+    const labelScaleThreshold = fgData.nodes.length > LARGE_GRAPH_NODE_COUNT ? 1.3 : 0.75
+    const shouldDrawLabel = isEmphasized || (layoutSettled && globalScale >= labelScaleThreshold)
+    if (!shouldDrawLabel) {
+      ctx.restore()
+      return
+    }
+
+    const fontSize = 10 / globalScale
     ctx.font = `${fontSize}px sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    ctx.fillStyle = isHighlighted ? HIGHLIGHT_COLOR : '#888888'
-    const label = node.label.length > 12 ? node.label.substring(0, 11) + '…' : node.label
-    ctx.fillText(label, node.x!, node.y! + size + 2)
-
+    ctx.fillStyle = isSelected ? palette.selected : isActive ? palette.active : palette.label
+    const label = node.label.length > 16 ? `${node.label.slice(0, 15)}…` : node.label
+    ctx.fillText(label, node.x, node.y + radius + 2 / globalScale)
     ctx.restore()
-  }, [highlightedIds])
+  }, [activeFile, fgData.nodes.length, hoveredNode?.id, layoutSettled, palette, selectedNode?.id])
 
-  // Custom link rendering
-  const linkCanvasObject = useCallback((link: FGLink, ctx: CanvasRenderingContext2D) => {
-    const source = link.source as FGNode
-    const target = link.target as FGNode
-    if (!source.x || !source.y || !target.x || !target.y) return
-
-    ctx.save()
-    ctx.strokeStyle = EDGE_COLOR
-    ctx.lineWidth = 1
+  const nodePointerAreaPaint = useCallback((
+    node: FGNode,
+    color: string,
+    ctx: CanvasRenderingContext2D,
+    globalScale: number,
+  ) => {
+    if (typeof node.x !== 'number' || typeof node.y !== 'number') return
+    ctx.fillStyle = color
     ctx.beginPath()
-    ctx.moveTo(source.x, source.y)
-    ctx.lineTo(target.x, target.y)
-    ctx.stroke()
-    ctx.restore()
+    ctx.arc(node.x, node.y, 12 / globalScale, 0, Math.PI * 2)
+    ctx.fill()
   }, [])
 
-  // Node label (tooltip)
-  const nodeLabel = useCallback((node: FGNode) => {
-    return node.label
-  }, [])
+  const fitGraphToViewport = useCallback((durationMs: number) => {
+    const graph = fgRef.current
+    if (!graph || dimensions.width <= 0 || dimensions.height <= 0) return
+    const bounds = graph.getGraphBbox()
+    if (!bounds) return
+    const graphWidth = Math.max(bounds.x[1] - bounds.x[0], 1)
+    const graphHeight = Math.max(bounds.y[1] - bounds.y[0], 1)
+    const padding = 48
+    const targetZoom = Math.min(
+      MAX_AUTO_ZOOM,
+      Math.max(0.1, (dimensions.width - padding * 2) / graphWidth),
+      Math.max(0.1, (dimensions.height - padding * 2) / graphHeight),
+    )
+    graph.centerAt((bounds.x[0] + bounds.x[1]) / 2, (bounds.y[0] + bounds.y[1]) / 2, durationMs)
+    graph.zoom(targetZoom, durationMs)
+    lastFittedDimensionsRef.current = dimensions
+  }, [dimensions])
 
-  // Click handler: single click highlights, double click navigates
-  const handleNodeClick = useCallback((node: FGNode) => {
-    if (clickTimerRef.current) {
-      // Double click — navigate
-      clearTimeout(clickTimerRef.current)
-      clickTimerRef.current = null
-      onNodeClick(node.id, node.type)
-    } else {
-      // Single click — highlight
-      setHoveredNode(node)
-      clickTimerRef.current = setTimeout(() => {
-        clickTimerRef.current = null
-      }, 300)
+  const handleEngineStop = useCallback(() => {
+    if (hasFitRef.current) return
+    hasFitRef.current = true
+    fgData.nodes.forEach(cacheNodePosition)
+    setLayoutSettled(true)
+    fitGraphToViewport(260)
+  }, [fgData.nodes, fitGraphToViewport])
+
+  useEffect(() => {
+    if (!layoutSettled || dimensions.width <= 0 || dimensions.height <= 0) return
+    const previous = lastFittedDimensionsRef.current
+    if (!previous) {
+      lastFittedDimensionsRef.current = dimensions
+      return
     }
-  }, [onNodeClick])
+    const widthChange = Math.abs(dimensions.width - previous.width) / Math.max(previous.width, 1)
+    const heightChange = Math.abs(dimensions.height - previous.height) / Math.max(previous.height, 1)
+    if (Math.max(widthChange, heightChange) < 0.1) return
 
-  // Active file name for title bar
-  const activeFileName = activeFile ? activeFile.split('/').pop() || activeFile : null
+    if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
+    resizeFitTimerRef.current = setTimeout(() => {
+      fitGraphToViewport(220)
+      resizeFitTimerRef.current = null
+    }, 160)
+    return () => {
+      if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
+    }
+  }, [dimensions, fitGraphToViewport, layoutSettled])
+
+  const visibleNode = hoveredNode ?? selectedNode
 
   return (
-    <div ref={containerRef} className="graph-view">
-      <div className="graph-toolbar">
-        <input
-          className="graph-search"
-          type="text"
-          placeholder="Search nodes..."
-          value={searchQuery}
-          onChange={(e) => store.getState().setSearchQuery(e.target.value)}
-        />
-        {changedFileCount > 0 && (
-          <span className="graph-change-badge">
-            {changedFileCount} changed
-          </span>
-        )}
-      </div>
-      <div className="graph-title-bar">
-        <Share2 size={14} className="graph-title-icon" />
-        <span className="graph-title-label">知识图谱</span>
-        {activeFileName && (
-          <>
-            <span className="graph-title-sep">·</span>
-            <span className="graph-title-file">当前：{activeFileName}</span>
-          </>
-        )}
-        {hoveredNode && (
-          <span className="graph-title-hint">单击高亮 · 双击跳转</span>
-        )}
-      </div>
-      <div className="graph-canvas">
+    <div className="graph-view">
+      <div ref={canvasRef} className="graph-canvas">
         {fgData.nodes.length > 0 ? (
-          <>
-          <ForceGraph2D
-            ref={fgRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            graphData={fgData}
-            nodeId="id"
-            nodeCanvasObject={nodeCanvasObject}
-            linkCanvasObject={linkCanvasObject}
-            linkDirectionalArrowLength={0}
-            linkColor={() => 'transparent'}
-            linkWidth={0}
-            onNodeClick={handleNodeClick}
-            onBackgroundClick={() => setHoveredNode(null)}
-            nodeLabel={nodeLabel}
-            backgroundColor="transparent"
-            warmupTicks={50}
-            cooldownTicks={100}
-            d3AlphaDecay={0.01}
-            d3VelocityDecay={0.3}
-            nodeVal={(node) => node.val ?? 12}
-          />
-          {hoveredNode && (
-            <div className="graph-node-tooltip">
-              <span className="graph-node-tooltip-type">{hoveredNode.type === 'memory' ? 'Memory' : 'File'}</span>
-              <span className="graph-node-tooltip-path">{hoveredNode.label}</span>
-            </div>
-          )}
-          </>
+          dimensions.width > 0 && dimensions.height > 0 && (
+            <>
+              <ForceGraph2D
+                ref={fgRef}
+                width={dimensions.width}
+                height={dimensions.height}
+                graphData={fgData}
+                nodeId="id"
+                nodeCanvasObject={nodeCanvasObject}
+                nodePointerAreaPaint={nodePointerAreaPaint}
+                linkColor={() => palette.edge}
+                linkWidth={1}
+                linkDirectionalArrowLength={0}
+                onNodeClick={(node) => {
+                  const selected = node as FGNode
+                  setSelectedNode(selected)
+                  setHoveredNode(selected)
+                }}
+                onNodeDragEnd={(node) => cacheNodePosition(node as FGNode)}
+                onNodeHover={(node) => handleNodeHover(node as FGNode | null)}
+                onBackgroundClick={() => {
+                  setHoveredNode(null)
+                  setSelectedNode(null)
+                }}
+                backgroundColor="transparent"
+                cooldownTicks={70}
+                d3AlphaDecay={0.05}
+                d3VelocityDecay={0.4}
+                onEngineStop={handleEngineStop}
+                nodeVal={10}
+              />
+              {visibleNode && (
+                <div
+                  className="graph-node-tooltip"
+                  role="group"
+                  aria-label={`${visibleNode.label} 节点操作`}
+                  onMouseEnter={keepHoverCardOpen}
+                  onMouseLeave={() => handleNodeHover(null)}
+                  onFocus={keepHoverCardOpen}
+                >
+                  <span className="graph-node-tooltip-type">
+                    {visibleNode.type === 'memory' ? '记忆' : visibleNode.type === 'entity' ? '实体' : '文档'}
+                  </span>
+                  <span className="graph-node-tooltip-path">{visibleNode.label}</span>
+                  <button
+                    type="button"
+                    className="graph-node-tooltip-action"
+                    onClick={() => onNodeClick(visibleNode.id, visibleNode.type)}
+                  >
+                    {visibleNode.type === 'entity' ? '查看实体' : '查看文档'}
+                    <ArrowUpRight size={12} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+            </>
+          )
         ) : (
-          <div className="graph-empty">No nodes to display</div>
+          <div className="graph-empty">知识库中还没有可展示的文档节点</div>
         )}
         <div className={`graph-legend-card${legendCollapsed ? ' collapsed' : ''}`}>
-          <button className="graph-legend-toggle" onClick={() => setLegendCollapsed(!legendCollapsed)}>
+          <button
+            type="button"
+            className="graph-legend-toggle"
+            aria-label={legendCollapsed ? '展开图例' : '收起图例'}
+            onClick={() => setLegendCollapsed((collapsed) => !collapsed)}
+          >
             {legendCollapsed ? <Info size={14} /> : <ChevronDown size={14} />}
           </button>
           {!legendCollapsed && (
             <div className="graph-legend-items">
               <span className="graph-legend-item">
-                <span className="graph-legend-dot" style={{ background: FILE_COLOR }} />
-                File
+                <span className="graph-legend-dot" style={{ background: 'var(--graph-node-file)' }} />
+                文档
               </span>
               <span className="graph-legend-item">
-                <span className="graph-legend-dot" style={{ background: MEMORY_COLOR }} />
-                Memory
+                <span className="graph-legend-dot" style={{ background: 'var(--graph-node-memory)' }} />
+                记忆
               </span>
               <span className="graph-legend-item">
-                <span className="graph-legend-line" style={{ background: EDGE_COLOR }} />
-                Reference
+                <span className="graph-legend-line" style={{ background: 'var(--graph-edge)' }} />
+                双向链接
               </span>
             </div>
           )}

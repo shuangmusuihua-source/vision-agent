@@ -664,7 +664,9 @@
 }
 
 .ai-inline-menu {
-  --ai-inline-control-width: min(304px, calc(100vw - 24px));
+  --ai-inline-control-width: min(280px, calc(100vw - 24px));
+  --ai-inline-control-height: 28px;
+  --ai-inline-shell-padding: 3px;
   z-index: 1200;
   /* BubbleMenu measures before its first positioning pass. Keep the portal
      shrink-wrapped from frame one so the initial x coordinate is accurate. */
@@ -692,10 +694,11 @@
 .ai-inline-toolbar {
   display: flex;
   align-items: center;
-  gap: 3px;
-  width: var(--ai-inline-control-width);
-  padding: 5px;
-  border-radius: 13px;
+  gap: var(--space-3xs);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: var(--ai-inline-shell-padding);
+  border-radius: var(--radius-lg);
   white-space: nowrap;
 }
 
@@ -712,11 +715,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
+  min-width: var(--ai-inline-control-height);
   flex: 0 0 auto;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 8px;
+  height: var(--ai-inline-control-height);
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   background: transparent;
   transition: color 0.14s ease, background 0.14s ease, transform 0.14s ease;
@@ -733,8 +736,8 @@
 }
 
 .ai-inline-toolbar .ai-inline-toolbar-primary {
-  gap: 7px;
-  padding: 0 10px;
+  gap: 5px;
+  padding: 0 var(--space-sm);
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -745,10 +748,9 @@
 }
 
 .ai-inline-toolbar-primary kbd {
-  margin-left: 2px;
   color: var(--color-text-tertiary);
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-normal);
 }
 
@@ -758,10 +760,11 @@
 }
 
 .ai-inline-toolbar .ai-inline-style-trigger {
-  gap: 5px;
-  width: 94px;
-  padding: 0 9px 0 11px;
+  gap: var(--space-2xs);
+  width: 76px;
+  padding: 0 var(--space-xs);
   color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
 
@@ -776,13 +779,13 @@
 
 .ai-inline-style-menu {
   position: absolute;
-  top: calc(100% + 9px);
+  top: calc(100% + 7px);
   right: 0;
   z-index: 2;
-  width: 212px;
-  padding: 5px;
+  width: 196px;
+  padding: var(--space-2xs);
   border: 1px solid var(--color-border);
-  border-radius: 13px;
+  border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-lg);
   animation: ai-inline-menu-in 0.14s ease-out;
@@ -793,12 +796,12 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 38px;
-  padding: 0 10px;
-  border-radius: 8px;
+  height: 32px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
   color: var(--color-text-primary);
   background: transparent;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-normal);
   text-align: left;
 }
@@ -818,33 +821,33 @@
 .ai-inline-toolbar-divider {
   flex: 0 0 auto;
   width: 1px;
-  height: 20px;
-  margin: 0 2px;
+  height: 16px;
+  margin: 0 1px;
   background: var(--color-border);
 }
 
 .ai-inline-prompt-shell {
   width: var(--ai-inline-control-width);
-  padding: 5px;
-  border-radius: 15px;
+  padding: var(--ai-inline-shell-padding);
+  border-radius: var(--radius-lg);
 }
 
 .ai-inline-prompt-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .ai-inline-prompt-row > svg {
   flex: 0 0 auto;
-  margin-left: 7px;
+  margin-left: 5px;
   color: var(--color-action);
 }
 
 .ai-inline-prompt-row input {
   flex: 1;
   min-width: 0;
-  height: 38px;
+  height: 32px;
   border: none;
   outline: none;
   color: var(--color-text-primary);
@@ -863,8 +866,8 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  width: var(--ai-inline-control-height);
+  height: var(--ai-inline-control-height);
   border-radius: 50%;
 }
 
@@ -888,8 +891,8 @@
 }
 
 .ai-inline-close {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   color: var(--color-text-tertiary);
   background: transparent;
 }
@@ -900,7 +903,7 @@
 }
 
 .ai-inline-error {
-  padding: 5px 10px 7px 31px;
+  padding: var(--space-2xs) var(--space-sm) var(--space-xs) 27px;
   color: var(--color-error);
   font-size: var(--font-size-xs);
   line-height: 1.4;
@@ -909,9 +912,9 @@
 .ai-inline-loading {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 10px 9px 12px;
-  border-radius: 13px;
+  gap: 7px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-lg);
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
 }
@@ -926,9 +929,9 @@
 }
 
 .ai-inline-loading button {
-  margin-left: 6px;
-  padding: 4px 7px;
-  border-radius: 6px;
+  margin-left: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   background: transparent;
   font-size: var(--font-size-xs);
@@ -942,18 +945,18 @@
 .ai-inline-review-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px;
-  border-radius: 13px;
+  gap: var(--space-2xs);
+  padding: var(--ai-inline-shell-padding);
+  border-radius: var(--radius-lg);
 }
 
 .ai-inline-review-actions button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 11px;
-  border-radius: 8px;
+  gap: var(--space-2xs);
+  height: var(--ai-inline-control-height);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }

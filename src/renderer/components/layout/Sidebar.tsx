@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, GitGraph, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks, Workflow, Sun, Moon, Monitor, Cpu, Check } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks, Workflow, BookOpenText, Sun, Moon, Monitor, Cpu, Check } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -46,18 +46,18 @@ interface SidebarProps {
   onReorderWorkspaces: (paths: string[]) => void
   onOpenSettings: () => void
   onOpenSearch: () => void
-  onToggleGraph: () => void
   onDaydream: (mode: string) => void
   onAskZuovis: () => void
   onOpenSkills: () => void
   onOpenAutomation: () => void
+  onOpenKnowledge: () => void
   onAskZuovisBack: () => void
   isAskZuovisActive: boolean
   isSkillsActive: boolean
   isAutomationActive: boolean
+  isKnowledgeActive: boolean
   isAskZuovisInChat: boolean
   isAskZuovisRunning: boolean
-  showGraph: boolean
   changedFileCount: number
   collapsed: boolean
 }
@@ -150,18 +150,18 @@ function Sidebar({
   onReorderWorkspaces,
   onOpenSettings,
   onOpenSearch,
-  onToggleGraph,
   onDaydream,
   onAskZuovis,
   onOpenSkills,
   onOpenAutomation,
+  onOpenKnowledge,
   onAskZuovisBack,
   isAskZuovisActive,
   isSkillsActive,
   isAutomationActive,
+  isKnowledgeActive,
   isAskZuovisInChat,
   isAskZuovisRunning,
-  showGraph,
   changedFileCount,
   collapsed
 }: SidebarProps): React.ReactElement {
@@ -349,6 +349,21 @@ function Sidebar({
           >
             <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Workflow size={13} /></div>
             <span className="sidebar-ask-zuovis-label">自动化</span>
+          </div>
+
+          <div
+            className={`sidebar-ask-zuovis sidebar-skills-entry${isKnowledgeActive ? ' sidebar-ask-zuovis-active' : ''}`}
+            onClick={onOpenKnowledge}
+            role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenKnowledge() } }}
+          >
+            <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><BookOpenText size={13} /></div>
+            <span className="sidebar-ask-zuovis-label">知识库</span>
+            {changedFileCount > 0 && (
+              <span className="sidebar-primary-badge" aria-label={`${changedFileCount} 项知识库变化`}>
+                {changedFileCount > 99 ? '99+' : changedFileCount}
+              </span>
+            )}
           </div>
         </div>
 
@@ -540,21 +555,6 @@ function Sidebar({
 
         <div className="sidebar-section-divider" />
 
-        {/* Knowledge */}
-        {fixedWorkspacePaths.length > 0 && (
-          <div className="sidebar-workspace-section sidebar-workspace-fixed">
-            <button
-              type="button"
-              className="sidebar-workspace-module-header sidebar-knowledge-entry"
-              onClick={onToggleGraph}
-              aria-label="打开知识库图谱"
-            >
-              <span className="sidebar-workspace-module-title">Knowledge</span>
-              <GitGraph size={13} aria-hidden="true" />
-            </button>
-          </div>
-        )}
-
         {/* Memory */}
         {memoryFiles.length > 0 && (
           <div className="sidebar-memory-section">
@@ -602,10 +602,6 @@ function Sidebar({
           <span className="sidebar-tool-separator" aria-hidden="true" />
           <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索" aria-label="搜索">
             <Search size={16} />
-          </button>
-          <button className={`sidebar-icon-btn${showGraph ? ' sidebar-icon-btn-active' : ''}`} onClick={onToggleGraph} title="图谱视图" aria-label="图谱视图">
-            <GitGraph size={16} />
-            {changedFileCount >= 2 && <span className="sidebar-badge-dot" />}
           </button>
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置" aria-label="设置">
             <Settings size={16} />

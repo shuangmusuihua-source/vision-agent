@@ -65,7 +65,7 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 ### 搜索、图谱与 Skills
 
-`file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与 wikilink 引用图。Renderer 使用 `react-force-graph-2d` 显示图谱。
+`file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与去重后的双向 wikilink 关系图。Renderer 使用 `react-force-graph-2d` 在固定视口中显示图谱。
 
 内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。
 
@@ -81,6 +81,8 @@ Renderer 是单页 React 应用：
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions
 - `notification-inbox.ts`：应用内通知的保留、持久化、toast 计时、已读状态和详情选择
 - `automation-task-draft.ts`：自动化草稿状态、频率派生、目标构建、网址规则和任务注册
+- `KnowledgePanel.tsx`：知识库一级模块，集中知识统计、刷新/错误恢复和图谱浏览
+- `GraphView.tsx`：知识图谱渲染，仅观察固定 Canvas 宿主尺寸；单击节点负责选中，悬浮胶囊提供显式的文档打开操作；节点坐标在模块生命周期之间缓存，显著尺寸变化后受控适配视口，并通过主题 token 绘制 Canvas
 - `MarkdownEditor.tsx`：Tiptap Markdown 编辑、自动保存及选区级 AI 改写审阅
 - `AssistantMarkdown.tsx`：Streamdown + Shiki + KaTeX + Mermaid
 

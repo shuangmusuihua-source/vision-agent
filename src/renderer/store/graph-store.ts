@@ -6,21 +6,15 @@ import type { GraphData } from '../../shared/types'
 export type GraphStore = {
   // Core data
   graphData: GraphData
-  filteredData: GraphData
 
   // File change tracking
   changedFileCount: number
   changedFiles: string[]
   changedFileVersion: number
-
-  // UI state
-  searchQuery: string
-  showGraph: boolean
+  isLoading: boolean
+  error: string | null
 
   // Actions
-  setSearchQuery: (query: string) => void
-  toggleGraph: () => void
-  setShowGraph: (show: boolean) => void
   loadGraphData: () => Promise<void>
   handleFilesChanged: (data: { count: number; files: string[]; version: number }) => void
   clearChangedFiles: () => void
@@ -31,47 +25,38 @@ export type GraphStore = {
 export const useGraphStore = create<GraphStore>((set) => ({
   // Core data
   graphData: { nodes: [], edges: [] },
-  filteredData: { nodes: [], edges: [] },
 
   // File change tracking
   changedFileCount: 0,
   changedFiles: [],
   changedFileVersion: 0,
-
-  // UI state
-  searchQuery: '',
-  showGraph: false,
+  isLoading: false,
+  error: null,
 
   // ─── Actions ─────────────────────────────────────────────────────
 
-  setSearchQuery: (query) => {
-    set({ searchQuery: query })
-  },
-
-  toggleGraph: () => {
-    set(s => ({ showGraph: !s.showGraph }))
-  },
-
-  setShowGraph: (show) => {
-    set({ showGraph: show })
-  },
-
   loadGraphData: async () => {
+    set({ isLoading: true, error: null })
     try {
       const data = await window.api.graph.getData()
       const loadedVersion = data.changeVersion || 0
       await window.api.graph.acknowledgeChanges(loadedVersion)
       set((state) => state.changedFileVersion > loadedVersion
-        ? { graphData: data, filteredData: data }
+        ? { graphData: data, isLoading: false, error: null }
         : {
             graphData: data,
-            filteredData: data,
             changedFileCount: 0,
             changedFiles: [],
             changedFileVersion: loadedVersion,
+            isLoading: false,
+            error: null,
           })
     } catch (err) {
       console.error('[GraphStore] Failed to load graph data:', err)
+      set({
+        isLoading: false,
+        error: err instanceof Error ? err.message : '无法读取知识库数据',
+      })
     }
   },
 
@@ -86,7 +71,5 @@ export const useGraphStore = create<GraphStore>((set) => ({
 
 // ─── Selectors ──────────────────────────────────────────────────────
 
-export const useGraphData = () => useGraphStore(s => s.filteredData)
+export const useGraphData = () => useGraphStore(s => s.graphData)
 export const useChangedFileCount = () => useGraphStore(s => s.changedFileCount)
-export const useGraphSearchQuery = () => useGraphStore(s => s.searchQuery)
-export const useShowGraph = () => useGraphStore(s => s.showGraph)
