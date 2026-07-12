@@ -21,7 +21,6 @@ interface FGLink {
 
 interface GraphPalette {
   file: string
-  memory: string
   active: string
   selected: string
   edge: string
@@ -30,7 +29,6 @@ interface GraphPalette {
 
 const DEFAULT_PALETTE: GraphPalette = {
   file: '#2383e2',
-  memory: '#7c3aed',
   active: '#1d4ed8',
   selected: '#f59e0b',
   edge: '#8b8b8b',
@@ -40,9 +38,9 @@ const MAX_AUTO_ZOOM = 1.6
 const LARGE_GRAPH_NODE_COUNT = 150
 const nodePositionCache = new Map<string, { x: number; y: number }>()
 
-function getNodeColor(node: FGNode, isActive: boolean, palette: GraphPalette): string {
+function getNodeColor(isActive: boolean, palette: GraphPalette): string {
   if (isActive) return palette.active
-  return node.type === 'memory' ? palette.memory : palette.file
+  return palette.file
 }
 
 function cacheNodePosition(node: FGNode): void {
@@ -55,7 +53,6 @@ function readGraphPalette(): GraphPalette {
   const read = (name: string, fallback: string): string => styles.getPropertyValue(name).trim() || fallback
   return {
     file: read('--graph-node-file', DEFAULT_PALETTE.file),
-    memory: read('--graph-node-memory', DEFAULT_PALETTE.memory),
     active: read('--graph-node-active', DEFAULT_PALETTE.active),
     selected: read('--graph-node-selected', DEFAULT_PALETTE.selected),
     edge: read('--graph-edge', DEFAULT_PALETTE.edge),
@@ -163,7 +160,7 @@ function GraphView({ onNodeClick, activeFile }: GraphViewProps): React.ReactElem
     ctx.save()
     ctx.beginPath()
     ctx.arc(node.x, node.y, radius, 0, Math.PI * 2)
-    ctx.fillStyle = getNodeColor(node, isActive, palette)
+    ctx.fillStyle = getNodeColor(isActive, palette)
     ctx.fill()
 
     if (isActive || isSelected) {
@@ -298,7 +295,7 @@ function GraphView({ onNodeClick, activeFile }: GraphViewProps): React.ReactElem
                   onFocus={keepHoverCardOpen}
                 >
                   <span className="graph-node-tooltip-type">
-                    {visibleNode.type === 'memory' ? '记忆' : visibleNode.type === 'entity' ? '实体' : '文档'}
+                    {visibleNode.type === 'entity' ? '实体' : '文档'}
                   </span>
                   <span className="graph-node-tooltip-path">{visibleNode.label}</span>
                   <button
@@ -330,10 +327,6 @@ function GraphView({ onNodeClick, activeFile }: GraphViewProps): React.ReactElem
               <span className="graph-legend-item">
                 <span className="graph-legend-dot" style={{ background: 'var(--graph-node-file)' }} />
                 文档
-              </span>
-              <span className="graph-legend-item">
-                <span className="graph-legend-dot" style={{ background: 'var(--graph-node-memory)' }} />
-                记忆
               </span>
               <span className="graph-legend-item">
                 <span className="graph-legend-line" style={{ background: 'var(--graph-edge)' }} />

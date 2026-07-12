@@ -53,6 +53,8 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 
 `session-file-catalog.ts` 从受管会话目录实时发现产物，不维护另一份 artifact 数据库。
 
+`memory-policy.ts` 是 Auto Memory 的策略 Module：交互会话和 Ask 共享应用 user-data 下的全局目录，自动化、行内改写和解析器显式禁用记忆；其系统提示只允许稳定、用户强相关、跨任务有效的信息进入记忆。`memory-files.ts` 管理该目录中的 Markdown 索引与主题文件，并拒绝目录穿越、嵌套文件和符号链接。
+
 ### 持久化
 
 共享的 electron-store 实例位于 `persistence/store-core.ts`：
@@ -82,6 +84,7 @@ Renderer 是单页 React 应用：
 - `notification-inbox.ts`：应用内通知的保留、持久化、toast 计时、已读状态和详情选择
 - `automation-task-draft.ts`：自动化草稿状态、频率派生、目标构建、网址规则和任务注册
 - `KnowledgePanel.tsx`：知识库一级模块，集中知识统计、刷新/错误恢复和图谱浏览
+- `MemorySettingsPage.tsx`：设置中的全局记忆管理页，渲染 Markdown，并提供索引/主题记忆的查看、编辑和删除
 - `GraphView.tsx`：知识图谱渲染，仅观察固定 Canvas 宿主尺寸；单击节点负责选中，悬浮胶囊提供显式的文档打开操作；节点坐标在模块生命周期之间缓存，显著尺寸变化后受控适配视口，并通过主题 token 绘制 Canvas
 - `MarkdownEditor.tsx`：Tiptap Markdown 编辑、自动保存及选区级 AI 改写审阅
 - `AssistantMarkdown.tsx`：Streamdown + Shiki + KaTeX + Mermaid

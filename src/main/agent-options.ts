@@ -1,9 +1,9 @@
 import type { Options, HookCallbackMatcher, SettingSource } from '@anthropic-ai/claude-agent-sdk'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { getApiKey, getBaseUrl, getModel } from './persistence/profile-store'
 import { getAppSkillsCwd } from './skill-init'
+import { getAgentMemorySettings, GLOBAL_MEMORY_PROMPT, type AgentMemoryMode } from './memory-policy'
 
 // ─── CLI path resolution (moved from agent-manager) ────────────────────
 
@@ -79,6 +79,8 @@ export interface AgentOptionsProfile {
   effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   /** Maximum number of tool-use turns before stopping. */
   maxTurns?: number
+  /** Auto-memory policy. Every Agent runtime must opt in or explicitly disable it. */
+  memoryMode: AgentMemoryMode
   /** Maximum cost in USD before stopping. */
   maxBudgetUsd?: number
 }
@@ -137,6 +139,11 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
 
   const effectiveCwd = profile.workspaceCwd ?? profile.cwd ?? getAppSkillsCwd()
 
+  const systemPromptAppend = [
+    profile.systemPromptAppend,
+    profile.memoryMode === 'global' ? GLOBAL_MEMORY_PROMPT : undefined,
+  ].filter((value): value is string => Boolean(value)).join('\n\n')
+
   const options: Options = {
     model,
     cwd: effectiveCwd,
@@ -144,13 +151,11 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
     permissionMode: profile.permissionMode,
     env,
     ...(cliPath ? { pathToClaudeCodeExecutable: cliPath } : {}),
-    settings: {
-      autoMemoryDirectory: join(effectiveCwd, '.vision', 'memory'),
-    },
+    settings: getAgentMemorySettings(profile.memoryMode),
     systemPrompt: {
       type: 'preset' as const,
       preset: 'claude_code' as const,
-      ...(profile.systemPromptAppend ? { append: profile.systemPromptAppend } : {}),
+      ...(systemPromptAppend ? { append: systemPromptAppend } : {}),
     },
   }
 

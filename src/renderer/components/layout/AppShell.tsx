@@ -78,7 +78,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     saveFile, retryPendingSave, refreshActiveContent,
     activeSaveError, activeHasPendingSave,
   } = useTabs()
-  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
   const [isRetryingSave, setIsRetryingSave] = useState(false)
   const [automationFocusTaskId, setAutomationFocusTaskId] = useState<string | null>(null)
   const {
@@ -602,7 +601,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const hasMessages = useAgentStore.getState().slots.editor.messages.length > 0
     if (!hasMessages) return
 
-    setMemoryRefreshKey((k) => k + 1)
     // Refresh session outputs so OverviewPanel shows newly produced files
     const sid = useAgentStore.getState().activeSessionId.editor
     if (sid) {
@@ -665,7 +663,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       <Sidebar
         workspacePaths={workspace.workspacePaths}
         fixedWorkspacePaths={workspace.fixedWorkspacePaths}
-        memoryRefreshKey={memoryRefreshKey}
         sessions={editorSessionList}
         activeSessionId={view === 'editor' ? activeSessionId : null}
         activeSessionRunning={isStreaming}

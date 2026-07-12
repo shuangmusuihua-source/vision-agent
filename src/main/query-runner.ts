@@ -175,6 +175,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
   ].filter(Boolean).join('\n')
 
   return buildAgentOptions({
+    memoryMode: 'global',
     permissionMode: 'default',
     // Bare allow-list entries bypass canUseTool in recent SDK versions. Keep
     // this empty so every tool request reaches the session authorization gate.

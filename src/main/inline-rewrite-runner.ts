@@ -15,6 +15,7 @@ export function createInlineRewriteOptions(
   abortController: AbortController,
 ): Options {
   const options = buildAgentOptions({
+    memoryMode: 'disabled',
     cwd: dirname(filePath),
     permissionMode: 'default',
     allowedTools: [],

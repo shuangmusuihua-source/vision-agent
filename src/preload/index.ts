@@ -233,6 +233,8 @@ const api = {
 
   memory: {
     list: () => invoke('memory:list'),
+    read: (filePath: string) => invoke('memory:read', filePath),
+    update: (filePath: string, content: string) => invoke('memory:update', { filePath, content }),
     delete: (filePath: string) => invoke('memory:delete', filePath)
   },
 

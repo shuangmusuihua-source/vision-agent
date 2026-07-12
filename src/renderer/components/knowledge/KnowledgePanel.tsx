@@ -34,7 +34,6 @@ function KnowledgePanel({
 
   const stats = useMemo(() => ({
     documents: graphData.nodes.filter((node) => node.type === 'file').length,
-    memories: graphData.nodes.filter((node) => node.type === 'memory').length,
     references: graphData.edges.length,
   }), [graphData])
 
@@ -62,7 +61,6 @@ function KnowledgePanel({
 
           <div className="knowledge-toolbar-meta" aria-label="知识库统计">
             <span><strong>{stats.documents}</strong> 文档</span>
-            <span><strong>{stats.memories}</strong> 记忆</span>
             <span><strong>{stats.references}</strong> 链接</span>
           </div>
 

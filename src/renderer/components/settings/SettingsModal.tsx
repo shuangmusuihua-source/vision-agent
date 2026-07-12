@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   CheckCircle2,
+  Brain,
   Cpu,
   Download,
   Eye,
@@ -21,6 +22,8 @@ import {
   X,
   Zap
 } from 'lucide-react'
+import { useModal } from '../common/ModalSystem'
+import MemorySettingsPage from './MemorySettingsPage'
 import { useSettings, useSettingsStore } from '../../store/settings-cache'
 import { useUiStore, type AppUpdateState } from '../../store/ui-slice'
 import type { ModelProfile } from '../../lib/ipc'
@@ -32,11 +35,12 @@ interface SettingsModalProps {
   onClose: () => void
 }
 
-type SettingsPage = 'appearance' | 'profiles' | 'about'
+type SettingsPage = 'appearance' | 'profiles' | 'memory' | 'about'
 
 const PAGES: Array<{ id: SettingsPage; label: string; description: string; icon: React.ReactElement }> = [
   { id: 'appearance', label: '外观', description: '界面主题与显示偏好', icon: <Palette size={16} /> },
   { id: 'profiles', label: '模型配置', description: '管理 Agent 使用的模型连接', icon: <Users size={16} /> },
+  { id: 'memory', label: '记忆', description: '管理跨工作区共享的全局长期记忆', icon: <Brain size={16} /> },
   { id: 'about', label: '关于', description: '版本与产品信息', icon: <Info size={16} /> }
 ]
 
@@ -88,7 +92,9 @@ function getUpdateStatusMessage(state: AppUpdateState): string {
 }
 
 function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
+  const modal = useModal()
   const [activePage, setActivePage] = useState<SettingsPage>('appearance')
+  const [memoryDirty, setMemoryDirty] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark' | 'system' | null>(null)
   const [profiles, setProfiles] = useState<ModelProfile[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
@@ -257,23 +263,45 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
 
   const overlayRef = useRef<HTMLDivElement>(null)
 
+  const confirmDiscardMemory = useCallback(async (message: string): Promise<boolean> => {
+    if (!memoryDirty) return true
+    return modal.confirm({
+      title: '放弃未保存的修改？',
+      message,
+      confirmLabel: '放弃修改',
+      variant: 'danger',
+    })
+  }, [memoryDirty, modal])
+
+  const requestClose = useCallback(async () => {
+    if (!await confirmDiscardMemory('关闭设置后，当前记忆中尚未保存的内容会丢失。')) return
+    onClose()
+  }, [confirmDiscardMemory, onClose])
+
+  const requestPageChange = useCallback(async (page: SettingsPage) => {
+    if (page === activePage) return
+    if (activePage === 'memory' && !await confirmDiscardMemory('切换设置页面后，当前记忆中尚未保存的内容会丢失。')) return
+    setActivePage(page)
+  }, [activePage, confirmDiscardMemory])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !e.defaultPrevented) void requestClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [requestClose])
 
   useEffect(() => {
     const el = overlayRef.current
     if (!el) return
-    const focusable = el.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
+    const focusableSelector = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+    const getFocusable = () => Array.from(el.querySelectorAll<HTMLElement>(focusableSelector))
+    const focusable = getFocusable()
     if (focusable.length > 0) focusable[0].focus()
 
     const handleTab = (e: KeyboardEvent) => {
+      const focusable = getFocusable()
       if (e.key !== 'Tab' || !focusable.length) return
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
@@ -298,7 +326,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const themeLabel = THEME_OPTIONS.find((option) => option.id === theme)?.label || '未设置'
 
   return (
-    <div className="settings-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="settings-overlay" ref={overlayRef} onClick={(e) => { if (e.target === e.currentTarget) void requestClose() }}>
       <div className="settings-window" role="dialog" aria-modal="true" aria-label="设置" onClick={(e) => e.stopPropagation()}>
         <aside className="settings-sidebar" aria-label="设置分类">
           <div className="settings-brand">
@@ -316,7 +344,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
               <button
                 key={page.id}
                 className={`settings-sidebar-item ${activePage === page.id ? 'active' : ''}`}
-                onClick={() => setActivePage(page.id)}
+                onClick={() => void requestPageChange(page.id)}
                 aria-current={activePage === page.id ? 'page' : undefined}
               >
                 <span className="settings-sidebar-icon">{page.icon}</span>
@@ -337,8 +365,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
           <div className="settings-sidebar-version">Version {appVersion || '...'}</div>
         </aside>
 
-        <section className="settings-content">
-          <button className="settings-close-btn" onClick={onClose} aria-label="关闭设置">
+        <section className={`settings-content${activePage === 'memory' ? ' settings-content-memory' : ''}`}>
+          <button className="settings-close-btn" onClick={() => void requestClose()} aria-label="关闭设置">
             <X size={17} />
           </button>
 
@@ -646,6 +674,10 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 </button>
               )}
             </div>
+          )}
+
+          {activePage === 'memory' && (
+            <MemorySettingsPage onDirtyChange={setMemoryDirty} />
           )}
 
           {activePage === 'about' && (

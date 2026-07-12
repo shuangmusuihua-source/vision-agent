@@ -19,6 +19,8 @@ import type {
   CommunitySkillMutationResult,
   InlineRewriteRequest,
   InlineRewriteResponse,
+  MemoryDocument,
+  MemoryEntry,
 } from './types'
 import type {
   MarkitdownFormat,
@@ -237,7 +239,15 @@ export type IPCChannelMap = {
   // Memory
   'memory:list': {
     request: void
-    response: Array<{ name: string; path: string }>
+    response: MemoryEntry[]
+  }
+  'memory:read': {
+    request: string
+    response: { success: boolean; document?: MemoryDocument; error?: string }
+  }
+  'memory:update': {
+    request: { filePath: string; content: string }
+    response: { success: boolean; document?: MemoryDocument; error?: string }
   }
   'memory:delete': {
     request: string

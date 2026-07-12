@@ -131,8 +131,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const inlineRequestSequenceRef = useRef(0)
   const beginInlineRewriteRef = useRef<(() => void) | null>(null)
   const inlineFilePathRef = useRef(filePath)
-  const isMemoryFile = filePath.includes('.vision/memory/')
-
   if (!sourceSaveControllerRef.current) {
     sourceSaveControllerRef.current = new SourceSaveController(onSave)
   }
@@ -168,9 +166,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 
   const handleSourceTextChange = useCallback((nextText: string) => {
     setSourceText(nextText)
-    if (!filePath || isMemoryFile) return
+    if (!filePath) return
     sourceSaveController.schedule(filePath, nextText)
-  }, [filePath, isMemoryFile, sourceSaveController])
+  }, [filePath, sourceSaveController])
 
   useEffect(() => {
     if (!workspacePath) {
@@ -188,7 +186,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   }, [workspacePath])
 
   const editor = useEditor({
-    editable: !isMemoryFile,
+    editable: true,
     extensions: [      StarterKit.configure({
         codeBlock: false
       }),
@@ -376,11 +374,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 
     if (!editor || editor.isDestroyed) return
     setAiInlineReview(editor, null)
-    editor.setEditable(!isMemoryFile)
+    editor.setEditable(true)
     if (restoreSelection && snapshot) {
       editor.chain().setTextSelection({ from: snapshot.from, to: snapshot.to }).focus().run()
     }
-  }, [editor, isMemoryFile])
+  }, [editor])
 
   const cancelInlineRewrite = useCallback((restoreSelection = true) => {
     const requestId = inlineRequestIdRef.current
@@ -399,7 +397,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   }, [filePath])
 
   const beginInlineRewrite = useCallback(() => {
-    if (!editor || editor.isDestroyed || isMemoryFile || internalSourceMode) return
+    if (!editor || editor.isDestroyed || internalSourceMode) return
     const snapshot = captureInlineRewriteSelection(editor)
     if (!snapshot) return
 
@@ -411,7 +409,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     setInlineEditMode('prompt')
     setAiInlineReview(editor, { phase: 'pending', from: snapshot.from, to: snapshot.to })
     editor.setEditable(false)
-  }, [editor, internalSourceMode, isMemoryFile, prepareInlineRewrite])
+  }, [editor, internalSourceMode, prepareInlineRewrite])
 
   beginInlineRewriteRef.current = beginInlineRewrite
 
@@ -475,7 +473,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     )
 
     setAiInlineReview(editor, null)
-    editor.setEditable(!isMemoryFile)
+    editor.setEditable(true)
     const chain = editor.chain().focus()
     if (replacement.markdown.length === 0) {
       chain.deleteRange({ from: snapshot.from, to: snapshot.to }).run()
@@ -491,7 +489,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     setInlineEditMode('idle')
     setInlineEditInstruction('')
     setInlineEditError(null)
-  }, [editor, isMemoryFile])
+  }, [editor])
 
   useEffect(() => {
     return () => {
@@ -579,15 +577,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     }
   }, [cancelInlineRewrite, content, editor])
 
-  // Sync editable state when filePath changes (memory files are read-only)
-  useEffect(() => {
-    if (!editor || editor.isDestroyed) return
-    editor.setEditable(!isMemoryFile)
-  }, [isMemoryFile, editor])
-
   // Auto-save with debounce
   useEffect(() => {
-    if (!editor || editor.isDestroyed || !filePath || isMemoryFile) return
+    if (!editor || editor.isDestroyed || !filePath) return
 
     const handler = () => {
       isLocalChange.current = true
@@ -602,7 +594,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       // expires. Persist the captured markdown for the old path first.
       editorSaveController.flush()
     }
-  }, [editor, editorSaveController, filePath, isMemoryFile])
+  }, [editor, editorSaveController, filePath])
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
@@ -666,7 +658,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     return <div className="editor-loading">Loading editor...</div>
   }
 
-  if (internalSourceMode && !isMemoryFile) {
+  if (internalSourceMode) {
     return (
       <textarea
         className="editor-source-textarea"

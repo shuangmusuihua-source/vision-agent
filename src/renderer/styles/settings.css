@@ -246,6 +246,17 @@
     var(--color-bg-primary);
 }
 
+.settings-content-memory {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-content-memory .settings-content-header {
+  flex: 0 0 auto;
+  margin-bottom: 18px;
+}
+
 .settings-close-btn {
   position: absolute;
   top: 18px;
@@ -1113,7 +1124,7 @@
 
   .settings-nav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1144,6 +1155,10 @@
 
   .settings-content-header {
     padding-right: 34px;
+  }
+
+  .settings-content-memory .settings-content-header {
+    margin-bottom: 14px;
   }
 
   .theme-options,

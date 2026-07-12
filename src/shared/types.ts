@@ -616,7 +616,7 @@ export type PaginatedMessagesResponse = {
 
 // ─── Graph / Knowledge Graph ────────────────────────────────────────
 
-export type GraphNodeType = 'file' | 'memory' | 'entity'
+export type GraphNodeType = 'file' | 'entity'
 
 export type GraphEdgeType = 'reference'
 
@@ -642,14 +642,28 @@ export type GraphData = {
   changeVersion?: number
 }
 
+// ─── Memory Files ──────────────────────────────────────────────────
+
+export type MemoryKind = 'index' | 'topic'
+
+export type MemoryEntry = {
+  name: string
+  path: string
+  kind: MemoryKind
+  modifiedAt: number
+  size: number
+}
+
+export type MemoryDocument = MemoryEntry & {
+  content: string
+}
+
 // ─── File Entry (workspace tree) ────────────────────────────────────
 
 export type FileChangeEvent = {
   filePath: string
   changeType: 'add' | 'change' | 'unlink'
 }
-
-// ─── File Entry (workspace tree) ────────────────────────────────────
 
 // ─── Workspace Record (P0: workspace-centric architecture) ────────────
 

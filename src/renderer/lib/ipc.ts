@@ -17,6 +17,8 @@ import type {
   CommunitySkillMutationResult,
   InlineRewriteRequest,
   InlineRewriteResponse,
+  MemoryDocument,
+  MemoryEntry,
 } from '../../shared/types'
 import type {
   MarkitdownFormat,
@@ -221,7 +223,9 @@ interface WindowApi {
 }
 
 interface MemoryApi {
-  list: () => Promise<Array<{ name: string; path: string }>>
+  list: () => Promise<MemoryEntry[]>
+  read: (filePath: string) => Promise<{ success: boolean; document?: MemoryDocument; error?: string }>
+  update: (filePath: string, content: string) => Promise<{ success: boolean; document?: MemoryDocument; error?: string }>
   delete: (filePath: string) => Promise<{ success: boolean; error?: string }>
 }
 
@@ -251,6 +255,8 @@ export type {
   SearchResult,
   GraphNode,
   GraphEdge,
+  MemoryDocument,
+  MemoryEntry,
   CronTask,
   CronTaskRegistration,
   CronScheduleParseRequest,

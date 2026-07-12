@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, ChevronsUp, X, Search, Settings, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, MessageCircle, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks, Workflow, BookOpenText, Sun, Moon, Monitor, Cpu, Check } from 'lucide-react'
+import { ChevronsUp, X, Search, Settings, Plus, Pin, Eye, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks, Workflow, BookOpenText, Sun, Moon, Monitor, Cpu, Check } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
-import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { useSettings } from '../../store/settings-cache'
 import appLogo from '../../assets/zuovis-logo.svg'
@@ -19,15 +18,9 @@ const QUICK_THEME_OPTIONS = [
   { id: 'system' as const, label: '跟随系统', Icon: Monitor }
 ]
 
-interface MemoryEntry {
-  name: string
-  path: string
-}
-
 interface SidebarProps {
   workspacePaths: string[]
   fixedWorkspacePaths: string[]
-  memoryRefreshKey: number
   sessions: SdkSessionInfo[]
   activeSessionId: string | null
   activeSessionRunning: boolean
@@ -131,7 +124,6 @@ function getSessionAttention(slot?: ContextSlot | null): {
 function Sidebar({
   workspacePaths,
   fixedWorkspacePaths,
-  memoryRefreshKey,
   sessions,
   activeSessionId,
   activeSessionRunning,
@@ -165,33 +157,15 @@ function Sidebar({
   changedFileCount,
   collapsed
 }: SidebarProps): React.ReactElement {
-  const modal = useModal()
   const settings = useSettings()
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set())
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameText, setRenameText] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
-  const [memoryExpanded, setMemoryExpanded] = useState(true)
-  const [memoryFiles, setMemoryFiles] = useState<MemoryEntry[]>([])
   const userWorkspacePaths = filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)
   // Subscribe reactively to sessionSlots so non-active session state (running indicator, title)
   // triggers re-renders when slots are saved/restored on session switch.
   const sessionSlots = useAgentStore((s) => s.sessionSlots)
-
-  const refreshMemory = useCallback(() => {
-    window.api.memory.list().then(setMemoryFiles).catch(() => setMemoryFiles([]))
-  }, [])
-
-  useEffect(() => {
-    refreshMemory()
-  }, [memoryRefreshKey, refreshMemory])
-
-  const handleDeleteMemory = useCallback(async (filePath: string) => {
-    const ok = await modal.confirm({ title: '删除记忆', message: '确定删除此记忆文件？此操作不可撤销。', variant: 'danger' })
-    if (!ok) return
-    await window.api.memory.delete(filePath)
-    refreshMemory()
-  }, [refreshMemory])
 
   const toggleWorkspace = useCallback((path: string) => {
     setCollapsedWorkspaces((prev) => {
@@ -553,38 +527,6 @@ function Sidebar({
           </Flipper>
         )}
 
-        <div className="sidebar-section-divider" />
-
-        {/* Memory */}
-        {memoryFiles.length > 0 && (
-          <div className="sidebar-memory-section">
-            <div className="sidebar-workspace-module-header" onClick={() => setMemoryExpanded((v) => !v)} style={{ cursor: 'pointer' }}>
-              <span className="sidebar-workspace-module-title">Memory</span>
-              <div className="sidebar-workspace-module-actions">
-                {memoryExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              </div>
-            </div>
-            {memoryExpanded && memoryFiles.map((file) => (
-              <div
-                key={file.path}
-                className="sidebar-entry sidebar-file sidebar-memory-entry"
-                style={{ paddingLeft: 20 }}
-              >
-                <MessageCircle size={13} />
-                <span className="sidebar-memory-name">{file.name}</span>
-                <button
-                  className="sidebar-memory-delete"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteMemory(file.path)
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="sidebar-tool-zone" role="group" aria-label="全局工具">

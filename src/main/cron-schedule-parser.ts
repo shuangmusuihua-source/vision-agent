@@ -202,6 +202,7 @@ async function resolveWithModel(request: CronScheduleParseRequest): Promise<Cron
   const timezone = request.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
   const now = new Date(request.now || Date.now()).toISOString()
   const options = buildAgentOptions({
+    memoryMode: 'disabled',
     cwd: process.cwd(),
     permissionMode: 'default',
     allowedTools: [],

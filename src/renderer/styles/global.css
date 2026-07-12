@@ -101,7 +101,6 @@
 
   /* Knowledge graph canvas */
   --graph-node-file: #2383e2;
-  --graph-node-memory: #7c3aed;
   --graph-node-active: #1d4ed8;
   --graph-node-selected: #f59e0b;
   --graph-edge: #8b8b8b;
@@ -256,7 +255,6 @@
   --sidebar-glass-border: var(--color-border-soft);
 
   --graph-node-file: #60a5fa;
-  --graph-node-memory: #a78bfa;
   --graph-node-active: #93c5fd;
   --graph-node-selected: #fbbf24;
   --graph-edge: #525252;

@@ -323,9 +323,8 @@ export class FileIndexService {
 
     for (const [filePath] of this.knowledgeIndex) {
       const label = path.basename(filePath, '.md')
-      const isMemory = filePath.includes(`${path.sep}.vision${path.sep}memory${path.sep}`)
       const id = filePath
-      nodes.push({ id, label, type: isMemory ? 'memory' : 'file' })
+      nodes.push({ id, label, type: 'file' })
       filePathToId.set(filePath, id)
     }
 

@@ -1327,41 +1327,6 @@
   outline: none;
 }
 
-.sidebar-memory-section {
-  margin-top: 4px;
-}
-
-.sidebar-memory-entry {
-  position: relative;
-}
-
-.sidebar-memory-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-memory-delete {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-tertiary);
-  margin-left: auto;
-}
-
-.sidebar-memory-entry:hover .sidebar-memory-delete {
-  display: flex;
-}
-
-.sidebar-memory-delete:hover {
-  color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
-}
-
 /* --- Move file dropdown --- */
 
 .move-dropdown {
@@ -1794,7 +1759,6 @@
 .sidebar-quick-empty:active,
 .sidebar-workspace-remove:active,
 .sidebar-workspace-add-file:active,
-.sidebar-memory-delete:active,
 .divider-swap-btn:active,
 .divider-expand-btn:active {
   opacity: 0.7;

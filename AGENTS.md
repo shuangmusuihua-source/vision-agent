@@ -42,6 +42,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
 - `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
 - `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
+- `memory-policy.ts`, `memory-files.ts` — application-global auto-memory policy and managed Markdown storage; interactive sessions share it, while automation and ephemeral model runs disable auto-memory
 - `session-store.ts` — SDK transcript listing, paging, rename, delete, and compaction filtering
 - `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata
 - `file-index-service.ts` — workspace search and knowledge graph index
@@ -79,10 +80,11 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - File access must pass the session-scoped authorization checks in `session-file-access.ts`.
 - Tool approval and AskUser requests are session-routed and time out after five minutes.
 - Renderer inactivity is only a notice; it must not automatically abort a healthy long-running task.
+- Auto-memory is global across workspaces and reserved for stable, user-specific, cross-task information. Automation, inline rewrites, parsers, and other ephemeral Agent runs must disable it explicitly; task logs belong to automation history.
 
 ## Persistence
 
-`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery.
+`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
 
 Do not introduce a second store for the same authority without documenting the ownership boundary.
 

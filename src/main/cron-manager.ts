@@ -211,6 +211,7 @@ export async function executeTask(task: CronTask): Promise<void> {
     const allowedToolNames = new Set(allowedTools)
 
     const options = buildAgentOptions({
+      memoryMode: 'disabled',
       cwd,
       permissionMode: 'acceptEdits',
       // Bare allowedTools entries bypass canUseTool in recent SDK versions.
