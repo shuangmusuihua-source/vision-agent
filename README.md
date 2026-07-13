@@ -32,7 +32,7 @@ npm run pack
 npm run dist
 ```
 
-`npm run pack` 生成未安装的 `.app`，`npm run dist` 生成 DMG/ZIP；两者都会校验内置 Skill 是否完整进入应用包。
+`npm run pack` 生成未安装的 `.app`，`npm run dist` 生成 DMG/ZIP；两者都会校验内置 Skill 完整性和 `app.asar` 运行时文件 allowlist。
 
 ## 配置与数据
 
@@ -57,4 +57,4 @@ npm run dist
 
 ## 发布说明
 
-当前 `electron-builder.yml` 的签名和 notarization 仍关闭，适合内部测试包，不应视为完成生产分发加固。
+Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程完成 hardened runtime、签名和 notarization。仓库本地缺少发布证书时，`npm run pack` 仍会生成未签名的验证包。
