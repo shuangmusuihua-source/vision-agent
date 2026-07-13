@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { X } from 'lucide-react'
+import { MessageSquare, X } from 'lucide-react'
 import type { PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -72,15 +72,19 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, permi
     if (activeSkillMeta?.status === 'running') setSkillDrawerHidden(false)
   }, [activeSkillMeta])
 
+  const workspaceName = workspacePath?.split('/').pop() || ''
+  const currentSessionTitle = sessionList.find((session) => session.id === currentSessionId)?.title?.trim() || '新会话'
+  const sessionContextTitle = workspaceName
+    ? `${workspaceName} / ${currentSessionTitle}`
+    : currentSessionTitle
+
   return (
     <div className={`agent-panel ${edgeClass}`} style={{ width, minWidth: width, maxWidth: width }}>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
-          <div className="agent-header-workspace" title={workspacePath || undefined}>
-            {workspacePath ? workspacePath.split('/').pop() : ''}
-            {currentSessionId && sessionList.find(s => s.id === currentSessionId)?.title && (
-              <>｜{sessionList.find(s => s.id === currentSessionId)!.title}</>
-            )}
+          <div className="agent-header-context" title={sessionContextTitle} aria-label={`当前会话：${sessionContextTitle}`}>
+            <MessageSquare size={14} aria-hidden="true" />
+            <span>{currentSessionTitle}</span>
           </div>
         </div>
         <div className="agent-panel-body">

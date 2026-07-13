@@ -79,7 +79,7 @@ interface MarkdownEditorProps {
   focusMode: boolean
   onOpenFile: (filePath: string) => void
   onSave: (filePath: string, content: string) => void | Promise<unknown>
-  onAskAgent: (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => void
+  onAskAgent: (action: 'explain' | 'review' | 'ask', selection: string, filePath: string) => void
   onStatsUpdate: (wordCount: number, charCount: number) => void
 }
 
@@ -609,50 +609,15 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     return () => { editor.off('update', updateCounts) }
   }, [editor, onStatsUpdate])
 
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      if (!editor || editor.isDestroyed) return
-      const { from, to } = editor.state.selection
-      if (from === to) return
+  const handleInlineAgentAction = useCallback((action: 'explain' | 'review' | 'ask') => {
+    if (!editor || editor.isDestroyed) return
+    const { from, to } = editor.state.selection
+    if (from === to) return
 
-      const selectedText = editor.state.doc.textBetween(from, to)
-      if (!selectedText.trim()) return
-
-      e.preventDefault()
-
-      const menu = document.createElement('div')
-      menu.className = 'editor-context-menu'
-
-      const items = [
-        { label: 'Explain', action: 'explain' as const },
-        { label: 'Edit', action: 'edit' as const },
-        { label: 'Review', action: 'review' as const },
-        { label: 'Ask...', action: 'ask' as const }
-      ]
-
-      for (const item of items) {
-        const el = document.createElement('div')
-        el.className = 'editor-context-menu-item'
-        el.textContent = item.label
-        el.onclick = () => {
-          onAskAgent(item.action, selectedText, filePath)
-          menu.remove()
-        }
-        menu.appendChild(el)
-      }
-
-      menu.style.left = `${e.clientX}px`
-      menu.style.top = `${e.clientY}px`
-      document.body.appendChild(menu)
-
-      const removeMenu = () => {
-        menu.remove()
-        document.removeEventListener('click', removeMenu)
-      }
-      setTimeout(() => document.addEventListener('click', removeMenu), 0)
-    },
-    [editor, filePath, onAskAgent]
-  )
+    const selectedText = editor.state.doc.textBetween(from, to)
+    if (!selectedText.trim()) return
+    onAskAgent(action, selectedText, filePath)
+  }, [editor, filePath, onAskAgent])
 
   if (!editor || editor.isDestroyed) {
     return <div className="editor-loading">Loading editor...</div>
@@ -670,7 +635,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   }
 
   return (
-    <div className="editor-wrapper" onContextMenu={handleContextMenu}>
+    <div className="editor-wrapper">
       <AiInlineEditControls
         editor={editor}
         mode={inlineEditMode}
@@ -678,6 +643,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
         error={inlineEditError}
         onInstructionChange={setInlineEditInstruction}
         onOpen={beginInlineRewrite}
+        onAgentAction={handleInlineAgentAction}
         onSubmit={submitInlineRewrite}
         onCancel={() => cancelInlineRewrite(true)}
         onAccept={acceptInlineRewrite}

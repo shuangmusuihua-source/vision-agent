@@ -592,11 +592,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   }, [setAgentPrefill])
 
   const handleAskAgent = useCallback(
-    (action: 'explain' | 'edit' | 'review' | 'ask', selection: string, filePath: string) => {
+    (action: 'explain' | 'review' | 'ask', selection: string, filePath: string) => {
       const context = `文件：${filePath}\n\n选中内容：\n${selection}`
-      const prompts: Record<string, string> = {
+      const prompts: Record<typeof action, string> = {
         explain: `${context}\n\n请解释以上选中内容。`,
-        edit: `${context}\n\n请修改以上选中内容。`,
         review: `${context}\n\n请检查以上选中内容是否有问题。`,
         ask: `${context}\n\n`
       }

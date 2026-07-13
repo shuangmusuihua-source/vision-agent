@@ -32,6 +32,7 @@ type AiInlineEditControlsProps = {
   error: string | null
   onInstructionChange: (value: string) => void
   onOpen: () => void
+  onAgentAction: (action: 'explain' | 'review' | 'ask') => void
   onSubmit: () => void
   onCancel: () => void
   onAccept: () => void
@@ -44,6 +45,7 @@ export default function AiInlineEditControls({
   error,
   onInstructionChange,
   onOpen,
+  onAgentAction,
   onSubmit,
   onCancel,
   onAccept,
@@ -175,6 +177,36 @@ export default function AiInlineEditControls({
             <PenLine size={14} />
             <span>AI 修改</span>
             <kbd>⌘ K</kbd>
+          </button>
+          <button
+            type="button"
+            className="ai-inline-agent-action"
+            title="解释选中内容"
+            aria-label="解释选中内容"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onAgentAction('explain')}
+          >
+            解释
+          </button>
+          <button
+            type="button"
+            className="ai-inline-agent-action"
+            title="审阅选中内容"
+            aria-label="审阅选中内容"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onAgentAction('review')}
+          >
+            审阅
+          </button>
+          <button
+            type="button"
+            className="ai-inline-agent-action"
+            title="围绕选中内容提问"
+            aria-label="围绕选中内容提问"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onAgentAction('ask')}
+          >
+            提问
           </button>
           <span className="ai-inline-toolbar-divider" aria-hidden="true" />
           <button

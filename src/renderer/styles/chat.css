@@ -73,20 +73,28 @@
   min-width: 0;
 }
 
-.agent-header-workspace {
+.agent-header-context {
   display: flex;
+  min-width: 0;
+  max-width: 240px;
   align-items: center;
-  padding: 2px 10px;
-  border-radius: var(--radius-md);
-  background: var(--color-action-bg);
-  color: var(--color-action);
+  gap: 6px;
+  color: var(--color-text-primary);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
-  max-width: 220px;
+  flex-shrink: 1;
+}
+
+.agent-header-context svg {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.agent-header-context span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 0;
 }
 
 .agent-header-dropdown {
