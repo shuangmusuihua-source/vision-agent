@@ -677,12 +677,11 @@
   border-radius: 6px;
   -electron-corner-smoothing: system-ui;
   color: var(--color-text-tertiary);
-  transition: background 0.15s, color 0.15s;
-}
-
-.sidebar-workspace-module-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease,
+    translate 0.18s ease;
 }
 
 .sidebar-workspace-header {
@@ -719,7 +718,11 @@
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease,
+    translate 0.18s ease;
   flex-shrink: 0;
 }
 
@@ -736,18 +739,8 @@
   opacity: 1;
 }
 
-.sidebar-workspace-add-session:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-action);
-}
-
 .sidebar-workspace-header:hover .sidebar-workspace-pin {
   opacity: 1;
-}
-
-.sidebar-workspace-pin:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-action);
 }
 
 .sidebar-workspace-name {
@@ -761,16 +754,6 @@
 .sidebar-workspace-header:hover .sidebar-workspace-remove,
 .sidebar-workspace-header:hover .sidebar-workspace-add-file {
   opacity: 1;
-}
-
-.sidebar-workspace-remove:hover {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.sidebar-workspace-add-file:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
 }
 
 .sidebar-workspace-list {
@@ -1249,12 +1232,12 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%) scale(0.92);
-  transition: opacity 0.12s ease, transform 0.12s ease, background 0.15s, color 0.15s;
-}
-
-.sidebar-session-delete:hover {
-  color: var(--color-danger, #ef4444);
-  background: var(--color-bg-hover);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    translate 0.18s ease;
 }
 
 .sidebar-session-entry:hover .sidebar-session-delete,
@@ -1268,6 +1251,51 @@
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%) scale(1);
+}
+
+:is(
+  .sidebar-workspace-module-btn,
+  .sidebar-workspace-add-session,
+  .sidebar-workspace-pin,
+  .sidebar-workspace-remove,
+  .sidebar-workspace-add-file,
+  .sidebar-session-delete
+):hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  translate: 0 -1px;
+}
+
+:is(.sidebar-workspace-remove, .sidebar-session-delete):hover {
+  color: var(--color-danger);
+}
+
+:is(
+  .sidebar-workspace-module-btn,
+  .sidebar-workspace-add-session,
+  .sidebar-workspace-pin,
+  .sidebar-workspace-remove,
+  .sidebar-workspace-add-file,
+  .sidebar-session-delete
+):active {
+  opacity: 0.7;
+  translate: 0;
+}
+
+.sidebar-workspace-header:hover :is(
+  .sidebar-workspace-add-session,
+  .sidebar-workspace-pin,
+  .sidebar-workspace-remove,
+  .sidebar-workspace-add-file
+):active,
+.sidebar-workspace-actions:focus-within :is(
+  .sidebar-workspace-add-session,
+  .sidebar-workspace-pin,
+  .sidebar-workspace-remove,
+  .sidebar-workspace-add-file
+):active,
+.sidebar-session-entry:is(:hover, :focus-within) .sidebar-session-delete:active {
+  opacity: 0.7;
 }
 
 .sidebar-session-entry:hover .sidebar-session-time,
@@ -1713,6 +1741,12 @@
 .sidebar-open-dir-btn:focus-visible,
 .sidebar-new-dir-btn:focus-visible,
 .sidebar-entry:focus-visible,
+.sidebar-workspace-module-btn:focus-visible,
+.sidebar-workspace-add-session:focus-visible,
+.sidebar-workspace-pin:focus-visible,
+.sidebar-workspace-remove:focus-visible,
+.sidebar-workspace-add-file:focus-visible,
+.sidebar-session-delete:focus-visible,
 .sidebar-quick-theme-btn:focus-visible,
 .sidebar-quick-model-row:focus-visible,
 .sidebar-quick-empty:focus-visible,
@@ -1733,8 +1767,6 @@
 .sidebar-quick-theme-btn:active,
 .sidebar-quick-model-row:active,
 .sidebar-quick-empty:active,
-.sidebar-workspace-remove:active,
-.sidebar-workspace-add-file:active,
 .divider-swap-btn:active,
 .divider-expand-btn:active {
   opacity: 0.7;
