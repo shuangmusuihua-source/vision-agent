@@ -34,6 +34,11 @@ npm run dist
 
 `npm run pack` 生成未安装的 `.app`，`npm run dist` 生成 DMG/ZIP；两者都会校验内置 Skill 完整性和 `app.asar` 运行时文件 allowlist。
 
+## 视觉资产
+
+- `build/icon.icns`、`build/icon.png` 和 `build/icon_preview.png` 是 S 形系统应用图标，分别用于发布包、开发 Dock 和设置页。
+- `src/renderer/assets/sumi-assistant-bull.svg` 是应用内助手牛形象，用于 Ask sumi、侧边栏快捷入口和 renderer favicon；不要用它覆盖系统应用图标。
+
 ## 配置与数据
 
 模型 Profile、工作区、会话元数据、主题、Cron 和 Skill 开关由 `electron-store` 保存在应用数据目录。API Key 在系统支持时使用 Electron `safeStorage` 加密。

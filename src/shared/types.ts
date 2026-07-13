@@ -90,7 +90,6 @@ export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock | Thinking
 export function isTextBlock(b: ContentBlock): b is TextBlock { return b.type === 'text' }
 export function isToolUseBlock(b: ContentBlock): b is ToolUseBlock { return b.type === 'tool_use' }
 export function isToolResultBlock(b: ContentBlock): b is ToolResultBlock { return b.type === 'tool_result' }
-export function isThinkingBlock(b: ContentBlock): b is ThinkingBlock { return b.type === 'thinking' }
 
 // ─── Stream Event Payloads ───────────────────────────────────────────
 
@@ -284,8 +283,6 @@ export type AgentSessionEnvelope = {
   /** Workspace/app directory that owns this session. */
   workspacePath: string
 }
-
-export type SessionRoutedPayload<T extends Record<string, unknown>> = T & AgentSessionEnvelope
 
 export type SessionRoutedAgentIPCMessage = AgentIPCMessage & AgentSessionEnvelope
 export type SessionRoutedPermissionRequest = PermissionRequestIPC & AgentSessionEnvelope
@@ -540,8 +537,6 @@ export type PermissionUpdate =
   | { type: 'addDirectories'; directories: string[]; destination: PermissionUpdateDestination }
   | { type: 'removeDirectories'; directories: string[]; destination: PermissionUpdateDestination }
 
-export type PermissionDecisionClassification = 'user_temporary' | 'user_permanent' | 'user_reject'
-
 export type PermissionRequestIPC = {
   id: string
   toolName: string
@@ -604,16 +599,6 @@ export type SdkSessionInfo = {
   context?: string       // AgentContext ('editor' | 'ask')
 }
 
-// ─── Paginated Messages Response ─────────────────────────────────────
-
-export type PaginatedMessagesResponse = {
-  messages: ConversationMessage[]
-  total: number       // from SdkSessionInfo.messageCount
-  offset: number
-  limit: number
-  hasMore: boolean
-}
-
 // ─── Graph / Knowledge Graph ────────────────────────────────────────
 
 export type GraphNodeType = 'file' | 'entity'
@@ -656,13 +641,6 @@ export type MemoryEntry = {
 
 export type MemoryDocument = MemoryEntry & {
   content: string
-}
-
-// ─── File Entry (workspace tree) ────────────────────────────────────
-
-export type FileChangeEvent = {
-  filePath: string
-  changeType: 'add' | 'change' | 'unlink'
 }
 
 // ─── Workspace Record (P0: workspace-centric architecture) ────────────
@@ -716,7 +694,6 @@ export const OVERVIEW_TAB_ID = 'workspace-overview'
 // Tab type guards
 export function isFileTab(t: TabDescriptor): t is FileTab { return t.type === 'file' }
 export function isFixedTab(t: TabDescriptor): t is FixedTab { return t.type === 'fixed' }
-export function isOverviewTab(t: TabDescriptor): boolean { return isFixedTab(t) && t.id === OVERVIEW_TAB_ID }
 export function tabKey(t: TabDescriptor): string { return isFileTab(t) ? t.path : t.id }
 
 // ─── Session Output (per-session file listing for overview) ──────────

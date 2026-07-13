@@ -17,7 +17,7 @@ import { inlineRewriteRunner } from './inline-rewrite-runner'
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
 import { flushAuditLog } from './agent-audit'
-import { APP_NAME } from '../shared/branding'
+import { APP_NAME, GITHUB_LATEST_RELEASE_URL } from '../shared/branding'
 import { toUpdateErrorPayload, type UpdateDownloadProgress } from '../shared/update-types'
 
 // Initialize Sentry before any error handlers
@@ -289,7 +289,7 @@ ipcMain.handle('update:download', async () => {
   await autoUpdater.downloadUpdate()
 })
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
-ipcMain.handle('update:openLatestRelease', () => shell.openExternal('https://github.com/shuangmusuihua-source/vision-agent/releases/latest'))
+ipcMain.handle('update:openLatestRelease', () => shell.openExternal(GITHUB_LATEST_RELEASE_URL))
 ipcMain.handle('update:checkForUpdates', async () => {
   try {
     return await checkForUpdates()

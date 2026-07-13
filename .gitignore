@@ -9,3 +9,5 @@ design-token-preview.html
 mockups/
 .claude/
 .vision/
+.coverage
+htmlcov/

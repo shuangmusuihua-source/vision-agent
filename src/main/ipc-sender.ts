@@ -11,10 +11,3 @@ export function setMainWindow(win: BrowserWindow): void {
 export function getMainWindow(): BrowserWindow | null {
   return _mainWindow
 }
-
-/** Send an IPC message to the renderer. No-op if window is null or destroyed. */
-export function sendIpc(channel: string, ...args: unknown[]): void {
-  if (_mainWindow && !_mainWindow.isDestroyed()) {
-    _mainWindow.webContents.send(channel, ...args)
-  }
-}

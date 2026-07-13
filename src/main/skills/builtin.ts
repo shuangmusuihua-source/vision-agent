@@ -63,7 +63,3 @@ const builtinSkills: SkillDefinition[] = [
 export function getBuiltinSkills(): SkillDefinition[] {
   return builtinSkills
 }
-
-export function getSkillById(id: string): SkillDefinition | undefined {
-  return builtinSkills.find((s) => s.id === id)
-}

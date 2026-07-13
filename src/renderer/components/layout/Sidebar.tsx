@@ -4,7 +4,7 @@ import { ChevronsUp, X, Search, Settings, Plus, Pin, Eye, Ellipsis, ArrowLeft, F
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { useSettings } from '../../store/settings-cache'
-import appLogo from '../../assets/zuovis-logo.svg'
+import assistantLogo from '../../assets/sumi-assistant-bull.svg'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
@@ -539,7 +539,7 @@ function Sidebar({
             aria-label="工作有问题，Ask sumi"
             aria-expanded={showQuickMenu}
           >
-            <img src={appLogo} alt="" />
+            <img src={assistantLogo} alt="" />
           </button>
           <span className="sidebar-tool-separator" aria-hidden="true" />
           <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索" aria-label="搜索">
@@ -558,7 +558,7 @@ function Sidebar({
       <div className="sidebar-quick-menu" style={{ left: quickMenuPos.left, bottom: quickMenuPos.bottom }}>
         <div className="sidebar-quick-menu-head">
           <span className="sidebar-quick-logo" aria-hidden="true">
-            <img src={appLogo} alt="" />
+            <img src={assistantLogo} alt="" />
           </span>
           <span>
             <span className="sidebar-quick-title">工作有问题，Ask sumi</span>

@@ -1,4 +1,5 @@
 import { app, Menu, shell } from 'electron'
+import { GITHUB_REPOSITORY_URL } from '../shared/branding'
 
 export function setupMenu(): void {
   const isMac = process.platform === 'darwin'
@@ -71,7 +72,7 @@ export function setupMenu(): void {
         {
           label: 'Learn More',
           click: async () => {
-            await shell.openExternal('https://github.com/shuangmusuihua-source/vision-agent')
+            await shell.openExternal(GITHUB_REPOSITORY_URL)
           }
         }
       ]

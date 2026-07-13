@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createSessionEnvelope, SessionRuntimeController } from '../src/main/session-runtime'
+import { SessionRuntimeController } from '../src/main/session-runtime'
+import { createSessionEnvelope } from '../src/main/session-envelope'
 
 describe('SessionRuntimeController Skill activity', () => {
   it('tracks whether a Skill is used by an active run', () => {

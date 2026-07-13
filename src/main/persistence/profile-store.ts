@@ -15,11 +15,6 @@ export function getSettings(): AppSettings {
   }
 }
 
-export function getActiveProfile(): ModelProfile | null {
-  const settings = store.store
-  return settings.profiles.find((p) => p.id === settings.activeProfileId) || null
-}
-
 export function getApiKey(): string {
   const profile = getActiveProfileRaw()
   if (!profile) return ''
