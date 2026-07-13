@@ -71,5 +71,4 @@ export const useGraphStore = create<GraphStore>((set) => ({
 
 // ─── Selectors ──────────────────────────────────────────────────────
 
-export const useGraphData = () => useGraphStore(s => s.graphData)
 export const useChangedFileCount = () => useGraphStore(s => s.changedFileCount)

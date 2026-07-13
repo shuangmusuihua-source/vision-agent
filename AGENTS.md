@@ -12,8 +12,10 @@ This is the canonical development guide for the repository. Keep it aligned with
 - `npm run build` — production bundles for main, preload, and renderer
 - `npm run preview` — preview the production renderer
 - `npm test` / `npm run test:watch` — Vitest tests in `tests/**/*.test.ts`
-- `npm run pack` — unpacked `.app` plus packaged-Skill verification
-- `npm run dist` — DMG/ZIP plus packaged-Skill verification
+- `npm run typecheck` — check main/preload/shared and renderer TypeScript projects
+- `npm run verify` — typecheck, test, and production build
+- `npm run pack` — unpacked `.app` plus packaged-Skill and `app.asar` allowlist verification
+- `npm run dist` — DMG/ZIP plus packaged-Skill and `app.asar` allowlist verification
 - `npm run release` — publish through electron-builder
 - `npm run postinstall` — install Electron native dependencies
 

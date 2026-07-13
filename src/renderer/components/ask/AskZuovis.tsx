@@ -6,7 +6,7 @@ import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer from '../chat/AskUserDrawer'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
-import bullLogo from '../../assets/zuovis-logo.svg'
+import assistantLogo from '../../assets/sumi-assistant-bull.svg'
 import './ask-zuovis.css'
 
 const ChatView = lazy(() => import('../chat/ChatView'))
@@ -143,7 +143,7 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
         {!hasMessages ? (
           <div className="ask-zuovis-content">
             <div className="ask-zuovis-greeting">
-              <img className="ask-zuovis-greeting-logo" src={bullLogo} alt={ASK_ASSISTANT_NAME} />
+              <img className="ask-zuovis-greeting-logo" src={assistantLogo} alt={ASK_ASSISTANT_NAME} />
               <div className="ask-zuovis-greeting-text">
                 <div className="ask-zuovis-greeting-title">你好，有什么可以帮你？</div>
                 <div className="ask-zuovis-greeting-sub">我是 {ASK_ASSISTANT_NAME}，你的智能助手</div>

@@ -186,10 +186,6 @@ export function listTasks(): CronTask[] {
   return Array.from(tasks.values()).map((e) => withRuntimeState(e.task))
 }
 
-export function getTask(taskId: string): CronTask | undefined {
-  return tasks.get(taskId)?.task
-}
-
 export async function executeTask(task: CronTask): Promise<void> {
   if (runningTasks.has(task.id)) return
   const abortController = new AbortController()

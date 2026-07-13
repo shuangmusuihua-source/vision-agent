@@ -401,6 +401,45 @@ describe('session-scoped store routing', () => {
     warnSpy.mockRestore()
   })
 
+  it('applies message projection and result FSM cleanup atomically', () => {
+    useAgentStore.setState({
+      slots: {
+        editor: {
+          ...emptySlot(),
+          currentSessionId: 'atomic-session',
+          agentState: 'thinking',
+          isStreaming: true,
+        },
+        ask: emptySlot(),
+      },
+      activeSessionId: { editor: 'atomic-session', ask: null },
+    })
+
+    useAgentStore.getState().processIPCMessage({
+      type: 'assistant',
+      context: 'editor',
+      sessionId: 'atomic-session',
+      uuid: 'atomic-answer',
+      message: { content: [{ type: 'text', text: 'done' }] },
+    })
+    useAgentStore.getState().processIPCMessage({
+      type: 'result',
+      subtype: 'success',
+      context: 'editor',
+      sessionId: 'atomic-session',
+      session_id: 'sdk-atomic',
+      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
+      total_cost_usd: 0,
+      duration_ms: 0,
+    })
+
+    const slot = useAgentStore.getState().slots.editor
+    expect(slot.agentState).toBe('idle')
+    expect(slot.isStreaming).toBe(false)
+    expect(slot.messages).toHaveLength(1)
+    expect(slot.messages[0]).toMatchObject({ id: 'atomic-answer', phase: 'complete' })
+  })
+
   it('keeps the single Ask session running while switching editor sessions', () => {
     const ask = {
       ...emptySlot(),

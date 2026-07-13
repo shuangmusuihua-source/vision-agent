@@ -159,39 +159,6 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
   }
 }
 
-export async function getSdkSessionTotalMessageCount(
-  sessionId: string,
-  _workspaceCwd?: string
-): Promise<number> {
-  try {
-    const sdkSessionId = getSdkSessionId(sessionId)
-    const sessionDir = getSessionDir(sessionId)
-    if (!sessionDir) return 0
-    const dirs = [sessionDir]
-    const seenIds = new Set<string>()
-    const compactionIds = compactionSessionIds
-    for (const dir of dirs) {
-      try {
-        const sessions = await listSessions({ dir })
-        for (const s of sessions) {
-          if (seenIds.has(s.sessionId)) continue
-          seenIds.add(s.sessionId)
-          if (compactionIds.has(s.sessionId)) continue
-          if (s.sessionId === sdkSessionId) {
-            return ((s as Record<string, unknown>).messageCount as number) || 0
-          }
-        }
-      } catch {
-        // Continue to the next dir
-      }
-    }
-    return 0
-  } catch (err) {
-    console.error('[SessionStore] getSdkSessionTotalMessageCount error:', err)
-    return 0
-  }
-}
-
 /**
  * Read session JSONL directly from disk, bypassing the SDK API which
  * truncates pre-compaction messages. SDK project directory encoding is an

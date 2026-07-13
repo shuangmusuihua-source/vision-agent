@@ -16,9 +16,12 @@ files:
   - '!**/.claude/**'
   - '!**/.codex/**'
   - '!**/.agents/**'
+  - '!**/.vision/**'
   - '!**/.git/**'
   - '!dist/**'
   - '!docs/**'
+  - '!scripts/**'
+  - '!skills-lock.json'
   - '!tests/**'
   - '!src/*'
   - '!**/*.map'
@@ -39,6 +42,7 @@ asarUnpack:
   - '**/@anthropic-ai/claude-agent-sdk/**/*.json'
 mac:
   icon: build/icon.icns
+  notarize: true
   target:
     - target: dmg
       arch:
@@ -47,14 +51,13 @@ mac:
       arch:
         - arm64
   category: public.app-category.productivity
-  hardenedRuntime: false
+  hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   gatekeeperAssess: false
   extendInfo:
     NSDocumentsFolderUsageDescription: "sumi needs access to your Documents folder to create workspaces."
     NSDesktopFolderUsageDescription: "sumi needs access to your Desktop folder to open workspace directories."
-# afterSign: scripts/notarize.js  # disabled for unsigned internal testing
 dmg:
   sign: false
   contents:

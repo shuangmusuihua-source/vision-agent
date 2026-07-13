@@ -22,7 +22,8 @@ import type {
   PostToolUseFailureHookInput,
   NotificationHookInput,
 } from '@anthropic-ai/claude-agent-sdk'
-import { createSessionEnvelope, sessionRuntime } from './session-runtime'
+import { sessionRuntime } from './session-runtime'
+import { createSessionEnvelope } from './session-envelope'
 import { persistMaterializedSession, recordCompactionSessionId } from './session-persistence-adapter'
 import {
   appendAttachmentConversionSummary,

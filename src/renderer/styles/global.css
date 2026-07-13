@@ -158,7 +158,6 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
   --shadow-xs: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-sidebar: -2px 0 12px rgba(0, 0, 0, 0.06);
   --color-overlay: rgba(0, 0, 0, 0.3);
   --color-overlay-heavy: rgba(0, 0, 0, 0.5);
   --modal-backdrop-bg: rgba(255, 255, 255, 0.08);
@@ -189,7 +188,6 @@
   --agent-panel-collapse-threshold: 180px;
   --editor-min-ratio: 0.30;
   --divider-zone-width: 12px;
-  --sidebar-glass-border: var(--color-border-soft);
 
   /* ── Editor tokens (Layer 3: Component) ─────────────────────── */
 
@@ -246,13 +244,11 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.24);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.32);
   --shadow-xs: 0 2px 8px rgba(0, 0, 0, 0.16);
-  --shadow-sidebar: -2px 0 12px rgba(0, 0, 0, 0.15);
   --color-overlay: rgba(0, 0, 0, 0.5);
   --color-overlay-heavy: rgba(0, 0, 0, 0.7);
   --modal-backdrop-bg: rgba(0, 0, 0, 0.18);
   --modal-backdrop-filter: blur(64px) saturate(1.04);
 
-  --sidebar-glass-border: var(--color-border-soft);
 
   --graph-node-file: #60a5fa;
   --graph-node-active: #93c5fd;

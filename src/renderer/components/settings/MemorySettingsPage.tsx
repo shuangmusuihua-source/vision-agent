@@ -24,7 +24,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`
 }
 
-export function memoryPreviewMarkdown(content: string): string {
+function memoryPreviewMarkdown(content: string): string {
   const withoutFrontmatter = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '')
   return withoutFrontmatter.trim() || '*（空记忆）*'
 }

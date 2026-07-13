@@ -19,24 +19,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
-
-      - name: Import Apple certificate
+      - name: Sign, notarize & publish
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        run: |
-          echo "$CSC_LINK" | base64 --decode > /tmp/cert.p12
-          security create-keychain -p actions /tmp/build.keychain
-          security import /tmp/cert.p12 -k /tmp/build.keychain -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign -k actions /tmp/build.keychain
-
-      - name: Sign, notarize & publish
-        env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_KEY_PATH: /tmp/api-key.p8
+          APPLE_API_KEY: /tmp/api-key.p8
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
@@ -46,5 +35,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          security delete-keychain /tmp/build.keychain 2>/dev/null || true
-          rm -f /tmp/cert.p12 /tmp/api-key.p8
+          rm -f /tmp/api-key.p8

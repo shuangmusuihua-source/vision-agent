@@ -30,11 +30,6 @@ export async function initAppSkills(): Promise<InstallBuiltinSkillsResult> {
   })
 }
 
-/** Claude config root used by every sumi agent process. */
-export function getAppClaudeConfigDir(): string {
-  return appClaudeDir
-}
-
 export function getAppSkillsDir(): string {
   return appSkillsDir
 }
@@ -55,10 +50,6 @@ export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<Works
     console.warn('[SkillInit] workspace Skill conflicts preserved:', result.conflicts)
   }
   return result
-}
-
-export function getBuiltinSkillNames(): string[] {
-  return BUILTIN_SKILLS.filter(skill => skill.hasResources).map(skill => skill.id)
 }
 
 export async function getInstalledSkillNames(): Promise<string[]> {

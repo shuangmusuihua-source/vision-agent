@@ -329,12 +329,10 @@ export function useAgent(context: AgentContext = 'editor') {
 
 // ─── Context-aware Selectors ────────────────────────────────────────────
 
-export const useSlot = (context: AgentContext) => useAgentStore((s) => s.slots[context])
 export const useMessages = (context: AgentContext) => useAgentStore((s) => s.slots[context].messages)
 export const useIsStreaming = (context: AgentContext) => useAgentStore((s) => s.slots[context].isStreaming)
 export const useCurrentSessionId = (context: AgentContext) => useAgentStore((s) => s.slots[context].currentSessionId)
 export const useAgentStatus = (context: AgentContext) => useAgentStore((s) => s.slots[context].agentState)
-export const useUsageInfo = (context: AgentContext) => useAgentStore((s) => s.slots[context].usageInfo)
 // Permission / AskUser selectors — live-slot priority, per-context session.
 //
 // The live slot (slots[context]) is the source of truth when the context's
@@ -349,12 +347,7 @@ export const usePermissionQueueLength = (context: AgentContext) =>
 export const useAskUserRequest = (context: AgentContext) =>
   useAgentStore((state) => selectAskUserRequest(state, context))
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
-export const useLastEditedFile = (context: AgentContext) => useAgentStore((s) => s.slots[context].lastEditedFile)
 export const useTtftMs = (context: AgentContext) => useAgentStore((s) => s.slots[context].ttftMs)
 export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)
 export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
 export const useGenerationActivity = (context: AgentContext) => useAgentStore((s) => s.slots[context].generationActivity)
-export const useHasMoreSdkMessages = (context: AgentContext) =>
-  useAgentStore((s) => s.slots[context]._needsSdkLoad)
-export const useIsLoadingMoreMessages = (context: AgentContext) =>
-  useAgentStore((s) => s.slots[context]._isLoadingMoreMessages)

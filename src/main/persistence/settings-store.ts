@@ -5,12 +5,6 @@ import { getBuiltinSkills } from '../skills/builtin'
 import { getAppSkillsDir } from '../skill-init'
 import { resolveEnabledSkillIds, updateSkillPreference } from '../../shared/skill-settings'
 
-// ─── Theme ──────────────────────────────────────────────────────────────
-
-export function getTheme(): 'light' | 'dark' | 'system' {
-  return store.get('theme')
-}
-
 export function setTheme(theme: 'light' | 'dark' | 'system'): void {
   store.set('theme', theme)
 }
@@ -57,12 +51,6 @@ export function getEnabledSkills(): string[] {
     store.set('enabledSkills', resolved)
   }
   return resolved
-}
-
-export function setEnabledSkills(skillIds: string[]): void {
-  store.set('enabledSkills', skillIds)
-  const enabled = new Set(skillIds)
-  store.set('disabledSkills', (store.get('disabledSkills') || []).filter(skillId => !enabled.has(skillId)))
 }
 
 export function toggleSkill(skillId: string, enabled: boolean): string[] {

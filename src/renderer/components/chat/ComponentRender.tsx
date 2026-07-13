@@ -1,93 +1,5 @@
-import { defineCatalog } from '@json-render/core'
-import { schema } from '@json-render/react/schema'
 import { Renderer, StateProvider, VisibilityProvider, ActionProvider } from '@json-render/react'
-import { z } from 'zod'
 import type { ReactNode } from 'react'
-
-// ─── Catalog ──────────────────────────────────────────────────────────
-// Components AI agents can use to produce rich UI in chat messages.
-
-// The schema value is a complex generic; cast to any for defineCatalog interop.
-// @ts-expect-error — schema generic inference produces `never` for the catalog param
-export const catalog = defineCatalog(schema as any, {
-  components: {
-    Card: {
-      props: z.object({
-        title: z.string().describe('卡片标题'),
-        description: z.string().optional().describe('副标题或描述'),
-      }),
-      slots: ['default'],
-    },
-    Table: {
-      props: z.object({
-        columns: z.array(z.object({
-          key: z.string(),
-          label: z.string(),
-        })).describe('列定义'),
-        rows: z.array(z.record(z.string(), z.unknown())).describe('数据行'),
-      }),
-    },
-    Metric: {
-      props: z.object({
-        label: z.string().describe('指标名称'),
-        value: z.string().describe('指标值'),
-        trend: z.enum(['up', 'down', 'neutral']).optional().describe('趋势方向'),
-      }),
-    },
-    CodeCard: {
-      props: z.object({
-        language: z.string().optional().describe('代码语言'),
-        title: z.string().optional().describe('文件名或标题'),
-      }),
-      slots: ['default'],
-    },
-    Button: {
-      props: z.object({
-        label: z.string().describe('按钮文本'),
-        variant: z.enum(['primary', 'secondary']).default('primary').describe('按钮样式'),
-      }),
-      actions: ['click'],
-    },
-    Alert: {
-      props: z.object({
-        severity: z.enum(['info', 'warning', 'error', 'success']).default('info'),
-        title: z.string().describe('提醒标题'),
-        content: z.string().describe('提醒内容'),
-      }),
-    },
-    List: {
-      props: z.object({
-        title: z.string().optional().describe('列表标题'),
-      }),
-      slots: ['default'],
-    },
-    ListItem: {
-      props: z.object({
-        icon: z.string().optional().describe('图标，单个 emoji 或字符'),
-        title: z.string().describe('主标题'),
-        subtitle: z.string().optional().describe('副标题或描述'),
-        href: z.string().optional().describe('链接路径（文件路径或URL）'),
-      }),
-    },
-    Badge: {
-      props: z.object({
-        label: z.string().describe('标签文本'),
-        variant: z.enum(['default', 'success', 'warning', 'error', 'info', 'accent']).default('default').describe('颜色变体'),
-      }),
-    },
-    Chart: {
-      props: z.object({
-        type: z.enum(['bar', 'line']).default('bar').describe('图表类型，bar 柱状图，line 折线图'),
-        data: z.array(z.object({
-          label: z.string(),
-          value: z.number(),
-        })).describe('数据点，value 为数值'),
-        height: z.number().optional().default(180).describe('图表高度 px'),
-        color: z.string().optional().describe('主色，CSS 颜色值'),
-      }),
-    },
-  },
-})
 
 // ─── Registry ─────────────────────────────────────────────────────────
 // Design: light, modern, shadow-over-border. No thick frames.
@@ -139,7 +51,7 @@ interface RegistryComponentProps {
   loading?: boolean
 }
 
-export const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
+const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
   Card: ({ element, children }) => {
     const { title, description } = element.props || {}
     const hasKids = element.children && element.children.length > 0
@@ -415,7 +327,7 @@ export const registry: Record<string, (props: RegistryComponentProps) => ReactNo
 
 // ─── Renderer ──────────────────────────────────────────────────────────
 
-export interface JsonRenderSpec {
+interface JsonRenderSpec {
   root: string
   elements: Record<string, {
     type: string

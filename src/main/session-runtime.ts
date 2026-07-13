@@ -46,7 +46,6 @@ export type SessionRuntimeStart = {
 
 type PermissionRequestInput = Omit<PermissionRequestIPC, keyof AgentSessionEnvelope | 'id'>
 type AskUserRequestInput = Omit<AskUserRequestIPC, keyof AgentSessionEnvelope | 'id'>
-export { createSessionEnvelope, withSessionEnvelope } from './session-envelope'
 
 export class SessionRuntimeController {
   private instanceCounter = 0

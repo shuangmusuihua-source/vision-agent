@@ -99,15 +99,6 @@ export function replacementPlanForSelection(
   return replacementPlanForDocument(editor.state.doc, replacementDoc, from, to)
 }
 
-export function replacementContentForDocument(
-  document: ProseMirrorNode,
-  replacementDoc: JSONContent,
-  from: number,
-  to: number,
-): JSONContent | JSONContent[] {
-  return replacementPlanForDocument(document, replacementDoc, from, to).content
-}
-
 export function replacementPlanForDocument(
   document: ProseMirrorNode,
   replacementDoc: JSONContent,

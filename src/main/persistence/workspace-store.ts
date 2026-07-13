@@ -1,6 +1,6 @@
 import { mkdirSync } from 'fs'
 import path from 'path'
-import type { WorkspaceRecord, SessionRecord } from '../../shared/types'
+import type { SessionRecord } from '../../shared/types'
 import { store, getKnowledgeBaseDir } from './store-core'
 import { filterUserWorkspacePaths, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 
@@ -49,48 +49,10 @@ export function reorderAuthorizedDirectories(paths: string[]): void {
   store.set('authorizedDirectories', nextPaths)
 }
 
-export function getFixedDirectories(): string[] {
-  return store.get('fixedDirectories')
-}
-
-// ─── Workspace records ──────────────────────────────────────────────────
-
-export function getWorkspaces(): WorkspaceRecord[] {
-  return store.get('workspaces')
-}
-
-export function setWorkspaces(workspaces: WorkspaceRecord[]): void {
-  store.set('workspaces', workspaces)
-}
-
-export function getWorkspaceById(id: string): WorkspaceRecord | undefined {
-  return store.get('workspaces').find(w => w.id === id)
-}
-
-export function getWorkspaceByPath(p: string): WorkspaceRecord | undefined {
-  return store.get('workspaces').find(w => w.path === p)
-}
-
-export function addWorkspace(record: WorkspaceRecord): void {
-  const workspaces = store.get('workspaces')
-  if (!workspaces.some(w => w.id === record.id || w.path === record.path)) {
-    store.set('workspaces', [...workspaces, record])
-  }
-}
-
-export function removeWorkspace(id: string): void {
-  const workspaces = store.get('workspaces').filter(w => w.id !== id)
-  store.set('workspaces', workspaces)
-}
-
 // ─── Session records ──────────────────────────────────────────────────
 
 export function getSessionRecords(): SessionRecord[] {
   return store.get('sessions')
-}
-
-export function getSessionsByWorkspace(workspacePath: string): SessionRecord[] {
-  return store.get('sessions').filter(s => s.workspacePath === workspacePath)
 }
 
 export function getSessionRecordById(id: string): SessionRecord | undefined {
