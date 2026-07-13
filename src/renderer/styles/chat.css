@@ -695,16 +695,23 @@
 
 .chat-input-wrapper {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(38px, auto) 32px;
   align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
   padding: 0;
   background: transparent;
-  border-radius: var(--radius-xl);
+  border-radius: inherit;
 }
 
 .chat-input-attach-btn {
-  width: 28px;
-  height: 28px;
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: start;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-tertiary);
@@ -769,11 +776,15 @@
 }
 
 .chat-input {
+  grid-column: 1 / -1;
+  grid-row: 1;
   flex: 1;
+  width: 100%;
+  min-height: 38px;
   resize: none;
   border: none;
-  border-radius: var(--radius-xl);
-  padding: 10px 40px 10px 4px;
+  border-radius: var(--radius-lg);
+  padding: 4px 4px 8px;
   font-size: var(--font-size-md);
   font-family: inherit;
   line-height: 1.5;
@@ -793,9 +804,9 @@
 }
 
 .chat-send-btn {
-  position: absolute;
-  right: 6px;
-  bottom: 4px;
+  position: static;
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -821,9 +832,9 @@
 }
 
 .chat-stop-btn {
-  position: absolute;
-  right: 6px;
-  bottom: 4px;
+  position: static;
+  grid-column: 2;
+  grid-row: 2;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1418,7 +1429,7 @@
 
 
 [data-theme="dark"] .chat-input:focus {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
 }
 
 [data-theme="dark"] .skill-popup {

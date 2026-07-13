@@ -94,7 +94,13 @@
   /* Sidebar */
   --sidebar-bg:          var(--color-bg-glass);
   --sidebar-entry-hover: var(--color-bg-hover);
+  --sidebar-entry-selected: color-mix(in srgb, var(--color-action) 7%, var(--color-bg-elevated));
+  --sidebar-entry-selected-hover: color-mix(in srgb, var(--color-action) 10%, var(--color-bg-elevated));
   --sidebar-icon-active: var(--color-action);
+
+  /* Agent composer */
+  --composer-bg: color-mix(in srgb, var(--color-bg-elevated) 96%, transparent);
+  --composer-shadow: 0 10px 30px color-mix(in srgb, var(--color-gray-900) 8%, transparent), 0 2px 8px color-mix(in srgb, var(--color-gray-900) 4%, transparent);
 
   /* Focus ring */
   --focus-ring: var(--color-action);
@@ -239,6 +245,11 @@
 
   --color-border:      #333333;
   --color-border-soft: #2a2a2a;
+
+  --sidebar-entry-selected: color-mix(in srgb, var(--color-action) 15%, var(--color-bg-elevated));
+  --sidebar-entry-selected-hover: color-mix(in srgb, var(--color-action) 19%, var(--color-bg-elevated));
+  --composer-bg: color-mix(in srgb, var(--color-bg-elevated) 94%, transparent);
+  --composer-shadow: 0 12px 32px color-mix(in srgb, var(--color-black) 28%, transparent), 0 2px 8px color-mix(in srgb, var(--color-black) 20%, transparent);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.16);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.24);

@@ -212,6 +212,7 @@ function Sidebar({
             className={`sidebar-ask-zuovis${isAskZuovisActive ? ' sidebar-ask-zuovis-active' : ''}`}
             onClick={onAskZuovis}
             role="button" tabIndex={0}
+            aria-current={isAskZuovisActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
           >
             <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
@@ -225,6 +226,7 @@ function Sidebar({
             className={`sidebar-ask-zuovis sidebar-skills-entry${isSkillsActive ? ' sidebar-ask-zuovis-active' : ''}`}
             onClick={onOpenSkills}
             role="button" tabIndex={0}
+            aria-current={isSkillsActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSkills() } }}
           >
             <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Blocks size={13} /></div>
@@ -235,6 +237,7 @@ function Sidebar({
             className={`sidebar-ask-zuovis sidebar-skills-entry${isAutomationActive ? ' sidebar-ask-zuovis-active' : ''}`}
             onClick={onOpenAutomation}
             role="button" tabIndex={0}
+            aria-current={isAutomationActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenAutomation() } }}
           >
             <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Workflow size={13} /></div>
@@ -245,6 +248,7 @@ function Sidebar({
             className={`sidebar-ask-zuovis sidebar-skills-entry${isKnowledgeActive ? ' sidebar-ask-zuovis-active' : ''}`}
             onClick={onOpenKnowledge}
             role="button" tabIndex={0}
+            aria-current={isKnowledgeActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenKnowledge() } }}
           >
             <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><BookOpenText size={13} /></div>
@@ -302,29 +306,31 @@ function Sidebar({
                         {isCollapsed ? <FolderClosed size={14} /> : <FolderOpen size={14} />}
                       </button>
                       <span className="sidebar-workspace-name">{workspaceName(wsPath)}</span>
-                      <button
-                        className="sidebar-workspace-add-session"
-                        onClick={(e) => { e.stopPropagation(); onNewConversation(wsPath) }}
-                        title="新建会话" aria-label="新建会话"
-                      >
-                        <Plus size={12} />
-                      </button>
-                      {idx > 0 && (
+                      <div className="sidebar-workspace-actions">
                         <button
-                          className="sidebar-workspace-pin"
-                          onClick={(e) => { e.stopPropagation(); handlePinToTop(wsPath) }}
-                          title="置顶" aria-label="置顶"
+                          className="sidebar-workspace-add-session"
+                          onClick={(e) => { e.stopPropagation(); onNewConversation(wsPath) }}
+                          title="新建会话" aria-label="新建会话"
                         >
-                          <Pin size={12} />
+                          <Plus size={12} />
                         </button>
-                      )}
-                      <button
-                        className="sidebar-workspace-remove"
-                        onClick={(e) => { e.stopPropagation(); onRemoveWorkspace(wsPath) }}
-                        title="移除工作区" aria-label="移除工作区"
-                      >
-                        <X size={12} />
-                      </button>
+                        {idx > 0 && (
+                          <button
+                            className="sidebar-workspace-pin"
+                            onClick={(e) => { e.stopPropagation(); handlePinToTop(wsPath) }}
+                            title="置顶" aria-label="置顶"
+                          >
+                            <Pin size={12} />
+                          </button>
+                        )}
+                        <button
+                          className="sidebar-workspace-remove"
+                          onClick={(e) => { e.stopPropagation(); onRemoveWorkspace(wsPath) }}
+                          title="移除工作区" aria-label="移除工作区"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
                     </div>
                     <div className="sidebar-workspace-body">
                       <div className="sidebar-workspace-body-inner">
@@ -348,6 +354,16 @@ function Sidebar({
                                 className={`sidebar-entry sidebar-session-entry${isActive ? ' sidebar-entry-active' : ''}${attention ? ' sidebar-session-needs-attention' : ''}`}
                                 onClick={() => onSessionSelect(session.id, wsPath)}
                                 title={attention?.label}
+                                role="button"
+                                tabIndex={0}
+                                aria-current={isActive ? 'page' : undefined}
+                                onKeyDown={(event) => {
+                                  if (event.target !== event.currentTarget) return
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    onSessionSelect(session.id, wsPath)
+                                  }
+                                }}
                               >
                                 {isRenaming ? (
                                   <input
