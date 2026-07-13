@@ -91,6 +91,11 @@
   line-height: 1.3;
 }
 
+.overview-section-title > svg {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
 .overview-section-title > span {
   display: inline-grid;
   min-width: 20px;

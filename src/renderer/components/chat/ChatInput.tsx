@@ -34,7 +34,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const [selectedSkillIdx, setSelectedSkillIdx] = useState(0)
   const [isPreparingAttachments, setIsPreparingAttachments] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const capsuleTextareaRef = useRef<HTMLTextAreaElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   const preparingAttachmentsRef = useRef(false)
   const modal = useModal()
@@ -50,7 +50,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     if (prefillText) {
       updateComposerDraft(context, { text: prefillText }, draftSessionId)
       consumePrefill(context)
-      ;(variant === 'capsule' ? inputRef.current : textareaRef.current)?.focus()
+      ;(variant === 'capsule' ? capsuleTextareaRef.current : textareaRef.current)?.focus()
     }
   }, [consumePrefill, draftSessionId, prefillText, context, updateComposerDraft, variant])
 
@@ -247,7 +247,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     if (!showSkillPopup) return
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        const activeInput = variant === 'capsule' ? inputRef.current : textareaRef.current
+        const activeInput = variant === 'capsule' ? capsuleTextareaRef.current : textareaRef.current
         if (activeInput && !activeInput.contains(e.target as Node)) {
           setShowSkillPopup(false)
         }
@@ -264,7 +264,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedSkillIdx, showSkillPopup, filteredSkills.length])
 
-  // --- Capsule variant: single-line input (Ask sumi style) ---
+  // --- Capsule variant: Ask sumi composer ---
   if (variant === 'capsule') {
     return (
       <div className="ask-zuovis-capsule-wrapper">
@@ -294,15 +294,15 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           >
             <Paperclip size={14} />
           </button>
-          <input
-            ref={inputRef}
-            type="text"
+          <textarea
+            ref={capsuleTextareaRef}
             className="ask-zuovis-input"
             placeholder={placeholder || `问 ${ASK_ASSISTANT_NAME} 任何问题...`}
             value={text}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={disabled || isPreparingAttachments}
+            rows={1}
             autoFocus
           />
           {isStreaming && onStop ? (

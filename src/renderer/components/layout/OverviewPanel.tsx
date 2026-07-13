@@ -152,7 +152,7 @@ function OverviewPanel({
     return (
       <article className={`overview-card overview-card--document${isActive ? ' overview-card--active' : ''}`} key={file.filePath}>
         <div className="overview-card-head">
-          <div className="overview-card-icon overview-card-icon--document"><FilePenLine size={21} strokeWidth={1.8} /></div>
+          <div className="overview-card-icon overview-card-icon--document"><FilePenLine size={19} strokeWidth={1.6} /></div>
           <div className="overview-card-identity">
             <button className="overview-card-name" type="button" onClick={() => onOpenFile(file.filePath)} title={file.filePath}>
               {file.fileName}
@@ -209,7 +209,7 @@ function OverviewPanel({
     return (
       <article className="overview-card overview-card--artifact" key={file.filePath}>
         <div className="overview-card-head">
-          <div className="overview-card-icon overview-card-icon--artifact"><Presentation size={21} strokeWidth={1.8} /></div>
+          <div className="overview-card-icon overview-card-icon--artifact"><Presentation size={19} strokeWidth={1.6} /></div>
           <div className="overview-card-identity">
             <button className="overview-card-name" type="button" onClick={() => onOpenFile(file.filePath)} title={file.filePath}>
               {file.fileName}
@@ -271,7 +271,7 @@ function OverviewPanel({
         <section className="overview-section">
           <div className="overview-section-head">
             <div>
-              <h3 className="overview-section-title"><FilePenLine size={17} /> 工作文档 <span>{documents.length}</span></h3>
+              <h3 className="overview-section-title"><FilePenLine size={16} strokeWidth={1.6} /> 工作文档 <span>{documents.length}</span></h3>
               <p>持续编辑，并将确认后的最新版本同步到知识库。</p>
             </div>
           </div>
@@ -283,7 +283,7 @@ function OverviewPanel({
         <section className="overview-section">
           <div className="overview-section-head">
             <div>
-              <h3 className="overview-section-title"><PackageOpen size={17} /> Skill 产物 <span>{skillOutputs.length}</span></h3>
+              <h3 className="overview-section-title"><PackageOpen size={16} strokeWidth={1.6} /> Skill 产物 <span>{skillOutputs.length}</span></h3>
               <p>由文档和会话上下文生成的可交付文件。</p>
             </div>
           </div>
@@ -295,7 +295,7 @@ function OverviewPanel({
         <section className="overview-section overview-section--other">
           <div className="overview-section-head">
             <div>
-              <h3 className="overview-section-title"><FolderOpen size={17} /> 其他文件 <span>{others.length}</span></h3>
+              <h3 className="overview-section-title"><FolderOpen size={16} strokeWidth={1.6} /> 其他文件 <span>{others.length}</span></h3>
             </div>
           </div>
           <div className="overview-other-list">
