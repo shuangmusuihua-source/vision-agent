@@ -758,6 +758,80 @@ export function reduceResultMessage(
   }
 }
 
+// ─── Agent message pipeline ───────────────────────────────────────────
+
+export interface AgentMessageReduction {
+  patch: Partial<ContextSlot> | null
+  events: AgentEvent[]
+  firstContentSeenDuringThisCall: boolean
+}
+
+/**
+ * Single message-semantics entry point for the store. Session routing, slot
+ * mirroring and FSM effect scheduling remain owned by agent-store-impl.
+ */
+export function reduceAgentMessage(
+  slot: ContextSlot,
+  msg: AgentIPCMessage,
+  delivery: 'live' | 'replay'
+): AgentMessageReduction {
+  if (delivery === 'replay' && msg.type === 'stream_event') {
+    return { patch: null, events: [], firstContentSeenDuringThisCall: false }
+  }
+
+  switch (msg.type) {
+    case 'system': {
+      const result = reduceSystemMessage(
+        slot,
+        msg as AgentIPCMessage & {
+          subtype?: string
+          session_id?: string
+          message?: string
+          tool_use_id?: string
+        }
+      )
+      return {
+        ...result,
+        events: delivery === 'live' ? result.events : [],
+        firstContentSeenDuringThisCall: false,
+      }
+    }
+    case 'assistant': {
+      const result = reduceAssistantMessage(slot, msg as AssistantPayload)
+      return {
+        ...result,
+        events: delivery === 'live' ? result.events : [],
+        firstContentSeenDuringThisCall: false,
+      }
+    }
+    case 'stream_event': {
+      const result = reduceStreamEvent(slot, msg as StreamEventPayloadIPC)
+      return { ...result, events: [] }
+    }
+    case 'user':
+      return {
+        patch: reduceUserMessage(slot, msg as UserPayload, delivery === 'replay'),
+        events: [],
+        firstContentSeenDuringThisCall: false,
+      }
+    case 'result': {
+      const result = reduceResultMessage(
+        slot,
+        msg as AgentIPCMessage & { subtype?: string },
+        slot._resultGuardGen
+      )
+      return {
+        ...result,
+        events: delivery === 'live' ? result.events : [],
+        firstContentSeenDuringThisCall: false,
+      }
+    }
+    case 'rate_limit_event':
+    case 'prompt_suggestion':
+      return { patch: null, events: [], firstContentSeenDuringThisCall: false }
+  }
+}
+
 // ─── Replayed message builder (pure — no store access) ─────────────────
 
 export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): ConversationMessage[] {

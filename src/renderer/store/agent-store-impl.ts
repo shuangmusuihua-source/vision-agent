@@ -7,26 +7,17 @@ import type {
   AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentSessionEnvelope,
-  AgentState,
   AgentEvent,
   ConversationMessage,
   PermissionRequestIPC,
   AskUserRequestIPC,
   SessionRoutedGenerationActivity,
-  AssistantPayload,
-  UserPayload,
-  StreamEventPayloadIPC,
 } from '../../shared/types'
-import { AGENT_TRANSITIONS as TRANSITIONS } from '../../shared/types'
 import {
-  extractArtifactFromMessage,
   buildReplayedMessages,
-  reduceSystemMessage,
-  reduceAssistantMessage,
-  reduceStreamEvent,
-  reduceUserMessage,
-  reduceResultMessage,
+  reduceAgentMessage,
 } from './message-pipeline'
+import { reduceAgentEvent } from './agent-state-machine'
 import {
   buildSessionSwitchPatch,
   cacheSessionSlot,
@@ -83,26 +74,9 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// ─── State Machine ─────────────────────────────────────────────────────
-
-export function transition(current: AgentState, event: AgentEvent): AgentState {
-  const allowed = TRANSITIONS[current]?.[event.type]
-  if (!allowed) {
-    console.warn(`[AgentFSM] Invalid transition: ${current} + ${event.type}`)
-    return current
-  }
-  return allowed
-}
-
 // ─── Store ─────────────────────────────────────────────────────────────
 
 export const useAgentStore = create<AgentStore>((set, get) => {
-  function dispatchEffectEvents(eventSid: string | null, events: AgentEvent[], ctx: AgentContext) {
-    for (const event of events) {
-      get().dispatchAgentEvent(event, ctx, eventSid)
-    }
-  }
-
   return {
     context: 'editor',
     slots: { editor: emptySlot(), ask: emptySlot() },
@@ -125,112 +99,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         // where sessionSlots has an auto-created stale entry that would
         // shadow the live slot before sessionCreated fires.
         const slot = resolveSessionSlot(state, ctx, eventSid)
-        const next = transition(slot.agentState, event)
-        const slotUpdates: Partial<ContextSlot> = { agentState: next }
-
-        if (event.type === 'SEND_MESSAGE') {
-          slotUpdates._queryGeneration = (slot._queryGeneration || 0) + 1
-        }
-
-        if (event.type === 'ABORT') {
-          slotUpdates._resultGuardGen = slot._queryGeneration || 0
-        }
-
-        if (slot.agentState === 'thinking' && next !== 'thinking') {
-          slotUpdates.messages = slot.messages.filter(
-            (m) => !(m.kind === 'status' && m.phase === 'streaming')
-          )
-        }
-
-        if (event.type === 'RESULT_SUCCESS') {
-          slotUpdates.isStreaming = false
-          slotUpdates._acc = null
-          slotUpdates._firstContentSeen = false
-          slotUpdates.activeSkillId = null
-          slotUpdates.generationActivity = null
-          slotUpdates.todoList = null
-          slotUpdates.permissionRequest = null
-          slotUpdates.permissionQueue = []
-          slotUpdates.askUserRequest = null
-          slotUpdates.askUserQueue = []
-          const msgs = (slotUpdates.messages || slot.messages).map((m) =>
-            m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'error'
-              ? { ...m, phase: 'complete' as const }
-              : m
-          )
-          const skillId = slot.activeSkillId
-          if (skillId) {
-            for (let i = 0; i < msgs.length; i++) {
-              const msg = msgs[i]
-              if ((msg.kind === 'text' || msg.kind === 'user') && msg.skillMeta?.id === skillId) {
-                msgs[i] = { ...msg, skillMeta: { ...msg.skillMeta!, status: 'completed' } } as typeof msg
-                break
-              }
-            }
-          }
-          const finalMsgs = [...msgs]
-          const processedIds = slot._processedArtifactIds
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            if (processedIds.has(msgs[i].id)) continue
-            const artifact = extractArtifactFromMessage(msgs[i])
-            if (artifact) {
-              processedIds.add(msgs[i].id)
-              finalMsgs.push({ kind: 'artifact' as const, id: `artifact-${Date.now()}-${i}`, role: 'assistant', artifact, createdAt: Date.now() })
-            }
-          }
-          slotUpdates._processedArtifactIds = processedIds
-          slotUpdates.messages = finalMsgs
-        }
-
-        if (event.type === 'RESULT_ERROR') {
-          slotUpdates.isStreaming = false
-          slotUpdates._acc = null
-          slotUpdates._firstContentSeen = false
-          slotUpdates.activeSkillId = null
-          slotUpdates.generationActivity = null
-          slotUpdates.todoList = null
-          slotUpdates.permissionRequest = null
-          slotUpdates.permissionQueue = []
-          slotUpdates.askUserRequest = null
-          slotUpdates.askUserQueue = []
-          const msgs = (slotUpdates.messages || slot.messages).map((m) =>
-            m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'stopped'
-              ? { ...m, phase: 'error' as const }
-              : m
-          )
-          const skillId = slot.activeSkillId
-          if (skillId) {
-            for (let i = 0; i < msgs.length; i++) {
-              const msg = msgs[i]
-              if ((msg.kind === 'text' || msg.kind === 'user') && msg.skillMeta?.id === skillId) {
-                msgs[i] = { ...msg, skillMeta: { ...msg.skillMeta!, status: 'error' } } as typeof msg
-                break
-              }
-            }
-          }
-          slotUpdates.messages = msgs
-        }
-
-        if (event.type === 'ABORT') {
-          slotUpdates.isStreaming = false
-          slotUpdates._acc = null
-          slotUpdates._firstContentSeen = false
-          slotUpdates.activeSkillId = null
-          slotUpdates.generationActivity = null
-          slotUpdates.todoList = null
-          slotUpdates.permissionRequest = null
-          slotUpdates.permissionQueue = []
-          slotUpdates.askUserRequest = null
-          slotUpdates.askUserQueue = []
-          const msgs = (slotUpdates.messages || slot.messages).map((m) =>
-            m.kind === 'text' && m.phase !== 'complete' && m.phase !== 'error'
-              ? { ...m, phase: 'complete' as const }
-              : m
-          )
-          slotUpdates.messages = msgs
-        }
-
-        return patchSessionSlot(state, ctx, slotUpdates, eventSid)
+        return patchSessionSlot(state, ctx, reduceAgentEvent(slot, event), eventSid)
       })
     },
 
@@ -248,128 +117,44 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       // Replay restores message content, but must not drive the live FSM.
       if (isReplay) {
-        if (msg.type === 'stream_event') return
-
-        switch (msg.type) {
-          case 'system': {
-            const sourceSlot = resolveSessionSlot(get(), ctx, eventSessionId)
-            const { patch } = reduceSystemMessage(
-              sourceSlot, msg as unknown as AgentIPCMessage & { subtype?: string; session_id?: string; message?: string; tool_use_id?: string }
-            )
-            if (Object.keys(patch).length > 0) {
-              set((state) => patchSessionSlot(state, ctx, patch, eventSessionId))
-            }
-            break
-          }
-          case 'assistant': {
-            const sourceSlot = resolveSessionSlot(get(), ctx, eventSessionId)
-            const { patch } = reduceAssistantMessage(sourceSlot, msg as AssistantPayload)
-            set((state) => patchSessionSlot(state, ctx, patch, eventSessionId))
-            break
-          }
-          case 'user': {
-            const sourceSlot = resolveSessionSlot(get(), ctx, eventSessionId)
-            const patch = reduceUserMessage(sourceSlot, msg as UserPayload, isReplay)
-            if (patch) set((state) => patchSessionSlot(state, ctx, patch, eventSessionId))
-            break
-          }
-          case 'result': {
-            const sourceSlot = resolveSessionSlot(get(), ctx, eventSessionId)
-            const { patch } = reduceResultMessage(
-              sourceSlot,
-              msg as AgentIPCMessage & { subtype?: string },
-              sourceSlot._resultGuardGen
-            )
-            if (patch) set((state) => patchSessionSlot(state, ctx, patch, eventSessionId))
-            break
-          }
+        const sourceSlot = resolveSessionSlot(get(), ctx, eventSessionId)
+        const { patch } = reduceAgentMessage(sourceSlot, msg, 'replay')
+        if (patch && Object.keys(patch).length > 0) {
+          set((state) => patchSessionSlot(state, ctx, patch, eventSessionId))
         }
         return
       }
 
-      // Live dispatch: read slot inside set() for freshness
-      switch (msg.type) {
-          case 'system': {
-            set((state) => {
-              const sourceSlot = resolveSessionSlot(state, ctx, eventSessionId)
-              const { patch, events } = reduceSystemMessage(
-                sourceSlot, msg as unknown as AgentIPCMessage & { subtype?: string; session_id?: string; message?: string; tool_use_id?: string }
-              )
-              if (Object.keys(patch).length === 0 && events.length === 0) return {}
-              // Dispatch events after state update (sync — Zustand batches)
-              if (events.length > 0) {
-                setTimeout(() => dispatchEffectEvents(eventSessionId || null, events, ctx), 0)
-              }
-              return Object.keys(patch).length > 0 ? patchSessionSlot(state, ctx, patch, eventSessionId) : {}
-            })
-            break
-          }
-          case 'assistant': {
-            set((state) => {
-              const sourceSlot = resolveSessionSlot(state, ctx, eventSessionId)
-              const { patch, events } = reduceAssistantMessage(sourceSlot, msg as AssistantPayload)
-              if (events.length > 0) {
-                setTimeout(() => dispatchEffectEvents(eventSessionId || null, events, ctx), 0)
-              }
-              return patchSessionSlot(state, ctx, patch, eventSessionId)
-            })
-            break
-          }
-          case 'stream_event': {
-            const streamMsg = msg as StreamEventPayloadIPC
-            set((state) => {
-              const sourceSlot = resolveSessionSlot(state, ctx, eventSessionId)
-              if (!sourceSlot) return {}
-              const result = reduceStreamEvent(sourceSlot, streamMsg)
-              if (!result.patch) {
-                return {}
-              }
-              // Handle deferred FIRST_CONTENT event
-              if (result.firstContentSeenDuringThisCall) {
-                setTimeout(() => {
-                  const currentState = resolveSessionSlot(get(), ctx, eventSessionId).agentState
-                  if (currentState === 'thinking' || currentState === 'compacting') {
-                    dispatchEffectEvents(eventSessionId || null, [{ type: 'FIRST_CONTENT' }], ctx)
-                  }
-                }, 0)
-              }
-              return patchSessionSlot(state, ctx, result.patch, eventSessionId)
-            })
-            break
-          }
-          case 'user': {
-            set((state) => {
-              const sourceSlot = resolveSessionSlot(state, ctx, eventSessionId)
-              const patch = reduceUserMessage(sourceSlot, msg as UserPayload, isReplay)
-              return patch ? patchSessionSlot(state, ctx, patch, eventSessionId) : {}
-            })
-            break
-          }
-          case 'result': {
-            set((state) => {
-              const sourceSlot = resolveSessionSlot(state, ctx, eventSessionId)
-              const abortGuardGen = sourceSlot._resultGuardGen
-              const { patch, events } = reduceResultMessage(
-                sourceSlot,
-                msg as AgentIPCMessage & { subtype?: string },
-                abortGuardGen
-              )
-              if (events.length > 0) {
-                setTimeout(() => dispatchEffectEvents(eventSessionId || null, events, ctx), 0)
-              }
-              return patch ? patchSessionSlot(state, ctx, patch, eventSessionId) : {}
-            })
-            break
-          }
-          case 'rate_limit_event': {
-            // Rate limit events are informational; no state change needed for now
-            break
-          }
-          case 'prompt_suggestion': {
-            // Prompt suggestions are informational; no state change needed for now
-            break
-          }
-      }
+      // Live dispatch reads the routed slot inside set() for freshness. Message
+      // projection and its FSM effects are applied to the same slot atomically.
+      set((state) => {
+        const sourceSlot = resolveSessionSlot(state, ctx, eventSessionId)
+        const { patch, events, firstContentSeenDuringThisCall } = reduceAgentMessage(
+          sourceSlot,
+          msg,
+          'live'
+        )
+
+        let slotUpdates: Partial<ContextSlot> = patch ? { ...patch } : {}
+        let projectedSlot: ContextSlot = { ...sourceSlot, ...slotUpdates }
+        const effectEvents = [...events]
+        if (
+          firstContentSeenDuringThisCall
+          && (projectedSlot.agentState === 'thinking' || projectedSlot.agentState === 'compacting')
+        ) {
+          effectEvents.push({ type: 'FIRST_CONTENT' })
+        }
+
+        for (const event of effectEvents) {
+          const eventPatch = reduceAgentEvent(projectedSlot, event)
+          slotUpdates = { ...slotUpdates, ...eventPatch }
+          projectedSlot = { ...projectedSlot, ...eventPatch }
+        }
+
+        return Object.keys(slotUpdates).length > 0
+          ? patchSessionSlot(state, ctx, slotUpdates, eventSessionId)
+          : {}
+      })
     },
 
     // ─── Interaction Handlers ─────────────────────────────────────────────

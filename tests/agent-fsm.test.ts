@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { AGENT_TRANSITIONS } from '../src/shared/types'
 import type { AgentState, AgentEvent } from '../src/shared/types'
-import { transition } from '../src/renderer/store/agent-store-impl'
+import { transition } from '../src/renderer/store/agent-state-machine'
 
 // ─── Transition table integrity ──────────────────────────────────
 
