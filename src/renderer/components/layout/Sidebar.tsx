@@ -6,43 +6,50 @@ import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { ContextSlot } from '../../store/agent-store'
+import type { PrimaryView } from '../../store/ui-slice'
 import SidebarToolDock from './SidebarToolDock'
 
 interface SidebarProps {
-  workspacePaths: string[]
-  fixedWorkspacePaths: string[]
-  sessions: SdkSessionInfo[]
-  activeSessionId: string | null
-  activeSessionRunning: boolean
-  onSessionSelect: (sessionId: string, workspacePath: string) => void
-  onDeleteSession: (sessionId: string, workspacePath: string) => void
-  onRenameSession: (sessionId: string, title: string) => Promise<void>
-  onNewConversation: (workspacePath: string) => void
-  onCancelNewSession: () => void
-  creatingSessionIn: string | null
-  newSessionName: string
-  onNewSessionNameChange: (name: string) => void
-  onCreateSession: (wsPath: string) => void
-  newSessionInputRef: React.RefObject<HTMLInputElement | null>
-  onNewWorkspace: () => void
-  onRemoveWorkspace: (path: string) => void
-  onReorderWorkspaces: (paths: string[]) => void
-  onOpenSettings: () => void
-  onOpenSearch: () => void
-  onDaydream: (mode: string) => void
-  onAskZuovis: () => void
-  onOpenSkills: () => void
-  onOpenAutomation: () => void
-  onOpenKnowledge: () => void
-  onAskZuovisBack: () => void
-  isAskZuovisActive: boolean
-  isSkillsActive: boolean
-  isAutomationActive: boolean
-  isKnowledgeActive: boolean
-  isAskZuovisInChat: boolean
-  isAskZuovisRunning: boolean
-  changedFileCount: number
   collapsed: boolean
+  navigation: {
+    view: PrimaryView
+    open: (view: Exclude<PrimaryView, 'editor'>) => void
+    ask: {
+      hasConversation: boolean
+      running: boolean
+      back: () => void
+    }
+    changedFileCount: number
+  }
+  workspaces: {
+    paths: string[]
+    fixedPaths: string[]
+    create: () => void
+    remove: (path: string) => void
+    reorder: (paths: string[]) => void
+  }
+  sessions: {
+    items: SdkSessionInfo[]
+    activeId: string | null
+    activeRunning: boolean
+    select: (sessionId: string, workspacePath: string) => void
+    remove: (sessionId: string, workspacePath: string) => void
+    rename: (sessionId: string, title: string) => Promise<void>
+    draft: {
+      workspacePath: string | null
+      title: string
+      inputRef: React.RefObject<HTMLInputElement | null>
+      begin: (workspacePath: string) => void
+      cancel: () => void
+      change: (name: string) => void
+      submit: (workspacePath: string) => void
+    }
+  }
+  tools: {
+    openSettings: () => void
+    openSearch: () => void
+    openDaydream: (mode: string) => void
+  }
 }
 
 function SidebarBackButton({ running, onBack }: { running: boolean; onBack: () => void }) {
@@ -112,41 +119,45 @@ function getSessionAttention(slot?: ContextSlot | null): {
 }
 
 function Sidebar({
-  workspacePaths,
-  fixedWorkspacePaths,
-  sessions,
-  activeSessionId,
-  activeSessionRunning,
-  onSessionSelect,
-  onDeleteSession,
-  onRenameSession,
-  onNewConversation,
-  onCancelNewSession,
-  creatingSessionIn,
-  newSessionName,
-  onNewSessionNameChange,
-  onCreateSession,
-  newSessionInputRef,
-  onNewWorkspace,
-  onRemoveWorkspace,
-  onReorderWorkspaces,
-  onOpenSettings,
-  onOpenSearch,
-  onDaydream,
-  onAskZuovis,
-  onOpenSkills,
-  onOpenAutomation,
-  onOpenKnowledge,
-  onAskZuovisBack,
-  isAskZuovisActive,
-  isSkillsActive,
-  isAutomationActive,
-  isKnowledgeActive,
-  isAskZuovisInChat,
-  isAskZuovisRunning,
-  changedFileCount,
-  collapsed
+  collapsed,
+  navigation,
+  workspaces,
+  sessions: sessionModel,
+  tools,
 }: SidebarProps): React.ReactElement {
+  const workspacePaths = workspaces.paths
+  const fixedWorkspacePaths = workspaces.fixedPaths
+  const onNewWorkspace = workspaces.create
+  const onRemoveWorkspace = workspaces.remove
+  const onReorderWorkspaces = workspaces.reorder
+  const sessions = sessionModel.items
+  const activeSessionId = sessionModel.activeId
+  const activeSessionRunning = sessionModel.activeRunning
+  const onSessionSelect = sessionModel.select
+  const onDeleteSession = sessionModel.remove
+  const onRenameSession = sessionModel.rename
+  const creatingSessionIn = sessionModel.draft.workspacePath
+  const newSessionName = sessionModel.draft.title
+  const newSessionInputRef = sessionModel.draft.inputRef
+  const onNewConversation = sessionModel.draft.begin
+  const onCancelNewSession = sessionModel.draft.cancel
+  const onNewSessionNameChange = sessionModel.draft.change
+  const onCreateSession = sessionModel.draft.submit
+  const onOpenSettings = tools.openSettings
+  const onOpenSearch = tools.openSearch
+  const onDaydream = tools.openDaydream
+  const onAskZuovis = () => navigation.open('ask')
+  const onOpenSkills = () => navigation.open('skills')
+  const onOpenAutomation = () => navigation.open('automation')
+  const onOpenKnowledge = () => navigation.open('knowledge')
+  const onAskZuovisBack = navigation.ask.back
+  const isAskZuovisActive = navigation.view === 'ask'
+  const isSkillsActive = navigation.view === 'skills'
+  const isAutomationActive = navigation.view === 'automation'
+  const isKnowledgeActive = navigation.view === 'knowledge'
+  const isAskZuovisInChat = navigation.ask.hasConversation
+  const isAskZuovisRunning = navigation.ask.running
+  const changedFileCount = navigation.changedFileCount
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set())
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameText, setRenameText] = useState('')

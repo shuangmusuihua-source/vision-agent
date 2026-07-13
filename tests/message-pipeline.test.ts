@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentIPCMessage } from '../src/shared/types'
 import { emptySlot } from '../src/renderer/store/agent-store'
-import { reduceAgentMessage } from '../src/renderer/store/message-pipeline'
+import { buildReplayedMessages, reduceAgentMessage } from '../src/renderer/store/message-pipeline'
 
 describe('reduceAgentMessage', () => {
   it('projects a live assistant message and emits the first-content event', () => {
@@ -69,6 +69,54 @@ describe('reduceAgentMessage', () => {
       patch: null,
       events: [],
       firstContentSeenDuringThisCall: false,
+    })
+  })
+
+  it('uses the same tool-result projection for live delivery and replay', () => {
+    const messages: AgentIPCMessage[] = [{
+      type: 'assistant',
+      uuid: 'tool-answer',
+      message: {
+        content: [
+          { type: 'text', text: 'working' },
+          { type: 'tool_use', id: 'tool-1', name: 'Read', input: { file_path: '/tmp/a.md' } },
+        ],
+      },
+    }, {
+      type: 'user',
+      uuid: 'tool-result',
+      message: {
+        content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'contents' }],
+      },
+    }]
+
+    let liveSlot = emptySlot()
+    for (const message of messages) {
+      const { patch } = reduceAgentMessage(liveSlot, message, 'live')
+      if (patch) liveSlot = { ...liveSlot, ...patch }
+    }
+
+    expect(buildReplayedMessages(messages)).toEqual(liveSlot.messages)
+    expect(liveSlot.messages[0]).toMatchObject({
+      toolCalls: [{ toolUseId: 'tool-1', status: 'completed', result: 'contents' }],
+    })
+  })
+
+  it('restores result diagnostics through the shared projection rules', () => {
+    const messages = buildReplayedMessages([{
+      type: 'result',
+      subtype: 'success',
+      stop_reason: 'max_tokens',
+      session_id: 'sdk-session',
+      usage: { input_tokens: 1, output_tokens: 2 },
+      total_cost_usd: 0,
+      duration_ms: 1,
+    } as AgentIPCMessage])
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatchObject({
+      kind: 'stopped',
+      textContent: expect.stringContaining('达到最大输出长度'),
     })
   })
 })

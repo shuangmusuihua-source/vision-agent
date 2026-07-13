@@ -1,6 +1,31 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { filterUserWorkspacePaths, KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
 
+export interface WorkspaceDeleteResult {
+  success: boolean
+  error?: string
+}
+
+export interface WorkspaceDialogsController {
+  create: {
+    open: boolean
+    visible: boolean
+    name: string
+    error: string
+    pending: boolean
+    setName: (name: string) => void
+    close: () => void
+    submit: () => Promise<void>
+  }
+  remove: {
+    path: string | null
+    confirmation: string
+    setConfirmation: (value: string) => void
+    close: () => void
+    submit: () => Promise<WorkspaceDeleteResult>
+  }
+}
+
 /**
  * Workspace management — paths and CRUD modals.
  *
@@ -70,6 +95,11 @@ export function useWorkspace() {
     }, 200)
   }, [])
 
+  const handleNewWorkspaceNameChange = useCallback((name: string) => {
+    setNewWorkspaceName(name)
+    setNewWorkspaceError('')
+  }, [])
+
   const handleCreateWorkspace = useCallback(async () => {
     const name = newWorkspaceName.trim()
     if (!name) {
@@ -109,15 +139,20 @@ export function useWorkspace() {
   const [deleteWsPath, setDeleteWsPath] = useState<string | null>(null)
   const [deleteWsConfirm, setDeleteWsConfirm] = useState('')
 
-  const handleDeleteWorkspace = useCallback(async () => {
+  const handleCloseDeleteWorkspace = useCallback(() => {
+    setDeleteWsPath(null)
+    setDeleteWsConfirm('')
+  }, [])
+
+  const handleDeleteWorkspace = useCallback(async (): Promise<WorkspaceDeleteResult> => {
     if (!deleteWsPath) return { success: false }
     const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
     if (result.success) {
       setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
-      setDeleteWsPath(null)
+      handleCloseDeleteWorkspace()
     }
     return result
-  }, [deleteWsPath])
+  }, [deleteWsPath, handleCloseDeleteWorkspace])
 
   return {
     // State
@@ -129,22 +164,25 @@ export function useWorkspace() {
     // Workspace handlers
     handleReorderWorkspaces,
     handleRemoveWorkspace,
-    // New workspace modal
-    showNewWorkspaceModal,
-    modalVisible,
-    newWorkspaceName,
-    setNewWorkspaceName,
-    newWorkspaceError,
-    setNewWorkspaceError,
-    isCreatingWorkspace,
     handleOpenNewWorkspaceModal,
-    handleCloseNewWorkspaceModal,
-    handleCreateWorkspace,
-    // Delete workspace modal
-    deleteWsPath,
-    setDeleteWsPath,
-    deleteWsConfirm,
-    setDeleteWsConfirm,
-    handleDeleteWorkspace,
+    dialogs: {
+      create: {
+        open: showNewWorkspaceModal,
+        visible: modalVisible,
+        name: newWorkspaceName,
+        error: newWorkspaceError,
+        pending: isCreatingWorkspace,
+        setName: handleNewWorkspaceNameChange,
+        close: handleCloseNewWorkspaceModal,
+        submit: handleCreateWorkspace,
+      },
+      remove: {
+        path: deleteWsPath,
+        confirmation: deleteWsConfirm,
+        setConfirmation: setDeleteWsConfirm,
+        close: handleCloseDeleteWorkspace,
+        submit: handleDeleteWorkspace,
+      },
+    } satisfies WorkspaceDialogsController,
   }
 }

@@ -26,7 +26,7 @@ import type {
   StreamContentBlockStart,
   StreamMessageStart,
 } from '../../shared/types'
-import { ContextSlot } from './agent-store'
+import { emptySlot, type ContextSlot } from './agent-store'
 import { isTextBlock, isToolUseBlock, isToolResultBlock } from '../../shared/types'
 import { parseAttachmentConversionStatuses, stripInternalAttachmentContext } from '../../shared/file-attachments'
 import { getSkillInvocationDisplayText } from '../../shared/skill-invocation'
@@ -767,8 +767,9 @@ export interface AgentMessageReduction {
 }
 
 /**
- * Single message-semantics entry point for the store. Session routing, slot
- * mirroring and FSM effect scheduling remain owned by agent-store-impl.
+ * Single message-semantics entry point for live delivery and history replay.
+ * Session routing, slot mirroring and atomic FSM application remain owned by
+ * agent-store-impl.
  */
 export function reduceAgentMessage(
   slot: ContextSlot,
@@ -832,176 +833,13 @@ export function reduceAgentMessage(
   }
 }
 
-// ─── Replayed message builder (pure — no store access) ─────────────────
+// ─── Replayed message builder (same projection semantics, no store access) ──
 
 export function buildReplayedMessages(rawMessages: AgentIPCMessage[]): ConversationMessage[] {
-  const messages: ConversationMessage[] = []
-  // Map tool_use_id → index in messages[] for O(1) lookup instead of O(n) linear scan
-  const toolUseIdToMsgIndex = new Map<string, number>()
-
-  for (const raw of rawMessages) {
-    if (raw.type === 'assistant') {
-      const assistantMsg = raw as AssistantPayload
-      const content = assistantMsg.message.content
-      const msgId = assistantMsg.uuid || `assistant-${Date.now()}`
-      const textContent = content.filter(isTextBlock).map(b => b.text).join('')
-      const toolCalls: ToolCallState[] = content.filter(isToolUseBlock).map(tu => {
-        let input: Record<string, unknown> = {}
-        if (tu.input && typeof tu.input === 'object') input = tu.input
-        return { toolUseId: tu.id || `tu-${Date.now()}`, toolName: tu.name || 'unknown', input, status: 'running' as const }
-      })
-
-      const msgIndex = messages.length
-      // Record tool_use block ids → message index for O(1) lookup by subsequent user/system messages
-      for (const tu of content.filter(isToolUseBlock)) {
-        if (tu.id) toolUseIdToMsgIndex.set(tu.id, msgIndex)
-      }
-
-      messages.push({
-        kind: 'text',
-        id: msgId,
-        role: 'assistant',
-        phase: 'complete',
-        textContent,
-        content,
-        toolCalls: toolCalls.filter(tc => tc.toolName !== 'AskUserQuestion'),
-        createdAt: Date.now(),
-      })
-    } else if (raw.type === 'user') {
-      const userMsg = raw as UserPayload
-
-      // SDK-injected skill/context messages — render as system info
-      if (userMsg.isMeta) {
-        const skillName = typeof userMsg.message.content !== 'string'
-          ? (userMsg.message.content as ContentBlock[]).find(b => b.type === 'text')?.text?.split('\n')[0]?.replace('Base directory for this skill: ', '')?.split('/').pop()
-          : undefined
-        messages.push({
-          kind: 'status', id: userMsg.uuid || `skill-${Date.now()}`, role: 'system',
-          phase: 'complete',
-          textContent: skillName ? `📎 已加载 skill: ${skillName}` : '📎 已加载系统上下文',
-          createdAt: Date.now(),
-        })
-        continue
-      }
-
-      // Compaction continuation: render as system divider, not user bubble
-      if (isCompactionContinuation(userMsg.message.content)) {
-        messages.push({
-          kind: 'status', id: userMsg.uuid || `compaction-${Date.now()}`, role: 'system',
-          phase: 'complete', textContent: '📋 上下文压缩 · 以上历史已摘要',
-          createdAt: Date.now(),
-        })
-        continue
-      }
-
-      const content = normalizeContent(userMsg.message.content)
-      const toolResults = content.filter(isToolResultBlock)
-      const textBlocks = content.filter(isTextBlock)
-
-      if (toolResults.length > 0) {
-        for (const tr of toolResults) {
-          const toolUseId = tr.tool_use_id
-          const resultContent = typeof tr.content === 'string'
-            ? tr.content
-            : Array.isArray(tr.content)
-              ? tr.content.map(c => (typeof c === 'object' && c && 'text' in c ? (c as { text: string }).text : '')).join('')
-              : JSON.stringify(tr.content)
-          const isError = tr.is_error === true
-
-          // O(1) Map lookup instead of O(n) linear scan over messages
-          const msgIdx = toolUseIdToMsgIndex.get(toolUseId)
-          if (msgIdx !== undefined) {
-            const msgRef = messages[msgIdx] as TextMessage
-            const tcIdx = msgRef.toolCalls.findIndex(tc => tc.toolUseId === toolUseId)
-            if (tcIdx >= 0) {
-              const updated = [...msgRef.toolCalls]
-              updated[tcIdx] = {
-                ...updated[tcIdx],
-                result: resultContent,
-                status: (isError ? 'error' : 'completed') as ToolCallState['status'],
-              }
-              messages[msgIdx] = { ...msgRef, toolCalls: updated } as TextMessage
-            }
-          }
-        }
-      }
-
-      if (textBlocks.length > 0) {
-        const rawText = textBlocks.map(b => b.text).join('')
-        const text = getVisibleUserText(rawText)
-        const attachmentConversions = parseAttachmentConversionStatuses(rawText)
-        const existingUserIndex = text ? findLastUserMessageIndex(messages, text) : -1
-        if (existingUserIndex >= 0 && attachmentConversions.length > 0) {
-          const existing = messages[existingUserIndex]
-          if (existing.kind === 'user') {
-            messages[existingUserIndex] = { ...existing, attachmentConversions }
-          }
-        }
-        if (text && !messages.some(m => m.kind === 'user' && m.textContent === text)) {
-          messages.push({
-            kind: 'user',
-            id: userMsg.uuid || `user-${Date.now()}`,
-            role: 'user',
-            textContent: text,
-            createdAt: Date.now(),
-            ...(attachmentConversions.length > 0 ? { attachmentConversions } : {}),
-          })
-        }
-      }
-    } else if (raw.type === 'system') {
-      const sysSubtype = (raw as Record<string, unknown>).subtype as string | undefined
-      if (sysSubtype === 'permission_denied') {
-        const pd = raw as SystemPermissionDeniedPayload
-        // O(1) Map lookup instead of O(n) linear scan over messages
-        const msgIdx = toolUseIdToMsgIndex.get(pd.tool_use_id)
-        if (msgIdx !== undefined) {
-          const msgRef = messages[msgIdx] as TextMessage
-          const tcIdx = msgRef.toolCalls.findIndex(tc => tc.toolUseId === pd.tool_use_id)
-          if (tcIdx >= 0) {
-            const updated = [...msgRef.toolCalls]
-            updated[tcIdx] = {
-              ...updated[tcIdx],
-              status: 'error' as const,
-              result: `Permission denied: ${pd.message}`,
-            }
-            messages[msgIdx] = { ...msgRef, toolCalls: updated } as TextMessage
-          }
-        }
-      }
-    } else if (raw.type === 'result') {
-      const resultSubtype = (raw as Record<string, unknown>).subtype as string | undefined
-      if (resultSubtype?.startsWith('error')) {
-        const errorMsg = raw as ResultErrorPayload
-        const errorText = errorMsg.errors.join('\n') || 'Agent error'
-        const isAborted = /aborted|cancelled|canceled/i.test(errorText)
-        if (isAborted) {
-          const lastMsg = messages[messages.length - 1]
-          if (lastMsg?.kind === 'text' && lastMsg.phase === 'streaming') {
-            messages[messages.length - 1] = { ...lastMsg, phase: 'complete' }
-          }
-          messages.push({
-            kind: 'stopped',
-            id: `stop-${Date.now()}`,
-            role: 'assistant',
-            phase: 'stopped',
-            textContent: '我的思考被用户停止了',
-            createdAt: Date.now(),
-          })
-        } else {
-          messages.push({
-            kind: 'text',
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            phase: 'error',
-            textContent: errorText,
-            content: [],
-            toolCalls: [],
-            createdAt: Date.now(),
-          })
-        }
-      }
-    }
+  let slot = emptySlot()
+  for (const rawMessage of rawMessages) {
+    const { patch } = reduceAgentMessage(slot, rawMessage, 'replay')
+    if (patch) slot = { ...slot, ...patch }
   }
-
-  return messages
+  return slot.messages
 }

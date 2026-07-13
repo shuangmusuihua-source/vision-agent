@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
-import { useUiStore } from '../../store/ui-slice'
+import { useUiStore, type PrimaryView } from '../../store/ui-slice'
 import { FileText, Download, ArrowLeftRight, ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
@@ -20,7 +20,6 @@ import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { AgentContext, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
 import { isFileTab, OVERVIEW_TAB_ID } from '../../../shared/types'
-import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
 import { useChangedFileCount, useGraphStore } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
@@ -30,6 +29,7 @@ import { checkForAppUpdates, getUpdateProgressLabel, performPrimaryUpdateAction 
 import type { MarkdownEditorHandle } from '../editor/MarkdownEditor'
 import type { AppNotification } from '../../notifications/notification-inbox'
 import NotificationCenter from '../notifications/NotificationCenter'
+import WorkspaceDialogs from '../workspace/WorkspaceDialogs'
 
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
@@ -625,50 +625,66 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     })
   }, [activeFilePath, editorSendMessage, linkedFile])
 
+  const handleWorkspaceDeleted = useCallback((deletedPath: string) => {
+    closeTabsByPrefix(`${deletedPath}/`)
+    const remaining = workspace.workspacePaths.filter((path) => path !== deletedPath)
+    useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
+  }, [closeTabsByPrefix, workspace.workspacePaths])
+
+  const handleSidebarNavigate = useCallback((nextView: Exclude<PrimaryView, 'editor'>) => {
+    if (nextView === 'ask') {
+      setAgentContext('ask')
+      clearTab()
+    }
+    setView(nextView)
+  }, [clearTab, setAgentContext, setView])
+
   // ── Render ──────────────────────────────────────────────────────────
 
   return (
     <div className="app-shell" ref={shellRef}>
       <nav aria-label="侧边栏" style={{ display: 'flex', height: '100%' }}>
       <Sidebar
-        workspacePaths={workspace.workspacePaths}
-        fixedWorkspacePaths={workspace.fixedWorkspacePaths}
-        sessions={editorSessionList}
-        activeSessionId={view === 'editor' ? activeSessionId : null}
-        activeSessionRunning={isStreaming}
-        onSessionSelect={handleSessionSelect}
-        onDeleteSession={handleDeleteSession}
-        onRenameSession={handleRenameSession}
-        onNewConversation={(wsPath) => setCreatingSessionIn(wsPath)}
-        onCancelNewSession={() => setCreatingSessionIn(null)}
-        creatingSessionIn={creatingSessionIn}
-        newSessionName={newSessionName}
-        onNewSessionNameChange={setNewSessionName}
-        onCreateSession={handleCreateSession}
-        newSessionInputRef={newSessionInputRef}
-        onNewWorkspace={workspace.handleOpenNewWorkspaceModal}
-        onRemoveWorkspace={workspace.handleRemoveWorkspace}
-        onReorderWorkspaces={workspace.handleReorderWorkspaces}
-        onOpenSettings={onOpenSettings}
-        onOpenSearch={() => openSearch()}
-        onDaydream={(mode: string) => openDaydream(mode)}
-        onAskZuovis={() => {
-            setAgentContext('ask')
-            clearTab()
-            setView('ask')
-          }}
-        isAskZuovisActive={view === 'ask'}
-        onOpenSkills={() => setView('skills')}
-        isSkillsActive={view === 'skills'}
-        onOpenAutomation={() => setView('automation')}
-        isAutomationActive={view === 'automation'}
-        onOpenKnowledge={() => setView('knowledge')}
-        isKnowledgeActive={view === 'knowledge'}
-        onAskZuovisBack={handleAskZuovisBack}
-        isAskZuovisInChat={askMessages.length > 0}
-        isAskZuovisRunning={askIsStreaming}
-        changedFileCount={changedFileCount}
         collapsed={sidebarCollapsed}
+        navigation={{
+          view,
+          open: handleSidebarNavigate,
+          ask: {
+            hasConversation: askMessages.length > 0,
+            running: askIsStreaming,
+            back: handleAskZuovisBack,
+          },
+          changedFileCount,
+        }}
+        workspaces={{
+          paths: workspace.workspacePaths,
+          fixedPaths: workspace.fixedWorkspacePaths,
+          create: workspace.handleOpenNewWorkspaceModal,
+          remove: workspace.handleRemoveWorkspace,
+          reorder: workspace.handleReorderWorkspaces,
+        }}
+        sessions={{
+          items: editorSessionList,
+          activeId: view === 'editor' ? activeSessionId : null,
+          activeRunning: isStreaming,
+          select: handleSessionSelect,
+          remove: handleDeleteSession,
+          rename: handleRenameSession,
+          draft: {
+            workspacePath: creatingSessionIn,
+            title: newSessionName,
+            inputRef: newSessionInputRef,
+            begin: setCreatingSessionIn,
+            cancel: () => setCreatingSessionIn(null),
+            change: setNewSessionName,
+            submit: handleCreateSession,
+          },
+        }}
+        tools={{
+          openSettings: onOpenSettings,
+          openSearch: openSearch,
+          openDaydream,
+        }}
       />
       </nav>
       <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' || view === 'automation' || view === 'knowledge' ? ' main-content-module' : ''}`}
@@ -941,101 +957,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <SidebarToggleIcon collapsed={sidebarCollapsed} />
         </button>
       </div>
-      {/* ── New workspace modal ── */}
-      {workspace.showNewWorkspaceModal && (
-        <div className={`modal-overlay${workspace.modalVisible ? ' modal-overlay-visible' : ''}`} onClick={workspace.handleCloseNewWorkspaceModal}>
-          <div className={`modal-window${workspace.modalVisible ? ' modal-window-visible' : ''}`} role="dialog" aria-modal="true" aria-label="新建工作区" onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Tab') {
-                const focusable = e.currentTarget.querySelectorAll<HTMLElement>('input, button:not([disabled])')
-                if (!focusable.length) return
-                const first = focusable[0]
-                const last = focusable[focusable.length - 1]
-                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
-                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
-              }
-              if (e.key === 'Escape') workspace.handleCloseNewWorkspaceModal()
-            }}
-          >
-            <div className="modal-title">新建工作区</div>
-            <div className="modal-subtitle">将创建在 ~/Documents/{DOCUMENTS_DIR_NAME}/ 下</div>
-            <input
-              className="modal-input"
-              placeholder="工作区名称"
-              value={workspace.newWorkspaceName}
-              onChange={(e) => { workspace.setNewWorkspaceName(e.target.value); workspace.setNewWorkspaceError('') }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.isComposing && !workspace.isCreatingWorkspace) workspace.handleCreateWorkspace()
-              }}
-              disabled={workspace.isCreatingWorkspace}
-              autoFocus
-              aria-describedby={workspace.newWorkspaceError ? 'workspace-error' : undefined}
-            />
-            {workspace.newWorkspaceError && <div className="modal-error" id="workspace-error" role="alert">{workspace.newWorkspaceError}</div>}
-            <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={workspace.handleCloseNewWorkspaceModal} disabled={workspace.isCreatingWorkspace}>取消</button>
-              <button className="btn-modal btn-modal-primary" onClick={workspace.handleCreateWorkspace} disabled={workspace.isCreatingWorkspace}>
-                {workspace.isCreatingWorkspace ? '创建中...' : '创建'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ── Delete workspace modal ── */}
-      {workspace.deleteWsPath && (
-        <div className="modal-overlay modal-overlay-visible" onClick={() => workspace.setDeleteWsPath(null)}>
-          <div className="modal-window modal-window-visible" role="dialog" aria-modal="true" aria-label="删除工作区" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">删除工作区</div>
-            <div className="modal-body">
-              此操作将永久删除工作区 <strong>{workspace.deleteWsPath.split('/').pop()}</strong> 及其所有文件，不可撤销。
-            </div>
-            <div className="modal-hint">请输入工作区名称以确认删除：</div>
-            <input
-              className="modal-input"
-              placeholder={workspace.deleteWsPath.split('/').pop()}
-              value={workspace.deleteWsConfirm}
-              onChange={(e) => workspace.setDeleteWsConfirm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') workspace.setDeleteWsPath(null)
-                if (e.key === 'Enter' && !e.isComposing && workspace.deleteWsConfirm === workspace.deleteWsPath!.split('/')?.pop()) {
-                  (async () => {
-                    const deletingPath = workspace.deleteWsPath
-                    if (!deletingPath) return
-                    const result = await workspace.handleDeleteWorkspace()
-                    if (!result.success) {
-                      modal.alert({ title: '删除失败', message: result.error || '删除失败' })
-                    } else {
-                      closeTabsByPrefix(deletingPath + '/')
-                      const remaining = workspace.workspacePaths.filter(p => p !== deletingPath)
-                      useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
-                    }
-                  })()
-                }
-              }}
-              autoFocus
-            />
-            <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={() => workspace.setDeleteWsPath(null)}>取消</button>
-              <button
-                className="btn-modal btn-modal-primary btn-modal-danger"
-                disabled={workspace.deleteWsConfirm !== workspace.deleteWsPath.split('/')?.pop()}
-                onClick={async () => {
-                  const deletingPath = workspace.deleteWsPath
-                  if (!deletingPath) return
-                  const result = await workspace.handleDeleteWorkspace()
-                  if (result.success) {
-                    closeTabsByPrefix(deletingPath + '/')
-                    const remaining = workspace.workspacePaths.filter(p => p !== deletingPath)
-                    useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
-                  } else {
-                    modal.alert({ title: '删除失败', message: result.error || '删除失败' })
-                  }
-                }}
-              >删除</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <WorkspaceDialogs controller={workspace.dialogs} onDeleted={handleWorkspaceDeleted} />
       {showDaydream && <DaydreamOverlay onExit={closeDaydream} mode={daydreamMode} />}
     </div>
   )
