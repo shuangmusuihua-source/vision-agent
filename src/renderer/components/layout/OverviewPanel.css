@@ -131,7 +131,7 @@
   padding: 14px;
   border: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
   border-radius: var(--overview-card-radius);
-  background: var(--sidebar-bg);
+  background: var(--color-bg-elevated);
   box-shadow: var(--shadow-xs);
   transition:
     background 0.18s ease,

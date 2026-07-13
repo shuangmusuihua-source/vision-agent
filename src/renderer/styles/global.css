@@ -92,7 +92,11 @@
   --tag-workspace-text: var(--color-success);
 
   /* Sidebar */
-  --sidebar-bg:          var(--color-bg-glass);
+  --sidebar-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-bg-secondary) 88%, var(--color-bg-primary) 12%),
+    var(--color-bg-secondary)
+  );
   --sidebar-entry-hover: var(--color-bg-hover);
   --sidebar-entry-selected: color-mix(in srgb, var(--color-action) 7%, var(--color-bg-elevated));
   --sidebar-entry-selected-hover: color-mix(in srgb, var(--color-action) 10%, var(--color-bg-elevated));
@@ -232,6 +236,12 @@
   --color-bg-elevated:  #303030;
   --color-bg-hover:     #333333;
   --color-bg-glass:     rgba(30, 30, 30, 0.42);
+
+  --sidebar-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-bg-secondary) 94%, var(--color-bg-primary) 6%),
+    var(--color-bg-secondary)
+  );
 
   --color-text-primary:   #e5e5e5;
   --color-text-secondary: #a3a3a3;

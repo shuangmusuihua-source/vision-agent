@@ -484,9 +484,7 @@
   color: var(--color-action);
 }
 
-.automation-create-button:not(:disabled):hover,
-.automation-task-card:hover,
-.automation-new-task-card:hover {
+.automation-create-button:not(:disabled):hover {
   transform: translateY(-1px);
 }
 
@@ -538,18 +536,15 @@
   min-height: 154px;
   padding: 14px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
   border-radius: var(--automation-card-radius);
-  background:
-    radial-gradient(circle at 18px 16px, color-mix(in srgb, var(--color-action) 7%, transparent), transparent 86px),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-elevated) 98%, var(--color-text-primary) 2%), var(--color-bg-elevated));
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--color-text-primary) 5%, transparent),
-    0 14px 34px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
   transition:
-    border-color var(--duration-fast) var(--ease-default),
-    box-shadow var(--duration-fast) var(--ease-default),
-    transform var(--duration-fast) var(--ease-default);
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .automation-task-card {
@@ -561,8 +556,6 @@
   justify-content: center;
   gap: 8px;
   border-style: dashed;
-  background: var(--color-bg-elevated);
-  background-image: none;
   color: var(--color-text-secondary);
   font: inherit;
   text-align: center;
@@ -599,10 +592,9 @@
 
 .automation-task-card:hover,
 .automation-new-task-card:hover {
-  border-color: color-mix(in srgb, var(--color-border) 60%, var(--color-action) 40%);
-  box-shadow:
-    0 2px 4px color-mix(in srgb, var(--color-text-primary) 6%, transparent),
-    0 16px 38px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .automation-task-card:focus-visible,
@@ -904,8 +896,6 @@
 }
 
 [data-theme="dark"] .automation-builder,
-[data-theme="dark"] .automation-task-card,
-[data-theme="dark"] .automation-new-task-card,
 [data-theme="dark"] .automation-detail-header,
 [data-theme="dark"] .automation-detail-card,
 [data-theme="dark"] .automation-field input,

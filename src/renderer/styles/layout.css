@@ -167,11 +167,7 @@
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-bg-secondary) 88%, var(--color-bg-primary) 12%),
-    var(--color-bg-secondary)
-  );
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--color-border-soft);
   box-shadow: none;
   transition: border-color 0.2s ease;
@@ -185,11 +181,6 @@
 }
 
 [data-theme="dark"] .sidebar {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-bg-secondary) 94%, var(--color-bg-primary) 6%),
-    var(--color-bg-secondary)
-  );
   border-right-color: var(--color-border-soft);
 }
 
