@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import {
   ArrowUpRight,
-  BookPlus,
   CircleCheck,
   FileText,
   FilePenLine,
+  FileUp,
   FolderOpen,
   LoaderCircle,
   PackageOpen,
@@ -143,46 +143,33 @@ function OverviewPanel({
     const isActive = activeFilePath === file.filePath
     const isBusy = busyFiles[file.filePath] === 'knowledge'
     const knowledgeStatus = file.knowledge?.status || 'not_added'
-    const knowledgeLabel = knowledgeStatus === 'synced'
-      ? '已同步知识库'
+    const knowledgeTooltip = knowledgeStatus === 'synced'
+      ? '知识库已是最新版本'
       : knowledgeStatus === 'update_available'
-        ? '同步最新版本'
+        ? '文档已有更新，点击同步最新版本'
         : '加入知识库'
+    const knowledgeBusyTooltip = knowledgeStatus === 'not_added'
+      ? '正在加入知识库…'
+      : '正在同步最新版本…'
 
     return (
       <article className={`overview-card overview-card--document${isActive ? ' overview-card--active' : ''}`} key={file.filePath}>
         <div className="overview-card-head">
           <div className="overview-card-icon overview-card-icon--document"><FilePenLine size={19} strokeWidth={1.6} /></div>
           <div className="overview-card-identity">
-            <button className="overview-card-name" type="button" onClick={() => onOpenFile(file.filePath)} title={file.filePath}>
+            <button
+              className="overview-card-name"
+              type="button"
+              onClick={() => onOpenFile(file.filePath)}
+              title={file.filePath}
+              aria-current={isActive ? 'page' : undefined}
+            >
               {file.fileName}
             </button>
             <span className="overview-card-subline">
               <span className="overview-format-badge">MD</span>
               <span className="overview-card-path">{cardDetailLabel(file, '工作文档')}</span>
             </span>
-          </div>
-          <div className="overview-card-toolbar">
-            <button className="overview-icon-action" type="button" onClick={() => onOpenFile(file.filePath)} title="打开文档" aria-label={`打开 ${file.fileName}`}>
-              <ArrowUpRight size={16} />
-            </button>
-            <button
-              className={`overview-icon-action overview-icon-action--knowledge overview-icon-action--${knowledgeStatus}`}
-              type="button"
-              onClick={() => void handleKnowledgeAction(file)}
-              disabled={isBusy}
-              aria-disabled={knowledgeStatus === 'synced'}
-              title={isBusy ? '正在同步知识库' : knowledgeLabel}
-              aria-label={`${knowledgeLabel}：${file.fileName}`}
-            >
-              {isBusy
-                ? <LoaderCircle size={16} className="overview-spin" />
-                : knowledgeStatus === 'synced'
-                  ? <CircleCheck size={16} />
-                  : knowledgeStatus === 'update_available'
-                    ? <RefreshCw size={16} />
-                    : <BookPlus size={16} />}
-            </button>
           </div>
         </div>
 
@@ -192,13 +179,27 @@ function OverviewPanel({
           <div><dt>大小</dt><dd>{formatFileSize(file.size)}</dd></div>
         </dl>
 
-        <div className={`overview-sync-state overview-sync-state--${knowledgeStatus}`}>
-          {knowledgeStatus === 'synced'
-            ? <CircleCheck size={15} />
-            : knowledgeStatus === 'update_available'
-              ? <RefreshCw size={15} />
-              : <BookPlus size={15} />}
-          <span>{knowledgeStatus === 'synced' ? '知识库已最新' : knowledgeStatus === 'update_available' ? '待同步最新' : '尚未入库'}</span>
+        <div className="overview-card-toolbar" role="group" aria-label={`${file.fileName} 操作`}>
+          <button className="overview-icon-action" type="button" onClick={() => onOpenFile(file.filePath)} title="打开文档" aria-label={`打开 ${file.fileName}`}>
+            <ArrowUpRight size={16} />
+          </button>
+          <button
+            className={`overview-icon-action overview-icon-action--knowledge overview-icon-action--${knowledgeStatus}`}
+            type="button"
+            onClick={() => void handleKnowledgeAction(file)}
+            disabled={isBusy}
+            aria-disabled={knowledgeStatus === 'synced'}
+            title={isBusy ? knowledgeBusyTooltip : knowledgeTooltip}
+            aria-label={`${isBusy ? knowledgeBusyTooltip : knowledgeTooltip}：${file.fileName}`}
+          >
+            {isBusy
+              ? <LoaderCircle size={16} className="overview-spin" />
+              : knowledgeStatus === 'synced'
+                ? <CircleCheck size={16} />
+                : knowledgeStatus === 'update_available'
+                  ? <RefreshCw size={16} />
+                  : <FileUp size={16} />}
+          </button>
         </div>
       </article>
     )
@@ -218,17 +219,6 @@ function OverviewPanel({
               <span className={`overview-format-badge overview-format-badge--${file.fileType}`}>{fileBadge(file)}</span>
               <span className="overview-card-path">{cardDetailLabel(file, 'Skill 产物')}</span>
             </span>
-          </div>
-          <div className="overview-card-toolbar">
-            <button className="overview-icon-action" type="button" onClick={() => onOpenFile(file.filePath)} title="打开产物" aria-label={`打开 ${file.fileName}`}>
-              <ArrowUpRight size={16} />
-            </button>
-            <button className="overview-icon-action" type="button" onClick={() => void onRevealOutput(file.filePath)} title="在访达中显示" aria-label={`在访达中显示 ${file.fileName}`}>
-              <FolderOpen size={16} />
-            </button>
-            <button className="overview-icon-action overview-icon-action--danger" type="button" onClick={() => void handleDelete(file)} disabled={isBusy} title="删除产物" aria-label={`删除 ${file.fileName}`}>
-              {isBusy ? <LoaderCircle size={16} className="overview-spin" /> : <Trash2 size={16} />}
-            </button>
           </div>
         </div>
 
@@ -252,6 +242,18 @@ function OverviewPanel({
           <div><dt>修改</dt><dd>{formatDateTime(file.modifiedAt)}</dd></div>
           <div><dt>大小</dt><dd>{formatFileSize(file.size)}</dd></div>
         </dl>
+
+        <div className="overview-card-toolbar" role="group" aria-label={`${file.fileName} 操作`}>
+          <button className="overview-icon-action" type="button" onClick={() => onOpenFile(file.filePath)} title="打开产物" aria-label={`打开 ${file.fileName}`}>
+            <ArrowUpRight size={16} />
+          </button>
+          <button className="overview-icon-action" type="button" onClick={() => void onRevealOutput(file.filePath)} title="在访达中显示" aria-label={`在访达中显示 ${file.fileName}`}>
+            <FolderOpen size={16} />
+          </button>
+          <button className="overview-icon-action overview-icon-action--danger" type="button" onClick={() => void handleDelete(file)} disabled={isBusy} title="删除产物" aria-label={`删除 ${file.fileName}`}>
+            {isBusy ? <LoaderCircle size={16} className="overview-spin" /> : <Trash2 size={16} />}
+          </button>
+        </div>
       </article>
     )
   }
@@ -272,7 +274,7 @@ function OverviewPanel({
           <div className="overview-section-head">
             <div>
               <h3 className="overview-section-title"><FilePenLine size={16} strokeWidth={1.6} /> 工作文档 <span>{documents.length}</span></h3>
-              <p>持续编辑，并将确认后的最新版本同步到知识库。</p>
+              <p>持续编辑，可将高价值文档加入知识库并同步更新。</p>
             </div>
           </div>
           <div className="overview-card-grid">{documents.map(renderDocument)}</div>

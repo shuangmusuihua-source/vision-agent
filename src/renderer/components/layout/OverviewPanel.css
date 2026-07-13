@@ -129,38 +129,27 @@
   overflow: hidden;
   min-height: 154px;
   padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
   border-radius: var(--overview-card-radius);
-  background:
-    radial-gradient(circle at 18px 16px, color-mix(in srgb, var(--color-action) 7%, transparent), transparent 86px),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-elevated) 98%, var(--color-text-primary) 2%), var(--color-bg-elevated));
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--color-text-primary) 5%, transparent),
-    0 14px 34px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  background: var(--sidebar-bg);
+  box-shadow: var(--shadow-xs);
   transition:
+    background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default),
     box-shadow var(--duration-fast) var(--ease-default),
     transform var(--duration-fast) var(--ease-default);
 }
 
 .overview-card:hover {
-  box-shadow:
-    0 2px 4px color-mix(in srgb, var(--color-text-primary) 6%, transparent),
-    0 16px 38px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
 .overview-card--active {
-  border-color: color-mix(in srgb, var(--color-border) 78%, transparent);
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--color-bg-elevated) 86%, var(--color-action) 14%) 0%,
-      color-mix(in srgb, var(--color-bg-elevated) 93%, var(--color-action) 7%) 54%,
-      var(--color-bg-elevated) 100%
-    );
-  box-shadow:
-    0 2px 5px color-mix(in srgb, var(--color-text-primary) 7%, transparent),
-    0 18px 42px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 56%, transparent);
+  background: var(--composer-bg);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
@@ -199,7 +188,7 @@
 }
 
 .overview-card-name {
-  display: block;
+  display: -webkit-box;
   max-width: 100%;
   min-height: 24px;
   padding: 2px 0 3px;
@@ -208,12 +197,14 @@
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  line-height: 1.55;
+  line-height: 1.45;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   text-box: normal;
-  white-space: nowrap;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   cursor: pointer;
 }
 
@@ -222,7 +213,6 @@
 }
 
 .overview-card-name:focus-visible,
-.overview-card-action:focus-visible,
 .overview-icon-action:focus-visible,
 .overview-artifact-fact button:focus-visible,
 .overview-asset-chip button:focus-visible,
@@ -307,133 +297,14 @@
   white-space: nowrap;
 }
 
-.overview-sync-state {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  width: fit-content;
-  min-height: 24px;
-  margin-top: 10px;
-  padding: 3px 8px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-}
-
-.overview-sync-state--not_added {
-  border-color: color-mix(in srgb, var(--color-border) 64%, transparent);
-  background: color-mix(in srgb, var(--color-bg-secondary) 66%, transparent);
-}
-
-.overview-sync-state--synced {
-  border-color: color-mix(in srgb, var(--color-success) 22%, transparent);
-  background: color-mix(in srgb, var(--color-success) 10%, transparent);
-  color: var(--color-success);
-}
-
-.overview-sync-state--update_available {
-  border-color: color-mix(in srgb, var(--color-warning) 24%, transparent);
-  background: color-mix(in srgb, var(--color-warning) 11%, transparent);
-  color: var(--color-warning);
-}
-
 .overview-card-toolbar {
   display: flex;
-  flex-shrink: 0;
   align-items: center;
-  gap: 2px;
-  margin-top: 1px;
-  opacity: 0.74;
-  transition: opacity var(--duration-fast) var(--ease-default);
-}
-
-.overview-card:hover .overview-card-toolbar,
-.overview-card:focus-within .overview-card-toolbar {
-  opacity: 1;
-}
-
-.overview-card-toolbar .overview-icon-action {
-  width: 27px;
-  height: 27px;
-}
-
-.overview-card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-top: var(--space-lg);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--color-border-soft);
-}
-
-.overview-card-action,
-.overview-icon-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-default),
-    border-color var(--duration-fast) var(--ease-default),
-    color var(--duration-fast) var(--ease-default);
-}
-
-.overview-card-action {
-  padding: 0 11px;
-}
-
-.overview-card-action--quiet {
-  margin-right: auto;
-  padding-left: 0;
-  background: transparent;
-  color: var(--color-text-secondary);
-}
-
-.overview-card-action--quiet:hover {
-  color: var(--color-action);
-}
-
-.overview-card-action--knowledge,
-.overview-card-action--open {
-  border-color: var(--color-border);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
-
-.overview-card-action--knowledge:hover:not(:disabled),
-.overview-card-action--open:hover {
-  border-color: var(--color-action);
-  background: var(--color-action-bg);
-  color: var(--color-action);
-}
-
-.overview-card-action--update_available {
-  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-bg-elevated));
-  color: var(--color-warning);
-}
-
-.overview-card-action--synced {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--color-success) 10%, transparent);
-  color: var(--color-success);
-}
-
-.overview-card-action:disabled,
-.overview-icon-action:disabled {
-  cursor: default;
-  opacity: 0.72;
-}
-
-.overview-card--artifact .overview-card-action--open {
-  margin-right: auto;
+  justify-content: flex-end;
+  gap: var(--space-2xs);
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
 }
 
 .overview-artifact-summary {
@@ -497,42 +368,52 @@
 }
 
 .overview-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
+  height: 32px;
   padding: 0;
-  border-color: transparent;
+  border: 0;
+  border-radius: 50%;
   background: transparent;
   color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.18s ease;
 }
 
-.overview-icon-action:hover {
-  border-color: color-mix(in srgb, var(--color-action) 18%, transparent);
-  background: var(--color-action-bg);
-  color: var(--color-action);
+.overview-icon-action:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: color-mix(in srgb, var(--color-bg-tertiary) 74%, transparent);
+  color: var(--color-text-primary);
+  transform: translateY(-1px);
 }
 
-.overview-icon-action--danger:hover {
-  border-color: color-mix(in srgb, var(--color-danger) 18%, transparent);
+.overview-icon-action--danger:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-danger-bg);
   color: var(--color-danger);
+  transform: translateY(-1px);
 }
 
-.overview-icon-action--knowledge:hover:not(:disabled),
-.overview-icon-action--knowledge:focus-visible {
-  border-color: var(--color-action);
-  background: var(--color-action-bg);
-  color: var(--color-action);
+.overview-icon-action:active:not(:disabled):not([aria-disabled="true"]) {
+  opacity: 0.7;
+  transform: none;
+}
+
+.overview-icon-action:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .overview-icon-action--synced {
-  border-color: color-mix(in srgb, var(--color-success) 14%, transparent);
-  background: color-mix(in srgb, var(--color-success) 10%, transparent);
   color: var(--color-success);
   cursor: default;
 }
 
 .overview-icon-action--update_available {
-  border-color: color-mix(in srgb, var(--color-warning) 22%, transparent);
-  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-bg-elevated));
   color: var(--color-warning);
 }
 
