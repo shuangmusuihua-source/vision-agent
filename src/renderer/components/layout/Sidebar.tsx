@@ -162,10 +162,27 @@ function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameText, setRenameText] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const imeCompositionRef = useRef({ active: false, endedAt: 0 })
   const userWorkspacePaths = filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)
   // Subscribe reactively to sessionSlots so non-active session state (running indicator, title)
   // triggers re-renders when slots are saved/restored on session switch.
   const sessionSlots = useAgentStore((s) => s.sessionSlots)
+
+  const handleCompositionStart = useCallback(() => {
+    imeCompositionRef.current.active = true
+  }, [])
+
+  const handleCompositionEnd = useCallback(() => {
+    imeCompositionRef.current = { active: false, endedAt: performance.now() }
+  }, [])
+
+  const isImeConfirm = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    const nativeEvent = event.nativeEvent
+    return nativeEvent.isComposing ||
+      nativeEvent.keyCode === 229 ||
+      imeCompositionRef.current.active ||
+      performance.now() - imeCompositionRef.current.endedAt < 100
+  }, [])
 
   const toggleWorkspace = useCallback((path: string) => {
     setCollapsedWorkspaces((prev) => {
@@ -371,8 +388,10 @@ function Sidebar({
                                     className="sidebar-new-file-field sidebar-session-rename-field"
                                     value={renameText}
                                     onChange={(e) => setRenameText(e.target.value)}
+                                    onCompositionStart={handleCompositionStart}
+                                    onCompositionEnd={handleCompositionEnd}
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !e.isComposing) {
+                                      if (e.key === 'Enter' && !isImeConfirm(e)) {
                                         const name = renameText.trim()
                                         if (name) void onRenameSession(session.id, name)
                                         setRenamingId(null)
@@ -438,8 +457,10 @@ function Sidebar({
                               placeholder="会话名称"
                               value={newSessionName}
                               onChange={(e) => onNewSessionNameChange(e.target.value)}
+                              onCompositionStart={handleCompositionStart}
+                              onCompositionEnd={handleCompositionEnd}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.isComposing) onCreateSession(wsPath)
+                                if (e.key === 'Enter' && !isImeConfirm(e)) onCreateSession(wsPath)
                                 if (e.key === 'Escape') { onNewSessionNameChange(''); onCancelNewSession() }
                               }}
                               onBlur={() => {

@@ -1232,7 +1232,7 @@
 .sidebar-session-delete {
   position: absolute;
   top: 50%;
-  right: 0;
+  right: 8px;
   display: flex;
   flex-shrink: 0;
   align-items: center;
