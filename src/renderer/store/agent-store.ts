@@ -17,8 +17,24 @@ import type {
   SessionOutputs,
 } from '../../shared/types'
 import type { SessionListAction } from './session-protocol'
+import type { AttachmentKind } from '../../shared/file-attachments'
 
 // ─── Context Slot (per agent instance) ────────────────────────────────────
+
+export type AgentComposerAttachment = {
+  name: string
+  path: string
+  type: AttachmentKind
+  base64?: string
+  mimeType?: string
+  size?: number
+  attachmentGrantId?: string
+}
+
+export type AgentComposerDraft = {
+  text: string
+  attachments: AgentComposerAttachment[]
+}
 
 export type ContextSlot = {
   messages: ConversationMessage[]
@@ -38,6 +54,7 @@ export type ContextSlot = {
   lastEditedFile: string | null
   linkedFile: string | null
   prefillText: string | null
+  composerDraft: AgentComposerDraft
   ttftMs: number | null
   todoList: TodoTaskList | null
   workspacePath: string | null
@@ -69,6 +86,7 @@ function emptySlot(): ContextSlot {
     lastEditedFile: null,
     linkedFile: null,
     prefillText: null,
+    composerDraft: { text: '', attachments: [] },
     ttftMs: null,
     todoList: null,
     workspacePath: null,
@@ -134,6 +152,11 @@ export type AgentStore = {
   setContext: (context: AgentContext) => void
   setPrefill: (context: AgentContext, text: string) => void
   consumePrefill: (context: AgentContext) => void
+  updateComposerDraft: (
+    context: AgentContext,
+    patch: Partial<AgentComposerDraft>,
+    sessionId?: string | null,
+  ) => void
   setLinkedFile: (context: AgentContext, path: string | null) => void
   dismissTodo: (context: AgentContext) => void
   markArtifactSaved: (context: AgentContext, messageId: string, filePath: string) => void

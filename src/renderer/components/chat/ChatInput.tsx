@@ -7,24 +7,14 @@ import { isSkillVisibleInSlashMenu } from '../../../shared/skill-invocation'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { useModal } from '../common/ModalSystem'
 import type { MarkitdownFormat } from '../../../shared/markitdown-runtime'
+import type { AgentComposerAttachment } from '../../store/agent-store'
 import {
   encodeFileConvertPath,
   encodeAttachmentReferencePath,
   fileExtension,
   formatAttachmentPromptLine,
   isConvertibleAttachmentPath,
-  type AttachmentKind,
 } from '../../../shared/file-attachments'
-
-interface AttachedFile {
-  name: string
-  path: string
-  type: AttachmentKind
-  base64?: string
-  mimeType?: string
-  size?: number
-  attachmentGrantId?: string
-}
 
 interface ChatInputProps {
   context: AgentContext
@@ -38,12 +28,10 @@ interface ChatInputProps {
 }
 
 function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
-  const [text, setText] = useState('')
   const [skills, setSkills] = useState<SkillDefinition[]>([])
   const [showSkillPopup, setShowSkillPopup] = useState(false)
   const [skillFilter, setSkillFilter] = useState('')
   const [selectedSkillIdx, setSelectedSkillIdx] = useState(0)
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [isPreparingAttachments, setIsPreparingAttachments] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -51,16 +39,26 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const preparingAttachmentsRef = useRef(false)
   const modal = useModal()
   const consumePrefill = useAgentStore((s) => s.consumePrefill)
+  const updateComposerDraft = useAgentStore((s) => s.updateComposerDraft)
+  const text = useAgentStore((s) => s.slots[context].composerDraft.text)
+  const attachedFiles = useAgentStore((s) => s.slots[context].composerDraft.attachments)
+  const draftSessionId = useAgentStore((s) => s.slots[context].currentSessionId)
 
   // Prefill from store slot — context-aware
   const prefillText = useAgentStore((s) => s.slots[context]?.prefillText)
   useEffect(() => {
     if (prefillText) {
-      setText(prefillText)
+      updateComposerDraft(context, { text: prefillText }, draftSessionId)
       consumePrefill(context)
       ;(variant === 'capsule' ? inputRef.current : textareaRef.current)?.focus()
     }
-  }, [consumePrefill, prefillText, context, variant])
+  }, [consumePrefill, draftSessionId, prefillText, context, updateComposerDraft, variant])
+
+  useEffect(() => {
+    setShowSkillPopup(false)
+    setSkillFilter('')
+    setSelectedSkillIdx(0)
+  }, [draftSessionId])
 
   // Keep the slash menu in sync with runtime installs and uninstalls.
   useEffect(() => {
@@ -81,7 +79,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
 
   // Detect "/" at start of input for skill popup
   const handleInputChange = useCallback((val: string) => {
-    setText(val)
+    updateComposerDraft(context, { text: val }, draftSessionId)
 
     if (context === 'editor' && val.startsWith('/')) {
       setShowSkillPopup(true)
@@ -90,7 +88,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
     } else {
       setShowSkillPopup(false)
     }
-  }, [context])
+  }, [context, draftSessionId, updateComposerDraft])
 
   const filteredSkills = skills.filter(s =>
     s.name.toLowerCase().includes(skillFilter) ||
@@ -100,18 +98,19 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
 
   const handleSelectSkill = useCallback((skill: SkillDefinition) => {
     setShowSkillPopup(false)
-    setText('')
+    updateComposerDraft(context, { text: '' }, draftSessionId)
     if (onSkillSelect) {
       onSkillSelect(skill)
     }
-  }, [onSkillSelect])
+  }, [context, draftSessionId, onSkillSelect, updateComposerDraft])
 
   const handleAttachFiles = useCallback(async () => {
+    const targetSessionId = draftSessionId
     const result = await window.api.workspace.selectFiles()
     if (result.canceled || result.filePaths.length === 0) return
 
     const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
-    const files: AttachedFile[] = []
+    const files: AgentComposerAttachment[] = []
     for (const filePath of result.filePaths) {
       const name = filePath.split('/').pop() || filePath
       const ext = fileExtension(name)
@@ -119,12 +118,25 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
         imageExts.includes(ext) ? 'image' : 'text'
       files.push({ name, path: filePath, type, attachmentGrantId: result.attachmentGrantId })
     }
-    setAttachedFiles((prev) => [...prev, ...files])
-  }, [])
+
+    const state = useAgentStore.getState()
+    if (!targetSessionId && state.slots[context].currentSessionId) return
+    const targetSlot = targetSessionId
+      ? (state.slots[context].currentSessionId === targetSessionId
+          ? state.slots[context]
+          : state.sessionSlots[targetSessionId])
+      : state.slots[context]
+    if (!targetSlot) return
+    updateComposerDraft(context, {
+      attachments: [...targetSlot.composerDraft.attachments, ...files],
+    }, targetSessionId)
+  }, [context, draftSessionId, updateComposerDraft])
 
   const handleRemoveFile = useCallback((index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
-  }, [])
+    updateComposerDraft(context, {
+      attachments: attachedFiles.filter((_, i) => i !== index),
+    }, draftSessionId)
+  }, [attachedFiles, context, draftSessionId, updateComposerDraft])
 
   const ensureAttachmentRuntime = useCallback(async (formats: MarkitdownFormat[]): Promise<boolean> => {
     if (preparingAttachmentsRef.current) return false
@@ -170,6 +182,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   }, [modal])
 
   const doSend = useCallback(async () => {
+    const targetSessionId = draftSessionId
     const hasContent = text.trim() || attachedFiles.length > 0
     if (hasContent && !disabled && !preparingAttachmentsRef.current) {
       let prompt = text.trim()
@@ -181,6 +194,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           const formats = [...new Set(convertibleFiles.map(file => fileExtension(file.path || file.name)))] as MarkitdownFormat[]
           if (!await ensureAttachmentRuntime(formats)) return
         }
+        if (useAgentStore.getState().slots[context].currentSessionId !== targetSessionId) return
         const fileParts = attachedFiles.map(formatAttachmentPromptLine)
         const attachmentPaths = attachedFiles.map(file => (
           encodeAttachmentReferencePath(file.path, file.attachmentGrantId)
@@ -190,12 +204,12 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
         const prefix = attachmentPrefix + conversionPrefix
         prompt = prefix + fileParts.join('\n') + (prompt ? '\n\n' + prompt : '')
       }
+      if (useAgentStore.getState().slots[context].currentSessionId !== targetSessionId) return
       onSend(prompt)
-      setText('')
-      setAttachedFiles([])
+      updateComposerDraft(context, { text: '', attachments: [] }, targetSessionId)
       setShowSkillPopup(false)
     }
-  }, [text, disabled, onSend, attachedFiles, ensureAttachmentRuntime])
+  }, [attachedFiles, context, disabled, draftSessionId, ensureAttachmentRuntime, onSend, text, updateComposerDraft])
 
   // Skill popup keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {

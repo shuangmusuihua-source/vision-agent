@@ -52,6 +52,51 @@ describe('agent store intent actions', () => {
     expect(state.sessionSlots['session-a'].linkedFile).toBe('/workspace/note.md')
   })
 
+  it('keeps composer text and attachments isolated per session', () => {
+    const sessionA = {
+      ...emptySlot(),
+      currentSessionId: 'session-a',
+      composerDraft: {
+        text: 'draft A',
+        attachments: [{ name: 'a.md', path: '/workspace/a.md', type: 'text' as const }],
+      },
+    }
+    const sessionB = {
+      ...emptySlot(),
+      currentSessionId: 'session-b',
+      composerDraft: { text: 'draft B', attachments: [] },
+    }
+    useAgentStore.setState({
+      activeSessionId: { editor: 'session-a', ask: null },
+      slots: { editor: sessionA, ask: emptySlot() },
+      sessionSlots: { 'session-a': sessionA, 'session-b': sessionB },
+      sessionAccessOrder: ['session-a', 'session-b'],
+    })
+
+    useAgentStore.getState().updateComposerDraft('editor', { text: 'updated A' }, 'session-a')
+    useAgentStore.getState().switchToSession('session-b', 'editor')
+
+    expect(useAgentStore.getState().slots.editor.composerDraft).toEqual({
+      text: 'draft B',
+      attachments: [],
+    })
+
+    useAgentStore.getState().updateComposerDraft('editor', {
+      attachments: [{ name: 'b.pdf', path: '/workspace/b.pdf', type: 'pdf' }],
+    }, 'session-b')
+    useAgentStore.getState().switchToSession('session-a', 'editor')
+
+    const state = useAgentStore.getState()
+    expect(state.slots.editor.composerDraft).toEqual({
+      text: 'updated A',
+      attachments: [{ name: 'a.md', path: '/workspace/a.md', type: 'text' }],
+    })
+    expect(state.sessionSlots['session-b'].composerDraft).toEqual({
+      text: 'draft B',
+      attachments: [{ name: 'b.pdf', path: '/workspace/b.pdf', type: 'pdf' }],
+    })
+  })
+
   it('records a saved artifact in both representations of the active session', () => {
     const slot = {
       ...emptySlot(),
@@ -150,6 +195,7 @@ describe('agent store intent actions', () => {
       ...emptySlot(),
       currentSessionId: 'temp-a',
       isStreaming: true,
+      composerDraft: { text: 'follow up', attachments: [] },
       messages: [{ kind: 'user' as const, id: 'user-a', role: 'user' as const, textContent: 'hello', createdAt: 1 }],
     }
     useAgentStore.setState({
@@ -180,7 +226,9 @@ describe('agent store intent actions', () => {
     expect(state.activeSessionId.editor).toBe('temp-a')
     expect(state.slots.editor.currentSessionId).toBe('temp-a')
     expect(state.slots.editor.sdkSessionId).toBe('sdk-a')
+    expect(state.slots.editor.composerDraft.text).toBe('follow up')
     expect(state.sessionSlots['temp-a'].sdkSessionId).toBe('sdk-a')
+    expect(state.sessionSlots['temp-a'].composerDraft.text).toBe('follow up')
     expect(state.sessionList[0]).toMatchObject({ id: 'temp-a', sdkSessionId: 'sdk-a', title: 'Research' })
   })
 

@@ -417,6 +417,22 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       set((s) => patchSessionSlot(s, context, { prefillText: null }))
     },
 
+    updateComposerDraft(context, patch, sessionId) {
+      set((state) => {
+        if (sessionId) {
+          const targetSlot = resolveSessionSlot(state, context, sessionId)
+          return patchSessionScopedSlot(state, context, {
+            composerDraft: { ...targetSlot.composerDraft, ...patch },
+          }, sessionId)
+        }
+
+        const activeSlot = state.slots[context]
+        return patchActiveContextSlot(state, context, {
+          composerDraft: { ...activeSlot.composerDraft, ...patch },
+        })
+      })
+    },
+
     setLinkedFile(context: AgentContext, path: string | null) {
       set((state) => patchActiveContextSlot(state, context, { linkedFile: path }))
     },
@@ -509,6 +525,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           lastEditedFile: realSlot?.lastEditedFile || sourceSlot?.lastEditedFile || null,
           usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
           todoList: realSlot?.todoList || sourceSlot?.todoList || null,
+          composerDraft: sourceSlot?.composerDraft || realSlot?.composerDraft || baseSlot.composerDraft,
           currentSessionId: clientSessionKey,
           sdkSessionId,
           workspacePath: envelope.workspacePath || sourceSlot?.workspacePath || realSlot?.workspacePath || null,
