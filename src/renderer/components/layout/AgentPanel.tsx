@@ -11,7 +11,6 @@ import TodoPanel from '../chat/TodoPanel'
 interface AgentPanelProps {
   context?: AgentContext
   width: number
-  edgeClass: string
   workspacePath?: string
   permissionRequest: PermissionRequest | null
   permissionQueueLength: number
@@ -28,7 +27,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ context = 'editor', width, workspacePath, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
@@ -79,7 +78,7 @@ function AgentPanel({ context = 'editor', width, edgeClass, workspacePath, permi
     : currentSessionTitle
 
   return (
-    <div className={`agent-panel ${edgeClass}`} style={{ width, minWidth: width, maxWidth: width }}>
+    <div className="agent-panel" style={{ width, minWidth: width, maxWidth: width }}>
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
           <div className="agent-header-context" title={sessionContextTitle} aria-label={`当前会话：${sessionContextTitle}`}>

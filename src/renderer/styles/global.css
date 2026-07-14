@@ -205,6 +205,7 @@
   --agent-panel-collapse-threshold: 180px;
   --editor-min-ratio: 0.30;
   --divider-zone-width: 12px;
+  --divider-zone-overlap: 6px;
 
   /* ── Editor tokens (Layer 3: Component) ─────────────────────── */
 

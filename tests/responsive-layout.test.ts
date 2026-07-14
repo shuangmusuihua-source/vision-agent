@@ -3,11 +3,11 @@ import { getDefaultAgentPanelWidth } from '../src/renderer/hooks/useResponsiveLa
 
 describe('default Agent panel layout', () => {
   it('splits the desktop panel area evenly with an expanded sidebar', () => {
-    expect(getDefaultAgentPanelWidth(1440, false)).toBe(604)
+    expect(getDefaultAgentPanelWidth(1440, false)).toBe(610)
   })
 
   it('splits the full panel area evenly when the sidebar is collapsed', () => {
-    expect(getDefaultAgentPanelWidth(1000, true)).toBe(494)
+    expect(getDefaultAgentPanelWidth(1000, true)).toBe(500)
   })
 
   it('keeps a usable minimum width', () => {

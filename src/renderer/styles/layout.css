@@ -1519,23 +1519,11 @@
   z-index: 1;
   transition: width 0.25s cubic-bezier(0.25, 1, 0.5, 1),
               opacity 0.2s ease;
-  margin-left: -20px;
-  border-radius: var(--radius-lg);
+  margin: 0;
+  border-radius: 0;
   -electron-corner-smoothing: system-ui;
   box-shadow: none;
   overflow: visible;
-}
-
-.agent-panel-edge-right {
-  margin-left: -20px;
-  margin-right: 0;
-}
-
-.agent-panel-edge-left {
-  margin-left: 0;
-  margin-right: -20px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
 }
 
 /* --- Divider Zone --- */
@@ -1544,6 +1532,7 @@
   position: relative;
   flex-shrink: 0;
   width: var(--divider-zone-width);
+  margin-inline: calc(-1 * var(--divider-zone-overlap));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1554,6 +1543,7 @@
 
 .divider-zone-collapsed {
   width: 24px;
+  margin-inline: 0;
   cursor: default;
 }
 
@@ -1563,14 +1553,14 @@
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: var(--color-border);
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-default);
+  background: var(--color-border-soft);
+  transition: background var(--duration-fast) var(--ease-default),
+              width var(--duration-fast) var(--ease-default);
   pointer-events: none;
 }
 
 .divider-zone-hover .divider-line {
-  opacity: 1;
+  background: var(--color-border);
 }
 
 .divider-zone-dragging .divider-line {

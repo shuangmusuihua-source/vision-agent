@@ -826,7 +826,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       >
       <AgentPanel
         width={agentWidth}
-        edgeClass={isChatFirst ? 'agent-panel-edge-left' : 'agent-panel-edge-right'}
         workspacePath={editorWorkspacePath || undefined}
         permissionRequest={editorPermission}
         permissionQueueLength={editorPermissionQueueLen}

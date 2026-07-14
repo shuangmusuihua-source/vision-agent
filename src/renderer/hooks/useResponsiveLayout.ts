@@ -4,12 +4,11 @@ import { useDividerDrag } from './useDividerDrag'
 const SIDEBAR_AUTO_COLLAPSE_BREAKPOINT = 1200
 const AGENT_OVERLAY_BREAKPOINT = 900
 const EXPANDED_SIDEBAR_WIDTH = 220
-const DIVIDER_ZONE_WIDTH = 12
 const AGENT_MIN_WIDTH = 240
 
 export function getDefaultAgentPanelWidth(viewportWidth: number, sidebarCollapsed: boolean): number {
   const sidebarWidth = sidebarCollapsed ? 0 : EXPANDED_SIDEBAR_WIDTH
-  const panelAreaWidth = Math.max(0, viewportWidth - sidebarWidth - DIVIDER_ZONE_WIDTH)
+  const panelAreaWidth = Math.max(0, viewportWidth - sidebarWidth)
   return Math.max(AGENT_MIN_WIDTH, Math.round(panelAreaWidth / 2))
 }
 
