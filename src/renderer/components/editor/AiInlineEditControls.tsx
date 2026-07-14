@@ -2,7 +2,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
-import { ArrowUp, Check, ChevronDown, LoaderCircle, PenLine, Undo2, X } from 'lucide-react'
+import {
+  ArrowUp,
+  BookOpenText,
+  Check,
+  ChevronDown,
+  LoaderCircle,
+  MessageCircleQuestionMark,
+  ScanSearch,
+  Sparkles,
+  Undo2,
+  X,
+} from 'lucide-react'
 
 export type InlineEditMode = 'idle' | 'prompt' | 'loading' | 'review'
 type BlockStyle = 'paragraph' | 'heading-1' | 'heading-2' | 'heading-3' | 'ordered-list' | 'bullet-list'
@@ -23,6 +34,35 @@ function getActiveBlockStyle(editor: Editor): BlockStyle {
   if (editor.isActive('heading', { level: 2 })) return 'heading-2'
   if (editor.isActive('heading', { level: 3 })) return 'heading-3'
   return 'paragraph'
+}
+
+function getInlineSelectionVirtualElement(editor: Editor) {
+  const selection = window.getSelection()
+  const editorRoot = editor.view.dom
+
+  if (
+    !selection
+    || selection.rangeCount === 0
+    || selection.isCollapsed
+    || !editorRoot.contains(selection.anchorNode)
+    || !editorRoot.contains(selection.focusNode)
+  ) {
+    return null
+  }
+
+  const range = selection.getRangeAt(0)
+  const clientRects = Array.from(range.getClientRects()).filter(
+    (rect) => rect.width > 0 && rect.height > 0,
+  )
+
+  if (clientRects.length === 0) return null
+
+  const boundingRect = range.getBoundingClientRect()
+  return {
+    getBoundingClientRect: () => boundingRect,
+    getClientRects: () => clientRects,
+    contextElement: editorRoot,
+  }
 }
 
 type AiInlineEditControlsProps = {
@@ -158,7 +198,15 @@ export default function AiInlineEditControls({
       pluginKey="aiInlineEditMenu"
       updateDelay={50}
       appendTo={() => bubblePortal}
-      options={{ placement: 'top', offset: 10, strategy: 'fixed', flip: true, shift: { padding: 12 } }}
+      getReferencedVirtualElement={() => getInlineSelectionVirtualElement(editor)}
+      options={{
+        placement: 'top',
+        offset: 10,
+        strategy: 'fixed',
+        flip: true,
+        shift: { padding: 12 },
+        inline: true,
+      }}
       shouldShow={({ state }) => {
         if (mode !== 'idle') return true
         const { from, to, empty } = state.selection
@@ -174,7 +222,7 @@ export default function AiInlineEditControls({
             onMouseDown={(event) => event.preventDefault()}
             onClick={onOpen}
           >
-            <PenLine size={14} />
+            <Sparkles size={14} />
             <span>AI 修改</span>
             <kbd>⌘ K</kbd>
           </button>
@@ -186,6 +234,7 @@ export default function AiInlineEditControls({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onAgentAction('explain')}
           >
+            <BookOpenText size={14} aria-hidden="true" />
             解释
           </button>
           <button
@@ -196,6 +245,7 @@ export default function AiInlineEditControls({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onAgentAction('review')}
           >
+            <ScanSearch size={14} aria-hidden="true" />
             审阅
           </button>
           <button
@@ -206,6 +256,7 @@ export default function AiInlineEditControls({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onAgentAction('ask')}
           >
+            <MessageCircleQuestionMark size={14} aria-hidden="true" />
             提问
           </button>
           <span className="ai-inline-toolbar-divider" aria-hidden="true" />
@@ -265,7 +316,7 @@ export default function AiInlineEditControls({
       {mode === 'prompt' && (
         <div className="ai-inline-prompt-shell">
           <div className="ai-inline-prompt-row">
-            <PenLine size={14} aria-hidden="true" />
+            <Sparkles size={14} aria-hidden="true" />
             <input
               ref={inputRef}
               value={instruction}

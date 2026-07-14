@@ -641,18 +641,20 @@
   --ai-inline-control-width: min(280px, calc(100vw - 24px));
   --ai-inline-control-height: 28px;
   --ai-inline-shell-padding: 3px;
+  --ai-inline-hover-bg: color-mix(in srgb, var(--color-bg-tertiary) 74%, transparent);
+  --ai-inline-motion-duration: 0.18s;
+  --ai-inline-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 1200;
   /* BubbleMenu measures before its first positioning pass. Keep the portal
      shrink-wrapped from frame one so the initial x coordinate is accurate. */
   width: max-content;
   max-width: min(520px, calc(100vw - 24px));
   color: var(--color-text-primary);
-  filter: drop-shadow(0 12px 26px rgba(17, 24, 39, 0.16));
-  animation: ai-inline-menu-in 0.16s ease-out;
+  animation: ai-inline-menu-in var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 @keyframes ai-inline-menu-in {
-  from { opacity: 0; transform: translateY(3px) scale(0.985); }
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -660,9 +662,10 @@
 .ai-inline-prompt-shell,
 .ai-inline-loading,
 .ai-inline-review-actions {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-md);
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
+  background: var(--composer-bg);
+  box-shadow: var(--composer-shadow);
+  -electron-corner-smoothing: system-ui;
 }
 
 .ai-inline-toolbar {
@@ -696,17 +699,33 @@
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   background: transparent;
-  transition: color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+  transition:
+    color var(--ai-inline-motion-duration) ease,
+    background var(--ai-inline-motion-duration) ease,
+    transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
-.ai-inline-toolbar button:hover,
-.ai-inline-toolbar button.is-active {
+.ai-inline-toolbar button:hover {
   color: var(--color-text-primary);
-  background: var(--color-bg-hover);
+  background: var(--ai-inline-hover-bg);
+  transform: translateY(-1px);
+}
+
+.ai-inline-toolbar button.is-active {
+  color: var(--color-action);
+  background: var(--color-action-bg);
 }
 
 .ai-inline-toolbar button:active {
-  transform: scale(0.96);
+  transform: translateY(0) scale(0.96);
+}
+
+.ai-inline-toolbar button:focus-visible,
+.ai-inline-review-actions button:focus-visible,
+.ai-inline-loading button:focus-visible,
+.ai-inline-prompt-row button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .ai-inline-toolbar .ai-inline-toolbar-primary {
@@ -718,12 +737,18 @@
 }
 
 .ai-inline-toolbar .ai-inline-agent-action {
+  gap: 5px;
   padding-inline: var(--space-sm);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
 
-.ai-inline-toolbar-primary svg {
+.ai-inline-toolbar button svg {
+  stroke-width: 1.75;
+}
+
+.ai-inline-toolbar-primary svg,
+.ai-inline-agent-action svg {
   color: var(--color-action);
 }
 
@@ -750,7 +775,7 @@
 
 .ai-inline-style-trigger svg {
   flex: 0 0 auto;
-  transition: transform 0.14s ease;
+  transition: transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 .ai-inline-style-trigger[aria-expanded="true"] svg {
@@ -764,11 +789,12 @@
   z-index: 2;
   width: 196px;
   padding: var(--space-2xs);
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
   border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-lg);
-  animation: ai-inline-menu-in 0.14s ease-out;
+  background: var(--composer-bg);
+  box-shadow: var(--composer-shadow);
+  -electron-corner-smoothing: system-ui;
+  animation: ai-inline-menu-in var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 .ai-inline-toolbar .ai-inline-style-option {
@@ -784,12 +810,21 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-normal);
   text-align: left;
+  transition:
+    color var(--ai-inline-motion-duration) ease,
+    background var(--ai-inline-motion-duration) ease,
+    transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
-.ai-inline-toolbar .ai-inline-style-option:hover,
-.ai-inline-toolbar .ai-inline-style-option.is-selected {
+.ai-inline-toolbar .ai-inline-style-option:hover {
   color: var(--color-text-primary);
-  background: var(--color-bg-hover);
+  background: var(--ai-inline-hover-bg);
+  transform: translateX(1px);
+}
+
+.ai-inline-toolbar .ai-inline-style-option.is-selected {
+  color: var(--color-action);
+  background: var(--color-action-bg);
 }
 
 .ai-inline-style-option kbd {
@@ -854,7 +889,10 @@
 .ai-inline-submit {
   color: var(--button-primary-text);
   background: var(--button-primary-bg);
-  transition: opacity 0.14s ease, background 0.14s ease, transform 0.14s ease;
+  transition:
+    opacity var(--ai-inline-motion-duration) ease,
+    background var(--ai-inline-motion-duration) ease,
+    transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 .ai-inline-submit:hover:not(:disabled) {
@@ -875,11 +913,16 @@
   height: 26px;
   color: var(--color-text-tertiary);
   background: transparent;
+  transition:
+    color var(--ai-inline-motion-duration) ease,
+    background var(--ai-inline-motion-duration) ease,
+    transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 .ai-inline-close:hover {
   color: var(--color-text-primary);
-  background: var(--color-bg-hover);
+  background: var(--ai-inline-hover-bg);
+  transform: translateY(-1px);
 }
 
 .ai-inline-error {
@@ -915,11 +958,16 @@
   color: var(--color-text-tertiary);
   background: transparent;
   font-size: var(--font-size-xs);
+  transition:
+    color var(--ai-inline-motion-duration) ease,
+    background var(--ai-inline-motion-duration) ease,
+    transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 .ai-inline-loading button:hover {
   color: var(--color-text-primary);
-  background: var(--color-bg-hover);
+  background: var(--ai-inline-hover-bg);
+  transform: translateY(-1px);
 }
 
 .ai-inline-review-actions {
@@ -939,6 +987,10 @@
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+  transition:
+    color var(--ai-inline-motion-duration) ease,
+    background var(--ai-inline-motion-duration) ease,
+    transform var(--ai-inline-motion-duration) var(--ai-inline-motion-ease);
 }
 
 .ai-inline-undo {
@@ -948,19 +1000,20 @@
 
 .ai-inline-undo:hover {
   color: var(--color-text-primary);
-  background: var(--color-bg-hover);
+  background: var(--ai-inline-hover-bg);
+  transform: translateY(-1px);
 }
 
 .ai-inline-accept {
   color: var(--button-primary-text);
   background: var(--button-primary-bg);
   box-shadow: 0 2px 6px color-mix(in srgb, var(--color-action) 34%, transparent);
-  transition: color 0.14s ease, background 0.14s ease, transform 0.14s ease;
 }
 
 .ai-inline-accept:hover {
   color: var(--button-primary-text);
   background: var(--button-primary-hover);
+  transform: translateY(-1px);
 }
 
 .ai-inline-accept:active {
@@ -1005,9 +1058,9 @@
 [data-theme="dark"] .ai-inline-prompt-shell,
 [data-theme="dark"] .ai-inline-loading,
 [data-theme="dark"] .ai-inline-review-actions {
-  border-color: rgba(255, 255, 255, 0.10);
-  background: var(--color-bg-elevated);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+  background: var(--composer-bg);
+  box-shadow: var(--composer-shadow);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1015,6 +1068,22 @@
   .ai-inline-review-suggestion,
   .ai-inline-spinner {
     animation: none;
+  }
+
+  .ai-inline-menu *,
+  .ai-inline-menu *::before,
+  .ai-inline-menu *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .ai-inline-toolbar button:hover,
+  .ai-inline-toolbar .ai-inline-style-option:hover,
+  .ai-inline-close:hover,
+  .ai-inline-loading button:hover,
+  .ai-inline-undo:hover,
+  .ai-inline-accept:hover {
+    transform: none;
   }
 }
 
