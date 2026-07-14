@@ -14,10 +14,13 @@
     "postinstall": "electron-builder install-app-deps",
     "pack": "electron-builder --dir && npm run verify:packaged",
     "dist": "electron-builder && npm run verify:packaged",
-    "release": "npm run verify && electron-builder --publish always && npm run verify:packaged",
+    "release": "npm run verify && electron-builder --publish never && npm run verify:packaged && node scripts/publish-verified-artifacts.mjs",
     "verify:packaged": "npm run verify:packaged-skills && npm run verify:packaged-app",
     "verify:packaged-skills": "node scripts/verify-packaged-skills.mjs",
     "verify:packaged-app": "node scripts/verify-packaged-app.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.206",

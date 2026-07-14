@@ -23,15 +23,32 @@ const mermaidPlugin: DiagramPlugin = {
 
 const STREAMDOWN_PLUGINS = { code, math, mermaid: mermaidPlugin }
 
+const themeListeners = new Set<() => void>()
+let themeObserver: MutationObserver | null = null
+
+function subscribeCodeTheme(listener: () => void): () => void {
+  themeListeners.add(listener)
+  if (!themeObserver) {
+    themeObserver = new MutationObserver(() => {
+      for (const notify of themeListeners) notify()
+    })
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  }
+  return () => {
+    themeListeners.delete(listener)
+    if (themeListeners.size === 0) {
+      themeObserver?.disconnect()
+      themeObserver = null
+    }
+  }
+}
+
+function codeThemeSnapshot(): string | null {
+  return document.documentElement.getAttribute('data-theme')
+}
+
 function useCodeTheme(): [BundledTheme, BundledTheme] {
-  const theme = useSyncExternalStore(
-    (cb) => {
-      const obs = new MutationObserver(cb)
-      obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-      return () => obs.disconnect()
-    },
-    () => document.documentElement.getAttribute('data-theme') as string | null
-  )
+  const theme = useSyncExternalStore(subscribeCodeTheme, codeThemeSnapshot)
   return theme === 'light'
     ? ['github-light', 'github-dark']
     : ['github-dark', 'github-light']

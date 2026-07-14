@@ -167,7 +167,7 @@ function AutomationPanel({
   }, [refreshTasks])
 
   const handleSelectDirectory = useCallback(async () => {
-    const result = await window.api.agent.selectFolder()
+    const result = await window.api.cron.selectDirectory()
     if (!result.canceled && result.filePaths[0]) {
       setDraftField('selectedDirectoryPath', result.filePaths[0])
     }

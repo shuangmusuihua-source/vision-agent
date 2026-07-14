@@ -55,7 +55,7 @@ describe('SourceSaveController', () => {
     expect(controller.hasPendingSave()).toBe(false)
   })
 
-  it('uses the latest save handler when the React prop changes', () => {
+  it('keeps the save handler that owned the edit when React props change', () => {
     vi.useFakeTimers()
     const firstSave = vi.fn()
     const nextSave = vi.fn()
@@ -65,8 +65,12 @@ describe('SourceSaveController', () => {
     controller.setSaveHandler(nextSave)
     vi.advanceTimersByTime(1500)
 
-    expect(firstSave).not.toHaveBeenCalled()
-    expect(nextSave).toHaveBeenCalledWith('/workspace/a.md', 'draft')
+    expect(firstSave).toHaveBeenCalledWith('/workspace/a.md', 'draft')
+    expect(nextSave).not.toHaveBeenCalled()
+
+    controller.schedule('/workspace/b.md', 'next draft')
+    vi.advanceTimersByTime(1500)
+    expect(nextSave).toHaveBeenCalledWith('/workspace/b.md', 'next draft')
   })
 
   it('flushes the captured file before a tab switch cancels its debounce', () => {

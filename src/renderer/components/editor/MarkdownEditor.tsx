@@ -39,6 +39,10 @@ const lowlight = createLowlight(common)
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 
+function editorDocumentIdentity(ownerKey: string | null, filePath: string): string {
+  return `${ownerKey || ''}\u0000${filePath}`
+}
+
 function extractFrontmatter(md: string): { frontmatter: string; body: string } {
   const match = md.match(FRONTMATTER_RE)
   if (match) {
@@ -74,6 +78,7 @@ interface MarkdownFile {
 interface MarkdownEditorProps {
   content: string
   filePath: string
+  documentOwnerKey: string | null
   workspacePath: string | null
   sourceMode: boolean
   focusMode: boolean
@@ -112,16 +117,17 @@ function SuggestionList({ items, command, selectedIndex }: {
   )
 }
 
-const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({ content, filePath, workspacePath, sourceMode, focusMode, onOpenFile, onSave, onAskAgent, onStatsUpdate }, ref): React.ReactElement {
+const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({ content, filePath, documentOwnerKey, workspacePath, sourceMode, focusMode, onOpenFile, onSave, onAskAgent, onStatsUpdate }, ref): React.ReactElement {
   const [, setMarkdownFiles] = useState<MarkdownFile[]>([])
   const filesRef = useRef<MarkdownFile[]>([])
   const [internalSourceMode, setInternalSourceMode] = useState(sourceMode)
   const [sourceText, setSourceText] = useState('')
   const frontmatterRef = useRef('')
-  const isLocalChange = useRef(false)
+  const localChangeIdentityRef = useRef<string | null>(null)
   const sourceSaveControllerRef = useRef<SourceSaveController | null>(null)
   const editorSaveControllerRef = useRef<SourceSaveController | null>(null)
-  const sourceFilePathRef = useRef(filePath)
+  const currentDocumentIdentity = editorDocumentIdentity(documentOwnerKey, filePath)
+  const sourceDocumentIdentityRef = useRef(currentDocumentIdentity)
   const [inlineEditMode, setInlineEditMode] = useState<InlineEditMode>('idle')
   const [inlineEditInstruction, setInlineEditInstruction] = useState('')
   const [inlineEditError, setInlineEditError] = useState<string | null>(null)
@@ -130,7 +136,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const inlineRequestIdRef = useRef<string | null>(null)
   const inlineRequestSequenceRef = useRef(0)
   const beginInlineRewriteRef = useRef<(() => void) | null>(null)
-  const inlineFilePathRef = useRef(filePath)
+  const inlineDocumentIdentityRef = useRef(currentDocumentIdentity)
+  const shortcutSaveRef = useRef({ filePath, documentOwnerKey, onSave })
+  shortcutSaveRef.current = { filePath, documentOwnerKey, onSave }
   if (!sourceSaveControllerRef.current) {
     sourceSaveControllerRef.current = new SourceSaveController(onSave)
   }
@@ -171,18 +179,22 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   }, [filePath, sourceSaveController])
 
   useEffect(() => {
+    let cancelled = false
     if (!workspacePath) {
       setMarkdownFiles([])
       filesRef.current = []
       return
     }
     window.api.workspace.listMarkdownFiles(workspacePath).then((files) => {
+      if (cancelled) return
       setMarkdownFiles(files)
       filesRef.current = files
     }).catch(() => {
+      if (cancelled) return
       setMarkdownFiles([])
       filesRef.current = []
     })
+    return () => { cancelled = true }
   }, [workspacePath])
 
   const editor = useEditor({
@@ -225,7 +237,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
           return {
             'Mod-s': () => {
               const md = getFullMarkdown(this.editor)
-              onSave(filePath, md)
+              const target = shortcutSaveRef.current
+              target.onSave(target.filePath, md)
               return true
             },
             'Mod-k': () => {
@@ -500,10 +513,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   }, [editor])
 
   useEffect(() => {
-    if (inlineFilePathRef.current === filePath) return
-    inlineFilePathRef.current = filePath
+    if (inlineDocumentIdentityRef.current === currentDocumentIdentity) return
+    inlineDocumentIdentityRef.current = currentDocumentIdentity
     if (inlineSelectionRef.current) cancelInlineRewrite(false)
-  }, [cancelInlineRewrite, filePath])
+  }, [cancelInlineRewrite, currentDocumentIdentity])
 
   useEffect(() => {
     if (internalSourceMode && inlineEditMode !== 'idle') cancelInlineRewrite(false)
@@ -516,7 +529,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       if (sourceMode) {
         // Entering source mode: save current full markdown to sourceText
         editorSaveController.flush()
-        sourceFilePathRef.current = filePath
+        sourceDocumentIdentityRef.current = currentDocumentIdentity
         setSourceText(getFullMarkdown(editor))
       } else {
         flushSourceSave()
@@ -531,17 +544,17 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       }
       setInternalSourceMode(sourceMode)
     }
-  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, filePath, editorSaveController])
+  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, currentDocumentIdentity, editorSaveController])
 
   useEffect(() => {
     if (!internalSourceMode) {
-      sourceFilePathRef.current = filePath
+      sourceDocumentIdentityRef.current = currentDocumentIdentity
       return
     }
 
-    if (sourceFilePathRef.current !== filePath) {
+    if (sourceDocumentIdentityRef.current !== currentDocumentIdentity) {
       flushSourceSave()
-      sourceFilePathRef.current = filePath
+      sourceDocumentIdentityRef.current = currentDocumentIdentity
       sourceSaveController.discard()
       setSourceText(content)
       return
@@ -550,7 +563,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     if (!sourceSaveController.hasPendingSave()) {
       setSourceText(content)
     }
-  }, [content, filePath, flushSourceSave, internalSourceMode, sourceSaveController])
+  }, [content, currentDocumentIdentity, flushSourceSave, internalSourceMode, sourceSaveController])
 
   useEffect(() => {
     return () => {
@@ -561,10 +574,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
-    if (isLocalChange.current) {
-      isLocalChange.current = false
+    if (localChangeIdentityRef.current === currentDocumentIdentity) {
+      localChangeIdentityRef.current = null
       return
     }
+    localChangeIdentityRef.current = null
     if (normalizeMd(content) !== normalizeMd(getFullMarkdown(editor))) {
       if (inlineSelectionRef.current) cancelInlineRewrite(false)
       const { frontmatter, body } = extractFrontmatter(content)
@@ -575,14 +589,14 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
         editor.commands.removeFrontmatter()
       }
     }
-  }, [cancelInlineRewrite, content, editor])
+  }, [cancelInlineRewrite, content, currentDocumentIdentity, editor])
 
   // Auto-save with debounce
   useEffect(() => {
     if (!editor || editor.isDestroyed || !filePath) return
 
     const handler = () => {
-      isLocalChange.current = true
+      localChangeIdentityRef.current = currentDocumentIdentity
       if (editor.isDestroyed) return
       editorSaveController.schedule(filePath, getFullMarkdown(editor))
     }
@@ -594,7 +608,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       // expires. Persist the captured markdown for the old path first.
       editorSaveController.flush()
     }
-  }, [editor, editorSaveController, filePath])
+  }, [currentDocumentIdentity, editor, editorSaveController, filePath])
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
@@ -656,6 +670,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 export default memo(MarkdownEditor, (prev, next) =>
   prev.content === next.content &&
   prev.filePath === next.filePath &&
+  prev.documentOwnerKey === next.documentOwnerKey &&
   prev.workspacePath === next.workspacePath &&
   prev.sourceMode === next.sourceMode &&
   prev.focusMode === next.focusMode

@@ -9,6 +9,7 @@ type LoadedCronManager = {
   buildAgentOptions: ReturnType<typeof vi.fn>
   notifyCronTaskComplete: ReturnType<typeof vi.fn>
   sentEvents: unknown[][]
+  isToolUsePathAuthorized: ReturnType<typeof vi.fn>
 }
 
 async function loadCronManager(options?: {
@@ -26,6 +27,7 @@ async function loadCronManager(options?: {
   const buildAgentOptions = vi.fn((profile) => profile)
   const notifyCronTaskComplete = vi.fn()
   const sentEvents: unknown[][] = []
+  const isToolUsePathAuthorized = vi.fn(() => true)
 
   vi.doMock('node-cron', () => ({
     default: { schedule },
@@ -42,7 +44,8 @@ async function loadCronManager(options?: {
     }),
   }))
   vi.doMock('../src/main/persistence/workspace-store', () => ({
-    getAuthorizedDirectories: () => options?.authorizedDirectories || ['/tmp/authorized'],
+    getAuthorizedDirectories: () => options?.authorizedDirectories || ['/tmp/workspace'],
+    getSessionRecordById: () => undefined,
   }))
   vi.doMock('../src/main/persistence/settings-store', () => ({
     getCronTasks: () => options?.persisted || [],
@@ -52,8 +55,13 @@ async function loadCronManager(options?: {
   vi.doMock('../src/main/notification-manager', () => ({ notifyCronTaskComplete }))
   vi.doMock('../src/main/agent-path-utils', () => ({
     extractToolPathInput: vi.fn(() => null),
-    isToolUsePathAuthorized: vi.fn(() => true),
+    isExactAuthorizedRoot: vi.fn((path: string, roots: string[]) => roots.includes(path)),
+    isToolUsePathAuthorized,
     toolRequiresPath: vi.fn(() => false),
+  }))
+  vi.doMock('../src/main/directory-grants', () => ({
+    canonicalGrantedDirectory: (path: string) => path,
+    consumeSelectedDirectoryGrant: () => true,
   }))
 
   const manager = await import('../src/main/cron-manager')
@@ -65,6 +73,7 @@ async function loadCronManager(options?: {
     buildAgentOptions,
     notifyCronTaskComplete,
     sentEvents,
+    isToolUsePathAuthorized,
   }
 }
 
@@ -99,7 +108,7 @@ describe('cron manager automation tasks', () => {
   })
 
   it('executes with target cwd, network tools, and run history', async () => {
-    const { manager, query, buildAgentOptions, notifyCronTaskComplete, sentEvents } = await loadCronManager()
+    const { manager, query, buildAgentOptions, notifyCronTaskComplete, sentEvents, isToolUsePathAuthorized } = await loadCronManager()
     const task = manager.registerTask({
       cronExpression: '0 9 * * *',
       prompt: 'summarize updates',
@@ -121,7 +130,14 @@ describe('cron manager automation tasks', () => {
     }))
     const profile = buildAgentOptions.mock.calls[0][0]
     await expect(profile.canUseTool('WebFetch', {})).resolves.toEqual(expect.objectContaining({ behavior: 'allow' }))
+    await expect(profile.canUseTool('Read', { file_path: '/tmp/automation-target/report.md' })).resolves.toEqual(expect.objectContaining({ behavior: 'allow' }))
     await expect(profile.canUseTool('Bash', {})).resolves.toEqual(expect.objectContaining({ behavior: 'deny' }))
+    expect(isToolUsePathAuthorized).toHaveBeenCalledWith(
+      'Read',
+      { file_path: '/tmp/automation-target/report.md' },
+      ['/tmp/automation-target'],
+      { cwd: '/tmp/automation-target' },
+    )
     expect(query).toHaveBeenCalledWith(expect.objectContaining({
       prompt: expect.stringMatching(/https:\/\/example\.com\/updates[\s\S]*只能使用 WebFetch 或 WebSearch[\s\S]*summarize updates/),
       options: expect.objectContaining({
@@ -170,6 +186,40 @@ describe('cron manager automation tasks', () => {
       status: 'cancelled',
       result: '任务已停止。',
     }))
+  })
+
+  it('aborts a running task when it is removed', async () => {
+    let releaseReady!: () => void
+    const ready = new Promise<void>((resolve) => { releaseReady = resolve })
+    const queryImpl = async function* queryMock(args: { options: { abortController: AbortController } }) {
+      releaseReady()
+      await new Promise<void>((_resolve, reject) => {
+        args.options.abortController.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+      })
+    }
+    const { manager } = await loadCronManager({ queryImpl })
+    const task = manager.registerTask({ cronExpression: '*/5 * * * *', prompt: 'watch files' })
+    const pending = manager.executeTaskById(task.id)
+    await ready
+
+    expect(manager.removeTask(task.id)).toBe(true)
+    await pending
+    expect(manager.listTasks()).toEqual([])
+  })
+
+  it('isolates untargeted tasks in separate scratch directories', async () => {
+    const { manager, buildAgentOptions } = await loadCronManager()
+    const first = manager.registerTask({ cronExpression: '0 1 * * *', prompt: 'first' })
+    const second = manager.registerTask({ cronExpression: '0 2 * * *', prompt: 'second' })
+
+    await manager.executeTaskById(first.id)
+    await manager.executeTaskById(second.id)
+
+    const firstCwd = buildAgentOptions.mock.calls[0][0].cwd as string
+    const secondCwd = buildAgentOptions.mock.calls[1][0].cwd as string
+    expect(firstCwd).toContain(first.id)
+    expect(secondCwd).toContain(second.id)
+    expect(firstCwd).not.toBe(secondCwd)
   })
 
   it('pauses and resumes the recurring schedule', async () => {

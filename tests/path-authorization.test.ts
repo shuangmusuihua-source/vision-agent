@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import path from 'path'
 import { describe, expect, it } from 'vitest'
-import { extractToolPathInput, isPathAuthorized, isToolUsePathAuthorized, toolRequiresPath } from '../src/main/agent-path-utils'
+import { extractToolPathInput, isExactAuthorizedRoot, isPathAuthorized, isToolUsePathAuthorized, toolRequiresPath } from '../src/main/agent-path-utils'
 
 function makeTempWorkspace() {
   const root = mkdtempSync(path.join(tmpdir(), 'sumi-auth-'))
@@ -14,6 +14,15 @@ function makeTempWorkspace() {
 }
 
 describe('agent path authorization', () => {
+  it('distinguishes an exact root from one of its descendants', () => {
+    const { workspace } = makeTempWorkspace()
+    const nested = path.join(workspace, 'nested')
+    mkdirSync(nested)
+
+    expect(isExactAuthorizedRoot(workspace, [workspace])).toBe(true)
+    expect(isExactAuthorizedRoot(nested, [workspace])).toBe(false)
+  })
+
   it('resolves relative paths against the provided cwd', () => {
     const { workspace, outside } = makeTempWorkspace()
     writeFileSync(path.join(workspace, 'note.md'), 'inside')

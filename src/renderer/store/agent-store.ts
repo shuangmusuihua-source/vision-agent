@@ -131,7 +131,6 @@ export type AgentStore = {
   sessionAccessOrder: string[]
 
   // Shared state (not context-specific)
-  isResumingSession: boolean
   sessionList: SdkSessionInfo[]
 
   // Workspace state

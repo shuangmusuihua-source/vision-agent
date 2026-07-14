@@ -121,7 +121,6 @@ export function useWorkspace() {
       if (dirPath) {
         if (!workspacePaths.includes(dirPath)) {
           setWorkspacePaths((prev) => [...prev, dirPath])
-          await window.api.settings.addDirectory(dirPath)
         }
         handleCloseNewWorkspaceModal()
       } else {

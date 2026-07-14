@@ -1,41 +1,48 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { CornerDownLeft, Check, ChevronLeft } from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
 import type { AskUserRequestIPC as AskUserRequest } from '../../../shared/types'
+import {
+  answerCurrentAskUserQuestion,
+  createAskUserFlow,
+  previousAskUserStep,
+  toggleAskUserSelection,
+} from './ask-user-flow'
 
 interface AskUserDrawerProps {
   request: AskUserRequest
   open: boolean
   onClose: () => void
   onRespond: (answers: Record<string, string>) => void
+  onTextSubmitReady?: (handler: AskUserTextSubmitHandler | null) => void
 }
 
-function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps): React.ReactElement {
-  const [step, setStep] = useState(0)
-  const [selections, setSelections] = useState<Record<string, Set<string>>>({})
-  const [textInputs, setTextInputs] = useState<Record<string, string>>({})
+export type AskUserTextSubmitHandler = {
+  requestId: string
+  submit: (answer: string) => void
+}
+
+function AskUserDrawer({ request, open, onClose, onRespond, onTextSubmitReady }: AskUserDrawerProps): React.ReactElement {
+  const [flow, setFlow] = useState(() => createAskUserFlow(request.id))
 
   const questions = request.questions
-
-  const currentQ = questions[step]
-  const isLastStep = step >= questions.length - 1
+  const currentQ = questions[flow.step]
+  const isLastStep = flow.step >= questions.length - 1
   const totalSteps = questions.length
 
-  const currentSelected = selections[currentQ?.question] || new Set<string>()
+  const currentSelected = flow.selections[currentQ?.question] || new Set<string>()
 
   const handleToggle = useCallback((label: string) => {
-    setSelections((prev) => {
-      const qKey = currentQ.question
-      const prevSet = prev[qKey] || new Set<string>()
-      const nextSet = new Set(prevSet)
-      if (nextSet.has(label)) {
-        nextSet.delete(label)
-      } else {
-        nextSet.add(label)
-      }
-      return { ...prev, [qKey]: nextSet }
-    })
+    if (!currentQ) return
+    setFlow((prev) => toggleAskUserSelection(prev, currentQ.question, label))
   }, [currentQ?.question])
+
+  const submitAnswer = useCallback((answer: string) => {
+    const result = answerCurrentAskUserQuestion(request, flow, answer)
+    if (!result) return
+    setFlow(result.state)
+    if (result.completedAnswers) onRespond(result.completedAnswers)
+  }, [flow, onRespond, request])
 
   const handleSingleSelect = useCallback((label: string) => {
     if (currentQ.multiSelect) {
@@ -43,37 +50,21 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
       return
     }
     // Single select — submit immediately or advance
-    const qKey = currentQ.question
-    const newSelections = { ...selections, [qKey]: new Set([label]) }
-    setSelections(newSelections)
-
-    if (isLastStep) {
-      // Build final answers map
-      const answers = buildAnswers(newSelections, textInputs, questions)
-      onRespond(answers)
-    } else {
-      setStep((s) => s + 1)
-    }
-  }, [currentQ, isLastStep, selections, textInputs, questions, onRespond, handleToggle])
+    submitAnswer(label)
+  }, [currentQ, handleToggle, submitAnswer])
 
   const handleMultiSubmit = useCallback(() => {
-    const qKey = currentQ.question
-    const selected = selections[qKey] || new Set()
-    const answer = Array.from(selected).join(', ')
-    const updatedTextInputs = { ...textInputs, [qKey]: answer }
-    setTextInputs(updatedTextInputs)
-
-    if (isLastStep) {
-      const answers = buildAnswers(selections, updatedTextInputs, questions)
-      onRespond(answers)
-    } else {
-      setStep((s) => s + 1)
-    }
-  }, [currentQ?.question, isLastStep, selections, textInputs, questions, onRespond])
+    submitAnswer(Array.from(currentSelected).join(', '))
+  }, [currentSelected, submitAnswer])
 
   const handlePrev = useCallback(() => {
-    setStep((s) => Math.max(0, s - 1))
+    setFlow(previousAskUserStep)
   }, [])
+
+  useEffect(() => {
+    onTextSubmitReady?.({ requestId: request.id, submit: submitAnswer })
+    return () => onTextSubmitReady?.(null)
+  }, [onTextSubmitReady, request.id, submitAnswer])
 
   const hasOptions = currentQ?.options && currentQ.options.length > 0
   const canSubmitMulti = currentQ?.multiSelect && currentSelected.size > 0
@@ -86,12 +77,12 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
             <button
               className="drawer-question-step-btn"
               onClick={handlePrev}
-              disabled={step === 0}
+              disabled={flow.step === 0}
               aria-label="上一题"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="drawer-question-step-label">{step + 1} / {totalSteps}</span>
+            <span className="drawer-question-step-label">{flow.step + 1} / {totalSteps}</span>
             <div style={{ width: 28 }} />
           </div>
         )}
@@ -150,26 +141,6 @@ function AskUserDrawer({ request, open, onClose, onRespond }: AskUserDrawerProps
       </div>
     </InputDrawer>
   )
-}
-
-function buildAnswers(
-  selections: Record<string, Set<string>>,
-  textInputs: Record<string, string>,
-  questions: Array<{ question: string }>
-): Record<string, string> {
-  const answers: Record<string, string> = {}
-  for (const q of questions) {
-    const text = textInputs[q.question]
-    if (text) {
-      answers[q.question] = text
-    } else {
-      const selected = selections[q.question]
-      if (selected && selected.size > 0) {
-        answers[q.question] = Array.from(selected).join(', ')
-      }
-    }
-  }
-  return answers
 }
 
 export default AskUserDrawer

@@ -80,7 +80,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
   return {
     context: 'editor',
     slots: { editor: emptySlot(), ask: emptySlot() },
-    isResumingSession: false,
     sessionList: [],
     sessionSlots: {},
     sessionAccessOrder: [],
@@ -722,12 +721,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       const targetSlot = get().slots[context]
       if (targetSlot._needsSdkLoad && targetSlot.currentSessionId === sessionId) {
-        set({ isResumingSession: true, sessionLoadError: null })
-        get().loadInitialSessionMessages(sessionId, context).finally(() => {
-          if (get().activeSessionId[context] === sessionId) {
-            set({ isResumingSession: false })
-          }
-        }).catch((err) => {
+        set({ sessionLoadError: null })
+        get().loadInitialSessionMessages(sessionId, context).catch((err) => {
           console.error('[AgentStore] switchToSession: loadInitialSessionMessages failed:', err)
         })
       }
@@ -756,7 +751,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       try {
         const INITIAL_LIMIT = 10
         const { messages, offset: paginationOffset, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
-          sdkSessionId, INITIAL_LIMIT, 0
+          sessionId, INITIAL_LIMIT, 0
         )
         const loadedMessages = buildReplayedMessages(messages)
 
@@ -796,7 +791,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             phase: 'initial',
             message,
           },
-          ...(state.slots[context]._isLoadingMoreMessages ? {
+          ...(state.activeSessionId[context] === sessionId
+            && state.slots[context].currentSessionId === sessionId
+            && state.slots[context]._isLoadingMoreMessages ? {
             slots: { ...state.slots, [context]: { ...state.slots[context], _isLoadingMoreMessages: false } },
           } : {}),
         }))
@@ -832,7 +829,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       try {
         const LOAD_MORE_LIMIT = 100
         const { messages: olderRawMessages, offset: olderRawOffset, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
-          sdkSessionId, LOAD_MORE_LIMIT, nextOffset
+          sessionId, LOAD_MORE_LIMIT, nextOffset
         )
 
         // Guard: if the session is no longer active in any context, write only

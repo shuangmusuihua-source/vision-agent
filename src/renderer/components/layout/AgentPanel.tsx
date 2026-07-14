@@ -4,7 +4,7 @@ import type { PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as As
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
 import PermissionDialog from '../chat/PermissionDialog'
-import AskUserDrawer from '../chat/AskUserDrawer'
+import AskUserDrawer, { type AskUserTextSubmitHandler } from '../chat/AskUserDrawer'
 import DrawerZone from './DrawerZone'
 import TodoPanel from '../chat/TodoPanel'
 
@@ -17,7 +17,7 @@ interface AgentPanelProps {
   onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void
   askUserRequest: AskUserRequest | null
   onAskUserRespond: (requestId: string, answers: Record<string, string>) => void
-  onAskUserDrawerRespond?: (respond: (answers: Record<string, string>) => void) => void
+  onAskUserTextSubmitReady?: (handler: AskUserTextSubmitHandler | null) => void
   sessionList: SdkSessionInfo[]
   currentSessionId: string | null
   activeSkillId: string | null
@@ -27,7 +27,7 @@ interface AgentPanelProps {
   onUnlinkFile: () => void
 }
 
-function AgentPanel({ context = 'editor', width, workspacePath, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserDrawerRespond, sessionList, currentSessionId, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
+function AgentPanel({ context = 'editor', width, workspacePath, permissionRequest, permissionQueueLength, onPermissionRespond, askUserRequest, onAskUserRespond, onAskUserTextSubmitReady, sessionList, currentSessionId, activeSkillId, children, chatInput, linkedFile, onUnlinkFile }: AgentPanelProps): React.ReactElement {
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [skillDrawerHidden, setSkillDrawerHidden] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
@@ -50,10 +50,6 @@ function AgentPanel({ context = 'editor', width, workspacePath, permissionReques
     setPendingAskAnswer({ requestId: askUserRequest.id, answers })
     setAskDrawerOpen(false)
   }, [askUserRequest])
-
-  useEffect(() => {
-    onAskUserDrawerRespond?.(handleAskUserRespond)
-  }, [handleAskUserRespond, onAskUserDrawerRespond])
 
   const activeSkillMeta = useAgentStore((s) => {
     if (!activeSkillId) return null
@@ -115,10 +111,12 @@ function AgentPanel({ context = 'editor', width, workspacePath, permissionReques
             )}
             {askUserRequest && (
               <AskUserDrawer
+                key={askUserRequest.id}
                 request={askUserRequest}
                 open={askDrawerOpen}
                 onClose={() => setAskDrawerOpen(false)}
                 onRespond={handleAskUserRespond}
+                onTextSubmitReady={onAskUserTextSubmitReady}
               />
             )}
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />

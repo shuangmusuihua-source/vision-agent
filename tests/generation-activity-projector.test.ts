@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   GenerationActivityProjector,
+  MAX_GENERATION_PREVIEW_CHARS,
   extractPartialJsonStringValues,
 } from '../src/main/generation-activity-projector'
 import { createSessionEnvelope } from '../src/main/session-envelope'
@@ -200,5 +201,57 @@ describe('GenerationActivityProjector', () => {
       content: '# Report',
       language: 'markdown',
     })
+  })
+
+  it('bounds large streamed tool previews while preserving the final tail', () => {
+    const activities: SessionRoutedGenerationActivity[] = []
+    const projector = new GenerationActivityProjector()
+    projector.setEmitter((activity) => activities.push(activity))
+    projector.reset('app-session', createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session',
+      workspacePath: '/workspace',
+    }))
+    projector.processRawMessage('app-session', streamEvent({
+      type: 'content_block_start', index: 0,
+      content_block: { type: 'tool_use', id: 'large-write', name: 'Write', input: {} },
+    }), null)
+
+    const content = `${'a'.repeat(MAX_GENERATION_PREVIEW_CHARS * 2)}THE-END`
+    projector.processRawMessage('app-session', streamEvent({
+      type: 'content_block_delta', index: 0,
+      delta: {
+        type: 'input_json_delta',
+        partial_json: JSON.stringify({ file_path: 'report.md', content }),
+      },
+    }), null)
+    projector.processRawMessage('app-session', streamEvent({ type: 'content_block_stop', index: 0 }), null)
+
+    expect(activities.every((activity) => activity.content.length <= MAX_GENERATION_PREVIEW_CHARS)).toBe(true)
+    expect(activities.at(-1)?.content).toContain('THE-END')
+    expect(activities.at(-1)?.content).toMatch(/^…已省略较早内容…/)
+  })
+
+  it('updates a small Write preview across fragmented JSON deltas', () => {
+    vi.useFakeTimers()
+    const activities: SessionRoutedGenerationActivity[] = []
+    const projector = new GenerationActivityProjector()
+    projector.setEmitter((activity) => activities.push(activity))
+    projector.reset('app-session', createSessionEnvelope({
+      context: 'editor', sessionId: 'app-session', workspacePath: '/workspace',
+    }))
+    projector.processRawMessage('app-session', streamEvent({
+      type: 'content_block_start', index: 0,
+      content_block: { type: 'tool_use', id: 'fragmented-write', name: 'Write', input: {} },
+    }), null)
+    for (const partial_json of ['{"file_path":"small.md",', '"content":"hello ', 'world"}']) {
+      projector.processRawMessage('app-session', streamEvent({
+        type: 'content_block_delta', index: 0,
+        delta: { type: 'input_json_delta', partial_json },
+      }), null)
+    }
+    vi.advanceTimersByTime(80)
+
+    expect(activities.some((activity) => activity.phase === 'generating' && activity.content === 'hello world')).toBe(true)
   })
 })

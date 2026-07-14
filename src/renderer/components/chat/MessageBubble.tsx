@@ -34,10 +34,18 @@ function ArtifactBubble({ artifact, messageId, onOpenFile, workspacePath, contex
 }) {
   const Icon = artifact.fileType === 'html' ? FileCode : FileText
   const markArtifactSaved = useAgentStore((s) => s.markArtifactSaved)
+  const currentSessionId = useAgentStore((s) => s.slots[context].currentSessionId)
 
   const handleOpen = () => {
     if (artifact.filePath) {
-      if (artifact.fileType === 'html') {
+      if (artifact.fileType === 'html' && artifact.content) {
+        void window.api.workspace.previewArtifact({
+          fileName: artifact.fileName,
+          content: artifact.content,
+        })
+      } else if (context === 'ask' && currentSessionId) {
+        void window.api.agent.openSessionOutput(currentSessionId, artifact.filePath)
+      } else if (artifact.fileType === 'html') {
         window.api.workspace.openInBrowser(artifact.filePath)
       } else {
         onOpenFile?.(artifact.filePath)

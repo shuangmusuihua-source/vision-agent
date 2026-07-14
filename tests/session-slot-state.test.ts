@@ -9,6 +9,7 @@ import {
   patchSessionSlot,
   resolveClientSessionId,
   selectAskUserRequest,
+  selectIsResumingSession,
 } from '../src/renderer/store/session-slot-state'
 
 function slot(sessionId: string, patch: Partial<ContextSlot> = {}): ContextSlot {
@@ -124,5 +125,22 @@ describe('session-slot state module', () => {
       context: 'editor',
       sessionId: 'session-a',
     })
+  })
+
+  it('derives resume state from the owning context slot only', () => {
+    const current = state({
+      slots: {
+        editor: slot('editor-session', { _isLoadingMoreMessages: true }),
+        ask: slot('ask-session'),
+      },
+    })
+
+    expect(selectIsResumingSession(current, 'editor')).toBe(true)
+    expect(selectIsResumingSession(current, 'ask')).toBe(false)
+
+    current.slots.editor.messages = [{
+      kind: 'user', id: 'existing', role: 'user', textContent: 'cached', createdAt: 1,
+    }]
+    expect(selectIsResumingSession(current, 'editor')).toBe(false)
   })
 })

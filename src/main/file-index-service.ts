@@ -30,9 +30,17 @@ export class FileIndexService {
   private changedFiles = new Map<string, number>()
   private changeVersion = 0
   private knowledgeWatcher: FSWatcher | null = null
+  private workspaceInitQueue: Promise<void> = Promise.resolve()
 
   /** Initialize one searchable index across all authorized workspaces. */
-  async init(workspaceDirs: string[]): Promise<void> {
+  init(workspaceDirs: string[]): Promise<void> {
+    const requestedDirs = [...workspaceDirs]
+    const run = this.workspaceInitQueue.then(() => this.performWorkspaceInit(requestedDirs))
+    this.workspaceInitQueue = run.catch(() => {})
+    return run
+  }
+
+  private async performWorkspaceInit(workspaceDirs: string[]): Promise<void> {
     const nextWorkspaceDirs = [...new Set(workspaceDirs.filter(Boolean).map((dir) => path.resolve(dir)))]
     const unchanged = nextWorkspaceDirs.length === this.workspaceDirs.length
       && nextWorkspaceDirs.every((dir, index) => dir === this.workspaceDirs[index])
@@ -54,11 +62,8 @@ export class FileIndexService {
   }
 
   /** Wait until index is ready */
-  onReady(): Promise<void> {
-    if (this.ready || this.workspaceDirs.length === 0) return Promise.resolve()
-    return new Promise((resolve) => {
-      this.readyCallbacks.push(resolve)
-    })
+  async onReady(): Promise<void> {
+    await this.workspaceInitQueue
   }
 
   /** Wait until knowledge index is ready */
@@ -402,6 +407,19 @@ export class FileIndexService {
     return [...this.index.keys()]
   }
 
+  async listMarkdownFilesUnder(rootPath: string): Promise<Array<{ label: string; path: string }>> {
+    await Promise.all([this.onReady(), this.onKnowledgeReady()])
+    const root = path.resolve(rootPath)
+    const files = new Set([...this.index.keys(), ...this.knowledgeIndex.keys()])
+    return [...files]
+      .filter((filePath) => {
+        const relativePath = path.relative(root, filePath)
+        return relativePath === '' || (!relativePath.startsWith(`..${path.sep}`) && relativePath !== '..' && !path.isAbsolute(relativePath))
+      })
+      .sort((left, right) => left.localeCompare(right))
+      .map((filePath) => ({ label: path.basename(filePath, '.md'), path: filePath }))
+  }
+
   /** Get content of a specific file from index */
   getFileContent(filePath: string): string | undefined {
     return this.index.get(filePath)?.content
@@ -434,6 +452,7 @@ export class FileIndexService {
 
   /** Clean up all indexes and watchers. */
   async destroy(): Promise<void> {
+    await this.workspaceInitQueue
     await this.destroyWorkspaceIndex()
     await this.destroyKnowledgeIndex()
     this.changedFiles.clear()

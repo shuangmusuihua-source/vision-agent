@@ -323,6 +323,11 @@ export function selectAskUserRequest(
   return state.slots[context].askUserRequest || cachedContextSlot(state, context)?.askUserRequest || null
 }
 
+export function selectIsResumingSession(state: AgentStore, context: AgentContext): boolean {
+  const slot = state.slots[context]
+  return slot._isLoadingMoreMessages && slot.messages.length === 0
+}
+
 export function findAskUserTarget(
   state: AgentStore,
   requestId: string,

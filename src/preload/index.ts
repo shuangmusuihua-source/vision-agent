@@ -23,6 +23,7 @@ type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentRevealSessionOutputRequest = IPCRequest<'agent:revealSessionOutput'>
+type AgentOpenSessionOutputRequest = IPCRequest<'agent:openSessionOutput'>
 type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
@@ -64,6 +65,7 @@ const api = {
       invoke('workspace:addToKnowledge', { sourcePath, sessionId }),
     listMarkdownFiles: (dirPath: string) => invoke('workspace:listMarkdownFiles', dirPath),
     openInBrowser: (filePath: string) => invoke('workspace:openInBrowser', filePath),
+    openExternalUrl: (url: string) => invoke('workspace:openExternalUrl', url),
     saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) =>
       invoke('workspace:saveArtifact', options),
     previewArtifact: (options: { fileName: string; content: string }) =>
@@ -89,7 +91,6 @@ const api = {
       invoke('settings:updateProfile', id, updates),
     removeProfile: (id: string) => invoke('settings:removeProfile', id),
     setActiveProfile: (id: string) => invoke('settings:setActiveProfile', id),
-    addDirectory: (dir: string) => invoke('settings:addDirectory', dir),
     removeDirectory: (dir: string) => invoke('settings:removeDirectory', dir),
     reorderDirectories: (paths: string[]) => invoke('settings:reorderDirectories', paths),
     setTheme: (theme: 'light' | 'dark' | 'system') => invoke('settings:setTheme', theme),
@@ -139,7 +140,7 @@ const api = {
       const request: AgentRenameSessionRequest = { sessionId, title }
       return invoke('agent:renameSession', request)
     },
-    updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => {
+    updateSessionRecord: (sessionId: string, patch: AgentUpdateSessionRecordRequest['patch']) => {
       const request: AgentUpdateSessionRecordRequest = { sessionId, patch }
       return invoke('agent:updateSessionRecord', request)
     },
@@ -163,6 +164,10 @@ const api = {
     revealSessionOutput: (sessionId: string, filePath: string) => {
       const request: AgentRevealSessionOutputRequest = { sessionId, filePath }
       return invoke('agent:revealSessionOutput', request)
+    },
+    openSessionOutput: (sessionId: string, filePath: string) => {
+      const request: AgentOpenSessionOutputRequest = { sessionId, filePath }
+      return invoke('agent:openSessionOutput', request)
     },
     deleteSessionOutput: (sessionId: string, filePath: string) => {
       const request: AgentDeleteSessionOutputRequest = { sessionId, filePath }
@@ -250,6 +255,7 @@ const api = {
   },
 
   cron: {
+    selectDirectory: () => invoke('cron:selectDirectory'),
     register: (request: CronRegisterRequest) =>
       invoke('cron:register', request),
     list: () => invoke('cron:list'),

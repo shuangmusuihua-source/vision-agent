@@ -92,7 +92,7 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
           >
             <div className="modal-title">删除工作区</div>
             <div className="modal-body">
-              此操作将永久删除工作区 <strong>{workspaceName}</strong> 及其所有文件，不可撤销。
+              此操作会将工作区 <strong>{workspaceName}</strong> 及其所有文件移到废纸篓。
             </div>
             <div className="modal-hint">请输入工作区名称以确认删除：</div>
             <input

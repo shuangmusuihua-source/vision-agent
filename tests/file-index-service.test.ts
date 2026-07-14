@@ -118,4 +118,42 @@ describe('FileIndexService workspace search', () => {
       await index.destroy()
     }
   })
+
+  it('lists wikilink candidates from the existing index and ignores dependency output', async () => {
+    const workspace = await createWorkspace('root.md', '# Root')
+    await mkdir(join(workspace, 'notes'))
+    await writeFile(join(workspace, 'notes', 'nested.md'), '# Nested')
+    await mkdir(join(workspace, 'node_modules'))
+    await writeFile(join(workspace, 'node_modules', 'dependency.md'), '# Dependency')
+    await mkdir(join(workspace, 'out'))
+    await writeFile(join(workspace, 'out', 'generated.md'), '# Generated')
+    const index = new FileIndexService()
+
+    try {
+      await index.init([workspace])
+      const files = await index.listMarkdownFilesUnder(workspace)
+      expect(files).toEqual([
+        { label: 'root', path: join(workspace, 'root.md') },
+        { label: 'nested', path: join(workspace, 'notes', 'nested.md') },
+      ].sort((left, right) => left.path.localeCompare(right.path)))
+    } finally {
+      await index.destroy()
+    }
+  })
+
+  it('serializes concurrent workspace initialization and exposes only the latest index', async () => {
+    const firstWorkspace = await createWorkspace('first.md', 'first')
+    const secondWorkspace = await createWorkspace('second.md', 'second')
+    const index = new FileIndexService()
+
+    try {
+      const firstInit = index.init([firstWorkspace])
+      const secondInit = index.init([secondWorkspace])
+      await Promise.all([firstInit, secondInit, index.onReady()])
+
+      expect(index.listFiles()).toEqual([join(secondWorkspace, 'second.md')])
+    } finally {
+      await index.destroy()
+    }
+  })
 })

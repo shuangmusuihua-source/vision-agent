@@ -3,7 +3,7 @@ import {
   getSettings, addProfile, updateProfile, removeProfile, setActiveProfile,
 } from '../persistence/profile-store'
 import {
-  addAuthorizedDirectory, removeAuthorizedDirectory, reorderAuthorizedDirectories,
+  removeAuthorizedDirectory, reorderAuthorizedDirectories,
   getAuthorizedDirectories,
 } from '../persistence/workspace-store'
 import { setTheme } from '../persistence/settings-store'
@@ -36,13 +36,6 @@ export function registerSettingsHandlers(pushSettingsToRenderer: () => void): vo
 
   ipcMain.handle('settings:setActiveProfile', (_event, id: string) => {
     setActiveProfile(id)
-    pushSettingsToRenderer()
-    return { success: true }
-  })
-
-  ipcMain.handle('settings:addDirectory', async (_event, dir: string) => {
-    addAuthorizedDirectory(dir)
-    await fileIndexService.init(getAuthorizedDirectories())
     pushSettingsToRenderer()
     return { success: true }
   })

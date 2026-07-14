@@ -75,3 +75,10 @@ export function isPathAuthorized(
     return resolved === resolvedDir || resolved.startsWith(resolvedDir + sep)
   })
 }
+
+/** Check whether a path canonically matches one of the authorized roots. */
+export function isExactAuthorizedRoot(filePath: string, authorizedDirs: string[]): boolean {
+  return authorizedDirs.some((dir) =>
+    isPathAuthorized(filePath, [dir]) && isPathAuthorized(dir, [filePath])
+  )
+}

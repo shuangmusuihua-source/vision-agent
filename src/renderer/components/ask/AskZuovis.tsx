@@ -3,7 +3,7 @@ import { Monitor, FolderOpen, Trash2, Gauge } from 'lucide-react'
 import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
 import ChatInput from '../chat/ChatInput'
 import PermissionDialog from '../chat/PermissionDialog'
-import AskUserDrawer from '../chat/AskUserDrawer'
+import AskUserDrawer, { type AskUserTextSubmitHandler } from '../chat/AskUserDrawer'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import assistantLogo from '../../assets/sumi-assistant-bull.svg'
@@ -45,7 +45,7 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
   const messages = useMessages('ask')
   const isStreaming = useIsStreaming('ask')
   const agentStatus = useAgentStatus('ask')
-  const isResuming = useIsResumingSession()
+  const isResuming = useIsResumingSession('ask')
   const permissionRequest = usePermissionRequest('ask')
   const permissionQueueLen = usePermissionQueueLength('ask')
   const askUserRequest = useAskUserRequest('ask')
@@ -82,7 +82,7 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
   // ── AskUser interaction ──
   const [askDrawerOpen, setAskDrawerOpen] = useState(false)
   const [pendingAskAnswer, setPendingAskAnswer] = useState<{ requestId: string; answers: Record<string, string> } | null>(null)
-  const askDrawerRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
+  const askUserTextSubmitRef = useRef<AskUserTextSubmitHandler | null>(null)
 
   useEffect(() => {
     if (askUserRequest) setAskDrawerOpen(true)
@@ -105,10 +105,6 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
     setAskDrawerOpen(false)
   }, [askUserRequest])
 
-  useEffect(() => {
-    askDrawerRespondRef.current = handleAskUserRespond
-  }, [handleAskUserRespond])
-
   const handleCardClick = async (card: FeatureCard) => {
     if (isStreaming && agentStatus !== 'waitingForUserInput') return
     const skill = card.skillId ? availableFeatureSkills.get(card.skillId) : undefined
@@ -123,12 +119,12 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
   }
 
   const handleChatSend = useCallback((msg: string) => {
-    if (askUserRequest && askDrawerRespondRef.current) {
-      const qKey = askUserRequest.questions[0]?.question || 'answer'
-      askDrawerRespondRef.current({ [qKey]: msg })
-    } else {
-      sendMessage(msg)
+    if (askUserRequest) {
+      const handler = askUserTextSubmitRef.current
+      if (handler?.requestId === askUserRequest.id) handler.submit(msg)
+      return
     }
+    sendMessage(msg)
   }, [askUserRequest, sendMessage])
 
   return (
@@ -201,10 +197,12 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
         )}
         {askUserRequest && (
           <AskUserDrawer
+            key={askUserRequest.id}
             request={askUserRequest}
             open={askDrawerOpen}
             onClose={() => setAskDrawerOpen(false)}
             onRespond={handleAskUserRespond}
+            onTextSubmitReady={(handler) => { askUserTextSubmitRef.current = handler }}
           />
         )}
           <ChatInput

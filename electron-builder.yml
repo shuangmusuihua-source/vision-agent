@@ -27,7 +27,7 @@ files:
   - '!**/*.map'
   - '!electron.vite.config.*'
   - '!vitest.config.*'
-  - '!{AGENTS.md,CLAUDE.md,.env.example}'
+  - '!{AGENTS.md,CLAUDE.md,.env.example,.node-version}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!*.html'

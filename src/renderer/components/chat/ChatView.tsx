@@ -24,7 +24,7 @@ interface ChatViewProps {
 function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef }: ChatViewProps): React.ReactElement {
   const messages = useMessages(context)
   const isStreaming = useIsStreaming(context)
-  const isResuming = useIsResumingSession()
+  const isResuming = useIsResumingSession(context)
   const agentState = useAgentStatus(context)
   const ttftMs = useTtftMs(context)
   const generationActivity = useGenerationActivity(context)

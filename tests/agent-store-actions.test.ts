@@ -7,7 +7,6 @@ function resetStore(): void {
   useAgentStore.setState({
     context: 'editor',
     slots: { editor: emptySlot(), ask: emptySlot() },
-    isResumingSession: false,
     sessionList: [],
     sessionSlots: {},
     sessionAccessOrder: [],

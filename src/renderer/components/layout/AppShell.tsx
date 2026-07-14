@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
+import { useShallow } from 'zustand/react/shallow'
 import { FileText, Download, ArrowLeftRight, ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import Sidebar from './Sidebar'
 import AgentPanel from './AgentPanel'
+import type { AskUserTextSubmitHandler } from '../chat/AskUserDrawer'
 import ChatInput from '../chat/ChatInput'
 import EditorTabs from '../editor/EditorTabs'
 import SearchPanel from '../search/SearchPanel'
@@ -41,6 +43,14 @@ interface AppShellProps {
   onOpenSettings: () => void
 }
 
+function EditorStats(): React.ReactElement {
+  const editorStats = useUiStore((state) => state.editorStats)
+  return <>
+    <span>{editorStats.words} words</span>
+    <span>{editorStats.chars} characters</span>
+  </>
+}
+
 function SidebarToggleIcon({ collapsed }: { collapsed: boolean }): React.ReactElement {
   return (
     <svg
@@ -67,7 +77,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const workspace = useWorkspace()
   const {
-    openTabs, activeTab, activeContent, activeFilePath,
+    openTabs, activeTab, activeContent, activeFilePath, documentOwnerKey,
     openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
     saveFile, retryPendingSave, refreshActiveContent,
     activeSaveError, activeHasPendingSave,
@@ -99,11 +109,33 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const {
     showSearch, searchQuery, openSearch, closeSearch: closeSearchPanel,
     sourceMode, setSourceMode, focusMode, setFocusMode,
-    editorStats, setEditorStats, linkedFile, setLinkedFile,
+    setEditorStats, linkedFile, setLinkedFile,
     view, setView, updateState, setUpdateState,
     showDaydream, daydreamMode, openDaydream, closeDaydream,
     mainError, setMainError,
-  } = useUiStore()
+  } = useUiStore(useShallow((state) => ({
+    showSearch: state.showSearch,
+    searchQuery: state.searchQuery,
+    openSearch: state.openSearch,
+    closeSearch: state.closeSearch,
+    sourceMode: state.sourceMode,
+    setSourceMode: state.setSourceMode,
+    focusMode: state.focusMode,
+    setFocusMode: state.setFocusMode,
+    setEditorStats: state.setEditorStats,
+    linkedFile: state.linkedFile,
+    setLinkedFile: state.setLinkedFile,
+    view: state.view,
+    setView: state.setView,
+    updateState: state.updateState,
+    setUpdateState: state.setUpdateState,
+    showDaydream: state.showDaydream,
+    daydreamMode: state.daydreamMode,
+    openDaydream: state.openDaydream,
+    closeDaydream: state.closeDaydream,
+    mainError: state.mainError,
+    setMainError: state.setMainError,
+  })))
   const sourceModeRef = useRef(sourceMode)
   sourceModeRef.current = sourceMode
   const focusModeRef = useRef(focusMode)
@@ -302,7 +334,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
   }, [clearTab, handleSessionSelect, setAgentContext, setView])
 
-  const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore()
+  const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore(useShallow((state) => ({
+    creatingSessionIn: state.creatingSessionIn,
+    setCreatingSessionIn: state.setCreatingSessionIn,
+    newSessionName: state.newSessionName,
+    setNewSessionName: state.setNewSessionName,
+  })))
   const newSessionInputRef = useRef<HTMLInputElement>(null)
   const creatingSessionRequestRef = useRef(false)
 
@@ -318,16 +355,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     if (!name || creatingSessionRequestRef.current) return
     creatingSessionRequestRef.current = true
     const tempSessionId = `new-${Date.now()}`
-    const now = Date.now()
     try {
       const result = await window.api.agent.updateSessionRecord(tempSessionId, {
         title: name,
         workspacePath: wsPath,
         context: 'editor',
-        status: 'empty',
-        createdAt: now,
-        lastModified: now,
-        messageCount: 0,
       })
       if (!result.success) throw new Error('会话记录未保存')
     } catch (error) {
@@ -463,7 +495,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const editorPermission = usePermissionRequest('editor')
   const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
-  const editorAskUserRespondRef = useRef<((answers: Record<string, string>) => void) | null>(null)
+  const editorAskUserTextSubmitRef = useRef<AskUserTextSubmitHandler | null>(null)
   const currentSessionId = useCurrentSessionId('editor')
   const sessionList = useSessionList()
   const editorSessionList = sessionList.filter((s) => s.context !== 'ask')
@@ -745,6 +777,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
               ref={editorRef}
               content={activeContent}
               filePath={activeFilePath}
+              documentOwnerKey={documentOwnerKey}
               workspacePath={activeFileWorkspacePath || editorWorkspacePath || ''}
               sourceMode={sourceMode}
               focusMode={focusMode}
@@ -775,8 +808,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         </div>
         {activeTab && isFileTab(activeTab) && (
           <div className="editor-status-bar" role="status">
-            <span>{editorStats.words} words</span>
-            <span>{editorStats.chars} characters</span>
+            <EditorStats />
             {sourceMode && <span>Source</span>}
             {focusMode && <span>Focus</span>}
             {activeHasPendingSave && (
@@ -832,17 +864,17 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         onPermissionRespond={respondPermission}
         askUserRequest={editorAskUser}
         onAskUserRespond={editorRespondAskUser}
-        onAskUserDrawerRespond={(respond) => { editorAskUserRespondRef.current = respond }}
+        onAskUserTextSubmitReady={(handler) => { editorAskUserTextSubmitRef.current = handler }}
         sessionList={editorSessionList}
         currentSessionId={currentSessionId}
         activeSkillId={activeSkillId}
         chatInput={<ChatInput context="editor" onApprovalModeChange={setEditorApprovalMode} onSend={(msg) => {
-          if (editorAskUser && editorAskUserRespondRef.current) {
-            const qKey = editorAskUser.questions[0]?.question || 'answer'
-            editorAskUserRespondRef.current({ [qKey]: msg })
-          } else {
-            editorSendMessage(msg, linkedFile || undefined)
+          if (editorAskUser) {
+            const handler = editorAskUserTextSubmitRef.current
+            if (handler?.requestId === editorAskUser.id) handler.submit(msg)
+            return
           }
+          editorSendMessage(msg, linkedFile || undefined)
         }} onSkillSelect={handleSkillSelect} onStop={() => {
             const sid = useAgentStore.getState().slots.editor.currentSessionId
             useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'editor', sid)

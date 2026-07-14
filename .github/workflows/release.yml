@@ -14,12 +14,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.12.0
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Sign, notarize & publish
+      - name: Sign, verify & publish
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}

@@ -33,6 +33,8 @@ import {
   stripFileConvertMarker,
 } from './attachment-conversion'
 import { isSkillAvailableAtInitialization } from '../shared/skill-invocation'
+import { isExactAuthorizedRoot } from './agent-path-utils'
+import { isAuthorizedSessionWorkspace } from './path-validator'
 import {
   ensureAskSessionWorkingDirectory,
   ensureSessionWorkingDirectory,
@@ -347,9 +349,46 @@ export async function sendMessage(
   approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
 ): Promise<void> {
   const queryKey = clientSessionKey || sessionId || context
-  const effectiveWorkspacePath = workspacePath
-    || (context === 'ask' ? getAppSkillsCwd() : undefined)
-    || (getAuthorizedDirectories().length > 0 ? getAuthorizedDirectories()[0] : process.cwd())
+  const existingRecord = getSessionRecordById(queryKey)
+  let effectiveContext = context
+  let effectiveWorkspacePath: string
+  let effectiveSdkSessionId = sessionId
+
+  if (existingRecord) {
+    const storedWorkspaceValid = existingRecord.context === 'ask'
+      ? isExactAuthorizedRoot(existingRecord.workspacePath, [getAppSkillsCwd()])
+      : isAuthorizedSessionWorkspace(existingRecord.workspacePath)
+    const workspaceMatches = !workspacePath
+      || isExactAuthorizedRoot(workspacePath, [existingRecord.workspacePath])
+    const sdkSessionMatches = existingRecord.sdkSessionId
+      ? !sessionId || sessionId === existingRecord.sdkSessionId
+      : !sessionId
+    if (!storedWorkspaceValid || context !== existingRecord.context || !workspaceMatches || !sdkSessionMatches) {
+      sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
+        context: existingRecord.context,
+        sessionId: queryKey,
+        workspacePath: existingRecord.workspacePath,
+        sdkSessionId: existingRecord.sdkSessionId,
+      }), '会话归属信息不匹配，请重新选择会话。')
+      return
+    }
+    effectiveContext = existingRecord.context
+    effectiveWorkspacePath = existingRecord.workspacePath
+    effectiveSdkSessionId = existingRecord.sdkSessionId || sessionId
+  } else if (context === 'ask') {
+    effectiveWorkspacePath = getAppSkillsCwd()
+  } else {
+    effectiveWorkspacePath = workspacePath || getAuthorizedDirectories()[0] || ''
+    if (!effectiveWorkspacePath || !isAuthorizedSessionWorkspace(effectiveWorkspacePath)) {
+      sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
+        context,
+        sessionId: queryKey,
+        workspacePath: effectiveWorkspacePath,
+        sdkSessionId: sessionId,
+      }), '工作区未授权，请重新选择工作区。')
+      return
+    }
+  }
 
   // A session has one ordered execution stream. Wait for the previous run's
   // finally block before starting its replacement so stale cleanup cannot
@@ -358,19 +397,18 @@ export async function sendMessage(
     await abortActiveQueryAndWait(queryKey)
   } catch (error) {
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
-      context,
+      context: effectiveContext,
       sessionId: queryKey,
       workspacePath: effectiveWorkspacePath,
-      sdkSessionId: sessionId,
+      sdkSessionId: effectiveSdkSessionId,
     }), toUserFacingQueryError(error))
     return
   }
 
-  const existingRecord = getSessionRecordById(queryKey)
   let effectiveWorkingDirectory = effectiveWorkspacePath
 
   try {
-    if (context === 'editor') {
+    if (effectiveContext === 'editor') {
       effectiveWorkingDirectory = await ensureSessionWorkingDirectory(effectiveWorkspacePath, queryKey)
     } else {
       effectiveWorkingDirectory = await ensureAskSessionWorkingDirectory(effectiveWorkspacePath, queryKey)
@@ -379,7 +417,7 @@ export async function sendMessage(
     updateSessionRecord(queryKey, {
       workspacePath: effectiveWorkspacePath,
       workingDirectory: effectiveWorkingDirectory,
-      context,
+      context: effectiveContext,
       status: existingRecord?.status || 'empty',
       createdAt: existingRecord?.createdAt || Date.now(),
       lastModified: Date.now(),
@@ -387,21 +425,21 @@ export async function sendMessage(
     })
   } catch (error) {
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
-      context,
+      context: effectiveContext,
       sessionId: queryKey,
       workspacePath: effectiveWorkspacePath,
-      sdkSessionId: sessionId,
+      sdkSessionId: effectiveSdkSessionId,
     }), toUserFacingQueryError(error))
     return
   }
 
   let runtimeEnvelope = createSessionEnvelope({
-    context,
+    context: effectiveContext,
     sessionId: queryKey,
     workspacePath: effectiveWorkspacePath,
-    sdkSessionId: sessionId,
+    sdkSessionId: effectiveSdkSessionId,
   })
-  let currentSessionId = sessionId
+  let currentSessionId = effectiveSdkSessionId
   let queryInstanceId = 0
   let outputSnapshot: SessionOutputSnapshot = {}
 
@@ -429,7 +467,7 @@ export async function sendMessage(
       throw new Error(`Skill 初始化失败: ${(error as Error).message}`)
     }
 
-    if (context === 'editor' && skillId) {
+    if (effectiveContext === 'editor' && skillId) {
       outputSnapshot = await captureSessionOutputSnapshot(effectiveWorkingDirectory)
     }
 
@@ -437,10 +475,10 @@ export async function sendMessage(
     const options = buildOptions(
       mainWindow,
       activeFilePath,
-      context,
+      effectiveContext,
       effectiveWorkspacePath,
       effectiveWorkingDirectory,
-      sessionId,
+      effectiveSdkSessionId,
       runtimeEnvelope,
       getSessionId,
       attachmentPaths,
@@ -489,7 +527,7 @@ export async function sendMessage(
           sdkSessionId: currentSessionId,
           workspacePath: effectiveWorkspacePath,
           workingDirectory: effectiveWorkingDirectory,
-          context,
+          context: effectiveContext,
           title,
         })
         sessionRuntime.emitSessionCreated(mainWindow, runtimeEnvelope)
@@ -516,7 +554,7 @@ export async function sendMessage(
       }, toUserFacingQueryError(error))
     }
   } finally {
-    if (context === 'editor' && skillId) {
+    if (effectiveContext === 'editor' && skillId) {
       try {
         const changed = await recordSessionOutputProvenance({
           workingDirectory: effectiveWorkingDirectory,

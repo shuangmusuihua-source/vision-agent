@@ -7,6 +7,9 @@ import type {
 } from '../shared/types'
 
 const PREVIEW_UPDATE_INTERVAL_MS = 80
+const PREVIEW_PARSE_STEP_CHARS = 1024
+const EAGER_PREVIEW_PARSE_CHARS = 4 * 1024
+export const MAX_GENERATION_PREVIEW_CHARS = 64 * 1024
 const SKILL_OUTPUT_FENCE = '```skill-output\n'
 const PREVIEW_TOOL_NAMES = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
 const TERMINAL_PHASES = new Set<GenerationActivityPhase>(['completed', 'failed', 'cancelled'])
@@ -15,6 +18,7 @@ type ToolAccumulator = {
   toolUseId: string
   toolName: string
   inputJson: string
+  lastPreviewInputLength: number
   updatedAt: number
   activity: GenerationActivity
 }
@@ -105,6 +109,7 @@ export class GenerationActivityProjector {
         toolUseId,
         toolName,
         inputJson: '',
+        lastPreviewInputLength: 0,
         updatedAt: Date.now(),
         activity,
       })
@@ -125,8 +130,20 @@ export class GenerationActivityProjector {
       accumulator.inputJson += delta.partial_json || ''
       accumulator.updatedAt = Date.now()
 
-      const preview = previewFromPartialInput(accumulator.toolName, accumulator.inputJson)
-      const content = preview.content ?? accumulator.activity.content
+      const previewInputLength = Math.min(accumulator.inputJson.length, MAX_GENERATION_PREVIEW_CHARS)
+      const shouldRefreshPreview = previewInputLength > accumulator.lastPreviewInputLength
+        && (accumulator.lastPreviewInputLength === 0
+          || previewInputLength <= EAGER_PREVIEW_PARSE_CHARS
+          || previewInputLength - accumulator.lastPreviewInputLength >= PREVIEW_PARSE_STEP_CHARS
+          || previewInputLength === MAX_GENERATION_PREVIEW_CHARS)
+      if (!shouldRefreshPreview) return
+
+      accumulator.lastPreviewInputLength = previewInputLength
+      const preview = previewFromPartialInput(
+        accumulator.toolName,
+        accumulator.inputJson.slice(0, previewInputLength),
+      )
+      const content = limitPreviewContent(preview.content ?? accumulator.activity.content)
       const activity: GenerationActivity = {
         ...accumulator.activity,
         phase: content ? 'generating' : 'preparing',
@@ -144,7 +161,7 @@ export class GenerationActivityProjector {
       if (!accumulator) return
 
       const preview = previewFromCompleteInput(accumulator.toolName, accumulator.inputJson)
-      const content = preview.content ?? accumulator.activity.content
+      const content = limitPreviewContent(preview.content ?? accumulator.activity.content)
       const activity: GenerationActivity = {
         ...accumulator.activity,
         phase: 'finalizing',
@@ -230,7 +247,7 @@ export class GenerationActivityProjector {
 
     const closeIndex = session.textBuffer.indexOf('```')
     if (closeIndex !== -1) {
-      session.skillOutputBuffer += session.textBuffer.slice(0, closeIndex)
+      session.skillOutputBuffer = appendPreviewTail(session.skillOutputBuffer, session.textBuffer.slice(0, closeIndex))
       const activity = this.currentSkillOutputActivity(session)
       if (activity) {
         this.emitImmediate(session, { ...activity, phase: 'completed', label: '生成完成' })
@@ -241,7 +258,7 @@ export class GenerationActivityProjector {
       return
     }
 
-    session.skillOutputBuffer += session.textBuffer
+    session.skillOutputBuffer = appendPreviewTail(session.skillOutputBuffer, session.textBuffer)
     session.textBuffer = ''
     const activity = this.currentSkillOutputActivity(session)
     if (activity) this.queueActivity(session, activity)
@@ -297,8 +314,19 @@ export class GenerationActivityProjector {
 
   private emit(session: ProjectionSession, activity: GenerationActivity): void {
     session.lastEmittedAt = Date.now()
-    this.emitter?.({ ...activity, ...session.envelope })
+    this.emitter?.({ ...activity, content: limitPreviewContent(activity.content), ...session.envelope })
   }
+}
+
+function limitPreviewContent(content: string | null): string {
+  if (!content) return ''
+  if (content.length <= MAX_GENERATION_PREVIEW_CHARS) return content
+  const marker = '…已省略较早内容…\n'
+  return marker + content.slice(-(MAX_GENERATION_PREVIEW_CHARS - marker.length))
+}
+
+function appendPreviewTail(current: string, next: string): string {
+  return limitPreviewContent(current + next)
 }
 
 function mostRecentToolBlock(session: ProjectionSession): ToolAccumulator | null {

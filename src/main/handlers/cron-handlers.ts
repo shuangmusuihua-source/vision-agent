@@ -1,9 +1,20 @@
-import { ipcMain } from 'electron'
+import { dialog, ipcMain } from 'electron'
 import { registerTask, removeTask, listTasks, executeTaskById, stopTaskById, setTaskStatus } from '../cron-manager'
 import { resolveCronSchedule } from '../cron-schedule-parser'
 import type { CronScheduleParseRequest, CronTaskRegistration } from '../../shared/cron-types'
+import { getMainWindow } from '../ipc-sender'
+import { rememberSelectedDirectoryGrant } from '../directory-grants'
 
 export function registerCronHandlers(): void {
+  ipcMain.handle('cron:selectDirectory', async () => {
+    const window = getMainWindow()
+    if (!window) return { canceled: true, filePaths: [] }
+    const result = await dialog.showOpenDialog(window, { properties: ['openDirectory'] })
+    if (!result.canceled && result.filePaths[0]) {
+      rememberSelectedDirectoryGrant(result.filePaths[0])
+    }
+    return result
+  })
   ipcMain.handle('cron:register', async (_event, registration: CronTaskRegistration) => {
     try {
       const task = registerTask(registration)

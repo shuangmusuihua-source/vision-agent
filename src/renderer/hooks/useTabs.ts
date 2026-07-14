@@ -158,7 +158,9 @@ export function useTabs() {
   }, [])
 
   const saveFile = useCallback(async (filePath: string, content: string): Promise<SaveFileResult> => {
-    const key = getCurrentKey()
+    // The rendered editor owns this composite key. Keep it stable across the
+    // async write so a session switch cannot receive another session's result.
+    const key = currentKey
     if (!key) return { success: false, error: 'No active workspace', pending: false }
 
     let result: SaveFileResult
@@ -182,7 +184,7 @@ export function useTabs() {
       return { ...prev, [key]: withSavedFile(current, filePath, content) }
     })
     return result
-  }, [getCurrentKey])
+  }, [currentKey])
 
   const retryPendingSave = useCallback(async (filePath?: string): Promise<SaveFileResult> => {
     const key = getCurrentKey()
@@ -230,6 +232,7 @@ export function useTabs() {
     pendingSaves,
     activeContent,
     activeFilePath,
+    documentOwnerKey: currentKey,
     activeSaveError: activePendingSave?.error ?? null,
     activeHasPendingSave: Boolean(activePendingSave),
     openFile,

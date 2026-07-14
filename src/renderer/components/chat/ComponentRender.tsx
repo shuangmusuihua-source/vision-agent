@@ -190,7 +190,7 @@ const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
           padding: '10px 18px', fontSize: 13, color: S.text,
           cursor: href ? 'pointer' : 'default',
         }}
-        onClick={() => { if (href) window.api?.workspace?.openInBrowser?.(href) }}
+        onClick={() => { if (href) void window.api?.workspace?.openExternalUrl?.(href) }}
       >
         {icon && <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>}
         <div style={{ flex: 1, minWidth: 0 }}>

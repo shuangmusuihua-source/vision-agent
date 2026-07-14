@@ -39,6 +39,7 @@ import type {
   CronTaskRegistration,
   CronTaskTarget,
 } from '../../shared/cron-types'
+import type { IPCRequest } from '../../shared/ipc-types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ interface WorkspaceApi {
   selectFiles: () => Promise<{ canceled: boolean; filePaths: string[]; attachmentGrantId?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
   openInBrowser: (filePath: string) => Promise<void>
+  openExternalUrl: (url: string) => Promise<{ success: boolean }>
   saveArtifact: (options: { fileName: string; content: string; defaultPath?: string }) => Promise<{ success: boolean; filePath?: string }>
   previewArtifact: (options: { fileName: string; content: string }) => Promise<{ success: boolean; filePath?: string }>
 }
@@ -113,7 +115,6 @@ interface SettingsApi {
   updateProfile: (id: string, updates: Partial<ModelProfile>) => Promise<{ success: boolean }>
   removeProfile: (id: string) => Promise<{ success: boolean }>
   setActiveProfile: (id: string) => Promise<{ success: boolean }>
-  addDirectory: (dir: string) => Promise<{ success: boolean }>
   removeDirectory: (dir: string) => Promise<{ success: boolean }>
   reorderDirectories: (paths: string[]) => Promise<{ success: boolean }>
   setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
@@ -128,12 +129,16 @@ interface AgentApi {
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
   loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }>
   renameSession: (sessionId: string, title: string) => Promise<{ success: boolean }>
-  updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
+  updateSessionRecord: (
+    sessionId: string,
+    patch: IPCRequest<'agent:updateSessionRecord'>['patch'],
+  ) => Promise<{ success: boolean; error?: string }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
   setPermissionMode: (queryKey: string, mode: AgentApprovalMode) => Promise<{ success: boolean; error?: string }>
   selectFolder: () => Promise<{ canceled: boolean; filePaths: string[] }>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   revealSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
+  openSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   deleteSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   deleteSession: (sessionId: string) => Promise<{ success: boolean }>
   removeSessionRecord: (sessionId: string) => Promise<{ success: boolean }>
@@ -159,6 +164,7 @@ interface GraphApi {
 }
 
 interface CronApi {
+  selectDirectory: () => Promise<{ canceled: boolean; filePaths: string[] }>
   register: (request: CronTaskRegistration) => Promise<{ success: boolean; task?: CronTask; error?: string }>
   list: () => Promise<CronTask[]>
   resolveSchedule: (request: CronScheduleParseRequest) => Promise<CronScheduleParseResponse>

@@ -6,6 +6,7 @@ import {
   findAskUserTarget,
   resolveSessionSlot,
   selectAskUserRequest,
+  selectIsResumingSession,
   selectPermissionQueueLength,
   selectPermissionRequest,
 } from '../store/session-slot-state'
@@ -303,8 +304,7 @@ export function useAgent(context: AgentContext = 'editor') {
   }, [store])
 
   const resumeSession = useCallback((sessionId: string) => {
-    // switchToSession now handles SDK message load internally when _needsSdkLoad
-    // is true, including isResumingSession flag management.
+    // switchToSession starts the slot-scoped SDK history load when needed.
     store.getState().switchToSession(sessionId, context)
   }, [context, store])
 
@@ -368,5 +368,6 @@ export const useAskUserRequest = (context: AgentContext) =>
 export const useSessionList = () => useAgentStore((s) => s.sessionList)
 export const useTtftMs = (context: AgentContext) => useAgentStore((s) => s.slots[context].ttftMs)
 export const useActiveSkillId = (context: AgentContext) => useAgentStore((s) => s.slots[context].activeSkillId)
-export const useIsResumingSession = () => useAgentStore((s) => s.isResumingSession)
+export const useIsResumingSession = (context: AgentContext) =>
+  useAgentStore((state) => selectIsResumingSession(state, context))
 export const useGenerationActivity = (context: AgentContext) => useAgentStore((s) => s.slots[context].generationActivity)

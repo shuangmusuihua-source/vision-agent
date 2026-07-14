@@ -104,8 +104,11 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'agent:updateSessionRecord': {
-    request: { sessionId: string; patch: Record<string, unknown> }
-    response: { success: boolean }
+    request: {
+      sessionId: string
+      patch: { title?: string; workspacePath: string; context: 'editor' }
+    }
+    response: { success: boolean; error?: string }
   }
   'agent:removeSessionRecord': {
     request: { sessionId: string }
@@ -120,6 +123,10 @@ export type IPCChannelMap = {
     response: SessionOutputs | null
   }
   'agent:revealSessionOutput': {
+    request: { sessionId: string; filePath: string }
+    response: { success: boolean; error?: string }
+  }
+  'agent:openSessionOutput': {
     request: { sessionId: string; filePath: string }
     response: { success: boolean; error?: string }
   }
@@ -186,6 +193,10 @@ export type IPCChannelMap = {
     request: string
     response: void
   }
+  'workspace:openExternalUrl': {
+    request: string
+    response: { success: boolean }
+  }
   'workspace:previewArtifact': {
     request: { fileName: string; content: string }
     response: { success: boolean; filePath?: string }
@@ -213,10 +224,6 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'settings:setActiveProfile': {
-    request: string
-    response: { success: boolean }
-  }
-  'settings:addDirectory': {
     request: string
     response: { success: boolean }
   }
@@ -269,6 +276,10 @@ export type IPCChannelMap = {
   'cron:register': {
     request: CronTaskRegistration
     response: { success: boolean; task?: CronTask; error?: string }
+  }
+  'cron:selectDirectory': {
+    request: void
+    response: { canceled: boolean; filePaths: string[] }
   }
   'cron:list': {
     request: void

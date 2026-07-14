@@ -2,22 +2,22 @@ import cron, { type ScheduledTask } from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './ipc-sender'
-import { getAuthorizedDirectories } from './persistence/workspace-store'
+import { getAuthorizedDirectories, getSessionRecordById } from './persistence/workspace-store'
 import { getCronTasks, saveCronTasks } from './persistence/settings-store'
-import type { CronTask, CronTaskRegistration, CronTaskRun } from '../shared/cron-types'
+import type { CronTask, CronTaskRegistration, CronTaskRun, CronTaskTarget } from '../shared/cron-types'
 import { buildAgentOptions } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
-import { extractToolPathInput, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
+import { extractToolPathInput, isExactAuthorizedRoot, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
 import { normalizeCronLinkedUrls, sanitizeCronLinkedUrls } from '../shared/cron-linked-urls'
+import { canonicalGrantedDirectory, consumeSelectedDirectoryGrant } from './directory-grants'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { mkdir } from 'fs/promises'
 
 const MAX_RUN_HISTORY = 10
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
 const runningTasks = new Map<string, AbortController>()
-
-function uniqueStrings(values: Array<string | null | undefined>): string[] {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value && value.trim()))))
-}
 
 function createRunId(taskId: string): string {
   return `${taskId}-run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -52,22 +52,49 @@ function scheduleTask(task: CronTask): ScheduledTask {
   return job
 }
 
+function matchingWorkspaceRoot(workspacePath: string): string | null {
+  return getAuthorizedDirectories().find((root) => isExactAuthorizedRoot(workspacePath, [root])) || null
+}
+
+function normalizeTaskTarget(target: CronTaskTarget | null | undefined, consumeDirectoryGrant: boolean): CronTaskTarget | null {
+  if (!target) return null
+
+  if (target.type === 'workspace') {
+    if (!target.workspacePath) throw new Error('Automation workspace target is missing a path')
+    const workspacePath = matchingWorkspaceRoot(target.workspacePath)
+    if (!workspacePath) throw new Error('Automation workspace target is not authorized')
+    return { ...target, workspacePath }
+  }
+
+  if (target.type === 'session') {
+    if (!target.sessionId) throw new Error('Automation session target is missing a session ID')
+    const record = getSessionRecordById(target.sessionId)
+    if (!record || record.context !== 'editor') throw new Error('Automation session target is not available')
+    const workspacePath = matchingWorkspaceRoot(record.workspacePath)
+    if (!workspacePath) throw new Error('Automation session workspace is not authorized')
+    return {
+      ...target,
+      workspacePath,
+      sessionTitle: record.title || target.sessionTitle,
+    }
+  }
+
+  if (!target.directoryPath) throw new Error('Automation directory target is missing a path')
+  if (consumeDirectoryGrant && !consumeSelectedDirectoryGrant(target.directoryPath)) {
+    throw new Error('Automation directory target must be selected again')
+  }
+  return { ...target, directoryPath: canonicalGrantedDirectory(target.directoryPath) }
+}
+
 function getTaskCwd(task: CronTask): string {
   const target = task.target
   if (target?.type === 'directory' && target.directoryPath) return target.directoryPath
   if ((target?.type === 'workspace' || target?.type === 'session') && target.workspacePath) return target.workspacePath
-  const authorizedRoots = getAuthorizedDirectories()
-  return authorizedRoots[0] || process.cwd()
+  return join(tmpdir(), 'sumi-automation', task.id)
 }
 
-function getTaskAuthorizedRoots(task: CronTask, cwd: string): string[] {
-  const target = task.target
-  return uniqueStrings([
-    ...getAuthorizedDirectories(),
-    cwd,
-    target?.workspacePath,
-    target?.directoryPath,
-  ])
+function getTaskAuthorizedRoots(_task: CronTask, cwd: string): string[] {
+  return [cwd]
 }
 
 function buildTaskPrompt(task: CronTask): string {
@@ -135,7 +162,16 @@ function notifyInApp(task: CronTask, title: string, message: string, type: 'succ
 export function restorePersistedTasks(): void {
   const persisted = getCronTasks()
   for (const rawTask of persisted) {
-    const task = normalizeTask(rawTask)
+    let task: CronTask
+    try {
+      task = normalizeTask({ ...rawTask, target: normalizeTaskTarget(rawTask.target, false) })
+    } catch (error) {
+      task = normalizeTask({
+        ...rawTask,
+        status: 'paused',
+        lastError: error instanceof Error ? error.message : String(error),
+      })
+    }
     const job = scheduleTask(task)
     tasks.set(task.id, { task, job })
   }
@@ -155,7 +191,7 @@ export function registerTask(registration: CronTaskRegistration): CronTask {
     lastRunAt: null,
     lastResult: null,
     status: 'active',
-    target: registration.target ?? null,
+    target: normalizeTaskTarget(registration.target, true),
     linkedUrls,
     allowNetwork: linkedUrls.length > 0 || (registration.allowNetwork ?? false),
     notifyOnCompletion: registration.notifyOnCompletion ?? true,
@@ -177,6 +213,7 @@ export function removeTask(taskId: string): boolean {
   const entry = tasks.get(taskId)
   if (!entry) return false
   entry.job.stop()
+  runningTasks.get(taskId)?.abort()
   tasks.delete(taskId)
   persistTasks()
   return true
@@ -199,7 +236,9 @@ export async function executeTask(task: CronTask): Promise<void> {
   notifyRendererTaskUpdated(task)
 
   try {
+    task.target = normalizeTaskTarget(task.target, false)
     const cwd = getTaskCwd(task)
+    if (!task.target) await mkdir(cwd, { recursive: true })
     const authorizedRoots = getTaskAuthorizedRoots(task, cwd)
     const allowedTools = task.allowNetwork
       ? ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'WebSearch', 'WebFetch']
@@ -267,6 +306,7 @@ export async function executeTask(task: CronTask): Promise<void> {
       notifyInApp(task, `自动化完成: ${task.name}`, task.lastResult || '任务已完成')
     }
   } catch (err) {
+    if (!tasks.has(task.id)) return
     const errorMessage = (err as Error).message || '未知错误'
     const wasCancelled = abortController.signal.aborted
     const run: CronTaskRun = {
@@ -292,7 +332,7 @@ export async function executeTask(task: CronTask): Promise<void> {
     )
   } finally {
     runningTasks.delete(task.id)
-    notifyRendererTaskUpdated(task)
+    if (tasks.has(task.id)) notifyRendererTaskUpdated(task)
   }
 }
 
@@ -316,6 +356,9 @@ export function setTaskStatus(taskId: string, status: CronTask['status']): CronT
   const entry = tasks.get(taskId)
   if (!entry) throw new Error('Task not found')
 
+  if (status === 'active') {
+    entry.task.target = normalizeTaskTarget(entry.task.target, false)
+  }
   entry.task.status = status
   if (status === 'paused') {
     entry.job.stop()
@@ -334,4 +377,5 @@ export function stopAllCronJobs(): void {
   for (const [, entry] of tasks) {
     entry.job.stop()
   }
+  for (const controller of runningTasks.values()) controller.abort()
 }

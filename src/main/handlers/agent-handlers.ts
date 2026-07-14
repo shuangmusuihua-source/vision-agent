@@ -10,6 +10,9 @@ import { isAgentApprovalMode } from '../../shared/types'
 import { removeSessionWorkingDirectory } from '../session-files'
 import { createAttachmentPathGrant } from '../attachment-path-authorization'
 import { removeSessionOutputMetadataEntry } from '../session-output-metadata'
+import { isAuthorizedSessionWorkspace } from '../path-validator'
+import { isSafeSdkSessionId, normalizeSessionPage } from '../session-request-policy'
+import { extname } from 'path'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -22,6 +25,7 @@ type AgentRemoveSessionRecordRequest = IPCRequest<'agent:removeSessionRecord'>
 type AgentDeleteSessionRequest = IPCRequest<'agent:deleteSession'>
 type AgentGetSessionOutputsRequest = IPCRequest<'agent:getSessionOutputs'>
 type AgentRevealSessionOutputRequest = IPCRequest<'agent:revealSessionOutput'>
+type AgentOpenSessionOutputRequest = IPCRequest<'agent:openSessionOutput'>
 type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
@@ -30,6 +34,9 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, request: AgentSendMessageRequest) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
+    if (request.context !== undefined && request.context !== 'editor' && request.context !== 'ask') {
+      throw new Error('Invalid agent context')
+    }
     sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey, request.title, request.approvalMode)
     return { started: true }
   })
@@ -49,7 +56,12 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:loadSessionMessagesPaginated', async (_event, request: AgentLoadSessionMessagesPaginatedRequest) => {
-    return await loadSdkSessionMessagesPaginated(request.sessionId, request.limit, request.offset)
+    const record = getSessionRecordById(request.sessionId)
+    if (!record?.sdkSessionId || !isSafeSdkSessionId(record.sdkSessionId)) {
+      return { messages: [], offset: 0, limit: 0, hasMore: false }
+    }
+    const page = normalizeSessionPage(request.limit, request.offset)
+    return await loadSdkSessionMessagesPaginated(record.sdkSessionId, page.limit, page.offset)
   })
 
   ipcMain.handle('agent:renameSession', async (_event, request: AgentRenameSessionRequest) => {
@@ -58,7 +70,25 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:updateSessionRecord', (_event, request: AgentUpdateSessionRecordRequest) => {
-    updateSessionRecord(request.sessionId, request.patch as any)
+    if (getSessionRecordById(request.sessionId)) {
+      return { success: false, error: 'Existing session ownership cannot be replaced' }
+    }
+    const patch = request.patch
+    if (patch.context !== 'editor'
+      || typeof patch.workspacePath !== 'string'
+      || !isAuthorizedSessionWorkspace(patch.workspacePath)) {
+      return { success: false, error: 'Session workspace is not authorized' }
+    }
+    const now = Date.now()
+    updateSessionRecord(request.sessionId, {
+      title: typeof patch.title === 'string' ? patch.title.trim() : undefined,
+      workspacePath: patch.workspacePath,
+      context: 'editor',
+      status: 'empty',
+      createdAt: now,
+      lastModified: now,
+      messageCount: 0,
+    })
     return { success: true }
   })
 
@@ -110,6 +140,23 @@ export function registerAgentHandlers(): void {
       .find((file) => file.filePath === request.filePath && file.availability === 'available')
     if (!output) return { success: false, error: '产物不存在或不属于当前会话' }
     shell.showItemInFolder(output.filePath)
+    return { success: true }
+  })
+
+  ipcMain.handle('agent:openSessionOutput', async (_event, request: AgentOpenSessionOutputRequest) => {
+    const record = getSessionRecordById(request.sessionId)
+    if (!record?.workingDirectory) return { success: false, error: '会话文件目录不可用' }
+    const output = (await getSessionFileOutputs(request.sessionId))
+      .find((file) => file.filePath === request.filePath && file.availability === 'available')
+    if (!output) return { success: false, error: '产物不存在或不属于当前会话' }
+    const safeExtensions = new Set([
+      '.html', '.htm', '.md', '.txt', '.pdf', '.csv', '.json', '.svg',
+      '.png', '.jpg', '.jpeg', '.gif', '.webp', '.docx', '.pptx', '.xlsx',
+    ])
+    if (!safeExtensions.has(extname(output.filePath).toLowerCase())) {
+      return { success: false, error: '不支持打开此文件类型' }
+    }
+    await shell.openPath(output.filePath)
     return { success: true }
   })
 

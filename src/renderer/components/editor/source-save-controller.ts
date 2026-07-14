@@ -3,7 +3,7 @@ export type SourceSaveHandler = (filePath: string, content: string) => void | Pr
 export class SourceSaveController {
   private dirty = false
   private timer: ReturnType<typeof setTimeout> | null = null
-  private target: { filePath: string; content: string } | null = null
+  private target: { filePath: string; content: string; save: SourceSaveHandler } | null = null
   private inFlightSaves = new Set<Promise<unknown>>()
 
   constructor(
@@ -21,7 +21,10 @@ export class SourceSaveController {
 
   schedule(filePath: string, content: string): void {
     this.dirty = true
-    this.target = { filePath, content }
+    // Capture the owner-specific save handler with the edit. React may switch
+    // workspace/session props before this debounce flushes; using the latest
+    // handler would project the old document's result into the new owner.
+    this.target = { filePath, content, save: this.save }
     this.clearScheduledSave()
     this.timer = setTimeout(() => {
       this.flush()
@@ -31,7 +34,7 @@ export class SourceSaveController {
   flush(): boolean {
     const target = this.takePendingTarget()
     if (!target) return false
-    const save = this.trackSave(this.save(target.filePath, target.content))
+    const save = this.trackSave(target.save(target.filePath, target.content))
     void save.catch(() => {})
     return true
   }
@@ -47,7 +50,7 @@ export class SourceSaveController {
       }
     }
     if (!target) return false
-    const result = await this.trackSave(this.save(target.filePath, target.content))
+    const result = await this.trackSave(target.save(target.filePath, target.content))
     this.assertSaveSucceeded(result)
     return true
   }
@@ -64,7 +67,7 @@ export class SourceSaveController {
     this.timer = null
   }
 
-  private takePendingTarget(): { filePath: string; content: string } | null {
+  private takePendingTarget(): { filePath: string; content: string; save: SourceSaveHandler } | null {
     if (!this.hasPendingSave() || !this.target) return null
     const target = this.target
     this.clearScheduledSave()

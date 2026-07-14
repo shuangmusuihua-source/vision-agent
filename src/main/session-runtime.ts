@@ -351,6 +351,7 @@ export class SessionRuntimeController {
   }
 
   handleWindowDestroy(): void {
+    this.generationWindow = null
     this.pendingInteractions.reject()
     discardAllTextBatches()
     this.generationProjector.cleanupAll()

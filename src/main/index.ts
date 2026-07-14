@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { configureAppIdentity } from './app-identity'
 configureAppIdentity()
 import { is } from '@electron-toolkit/utils'
@@ -19,6 +20,7 @@ import { setMainWindow, getMainWindow } from './ipc-sender'
 import { flushAuditLog } from './agent-audit'
 import { APP_NAME, GITHUB_LATEST_RELEASE_URL } from '../shared/branding'
 import { toUpdateErrorPayload, type UpdateDownloadProgress } from '../shared/update-types'
+import { isAllowedExternalUrl, isAllowedRendererNavigation } from './navigation-policy'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -132,6 +134,9 @@ function checkForUpdatesSilently(reason: 'launch' | 'foreground'): void {
 }
 
 function createWindow(): void {
+  const rendererEntry = is.dev && process.env['ELECTRON_RENDERER_URL']
+    ? process.env['ELECTRON_RENDERER_URL']
+    : pathToFileURL(join(__dirname, '../renderer/index.html')).href
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -156,23 +161,35 @@ function createWindow(): void {
 
   // Register the window in ipc-sender so other modules can reach it
   setMainWindow(mainWindow)
+  setGenerationWindow(mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     if (mainWindow) mainWindow.show()
   })
 
   mainWindow.on('closed', () => {
+    abortActiveQuery()
     inlineRewriteRunner.cancelAll()
     handleWindowDestroy()
+    setMainWindow(null)
+    mainWindow = null
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    if (isAllowedExternalUrl(details.url)) {
+      void shell.openExternal(details.url)
+    }
     return { action: 'deny' }
   })
 
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    if (!isAllowedRendererNavigation(targetUrl, rendererEntry)) {
+      event.preventDefault()
+    }
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    mainWindow.loadURL(rendererEntry)
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
@@ -225,9 +242,6 @@ app.whenReady().then(async () => {
   restorePersistedTasks()
 
   createWindow()
-
-  const win = getMainWindow()
-  if (win) setGenerationWindow(win)
 
   // Auto-updater: check for updates after launch (production only)
   if (app.isPackaged) {

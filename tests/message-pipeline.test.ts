@@ -96,7 +96,8 @@ describe('reduceAgentMessage', () => {
       if (patch) liveSlot = { ...liveSlot, ...patch }
     }
 
-    expect(buildReplayedMessages(messages)).toEqual(liveSlot.messages)
+    const withoutProjectionTime = (items: typeof liveSlot.messages) => items.map(({ createdAt: _createdAt, ...message }) => message)
+    expect(withoutProjectionTime(buildReplayedMessages(messages))).toEqual(withoutProjectionTime(liveSlot.messages))
     expect(liveSlot.messages[0]).toMatchObject({
       toolCalls: [{ toolUseId: 'tool-1', status: 'completed', result: 'contents' }],
     })

@@ -1,22 +1,23 @@
 import { ipcMain, dialog, shell, app } from 'electron'
-import { readFile, mkdir, rm } from 'fs/promises'
-import { join } from 'path'
+import { lstat, readFile, mkdir } from 'fs/promises'
+import { extname, join } from 'path'
 import { existsSync } from 'fs'
 import { getMainWindow } from '../ipc-sender'
 import {
   removeAuthorizedDirectory,
+  addAuthorizedDirectory,
   getAuthorizedDirectories,
 } from '../persistence/workspace-store'
 import { getKnowledgeBaseDir } from '../persistence/store-core'
 import { fileIndexService } from '../file-index-service'
-import { isPathAuthorized, sanitizeFileName } from '../path-validator'
+import { findAuthorizedWorkspaceRoot, isPathAuthorized, sanitizeFileName } from '../path-validator'
 import { atomicWriteTextFile } from '../atomic-write'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 import { KNOWLEDGE_BASE_NAME, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 import { addMarkdownToKnowledge } from '../knowledge-curation'
+import { isAllowedExternalUrl } from '../navigation-policy'
 
 export function registerWorkspaceHandlers(
-  listMarkdownFiles: (dir: string) => Promise<{ label: string; path: string }[]>,
   pushSettingsToRenderer: () => void,
 ): void {
   ipcMain.handle('workspace:readFile', async (_event, filePath: string) => {
@@ -52,19 +53,33 @@ export function registerWorkspaceHandlers(
       const dirPath = join(docsDir, safeName)
       if (existsSync(dirPath)) return null
       await mkdir(dirPath, { recursive: true })
+      addAuthorizedDirectory(dirPath)
+      try {
+        await fileIndexService.init(getAuthorizedDirectories())
+      } catch (error) {
+        console.error('[workspace:createWorkspace] index refresh failed:', error)
+      }
+      pushSettingsToRenderer()
       return dirPath
     } catch (err) { console.error('Failed to create workspace:', err); return null }
   })
 
   ipcMain.handle('workspace:deleteWorkspace', async (_event, dirPath: string) => {
-    if (!isPathAuthorized(dirPath)) return { success: false, error: 'Path not authorized' }
+    const registeredRoot = findAuthorizedWorkspaceRoot(dirPath)
+    if (!registeredRoot) {
+      return { success: false, error: 'Only a registered workspace root can be deleted' }
+    }
     if (isReservedKnowledgeWorkspacePath(dirPath, [getKnowledgeBaseDir()])) {
       return { success: false, error: 'Cannot delete system workspace' }
     }
     try {
-      await rm(dirPath, { recursive: true, force: true })
-      removeAuthorizedDirectory(dirPath)
-      await fileIndexService.init(getAuthorizedDirectories())
+      await shell.trashItem(registeredRoot)
+      removeAuthorizedDirectory(registeredRoot)
+      try {
+        await fileIndexService.init(getAuthorizedDirectories())
+      } catch (error) {
+        console.error('[workspace:deleteWorkspace] index refresh failed:', error)
+      }
       pushSettingsToRenderer()
       return { success: true }
     } catch (err) { return { success: false, error: (err as Error).message } }
@@ -72,18 +87,30 @@ export function registerWorkspaceHandlers(
 
   ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {
     if (!isPathAuthorized(dirPath)) return []
-    try { return await listMarkdownFiles(dirPath) }
+    try { return await fileIndexService.listMarkdownFilesUnder(dirPath) }
     catch (e) { console.error('[workspace:listMarkdownFiles] failed:', dirPath, e); return [] }
   })
 
   ipcMain.handle('workspace:openInBrowser', async (_event, filePath: string) => {
     if (!isPathAuthorized(filePath)) return
+    if (!['.html', '.htm'].includes(extname(filePath).toLowerCase())) return
+    const stat = await lstat(filePath).catch(() => null)
+    if (!stat?.isFile()) return
     await shell.openPath(filePath)
+  })
+
+  ipcMain.handle('workspace:openExternalUrl', async (_event, url: string) => {
+    if (!isAllowedExternalUrl(url)) return { success: false }
+    await shell.openExternal(url)
+    return { success: true }
   })
 
   ipcMain.handle('workspace:previewArtifact', async (_event, options: { fileName: string; content: string }) => {
     const safeName = sanitizeFileName(options.fileName)
     if (!safeName) return { success: false, error: 'Invalid file name' }
+    if (!['.html', '.htm'].includes(extname(safeName).toLowerCase())) {
+      return { success: false, error: 'Only HTML previews are supported' }
+    }
     const tmpDir = join(app.getPath('temp'), 'sumi-preview')
     await mkdir(tmpDir, { recursive: true })
     const filePath = join(tmpDir, safeName)

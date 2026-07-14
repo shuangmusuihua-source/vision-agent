@@ -24,17 +24,22 @@ function ensureBatchSlot(key: string, envelope: AgentSessionEnvelope) {
 
 export function flushTextBatch(key: string, win: BrowserWindow): void {
   const slot = textBatches.get(key)
-  if (!slot || slot.entries.length === 0) return
+  if (!slot) return
 
   if (slot.timer) {
     clearTimeout(slot.timer)
     slot.timer = null
   }
 
+  if (slot.entries.length === 0) {
+    textBatches.delete(key)
+    return
+  }
+
   const combinedText = slot.entries.reduce((acc, e) => acc + e.text, '')
   const lastUuid = slot.entries[slot.entries.length - 1].uuid
   const envelope = slot.envelope
-  slot.entries = []
+  textBatches.delete(key)
 
   if (!combinedText || win.isDestroyed()) return
 
@@ -82,8 +87,7 @@ export function discardTextBatch(key: string): void {
   const slot = textBatches.get(key)
   if (slot) {
     if (slot.timer) clearTimeout(slot.timer)
-    slot.timer = null
-    slot.entries = []
+    textBatches.delete(key)
   }
 }
 
@@ -92,4 +96,5 @@ export function discardAllTextBatches(): void {
   for (const key of textBatches.keys()) {
     discardTextBatch(key)
   }
+  textBatches.clear()
 }
