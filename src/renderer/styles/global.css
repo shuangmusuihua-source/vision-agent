@@ -7,7 +7,6 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  -electron-corner-smoothing: system-ui;
   /* ── Layer 1: Primitive Colors ─────────────────────────────── */
 
   --color-black: #1a1a1a;
@@ -168,6 +167,7 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --corner-smoothing-g2: system-ui;
 
   /* ── Shadow ────────────────────────────────────────────────── */
 
@@ -304,6 +304,9 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  /* Electron's native continuous curve. On macOS, system-ui maps to 60%
+     smoothing and automatically backs off for circles, pills, and small radii. */
+  -electron-corner-smoothing: var(--corner-smoothing-g2);
 }
 
 html, body {
