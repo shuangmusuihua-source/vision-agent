@@ -133,10 +133,12 @@ export default function GenerationActivityCard({ activity }: { activity: Generat
       aria-label={`${activity.label}，${phaseText(activity.phase)}`}
     >
       <div className="generation-activity-card-header">
-        <span className="generation-activity-card-label">{activity.label}</span>
-        {lineCount > 0 && (
-          <span className="generation-activity-card-lines"><OdometerNumber value={lineCount} /> 行</span>
-        )}
+        <span className="generation-activity-card-heading">
+          <span className="generation-activity-card-label">{activity.label}</span>
+          {lineCount > 0 && (
+            <span className="generation-activity-card-lines"><OdometerNumber value={lineCount} /> 行</span>
+          )}
+        </span>
         <span className="generation-activity-card-status">
           {phaseText(activity.phase)}
           <span className="generating-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>

@@ -40,6 +40,8 @@ describe('GenerationActivityCard', () => {
 
     expect(html).toContain('class="odometer-number"')
     expect(html).toContain('aria-label="12"')
+    expect(html).not.toContain('generation-activity-card-signal')
+    expect(html).not.toContain('generation-activity-card-status-dot')
     expect(html.match(/class="odometer"/g)).toHaveLength(2)
   })
 })

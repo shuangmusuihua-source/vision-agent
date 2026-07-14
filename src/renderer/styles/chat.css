@@ -1604,12 +1604,12 @@
 .generation-activity-card {
   width: 100%;
   max-width: 100%;
-  border: none;
-  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  margin: 8px 0;
-  background: var(--color-bg-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin: 8px 0 10px;
+  background: var(--color-bg-elevated);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   min-width: 0;
 }
 
@@ -1627,24 +1627,41 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 40px;
   padding: 8px 12px;
-  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: color-mix(in srgb, var(--color-action) 3%, var(--color-bg-elevated));
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
 }
 
+.generation-activity-card-heading {
+  display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
 .generation-activity-card-label {
+  overflow: hidden;
   font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .generation-activity-card-lines {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
   display: inline-flex;
-  align-items: center;
+  flex: 0 0 auto;
   min-width: 5.5em;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
 }
 
 .odometer-number {
@@ -1709,6 +1726,7 @@
 .generation-activity-card-status {
   margin-left: auto;
   font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   color: var(--color-action);
 }
 
@@ -1718,10 +1736,9 @@
   font-size: var(--font-size-xs);
   line-height: 1.5;
   color: var(--color-text-secondary);
-  padding: 6px 12px 8px;
+  padding: 8px 12px 9px;
   overflow: hidden;
-  border-top: 1px solid var(--color-border-soft);
-  height: calc(var(--font-size-xs) * 1.5 * 5 + 14px); /* 5 lines + padding */
+  height: calc(var(--font-size-xs) * 1.5 * 5 + 17px); /* 5 lines + padding */
 }
 
 .generation-activity-card-body pre {
@@ -1787,16 +1804,17 @@
 /* --- Dark mode skill output --- */
 
 [data-theme="dark"] .generation-activity-card {
+  border-color: var(--color-border);
   background: var(--color-bg-elevated);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
 }
 
 [data-theme="dark"] .generation-activity-card-header {
-  background: var(--color-bg-elevated);
+  background: color-mix(in srgb, var(--color-action) 5%, var(--color-bg-elevated));
 }
 
 [data-theme="dark"] .generation-activity-card-body {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.32);
 }
 
 [data-theme="dark"] .generation-activity-card-body .hljs-tag { color: #56b6c2; }
