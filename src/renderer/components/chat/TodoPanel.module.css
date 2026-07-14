@@ -1,7 +1,7 @@
 .panel {
   max-width: 100%;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-soft);
   border-radius: 8px;
   overflow: hidden;
   font-size: 12px;
@@ -31,7 +31,7 @@
 }
 
 .bar:hover {
-  background: var(--bg-hover);
+  background: var(--color-bg-hover);
 }
 
 .barLeft {
@@ -42,7 +42,7 @@
 }
 
 .barText {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -50,7 +50,7 @@
 }
 
 .barCount {
-  color: var(--text-muted);
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 
@@ -69,14 +69,14 @@
   height: 22px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--color-text-tertiary);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .btn:hover {
-  background: var(--bg-active);
-  color: var(--text-primary);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 /* Timeline */
@@ -102,36 +102,36 @@
 
 .taskLabel {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--color-text-tertiary);
 }
 
 .taskSubject {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   word-break: break-word;
 }
 
 .task-completed .taskSubject {
   text-decoration: line-through;
-  color: var(--text-muted);
+  color: var(--color-text-tertiary);
 }
 
 .task-in_progress .taskSubject {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
 .taskDesc {
-  color: var(--text-muted);
+  color: var(--color-text-tertiary);
   font-weight: 400;
 }
 
 /* Icons */
 .iconDone {
-  color: var(--color-success, #22c55e);
+  color: var(--color-success);
 }
 
 .iconActive {
-  color: var(--color-primary, #3b82f6);
+  color: var(--color-action);
 }
 
 .iconPending {
@@ -139,5 +139,5 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 1.5px solid var(--text-muted);
+  border: 1.5px solid var(--color-text-tertiary);
 }

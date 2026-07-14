@@ -106,6 +106,13 @@
   --composer-bg: var(--color-bg-elevated);
   --composer-shadow: 0 10px 30px color-mix(in srgb, var(--color-gray-900) 8%, transparent), 0 2px 8px color-mix(in srgb, var(--color-gray-900) 4%, transparent);
 
+  /* Agent messages */
+  --chat-user-bg: var(--color-gray-900);
+  --chat-user-text: var(--color-white);
+  --chat-assistant-text: var(--color-gray-700);
+  --chat-assistant-surface: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  --chat-status-surface: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+
   /* Focus ring */
   --focus-ring: var(--color-action);
 
@@ -260,6 +267,9 @@
   --sidebar-entry-selected-hover: color-mix(in srgb, var(--color-action) 19%, var(--color-bg-elevated));
   --composer-bg: var(--color-bg-elevated);
   --composer-shadow: 0 12px 32px color-mix(in srgb, var(--color-black) 28%, transparent), 0 2px 8px color-mix(in srgb, var(--color-black) 20%, transparent);
+  --chat-user-bg: var(--color-bg-tertiary);
+  --chat-user-text: var(--color-text-primary);
+  --chat-assistant-text: var(--color-text-primary);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.16);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.24);

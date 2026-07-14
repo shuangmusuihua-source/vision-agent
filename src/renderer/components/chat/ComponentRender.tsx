@@ -2,21 +2,21 @@ import { Renderer, StateProvider, VisibilityProvider, ActionProvider } from '@js
 import type { ReactNode } from 'react'
 
 // ─── Registry ─────────────────────────────────────────────────────────
-// Design: light, modern, shadow-over-border. No thick frames.
+// Design: theme-aware, quiet surfaces, shadow-over-border. No thick frames.
 
 const S = {
   radius: 12,
-  shadow: '0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)',
-  bg: 'var(--jr-bg, #fff)',
-  bgMuted: 'var(--jr-bg-muted, #f8f9fa)',
-  text: 'var(--jr-text, #1a1a2e)',
-  textMuted: 'var(--jr-text-muted, #6b7280)',
-  accent: 'var(--jr-accent, #6366f1)',
-  accentBg: 'var(--jr-accent-bg, #eef2ff)',
-  success: '#10b981',
-  danger: '#ef4444',
-  amber: '#f59e0b',
-  blue: '#3b82f6',
+  shadow: 'var(--shadow-xs)',
+  bg: 'var(--color-bg-elevated)',
+  bgMuted: 'var(--color-bg-tertiary)',
+  text: 'var(--color-text-primary)',
+  textMuted: 'var(--color-text-secondary)',
+  accent: 'var(--color-action)',
+  accentBg: 'var(--color-action-bg)',
+  success: 'var(--color-success)',
+  danger: 'var(--color-error)',
+  amber: 'var(--color-warning)',
+  blue: 'var(--color-accent)',
 }
 
 const trendConfig: Record<string, { icon: string; color: string }> = {
@@ -26,10 +26,10 @@ const trendConfig: Record<string, { icon: string; color: string }> = {
 }
 
 const severityConfig: Record<string, { bg: string; dot: string; icon: string }> = {
-  info:    { bg: '#eff6ff', dot: S.blue,    icon: 'ℹ' },
-  warning: { bg: '#fffbeb', dot: S.amber,   icon: '⚠' },
-  error:   { bg: '#fef2f2', dot: S.danger,  icon: '✕' },
-  success: { bg: '#f0fdf4', dot: S.success, icon: '✓' },
+  info:    { bg: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', dot: S.blue, icon: 'ℹ' },
+  warning: { bg: 'color-mix(in srgb, var(--color-warning) 12%, transparent)', dot: S.amber, icon: '⚠' },
+  error:   { bg: 'var(--color-danger-bg)', dot: S.danger, icon: '✕' },
+  success: { bg: 'color-mix(in srgb, var(--color-success) 10%, transparent)', dot: S.success, icon: '✓' },
 }
 
 // json-render passes { element, children, emit, on, bindings, loading } to registry components.
@@ -120,14 +120,14 @@ const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
   CodeCard: ({ element, children }) => {
     const { language, title } = element.props || {}
     return (
-      <div style={{ background: '#1e1e2e', borderRadius: S.radius, boxShadow: S.shadow, marginBottom: 14, overflow: 'hidden' }}>
+      <div style={{ background: S.bgMuted, borderRadius: S.radius, boxShadow: S.shadow, marginBottom: 14, overflow: 'hidden' }}>
         {(title != null || language != null) && (
-          <div style={{ padding: '7px 14px', background: 'rgba(255,255,255,.05)', fontSize: 11, color: 'rgba(255,255,255,.45)', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ padding: '7px 14px', background: 'var(--color-bg-secondary)', fontSize: 11, color: S.textMuted, display: 'flex', justifyContent: 'space-between' }}>
             <span>{title ? String(title) : ''}</span>
             {language != null && <span>{String(language)}</span>}
           </div>
         )}
-        <pre style={{ margin: 0, padding: '12px 16px', overflow: 'auto', fontSize: 13, color: '#e2e2f0', lineHeight: 1.5 }}>
+        <pre style={{ margin: 0, padding: '12px 16px', overflow: 'auto', fontSize: 13, color: S.text, lineHeight: 1.5 }}>
           <code>{children || element.text || ''}</code>
         </pre>
       </div>
@@ -139,7 +139,7 @@ const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
     const isPrimary = variant !== 'secondary'
     return (
       <button
-        style={{ display: 'inline-flex', alignItems: 'center', padding: '7px 18px', borderRadius: 8, border: 'none', background: isPrimary ? S.accent : S.bgMuted, color: isPrimary ? '#fff' : S.text, fontSize: 13, fontWeight: 500, cursor: 'pointer', marginBottom: 8, boxShadow: isPrimary ? S.shadow : 'none' }}
+        style={{ display: 'inline-flex', alignItems: 'center', padding: '7px 18px', borderRadius: 8, border: 'none', background: isPrimary ? S.accent : S.bgMuted, color: isPrimary ? 'var(--color-action-text)' : S.text, fontSize: 13, fontWeight: 500, cursor: 'pointer', marginBottom: 8, boxShadow: isPrimary ? S.shadow : 'none' }}
         onClick={() => emit?.('click')}
       >
         {label ?? ''}
@@ -152,7 +152,7 @@ const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
     const s = severityConfig[severity || 'info'] || severityConfig.info
     return (
       <div style={{ background: s.bg, borderRadius: S.radius, padding: '14px 18px', marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start', borderLeft: `3px solid ${s.dot}` }}>
-        <span style={{ width: 20, height: 20, borderRadius: 10, background: s.dot, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+        <span style={{ width: 20, height: 20, borderRadius: 10, background: s.dot, color: 'var(--color-action-text)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
           {s.icon}
         </span>
         <div>
@@ -213,10 +213,10 @@ const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
     const v = variant || 'default'
     const colors: Record<string, { bg: string; text: string }> = {
       default: { bg: S.bgMuted, text: S.textMuted },
-      success: { bg: '#ecfdf5', text: '#059669' },
-      warning: { bg: '#fffbeb', text: '#d97706' },
-      error:   { bg: '#fef2f2', text: '#dc2626' },
-      info:    { bg: '#eff6ff', text: '#2563eb' },
+      success: { bg: 'color-mix(in srgb, var(--color-success) 12%, transparent)', text: S.success },
+      warning: { bg: 'color-mix(in srgb, var(--color-warning) 12%, transparent)', text: S.amber },
+      error:   { bg: 'var(--color-danger-bg)', text: S.danger },
+      info:    { bg: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', text: S.blue },
       accent:  { bg: S.accentBg, text: S.accent },
     }
     const c = colors[v] || colors.default
@@ -306,7 +306,7 @@ const registry: Record<string, (props: RegistryComponentProps) => ReactNode> = {
                 const label = d.label.length > 6 ? d.label.slice(0, 6) + '…' : d.label
                 return (
                   <g key={i}>
-                    <circle cx={cx} cy={cy} r={3.5} fill="#fff" stroke={chartColor} strokeWidth={2} />
+                    <circle cx={cx} cy={cy} r={3.5} fill="var(--color-bg-elevated)" stroke={chartColor} strokeWidth={2} />
                     <text x={cx} y={pad.top + plotH + 16} textAnchor="middle" fontSize={10} fill={S.textMuted}>
                       {label}
                     </text>
