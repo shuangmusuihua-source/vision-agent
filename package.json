@@ -1,6 +1,6 @@
 {
   "name": "sumi",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "A task-focused intelligent workspace for collaborative research, editable documents, skill-driven deliverables, and personal knowledge.",
   "main": "./out/main/index.js",
   "scripts": {
