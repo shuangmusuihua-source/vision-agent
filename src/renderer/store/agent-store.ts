@@ -1,4 +1,5 @@
 import type {
+  AgentApprovalMode,
   AgentContext,
   AgentIPCMessage,
   AgentIPCMessageWithContext,
@@ -16,6 +17,7 @@ import type {
   TodoTaskList,
   SessionOutputs,
 } from '../../shared/types'
+import { DEFAULT_AGENT_APPROVAL_MODE } from '../../shared/types'
 import type { SessionListAction } from './session-protocol'
 import type { AttachmentKind } from '../../shared/file-attachments'
 
@@ -55,6 +57,7 @@ export type ContextSlot = {
   linkedFile: string | null
   prefillText: string | null
   composerDraft: AgentComposerDraft
+  approvalMode: AgentApprovalMode
   ttftMs: number | null
   todoList: TodoTaskList | null
   workspacePath: string | null
@@ -87,6 +90,7 @@ function emptySlot(): ContextSlot {
     linkedFile: null,
     prefillText: null,
     composerDraft: { text: '', attachments: [] },
+    approvalMode: DEFAULT_AGENT_APPROVAL_MODE,
     ttftMs: null,
     todoList: null,
     workspacePath: null,
@@ -155,6 +159,11 @@ export type AgentStore = {
   updateComposerDraft: (
     context: AgentContext,
     patch: Partial<AgentComposerDraft>,
+    sessionId?: string | null,
+  ) => void
+  setApprovalMode: (
+    context: AgentContext,
+    mode: AgentApprovalMode,
     sessionId?: string | null,
   ) => void
   setLinkedFile: (context: AgentContext, path: string | null) => void

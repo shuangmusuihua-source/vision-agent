@@ -2,7 +2,8 @@ import type { BrowserWindow } from 'electron'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { ensureWorkspaceSkills, getAppSkillsCwd, getAppSkillsDir } from './skill-init'
-import type { AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
+import { DEFAULT_AGENT_APPROVAL_MODE } from '../shared/types'
+import type { AgentApprovalMode, AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
 import {
   getApiKey,
 } from './persistence/profile-store'
@@ -49,6 +50,10 @@ import {
 type HookSessionContext = {
   envelope: AgentSessionEnvelope
   getSdkSessionId?: () => string | undefined
+  decideFileAccess?: (
+    toolName: string,
+    input: Record<string, unknown>,
+  ) => ReturnType<typeof decideSessionFileAccess>
 }
 
 function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext): Partial<Record<string, HookCallbackMatcher[]>> {
@@ -59,6 +64,19 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
       tool: tool_name,
       input: JSON.stringify(tool_input).substring(0, 500)
     })
+    const fileAccess = hookContext.decideFileAccess?.(
+      tool_name,
+      (tool_input || {}) as Record<string, unknown>,
+    )
+    if (fileAccess === 'deny') {
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: '该路径不属于当前会话，且用户未在本次消息中明确提供。',
+        },
+      }
+    }
     return {}
   }
 
@@ -132,6 +150,7 @@ function buildOptions(
   getSessionId?: () => string | undefined,
   authorizedAttachmentPaths: string[] = [],
   explicitExternalPaths: string[] = [],
+  approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
 ) {
   const dirs = getAuthorizedDirectories()
   const workspacePath = workspacePathOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
@@ -146,6 +165,14 @@ function buildOptions(
   const currentEnvelope = (): AgentSessionEnvelope => ({
     ...sessionEnvelope,
     sdkSessionId: getSessionId?.() || sessionEnvelope.sdkSessionId,
+  })
+  const decideFileAccess = (toolName: string, input: Record<string, unknown>) => decideSessionFileAccess({
+    toolName,
+    input,
+    workingDirectory,
+    skillsDirectory,
+    authorizedExternalReadPaths: authorizedAttachmentPaths,
+    explicitExternalPaths,
   })
 
   const workspaceContextLines = buildSumiContextPrompt(context, workspacePath, workingDirectory)
@@ -177,7 +204,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
 
   return buildAgentOptions({
     memoryMode: 'global',
-    permissionMode: 'default',
+    permissionMode: approvalMode === 'auto' ? 'auto' : 'default',
     // Bare allow-list entries bypass canUseTool in recent SDK versions. Keep
     // this empty so every tool request reaches the session authorization gate.
     allowedTools: [],
@@ -193,6 +220,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
     hooks: buildHooks(mainWindow, {
       envelope: sessionEnvelope,
       getSdkSessionId: getSessionId,
+      decideFileAccess,
     }),
     resume: sessionId || undefined,
     canUseTool: async (
@@ -213,14 +241,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
         return { behavior: 'allow', updatedInput: input }
       }
 
-      const fileAccess = decideSessionFileAccess({
-        toolName,
-        input,
-        workingDirectory,
-        skillsDirectory,
-        authorizedExternalReadPaths: authorizedAttachmentPaths,
-        explicitExternalPaths,
-      })
+      const fileAccess = decideFileAccess(toolName, input)
       if (fileAccess === 'allow') {
         return { behavior: 'allow', updatedInput: input }
       }
@@ -322,7 +343,8 @@ export async function sendMessage(
   skillId?: string | null,
   workspacePath?: string,
   clientSessionKey?: string,
-  title?: string
+  title?: string,
+  approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
 ): Promise<void> {
   const queryKey = clientSessionKey || sessionId || context
   const effectiveWorkspacePath = workspacePath
@@ -423,6 +445,7 @@ export async function sendMessage(
       getSessionId,
       attachmentPaths,
       explicitExternalPaths,
+      approvalMode,
     )
     const appSessionKey = queryKey
     const abortController = new AbortController()

@@ -2588,6 +2588,9 @@
   .main-content-cover-sidebar {
     margin-left: -48px;
   }
+  .agent-panel-shell-cover-sidebar {
+    margin-left: -48px;
+  }
 }
 
 /* <900px: sidebar as overlay, agent panel as overlay drawer */
@@ -2640,6 +2643,9 @@
     border-radius: 0;
   }
   .main-content-cover-sidebar {
+    margin-left: 0;
+  }
+  .agent-panel-shell-cover-sidebar {
     margin-left: 0;
   }
   .main-content-header-cover-sidebar {

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, Square, Paperclip, X, Loader2 } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, X, Loader2, ShieldQuestionMark, ShieldCheck, ChevronDown, Check } from 'lucide-react'
 import type { SkillDefinition } from '../../lib/ipc'
-import type { AgentContext } from '../../../shared/types'
+import type { AgentApprovalMode, AgentContext } from '../../../shared/types'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { isSkillVisibleInSlashMenu } from '../../../shared/skill-invocation'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -25,17 +25,20 @@ interface ChatInputProps {
   isStreaming?: boolean
   placeholder?: string
   variant?: 'default' | 'capsule'
+  onApprovalModeChange?: (mode: AgentApprovalMode) => Promise<{ success: boolean; error?: string }>
 }
 
-function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default' }: ChatInputProps): React.ReactElement {
+function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default', onApprovalModeChange }: ChatInputProps): React.ReactElement {
   const [skills, setSkills] = useState<SkillDefinition[]>([])
   const [showSkillPopup, setShowSkillPopup] = useState(false)
   const [skillFilter, setSkillFilter] = useState('')
   const [selectedSkillIdx, setSelectedSkillIdx] = useState(0)
   const [isPreparingAttachments, setIsPreparingAttachments] = useState(false)
+  const [showApprovalMenu, setShowApprovalMenu] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const capsuleTextareaRef = useRef<HTMLTextAreaElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
+  const approvalMenuRef = useRef<HTMLDivElement>(null)
   const preparingAttachmentsRef = useRef(false)
   const modal = useModal()
   const consumePrefill = useAgentStore((s) => s.consumePrefill)
@@ -43,6 +46,8 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
   const text = useAgentStore((s) => s.slots[context].composerDraft.text)
   const attachedFiles = useAgentStore((s) => s.slots[context].composerDraft.attachments)
   const draftSessionId = useAgentStore((s) => s.slots[context].currentSessionId)
+  const approvalMode = useAgentStore((s) => s.slots[context].approvalMode)
+  const ApprovalModeIcon = approvalMode === 'auto' ? ShieldCheck : ShieldQuestionMark
 
   // Prefill from store slot — context-aware
   const prefillText = useAgentStore((s) => s.slots[context]?.prefillText)
@@ -56,9 +61,34 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
 
   useEffect(() => {
     setShowSkillPopup(false)
+    setShowApprovalMenu(false)
     setSkillFilter('')
     setSelectedSkillIdx(0)
   }, [draftSessionId])
+
+  useEffect(() => {
+    if (!showApprovalMenu) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!approvalMenuRef.current?.contains(event.target as Node)) {
+        setShowApprovalMenu(false)
+      }
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowApprovalMenu(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showApprovalMenu])
+
+  const handleApprovalModeChange = useCallback(async (mode: AgentApprovalMode) => {
+    setShowApprovalMenu(false)
+    if (mode === approvalMode || !onApprovalModeChange) return
+    await onApprovalModeChange(mode)
+  }, [approvalMode, onApprovalModeChange])
 
   // Keep the slash menu in sync with runtime installs and uninstalls.
   useEffect(() => {
@@ -379,15 +409,65 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
         </div>
       )}
       <div className="chat-input-wrapper">
-        <button
-          className="chat-input-attach-btn"
-          onClick={handleAttachFiles}
-          disabled={disabled || isPreparingAttachments}
-          type="button"
-          title="上传文件"
-        >
-          <Paperclip size={14} />
-        </button>
+        <div className="chat-input-bottom-actions">
+          <button
+            className="chat-input-attach-btn"
+            onClick={handleAttachFiles}
+            disabled={disabled || isPreparingAttachments}
+            type="button"
+            title="上传文件"
+            aria-label="上传文件"
+          >
+            <Paperclip size={14} />
+          </button>
+          <div className="approval-mode-control" ref={approvalMenuRef}>
+            <button
+              className={`approval-mode-trigger${approvalMode === 'auto' ? ' approval-mode-trigger-auto' : ''}`}
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={showApprovalMenu}
+              aria-label={`权限模式：${approvalMode === 'auto' ? '自动审批' : '请求批准'}`}
+              title={approvalMode === 'auto' ? '由安全模型自动批准或拒绝权限请求' : '需要时请求你的批准'}
+              onClick={() => setShowApprovalMenu((open) => !open)}
+            >
+              <ApprovalModeIcon size={14} aria-hidden="true" />
+              <span>{approvalMode === 'auto' ? '自动审批' : '请求批准'}</span>
+              <ChevronDown size={12} aria-hidden="true" />
+            </button>
+            {showApprovalMenu && (
+              <div className="approval-mode-menu" role="menu" aria-label="选择权限模式">
+                <button
+                  className={`approval-mode-option${approvalMode === 'request' ? ' approval-mode-option-active' : ''}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={approvalMode === 'request'}
+                  onClick={() => void handleApprovalModeChange('request')}
+                >
+                  <ShieldQuestionMark size={16} aria-hidden="true" />
+                  <span className="approval-mode-option-copy">
+                    <strong>请求批准</strong>
+                    <small>需要额外权限时由你确认</small>
+                  </span>
+                  {approvalMode === 'request' && <Check size={14} aria-hidden="true" />}
+                </button>
+                <button
+                  className={`approval-mode-option${approvalMode === 'auto' ? ' approval-mode-option-active' : ''}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={approvalMode === 'auto'}
+                  onClick={() => void handleApprovalModeChange('auto')}
+                >
+                  <ShieldCheck size={16} aria-hidden="true" />
+                  <span className="approval-mode-option-copy">
+                    <strong>自动审批</strong>
+                    <small>安全模型自动批准或拒绝，不突破访问边界</small>
+                  </span>
+                  {approvalMode === 'auto' && <Check size={14} aria-hidden="true" />}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
         <textarea
           ref={textareaRef}
           className="chat-input"

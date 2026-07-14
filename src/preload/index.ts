@@ -105,7 +105,7 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string, clientSessionKey?: string) => {
+    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string, clientSessionKey?: string, approvalMode?: import('../shared/types').AgentApprovalMode) => {
       const request: AgentSendMessageRequest = {
         prompt,
         sessionId,
@@ -115,6 +115,7 @@ const api = {
         workspacePath,
         title,
         clientSessionKey,
+        approvalMode,
       }
       return invoke('agent:sendMessage', request)
     },
@@ -150,8 +151,8 @@ const api = {
       const request: AgentAbortRequest = { contextOrSessionId }
       return invoke('agent:abort', request)
     },
-    setPermissionMode: (context: 'editor' | 'ask', mode: string) => {
-      const request: AgentSetPermissionModeRequest = { context, mode }
+    setPermissionMode: (queryKey: string, mode: import('../shared/types').AgentApprovalMode) => {
+      const request: AgentSetPermissionModeRequest = { queryKey, mode }
       return invoke('agent:setPermissionMode', request)
     },
     selectFolder: () => invoke('agent:selectFolder'),

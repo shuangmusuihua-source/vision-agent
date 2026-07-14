@@ -714,10 +714,17 @@
   border-radius: inherit;
 }
 
-.chat-input-attach-btn {
+.chat-input-bottom-actions {
   grid-column: 1;
   grid-row: 2;
+  display: flex;
+  align-items: center;
   justify-self: start;
+  min-width: 0;
+  gap: 2px;
+}
+
+.chat-input-attach-btn {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
@@ -733,12 +740,152 @@
 
 .chat-input-attach-btn:hover {
   color: var(--color-text-primary);
-  background: var(--color-bg-secondary);
+  background: color-mix(in srgb, var(--color-bg-tertiary) 74%, transparent);
 }
 
 .chat-input-attach-btn:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+.approval-mode-control {
+  position: static;
+  min-width: 0;
+}
+
+.approval-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  max-width: 132px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-default),
+    background 160ms var(--ease-default),
+    transform 160ms var(--ease-default);
+}
+
+.approval-mode-trigger:hover,
+.approval-mode-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--color-bg-tertiary) 74%, transparent);
+  color: var(--color-text-primary);
+}
+
+.approval-mode-trigger-auto {
+  color: var(--color-action);
+}
+
+.approval-mode-trigger:active {
+  transform: scale(0.97);
+}
+
+.approval-mode-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.approval-mode-trigger > svg:last-child {
+  transition: transform 160ms var(--ease-default);
+}
+
+.approval-mode-trigger[aria-expanded="true"] > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.approval-mode-menu {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  width: min(286px, 100%);
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+  transform-origin: left bottom;
+  animation: approval-mode-menu-in 180ms var(--ease-spring);
+}
+
+@keyframes approval-mode-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.approval-mode-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-default),
+    background 160ms var(--ease-default),
+    transform 160ms var(--ease-default);
+}
+
+.approval-mode-option:hover {
+  background: color-mix(in srgb, var(--color-bg-tertiary) 74%, transparent);
+  color: var(--color-text-primary);
+}
+
+.approval-mode-option:active {
+  transform: scale(0.985);
+}
+
+.approval-mode-option-active {
+  color: var(--color-action);
+}
+
+.approval-mode-option-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.approval-mode-option-copy strong {
+  color: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+
+.approval-mode-option-copy small {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  line-height: 1.35;
+}
+
+.approval-mode-option > svg:last-child {
+  color: var(--color-action);
 }
 
 .chat-input-attachments {
@@ -1417,6 +1564,8 @@
 }
 
 .chat-send-btn:focus-visible,
+.approval-mode-trigger:focus-visible,
+.approval-mode-option:focus-visible,
 .drawer-permission-btn:focus-visible,
 .drawer-question-option:focus-visible,
 .skill-popup-item:focus-visible,

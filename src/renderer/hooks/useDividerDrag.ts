@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 
 const AGENT_DEFAULT_WIDTH = 360
-const AGENT_MAX_WIDTH = 500
 const AGENT_COLLAPSE_THRESHOLD = 180
 const EDITOR_MIN_RATIO = 0.30
 
@@ -24,7 +23,7 @@ export function useDividerDrag({
   shellRef,
   onSwapLayout,
 }: UseDividerDragOptions) {
-  const lastWidthRef = useRef(AGENT_DEFAULT_WIDTH)
+  const lastWidthRef = useRef(agentWidth || AGENT_DEFAULT_WIDTH)
   const [dividerHovered, setDividerHovered] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const dragStartXRef = useRef(0)
@@ -62,14 +61,15 @@ export function useDividerDrag({
     setDividerHovered(true)
     dragStartXRef.current = e.clientX
     dragStartWidthRef.current = agentWidth
-    layoutWidthRef.current = shellRef.current?.offsetWidth || window.innerWidth
+    const mainContentWidth = shellRef.current?.querySelector<HTMLElement>('.main-content')?.offsetWidth || 0
+    layoutWidthRef.current = mainContentWidth + agentWidth || window.innerWidth
   }, [agentCollapsed, agentWidth, shellRef])
 
   useEffect(() => {
     if (!isDragging) return
     const onMouseMove = (e: MouseEvent) => {
       const delta = isChatFirst ? e.clientX - dragStartXRef.current : dragStartXRef.current - e.clientX
-      const newWidth = Math.min(AGENT_MAX_WIDTH, Math.max(0, dragStartWidthRef.current + delta))
+      const newWidth = Math.max(0, dragStartWidthRef.current + delta)
       const editorMinWidth = layoutWidthRef.current * EDITOR_MIN_RATIO
       const maxAgentWidth = layoutWidthRef.current - editorMinWidth
       const clamped = Math.min(newWidth, maxAgentWidth)
@@ -107,7 +107,7 @@ export function useDividerDrag({
   }, [isDragging, isChatFirst, setAgentWidth, setAgentCollapsed])
 
   useEffect(() => {
-    if (agentCollapsed && agentWidth > 0) {
+    if (!agentCollapsed && agentWidth > 0) {
       lastWidthRef.current = agentWidth
     }
   }, [agentCollapsed, agentWidth])

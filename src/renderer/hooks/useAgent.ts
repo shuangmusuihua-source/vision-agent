@@ -10,6 +10,7 @@ import {
   selectPermissionRequest,
 } from '../store/session-slot-state'
 import type {
+  AgentApprovalMode,
   AgentContext,
   AgentSessionEnvelope,
   AskUserRequestIPC,
@@ -255,7 +256,17 @@ export function useAgent(context: AgentContext = 'editor') {
     const sessionTitle = slotSid
       ? store.getState().sessionList.find((session) => session.id === slotSid)?.title
       : undefined
-    window.api.agent.sendMessage(prompt, effectiveSid, activeFilePath, skillId || undefined, context, workspacePath, sessionTitle, clientSessionKey)
+    window.api.agent.sendMessage(
+      prompt,
+      effectiveSid,
+      activeFilePath,
+      skillId || undefined,
+      context,
+      workspacePath,
+      sessionTitle,
+      clientSessionKey,
+      currentSlot.approvalMode,
+    )
   }, [context, store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
@@ -305,13 +316,21 @@ export function useAgent(context: AgentContext = 'editor') {
 
   const isLoadingMoreMessages = store((s) => s.slots[context]._isLoadingMoreMessages)
 
-  const setPermissionMode = useCallback(async (mode: string) => {
-    const result = await window.api.agent.setPermissionMode(context, mode)
+  const setPermissionMode = useCallback(async (mode: AgentApprovalMode) => {
+    const currentSlot = store.getState().slots[context]
+    const previousMode = currentSlot.approvalMode
+    const queryKey = currentSlot.currentSessionId || context
+    store.getState().setApprovalMode(context, mode, currentSlot.currentSessionId)
+
+    if (!currentSlot.isStreaming) return { success: true }
+
+    const result = await window.api.agent.setPermissionMode(queryKey, mode)
     if (!result.success) {
       console.warn('[useAgent] Failed to set permission mode:', result.error)
+      store.getState().setApprovalMode(context, previousMode, currentSlot.currentSessionId)
     }
     return result
-  }, [context])
+  }, [context, store])
 
   return {
     sendMessage,

@@ -433,6 +433,15 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       })
     },
 
+    setApprovalMode(context, mode, sessionId) {
+      set((state) => {
+        if (sessionId) {
+          return patchSessionScopedSlot(state, context, { approvalMode: mode }, sessionId)
+        }
+        return patchActiveContextSlot(state, context, { approvalMode: mode })
+      })
+    },
+
     setLinkedFile(context: AgentContext, path: string | null) {
       set((state) => patchActiveContextSlot(state, context, { linkedFile: path }))
     },
@@ -526,6 +535,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
           todoList: realSlot?.todoList || sourceSlot?.todoList || null,
           composerDraft: sourceSlot?.composerDraft || realSlot?.composerDraft || baseSlot.composerDraft,
+          approvalMode: sourceSlot?.approvalMode || realSlot?.approvalMode || baseSlot.approvalMode,
           currentSessionId: clientSessionKey,
           sdkSessionId,
           workspacePath: envelope.workspacePath || sourceSlot?.workspacePath || realSlot?.workspacePath || null,

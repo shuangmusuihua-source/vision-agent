@@ -46,7 +46,7 @@ function resolveAsarPath(filePath: string): string {
 
 export interface AgentOptionsProfile {
   /** Permission mode for the SDK subprocess. */
-  permissionMode: 'default' | 'acceptEdits'
+  permissionMode: 'default' | 'acceptEdits' | 'auto'
   /** Allowed tool names. */
   allowedTools: string[]
   /** Working directory. Defaults to getAppSkillsCwd(). */

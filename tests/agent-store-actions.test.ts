@@ -97,6 +97,27 @@ describe('agent store intent actions', () => {
     })
   })
 
+  it('keeps approval mode isolated per session and defaults new sessions to requests', () => {
+    const sessionA = { ...emptySlot(), currentSessionId: 'session-a' }
+    const sessionB = { ...emptySlot(), currentSessionId: 'session-b' }
+    useAgentStore.setState({
+      activeSessionId: { editor: 'session-a', ask: null },
+      slots: { editor: sessionA, ask: emptySlot() },
+      sessionSlots: { 'session-a': sessionA, 'session-b': sessionB },
+      sessionAccessOrder: ['session-a', 'session-b'],
+    })
+
+    useAgentStore.getState().setApprovalMode('editor', 'auto', 'session-a')
+    useAgentStore.getState().switchToSession('session-b', 'editor')
+    expect(useAgentStore.getState().slots.editor.approvalMode).toBe('request')
+
+    useAgentStore.getState().switchToSession('session-a', 'editor')
+    expect(useAgentStore.getState().slots.editor.approvalMode).toBe('auto')
+
+    useAgentStore.getState().startNewSession('editor')
+    expect(useAgentStore.getState().slots.editor.approvalMode).toBe('request')
+  })
+
   it('records a saved artifact in both representations of the active session', () => {
     const slot = {
       ...emptySlot(),
@@ -195,6 +216,7 @@ describe('agent store intent actions', () => {
       ...emptySlot(),
       currentSessionId: 'temp-a',
       isStreaming: true,
+      approvalMode: 'auto' as const,
       composerDraft: { text: 'follow up', attachments: [] },
       messages: [{ kind: 'user' as const, id: 'user-a', role: 'user' as const, textContent: 'hello', createdAt: 1 }],
     }
@@ -227,6 +249,7 @@ describe('agent store intent actions', () => {
     expect(state.slots.editor.currentSessionId).toBe('temp-a')
     expect(state.slots.editor.sdkSessionId).toBe('sdk-a')
     expect(state.slots.editor.composerDraft.text).toBe('follow up')
+    expect(state.slots.editor.approvalMode).toBe('auto')
     expect(state.sessionSlots['temp-a'].sdkSessionId).toBe('sdk-a')
     expect(state.sessionSlots['temp-a'].composerDraft.text).toBe('follow up')
     expect(state.sessionList[0]).toMatchObject({ id: 'temp-a', sdkSessionId: 'sdk-a', title: 'Research' })

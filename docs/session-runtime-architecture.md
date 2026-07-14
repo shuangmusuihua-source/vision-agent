@@ -109,6 +109,14 @@ Agent IPC 请求使用 `src/shared/ipc-types.ts` 中定义的对象 payload；Ma
 - 其他工具进入 renderer 审批队列
 - `AskUserQuestion` 使用独立的 AskUser 队列
 
+会话 Agent 的审批模式属于 app session，而不是全局设置：
+
+- `request`（请求批准）映射到 SDK `default`，除会话范围内已允许的操作外，其余权限请求交给用户确认
+- `auto`（自动审批）映射到 SDK `auto`，由 SDK 的安全分类器自动批准或拒绝原本需要确认的请求
+- 两种模式都必须先经过应用的 session 文件访问判断；SDK 自动审批不能越过未授权路径或受保护路径
+- `AskUserQuestion` 不属于工具权限审批，两种模式下仍由用户回答
+- 新会话及应用重启后默认使用 `request`；当前进程内切换会话时，各会话保留自己的选择
+
 Renderer 回复必须携带 request ID；runtime 根据注册信息找到原 session。超时或 abort 会清理 pending Promise，避免后续响应串到其他会话。
 
 ## Transcript 与产品元数据

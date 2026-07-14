@@ -6,7 +6,7 @@ import { listSdkSessions, loadSdkSessionMessagesPaginated, renameSdkSession, del
 import { getSessionRecords, getSessionRecordById, updateSessionRecord, removeSessionRecord } from '../persistence/workspace-store'
 import { getSessionFileOutputs } from '../session-file-catalog'
 import type { IPCRequest } from '../../shared/ipc-types'
-import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
+import { isAgentApprovalMode } from '../../shared/types'
 import { removeSessionWorkingDirectory } from '../session-files'
 import { createAttachmentPathGrant } from '../attachment-path-authorization'
 import { removeSessionOutputMetadataEntry } from '../session-output-metadata'
@@ -26,19 +26,11 @@ type AgentDeleteSessionOutputRequest = IPCRequest<'agent:deleteSessionOutput'>
 type AgentSetPermissionModeRequest = IPCRequest<'agent:setPermissionMode'>
 type AgentAbortRequest = IPCRequest<'agent:abort'>
 
-function isPermissionMode(value: string): value is PermissionMode {
-  return value === 'default' ||
-    value === 'acceptEdits' ||
-    value === 'plan' ||
-    value === 'dontAsk' ||
-    value === 'auto'
-}
-
 export function registerAgentHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, request: AgentSendMessageRequest) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey, request.title)
+    sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey, request.title, request.approvalMode)
     return { started: true }
   })
 
@@ -139,14 +131,14 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:setPermissionMode', async (_event, request: AgentSetPermissionModeRequest) => {
-    if (!isPermissionMode(request.mode)) {
-      return { success: false, error: `Unsupported permission mode: ${request.mode}` }
+    if (!isAgentApprovalMode(request.mode)) {
+      return { success: false, error: `Unsupported approval mode: ${String(request.mode)}` }
     }
 
     try {
-      const applied = await setPermissionMode(request.context, request.mode)
+      const applied = await setPermissionMode(request.queryKey, request.mode === 'auto' ? 'auto' : 'default')
       if (!applied) {
-        return { success: false, error: `No active agent run for context: ${request.context}` }
+        return { success: false, error: `No active agent run for session: ${request.queryKey}` }
       }
       return { success: true }
     } catch (err) {

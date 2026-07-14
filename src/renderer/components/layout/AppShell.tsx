@@ -408,6 +408,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     loadSessions,
     respondPermission,
     respondAskUser: editorRespondAskUser,
+    setPermissionMode: setEditorApprovalMode,
   } = useAgent('editor')
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
@@ -836,7 +837,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         sessionList={editorSessionList}
         currentSessionId={currentSessionId}
         activeSkillId={activeSkillId}
-        chatInput={<ChatInput context="editor" onSend={(msg) => {
+        chatInput={<ChatInput context="editor" onApprovalModeChange={setEditorApprovalMode} onSend={(msg) => {
           if (editorAskUser && editorAskUserRespondRef.current) {
             const qKey = editorAskUser.questions[0]?.question || 'answer'
             editorAskUserRespondRef.current({ [qKey]: msg })

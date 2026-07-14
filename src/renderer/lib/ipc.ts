@@ -2,6 +2,7 @@ import type {
   AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentContext,
+  AgentApprovalMode,
   AgentNotificationEvent,
   AgentSessionEnvelope,
   SessionRoutedAskUserRequest,
@@ -121,7 +122,7 @@ interface SettingsApi {
 }
 
 interface AgentApi {
-  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string, clientSessionKey?: string) => Promise<{ started: boolean }>
+  sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: AgentContext, workspacePath?: string, title?: string, clientSessionKey?: string, approvalMode?: AgentApprovalMode) => Promise<{ started: boolean }>
   respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => Promise<{ success: boolean }>
   respondAskUser: (requestId: string, answers: Record<string, string>) => Promise<{ success: boolean }>
   listSdkSessions: (workspaceCwd?: string) => Promise<SdkSessionInfo[]>
@@ -129,7 +130,7 @@ interface AgentApi {
   renameSession: (sessionId: string, title: string) => Promise<{ success: boolean }>
   updateSessionRecord: (sessionId: string, patch: Record<string, unknown>) => Promise<{ success: boolean }>
   abort: (contextOrSessionId?: string) => Promise<{ success: boolean }>
-  setPermissionMode: (context: AgentContext, mode: string) => Promise<{ success: boolean; error?: string }>
+  setPermissionMode: (queryKey: string, mode: AgentApprovalMode) => Promise<{ success: boolean; error?: string }>
   selectFolder: () => Promise<{ canceled: boolean; filePaths: string[] }>
   getSessionOutputs: (sessionId: string) => Promise<SessionOutputs | null>
   revealSessionOutput: (sessionId: string, filePath: string) => Promise<{ success: boolean; error?: string }>

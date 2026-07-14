@@ -60,6 +60,7 @@ export type IPCChannelMap = {
       workspacePath?: string
       title?: string
       clientSessionKey?: string
+      approvalMode?: import('./types').AgentApprovalMode
     }
     response: { started: boolean }
   }
@@ -80,7 +81,7 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'agent:setPermissionMode': {
-    request: { context: 'editor' | 'ask'; mode: string }
+    request: { queryKey: string; mode: import('./types').AgentApprovalMode }
     response: { success: boolean; error?: string }
   }
   'agent:respondAskUser': {

@@ -7,6 +7,15 @@ import type { AttachmentConversionDisplayStatus } from './file-attachments'
 
 export type AgentContext = 'editor' | 'ask'
 
+/** Per-session policy for handling SDK permission prompts. */
+export type AgentApprovalMode = 'request' | 'auto'
+
+export const DEFAULT_AGENT_APPROVAL_MODE: AgentApprovalMode = 'request'
+
+export function isAgentApprovalMode(value: unknown): value is AgentApprovalMode {
+  return value === 'request' || value === 'auto'
+}
+
 // ─── Model Profile ──────────────────────────────────────────────────
 
 export interface ModelProfile {

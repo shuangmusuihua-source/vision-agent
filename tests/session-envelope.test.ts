@@ -237,11 +237,13 @@ describe('session runtime event routing', () => {
     await expect(runtime.setPermissionMode('app-session-permission-mode', 'acceptEdits')).resolves.toBe(true)
     await expect(runtime.setPermissionMode('sdk-session-permission-mode', 'plan')).resolves.toBe(true)
     await expect(runtime.setPermissionMode('editor', 'dontAsk')).resolves.toBe(true)
+    await expect(runtime.setPermissionMode('app-session-permission-mode', 'auto')).resolves.toBe(true)
     await expect(runtime.setPermissionMode('missing-session', 'default')).resolves.toBe(false)
 
     expect(setPermissionMode).toHaveBeenNthCalledWith(1, 'acceptEdits')
     expect(setPermissionMode).toHaveBeenNthCalledWith(2, 'plan')
     expect(setPermissionMode).toHaveBeenNthCalledWith(3, 'dontAsk')
+    expect(setPermissionMode).toHaveBeenNthCalledWith(4, 'auto')
   })
 
   it('keeps generation activity on the app session after the SDK session materializes', () => {
