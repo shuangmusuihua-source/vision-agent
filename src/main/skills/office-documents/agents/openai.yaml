@@ -1,0 +1,4 @@
+interface:
+  display_name: "Office 文档"
+  short_description: "创建、编辑并校验 Word、Excel 和 PowerPoint 文件"
+  default_prompt: "Use $office-documents to create or update an editable Office document."

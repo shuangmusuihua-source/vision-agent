@@ -21,6 +21,17 @@
     }
   },
   {
+    "id": "office-documents",
+    "hasResources": true,
+    "requiredPaths": ["SKILL.md", "agents/openai.yaml"],
+    "version": "1.0.136",
+    "source": {
+      "repositoryUrl": "https://github.com/iOfficeAI/OfficeCLI",
+      "ref": "4ba79f0b984e141f57f58d4398ba2df29e8187e8",
+      "license": "Apache-2.0"
+    }
+  },
+  {
     "id": "system-cleanup",
     "hasResources": true,
     "requiredPaths": ["SKILL.md", "scan.sh"]

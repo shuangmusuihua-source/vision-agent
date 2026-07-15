@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { getApiKey, getBaseUrl, getModel } from './persistence/profile-store'
 import { getAppSkillsCwd } from './skill-init'
 import { getAgentMemorySettings, GLOBAL_MEMORY_PROMPT, type AgentMemoryMode } from './memory-policy'
+import { getOfficeCliBinDir } from './officecli-runtime'
 
 // ─── CLI path resolution (moved from agent-manager) ────────────────────
 
@@ -109,6 +110,7 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   // Prepend user-level bin paths so tools like pip/brew/npm are findable
   if (profile.prependUserBinPaths !== false) {
     const userBinPaths = [
+      getOfficeCliBinDir(),
       '/opt/homebrew/bin',
       '/opt/homebrew/sbin',
       '/usr/local/bin',
@@ -117,6 +119,7 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
     ].join(':')
     env.PATH = `${userBinPaths}:${process.env.PATH}`
     env.LC_ALL = process.env.LC_ALL
+    env.OFFICECLI_SKIP_UPDATE = '1'
   }
 
   if (apiKey) {

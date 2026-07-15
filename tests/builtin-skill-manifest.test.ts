@@ -2,6 +2,8 @@ import { access, readFile } from 'fs/promises'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { BUILTIN_SKILLS } from '../src/main/skills/skills-manifest'
+import { getBuiltinSkills } from '../src/main/skills/builtin'
+import { OFFICECLI_VERSION } from '../src/shared/officecli-runtime'
 
 const skillsRoot = join(process.cwd(), 'src', 'main', 'skills')
 
@@ -20,11 +22,12 @@ describe('built-in skill manifest', () => {
     expect(sourcedSkills.map(item => item.id)).toEqual([
       'kami',
       'frontend-slides',
+      'office-documents',
     ])
     for (const skill of sourcedSkills) {
       expect(skill.source?.repositoryUrl).toMatch(/^https:\/\/github\.com\//)
       expect(skill.source?.ref).toMatch(/^[0-9a-f]{40}$/)
-      expect(skill.source?.license).toBe('MIT')
+      expect(skill.source?.license).toMatch(/^(MIT|Apache-2\.0)$/)
     }
   })
 
@@ -34,6 +37,14 @@ describe('built-in skill manifest', () => {
 
     expect(kami?.version).toBe('1.9.0')
     expect(version).toBe(kami?.version)
+  })
+
+  it('keeps the downloadable Office runtime opt-in', () => {
+    const office = getBuiltinSkills().find(skill => skill.id === 'office-documents')
+    const manifestEntry = BUILTIN_SKILLS.find(skill => skill.id === 'office-documents')
+
+    expect(office).toMatchObject({ defaultEnabled: false, outputMode: 'write' })
+    expect(manifestEntry?.version).toBe(OFFICECLI_VERSION)
   })
 
   it('does not bundle Kami repository-only material', async () => {

@@ -11,6 +11,7 @@ import { CURATED_COMMUNITY_SKILLS, getCuratedCommunitySkill } from '../skills/co
 import { sessionRuntime } from '../session-runtime'
 import { runSkillMutation } from '../skill-mutation-coordinator'
 import type { CommunitySkillCatalogItem, CommunitySkillMutationResult } from '../../shared/types'
+import { getOfficeCliRuntimeManager } from '../officecli-runtime'
 
 function emitSkillsChanged(skillId: string, reason: 'installed' | 'updated' | 'uninstalled' | 'toggled'): void {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -62,6 +63,12 @@ export function registerSkillHandlers(): void {
   })
 
   ipcMain.handle('skills:toggle', async (_event, skillId: string, enabled: boolean) => {
+    if (skillId === 'office-documents' && enabled) {
+      const runtime = await getOfficeCliRuntimeManager().getStatus()
+      if (runtime.state !== 'ready') {
+        throw new Error('请先安装 Office 文档运行组件')
+      }
+    }
     const result = toggleSkill(skillId, enabled)
     emitSkillsChanged(skillId, 'toggled')
     return result

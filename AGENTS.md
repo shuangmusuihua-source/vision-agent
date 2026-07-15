@@ -44,6 +44,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
 - `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
 - `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
+- `officecli-runtime.ts` — opt-in, pinned OfficeCLI download, SHA-256 verification, atomic install, and runtime discovery for editable DOCX/XLSX/PPTX work
 - `memory-policy.ts`, `memory-files.ts` — application-global auto-memory policy and managed Markdown storage; interactive sessions share it, while automation and ephemeral model runs disable auto-memory
 - `session-store.ts` — SDK transcript listing, paging, rename, delete, and compaction filtering
 - `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata
@@ -107,6 +108,7 @@ Do not introduce a second store for the same authority without documenting the o
 - Prefer focused owning modules; do not introduce pass-through facades.
 - Update `src/shared/ipc-types.ts`, preload, and renderer types together when changing IPC.
 - Built-in Skill changes must keep `skills-manifest.json`, `builtin.ts`, resources, and packaged verification aligned. See `src/main/skills/BUILTIN-SKILL-ARCHITECTURE.md`.
+- OfficeCLI remains an app-managed runtime: pin release assets and hashes, disable its self-update, and never invoke its global installer or MCP registration flow.
 - Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.
 
 ## Documentation policy

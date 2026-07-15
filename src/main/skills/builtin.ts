@@ -7,6 +7,7 @@ export interface SkillDefinition {
   systemPromptAppend?: string
   outputMode?: 'skill-output' | 'write'
   hideInSlashMenu?: boolean
+  defaultEnabled?: boolean
 }
 
 const builtinSkills: SkillDefinition[] = [
@@ -25,6 +26,15 @@ const builtinSkills: SkillDefinition[] = [
     icon: 'PresentationChart',
     promptTemplate: `使用 frontend-slides skill 接下来制作演示文稿... {activeFile}`,
     outputMode: 'write',
+  },
+  {
+    id: 'office-documents',
+    name: 'Office 文档',
+    description: '无需安装 Microsoft Office，创建、编辑并校验 Word、Excel 和 PowerPoint 文件',
+    icon: 'FileSpreadsheet',
+    promptTemplate: `使用 office-documents skill 创建或修改可编辑的 Office 文档... {activeFile}`,
+    outputMode: 'write',
+    defaultEnabled: false,
   },
   {
     id: 'system-cleanup',

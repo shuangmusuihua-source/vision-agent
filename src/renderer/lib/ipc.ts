@@ -27,6 +27,10 @@ import type {
   MarkitdownRuntimeStatus,
 } from '../../shared/markitdown-runtime'
 import type {
+  OfficeCliRuntimeInstallResult,
+  OfficeCliRuntimeStatus,
+} from '../../shared/officecli-runtime'
+import type {
   UpdateCheckResult,
   UpdateDownloadProgress,
   UpdateErrorPayload,
@@ -191,6 +195,11 @@ interface AttachmentsApi {
   installRuntime: () => Promise<MarkitdownRuntimeInstallResult>
 }
 
+interface OfficeApi {
+  runtimeStatus: () => Promise<OfficeCliRuntimeStatus>
+  installRuntime: () => Promise<OfficeCliRuntimeInstallResult>
+}
+
 interface SearchApi {
   query: (keyword: string) => Promise<SearchResult[]>
 }
@@ -223,6 +232,7 @@ interface WindowApi {
   cron: CronApi
   skills: SkillsApi
   attachments: AttachmentsApi
+  office: OfficeApi
   search: SearchApi
   menu: MenuApi
   update: UpdateApi
@@ -253,6 +263,7 @@ export type {
   CronApi,
   SkillsApi,
   AttachmentsApi,
+  OfficeApi,
   SearchApi,
   MenuApi,
   UpdateApi,

@@ -38,6 +38,7 @@ type SkillFilter = 'all' | 'installed' | 'updates'
 const builtinSkillIcons = {
   kami: FileText,
   'frontend-slides': Presentation,
+  'office-documents': FileSpreadsheet,
   'system-cleanup': Trash2,
   'organize-desktop': Monitor,
   'organize-folder': FolderOpen,
@@ -224,6 +225,30 @@ function SkillLibrary(): React.ReactElement {
     setPendingBuiltinId(skill.id)
     setError(null)
     try {
+      if (!skill.enabled && skill.id === 'office-documents') {
+        const status = await window.api.office.runtimeStatus()
+        if (status.state === 'unsupported') {
+          await modal.alert({
+            title: '当前系统暂不支持',
+            message: `Office 文档能力暂不支持 ${status.platform}/${status.arch}。`,
+          })
+          return
+        }
+
+        if (status.state === 'not-installed') {
+          const sizeMb = Math.ceil(status.downloadSizeBytes / 1024 / 1024)
+          const confirmed = await modal.confirm({
+            title: status.reason === 'invalid' ? '修复 Office 文档能力' : '启用 Office 文档能力',
+            message: `sumi 将下载并校验 OfficeCLI ${status.version}（约 ${sizeMb} MB），安装到 sumi 的独立目录。无需安装 Microsoft Word、Excel 或 PowerPoint，也不会修改其他 Agent 的配置。`,
+            variant: 'primary',
+            confirmLabel: status.reason === 'invalid' ? '修复并启用' : '安装并启用',
+          })
+          if (!confirmed) return
+
+          const result = await window.api.office.installRuntime()
+          if (!result.success) throw new Error(result.error)
+        }
+      }
       await window.api.skills.toggle(skill.id, !skill.enabled)
       await loadCatalog(false)
     } catch (toggleError) {
@@ -231,7 +256,7 @@ function SkillLibrary(): React.ReactElement {
     } finally {
       setPendingBuiltinId(null)
     }
-  }, [loadCatalog, pendingBuiltinId])
+  }, [loadCatalog, modal, pendingBuiltinId])
 
   const openSkillDetail = useCallback((skillId: string) => {
     catalogScrollTopRef.current = libraryRef.current?.scrollTop || 0

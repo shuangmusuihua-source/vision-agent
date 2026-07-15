@@ -12,6 +12,7 @@ flowchart LR
   M --> FS[Workspace / session files]
   M --> Store[electron-store]
   M --> OS[Notifications / updater / shell]
+  M --> Office[Managed OfficeCLI runtime]
 ```
 
 BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isolation 和 web security，关闭 Node integration。主进程是文件系统、SDK、通知、更新与持久化的信任边界。
@@ -31,7 +32,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 
 ### IPC 层
 
-`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、search 和 connection。
+`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、office、search 和 connection。
 
 `src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/preload/index.ts` 将其适配成 `window.api`。新增 IPC 时必须同时维护这两个边界和 renderer 类型。
 
@@ -46,6 +47,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 - `session-store.ts`：SDK 会话列表、历史分页、重命名、删除及 compaction 过滤
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
 - `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
+- `officecli-runtime.ts`：固定版本 OfficeCLI 的按需下载、SHA-256 校验、原子安装和能力探测；Agent 环境只获得受管二进制路径，并禁用 OfficeCLI 自更新
 
 ### 文件与授权
 
@@ -69,7 +71,7 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 `file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与去重后的双向 wikilink 关系图。Renderer 使用 `react-force-graph-2d` 在固定视口中显示图谱。
 
-内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。
+内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”是默认关闭的内置能力；首次启用时由 main process 准备 OfficeCLI 运行时，Skill 只提供 Agent 工作流和质量检查规则。
 
 ## Renderer
 

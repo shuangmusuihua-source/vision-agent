@@ -28,6 +28,10 @@ import type {
   MarkitdownRuntimeStatus,
 } from './markitdown-runtime'
 import type {
+  OfficeCliRuntimeInstallResult,
+  OfficeCliRuntimeStatus,
+} from './officecli-runtime'
+import type {
   UpdateCheckResult,
   UpdateDownloadProgress,
   UpdateErrorPayload,
@@ -344,6 +348,16 @@ export type IPCChannelMap = {
   'attachments:installRuntime': {
     request: void
     response: MarkitdownRuntimeInstallResult
+  }
+
+  // Managed OfficeCLI runtime
+  'office:runtimeStatus': {
+    request: void
+    response: OfficeCliRuntimeStatus
+  }
+  'office:installRuntime': {
+    request: void
+    response: OfficeCliRuntimeInstallResult
   }
 
   // Search

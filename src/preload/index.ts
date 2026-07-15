@@ -293,6 +293,11 @@ const api = {
     installRuntime: () => invoke('attachments:installRuntime'),
   },
 
+  office: {
+    runtimeStatus: () => invoke('office:runtimeStatus'),
+    installRuntime: () => invoke('office:installRuntime'),
+  },
+
   search: {
     query: (keyword: string) => invoke('search:query', keyword)
   },

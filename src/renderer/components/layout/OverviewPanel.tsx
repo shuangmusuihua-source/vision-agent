@@ -19,6 +19,7 @@ interface OverviewPanelProps {
   sessionId: string | null
   activeFilePath?: string
   onOpenFile: (path: string) => void
+  onOpenOutput: (path: string) => Promise<void>
   onAddToKnowledge: (path: string) => Promise<{ success: boolean; alreadyExists?: boolean; updated?: boolean; error?: string }>
   onRevealOutput: (path: string) => Promise<void>
   onDeleteOutput: (file: SessionOutputEntry) => Promise<boolean>
@@ -73,6 +74,7 @@ function OverviewPanel({
   sessionId,
   activeFilePath,
   onOpenFile,
+  onOpenOutput,
   onAddToKnowledge,
   onRevealOutput,
   onDeleteOutput,
@@ -212,7 +214,7 @@ function OverviewPanel({
         <div className="overview-card-head">
           <div className="overview-card-icon overview-card-icon--artifact"><Presentation size={19} strokeWidth={1.6} /></div>
           <div className="overview-card-identity">
-            <button className="overview-card-name" type="button" onClick={() => onOpenFile(file.filePath)} title={file.filePath}>
+            <button className="overview-card-name" type="button" onClick={() => void onOpenOutput(file.filePath)} title={file.filePath}>
               {file.fileName}
             </button>
             <span className="overview-card-subline">
@@ -244,7 +246,7 @@ function OverviewPanel({
         </dl>
 
         <div className="overview-card-toolbar" role="group" aria-label={`${file.fileName} 操作`}>
-          <button className="overview-icon-action" type="button" onClick={() => onOpenFile(file.filePath)} title="打开产物" aria-label={`打开 ${file.fileName}`}>
+          <button className="overview-icon-action" type="button" onClick={() => void onOpenOutput(file.filePath)} title="打开产物" aria-label={`打开 ${file.fileName}`}>
             <ArrowUpRight size={16} />
           </button>
           <button className="overview-icon-action" type="button" onClick={() => void onRevealOutput(file.filePath)} title="在访达中显示" aria-label={`在访达中显示 ${file.fileName}`}>

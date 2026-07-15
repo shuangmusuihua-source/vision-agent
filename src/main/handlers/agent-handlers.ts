@@ -156,8 +156,8 @@ export function registerAgentHandlers(): void {
     if (!safeExtensions.has(extname(output.filePath).toLowerCase())) {
       return { success: false, error: '不支持打开此文件类型' }
     }
-    await shell.openPath(output.filePath)
-    return { success: true }
+    const openError = await shell.openPath(output.filePath)
+    return openError ? { success: false, error: openError } : { success: true }
   })
 
   ipcMain.handle('agent:deleteSessionOutput', async (_event, request: AgentDeleteSessionOutputRequest) => {

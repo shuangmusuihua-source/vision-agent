@@ -5,6 +5,7 @@ import { registerSkillHandlers } from './skill-handlers'
 import { registerSearchHandlers } from './search-handlers'
 import { registerConnectionHandlers } from './connection-handlers'
 import { registerAttachmentHandlers } from './attachment-handlers'
+import { registerOfficeHandlers } from './office-handlers'
 
 export function registerSystemHandlers(): void {
   registerMemoryHandlers()
@@ -14,4 +15,5 @@ export function registerSystemHandlers(): void {
   registerSearchHandlers()
   registerConnectionHandlers()
   registerAttachmentHandlers()
+  registerOfficeHandlers()
 }

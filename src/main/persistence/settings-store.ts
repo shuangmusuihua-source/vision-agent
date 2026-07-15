@@ -44,9 +44,13 @@ function getInstalledCommunitySkillIds(builtinSkillIds: string[]): string[] {
 export function getEnabledSkills(): string[] {
   const stored = store.get('enabledSkills') || []
   const disabled = store.get('disabledSkills') || []
-  const builtins = getBuiltinSkills().map((s: { id: string }) => s.id)
+  const builtinDefinitions = getBuiltinSkills()
+  const builtins = builtinDefinitions.map((s: { id: string }) => s.id)
+  const defaultBuiltins = builtinDefinitions
+    .filter(skill => skill.defaultEnabled !== false)
+    .map(skill => skill.id)
   const available = [...builtins, ...getInstalledCommunitySkillIds(builtins)]
-  const resolved = resolveEnabledSkillIds(stored, builtins, disabled, available)
+  const resolved = resolveEnabledSkillIds(stored, defaultBuiltins, disabled, available)
   if (resolved.length !== stored.length || resolved.some((skillId, index) => skillId !== stored[index])) {
     store.set('enabledSkills', resolved)
   }

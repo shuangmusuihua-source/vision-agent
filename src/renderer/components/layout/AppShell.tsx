@@ -574,6 +574,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
   }, [activeSessionId, modal])
 
+  const handleOpenSessionOutput = useCallback(async (filePath: string) => {
+    if (!activeSessionId) return
+    const result = await window.api.agent.openSessionOutput(activeSessionId, filePath)
+    if (!result.success) {
+      await modal.alert({ title: '无法打开产物', message: result.error || '没有可用于打开该文件的应用' })
+    }
+  }, [activeSessionId, modal])
+
   const handleDeleteSessionOutput = useCallback(async (file: SessionOutputEntry) => {
     if (!activeSessionId) return false
     const confirmed = await modal.confirm({
@@ -794,6 +802,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             sessionId={activeSessionId}
             activeFilePath={linkedFile || activeFilePath}
             onOpenFile={handleFileSelect}
+            onOpenOutput={handleOpenSessionOutput}
             onAddToKnowledge={handleAddToKnowledge}
             onRevealOutput={handleRevealSessionOutput}
             onDeleteOutput={handleDeleteSessionOutput}

@@ -11,6 +11,7 @@
 - 全局搜索、知识库与双向链接图谱
 - 内置 Skills、社区 Skill 安装/更新/卸载
 - PDF、DOCX、PPTX、XLSX 附件转换
+- 可选的 Office 文档能力：无需安装 Microsoft Office，创建、编辑、渲染并校验 DOCX、XLSX 和 PPTX
 - 持久化定时任务和系统通知
 - 应用更新、Sentry 集成（配置 `SENTRY_DSN` 后上报）和可恢复的界面错误提示
 
@@ -50,6 +51,8 @@ npm run dist
 ```
 
 知识库默认位于用户 Documents 下的 `sumi/Knowledge`。
+
+首次启用“Office 文档”内置能力时，sumi 会下载并校验固定版本的 OfficeCLI 到应用自己的运行时目录；不会修改其他 Agent 配置，也不会启用 OfficeCLI 自动更新。
 
 ## 架构
 
