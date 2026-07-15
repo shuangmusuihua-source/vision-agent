@@ -10,6 +10,8 @@ import html as html_mod
 import re
 import sys
 
+from shared import token_value
+
 CODE_BLOCK_RE = re.compile(
     r'(<pre[^>]*>\s*<code\s+class="language-([\w+-]+)"[^>]*>)'
     r'(.*?)'
@@ -17,13 +19,28 @@ CODE_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
-KAMI_PALETTE = {
-    "brand":      "#1B365D",
-    "stone":      "#6b6a64",
-    "olive":      "#504e49",
-    "dark_warm":  "#3d3d3a",
-    "near_black": "#141413",
-}
+_KAMI_PALETTE: dict[str, str] | None = None
+
+
+def _kami_palette() -> dict[str, str]:
+    """Resolve design-token colors lazily.
+
+    Kept out of module scope so importing this module (e.g. by build.py for a
+    command that never highlights code) does not read tokens.json. That keeps
+    the import resilient on a half-installed checkout, matching shared.py's
+    baked-in fallbacks.
+    """
+    global _KAMI_PALETTE
+    if _KAMI_PALETTE is None:
+        _KAMI_PALETTE = {
+            "brand":      token_value("brand"),
+            "stone":      token_value("stone"),
+            "olive":      token_value("olive"),
+            "dark_warm":  token_value("dark-warm"),
+            "near_black": token_value("near-black"),
+        }
+    return _KAMI_PALETTE
+
 
 _WARNED_MISSING_PYGMENTS = False
 
@@ -47,29 +64,31 @@ def _build_kami_style():
         Punctuation, String, Token,
     )
 
+    palette = _kami_palette()
+
     class KamiStyle(Style):
         background_color = ""
         default_style = ""
         styles = {
             Token:              "",
-            Comment:            KAMI_PALETTE["stone"],
-            Comment.Single:     KAMI_PALETTE["stone"],
-            Comment.Multiline:  KAMI_PALETTE["stone"],
-            Comment.Preproc:    KAMI_PALETTE["stone"],
-            Keyword:            KAMI_PALETTE["brand"],
-            Keyword.Constant:   KAMI_PALETTE["brand"],
-            Keyword.Namespace:  KAMI_PALETTE["brand"],
-            Keyword.Type:       KAMI_PALETTE["brand"],
-            Name.Builtin:       KAMI_PALETTE["brand"],
-            Name.Function:      KAMI_PALETTE["near_black"],
-            Name.Class:         KAMI_PALETTE["near_black"],
-            Name.Decorator:     KAMI_PALETTE["olive"],
-            String:             KAMI_PALETTE["olive"],
-            String.Doc:         KAMI_PALETTE["stone"],
-            Number:             KAMI_PALETTE["dark_warm"],
-            Number.Float:       KAMI_PALETTE["dark_warm"],
-            Number.Integer:     KAMI_PALETTE["dark_warm"],
-            Literal:            KAMI_PALETTE["dark_warm"],
+            Comment:            palette["stone"],
+            Comment.Single:     palette["stone"],
+            Comment.Multiline:  palette["stone"],
+            Comment.Preproc:    palette["stone"],
+            Keyword:            palette["brand"],
+            Keyword.Constant:   palette["brand"],
+            Keyword.Namespace:  palette["brand"],
+            Keyword.Type:       palette["brand"],
+            Name.Builtin:       palette["brand"],
+            Name.Function:      palette["near_black"],
+            Name.Class:         palette["near_black"],
+            Name.Decorator:     palette["olive"],
+            String:             palette["olive"],
+            String.Doc:         palette["stone"],
+            Number:             palette["dark_warm"],
+            Number.Float:       palette["dark_warm"],
+            Number.Integer:     palette["dark_warm"],
+            Literal:            palette["dark_warm"],
             Operator:           "",
             Punctuation:        "",
         }

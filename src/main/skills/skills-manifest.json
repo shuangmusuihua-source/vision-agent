@@ -2,11 +2,11 @@
   {
     "id": "kami",
     "hasResources": true,
-    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "assets/templates"],
-    "version": "1.9.0",
+    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "references/diagrams.md", "assets/diagrams/architecture-board.html", "assets/templates"],
+    "version": "1.9.4",
     "source": {
       "repositoryUrl": "https://github.com/tw93/kami",
-      "ref": "7882ed7bb0fe09ccbf3ba999d894347e8a553c26",
+      "ref": "1a2d2e4a8cbaa700437064e6004ab66e719b0825",
       "license": "MIT"
     }
   },

@@ -24,9 +24,21 @@ EXAMPLES = ROOT / "assets" / "examples"
 TOKENS_FILE = ROOT / "references" / "tokens.json"
 CHECKS_THRESHOLDS_FILE = ROOT / "references" / "checks_thresholds.json"
 
+PUBLIC_REPO = "tw93/kami"
+CLAUDE_CODE_MIN_VERSION = "2.1.142"
+CLAUDE_CODE_INSTALL_COMMANDS = (
+    f"/plugin marketplace add {PUBLIC_REPO}",
+    "/plugin install kami@kami",
+)
+CODEX_PLUGIN_INSTALL_COMMANDS = (
+    f"codex plugin marketplace add {PUBLIC_REPO}",
+    "codex plugin add kami@kami",
+)
+GENERIC_AGENT_INSTALL_COMMAND = f"npx skills add {PUBLIC_REPO}/plugins/kami -a universal -g -y"
+CLAUDE_DESKTOP_PACKAGE_URL = "https://github.com/tw93/kami/releases/latest/download/kami.zip"
+
 # Canonical parchment background color, kept here so build/density
 # checks share one source of truth instead of redefining the RGB triple.
-PARCHMENT_HEX = "#f5f4ed"
 PARCHMENT_RGB = (0xF5, 0xF4, 0xED)
 
 _HOMEBREW_PREFIXES = (Path("/opt/homebrew"), Path("/usr/local"))
@@ -133,7 +145,8 @@ SCREEN_TEMPLATES: dict[str, str] = {
 # Registered here (not in build.py) so all template registries share one home.
 # The Mermaid-sourced ones are produced via scripts/mermaid_normalize.py.
 DIAGRAM_TEMPLATES: dict[str, str] = {
-    "diagram-architecture":  "architecture.html",
+    "diagram-architecture":       "architecture.html",
+    "diagram-architecture-board": "architecture-board.html",
     "diagram-flowchart":     "flowchart.html",
     "diagram-quadrant":      "quadrant.html",
     "diagram-bar-chart":     "bar-chart.html",
@@ -152,6 +165,91 @@ DIAGRAM_TEMPLATES: dict[str, str] = {
     "diagram-class":         "class.html",
     "diagram-er":            "er.html",
 }
+
+
+PUBLIC_DOCUMENT_TEMPLATE_KINDS = {
+    "one-pager",
+    "letter",
+    "long-doc",
+    "portfolio",
+    "resume",
+    "slides",
+    "equity-report",
+    "changelog",
+}
+
+
+def _public_template_kind(name: str) -> str:
+    for suffix in ("-en", "-ko"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+            break
+    if name.startswith("slides-weasy"):
+        return "slides"
+    return name
+
+
+def public_document_template_kinds() -> set[str]:
+    """Return public document-template kinds represented by HTML_TEMPLATES."""
+    return {
+        _public_template_kind(name)
+        for name in HTML_TEMPLATES
+        if _public_template_kind(name) in PUBLIC_DOCUMENT_TEMPLATE_KINDS
+    }
+
+
+def public_document_template_count() -> int:
+    return len(public_document_template_kinds())
+
+
+def rel_to_root(path: Path) -> Path:
+    """Return `path` relative to ROOT when possible, else the path unchanged."""
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
+def default_example_pdfs() -> list[str]:
+    """Return every rendered example PDF, the default scan set for PDF checks."""
+    return [str(p) for p in sorted(EXAMPLES.glob("*.pdf"))]
+
+
+def iter_template_files(
+    *,
+    include_py: bool = False,
+    include_diagrams: bool = False,
+    include_marp_css: bool = False,
+) -> list[Path]:
+    """Collect template-family files for scanning.
+
+    One shared walker so lint, token-sync, and future checks cannot silently
+    diverge in coverage (a divergence is how the Marp CSS family once slipped
+    out of the lint scan while staying in the token scan).
+    """
+    targets: list[Path] = list(TEMPLATES.glob("*.html"))
+    if include_py:
+        targets.extend(TEMPLATES.glob("*.py"))
+    if include_diagrams and DIAGRAMS.exists():
+        targets.extend(DIAGRAMS.glob("*.html"))
+    if include_marp_css:
+        marp_dir = TEMPLATES / "marp"
+        if marp_dir.exists():
+            targets.extend(marp_dir.glob("*.css"))
+    return sorted(targets)
+
+
+@functools.lru_cache(maxsize=1)
+def kami_version() -> str:
+    """Return the canonical Kami version from the tracked VERSION file."""
+    return (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+
+
+@functools.lru_cache(maxsize=1)
+def load_tokens() -> dict[str, str]:
+    return json.loads(TOKENS_FILE.read_text(encoding="utf-8"))
+
+
+def token_value(name: str) -> str:
+    key = name if name.startswith("--") else f"--{name}"
+    return load_tokens()[key]
 
 
 def build_targets() -> dict[str, tuple[str, int]]:

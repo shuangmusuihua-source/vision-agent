@@ -18,7 +18,7 @@ from optional_deps import (
     require_pypdf_reader,
     require_weasyprint_html,
 )
-from shared import DIAGRAMS, EXAMPLES, TEMPLATES, load_checks_thresholds
+from shared import DIAGRAMS, EXAMPLES, TEMPLATES, default_example_pdfs, load_checks_thresholds
 
 # Primary fonts expected in embedded PDF font names
 CN_PRIMARY_FONTS = {"TsangerJinKai02"}
@@ -270,8 +270,8 @@ def verify_all(
     for status, detail in rows:
         print(f"{status}: {detail}")
 
-    if target is None and EXAMPLES.exists():
-        pdfs = [str(p) for p in sorted(EXAMPLES.glob("*.pdf"))]
+    if target is None:
+        pdfs = default_example_pdfs()
         if pdfs:
             print()
             print("Density scan (advisory):")

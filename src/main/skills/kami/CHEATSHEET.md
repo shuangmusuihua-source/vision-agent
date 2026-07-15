@@ -247,12 +247,13 @@ Combine freely: `<table class="kami-table financial striped">`.
 
 ## Diagram components
 
-Seventeen built-in diagram types (incl. Mermaid-sourced sequence / class / ER; see `references/mermaid.md`). Extract the `<svg>` block and embed in a `<figure>` in long-doc / portfolio:
+Eighteen built-in diagram types (incl. Mermaid-sourced sequence / class / ER; see `references/mermaid.md`). Extract the `<svg>` block and embed in a `<figure>` in long-doc / portfolio:
 
 
 | Type          | File                                 | Use                                             |
 | ------------- | ------------------------------------ | ----------------------------------------------- |
 | Architecture  | `assets/diagrams/architecture.html`  | System components and connections               |
+| Architecture Board | `assets/diagrams/architecture-board.html` | Report-scale five-layer system board (standalone page) |
 | Flowchart     | `assets/diagrams/flowchart.html`     | Decision branches and flows                     |
 | Quadrant      | `assets/diagrams/quadrant.html`      | 2×2 positioning                                 |
 | Bar Chart     | `assets/diagrams/bar-chart.html`     | Category comparison (up to 8 groups × 3 series) |
@@ -269,6 +270,8 @@ Seventeen built-in diagram types (incl. Mermaid-sourced sequence / class / ER; s
 
 
 Usage: extract the `<svg>` block from the HTML file and paste into the template's `<figure>` container.
+
+**Repo-maintained diagram** (README / docs-site figure living in the user's repository): keep the trio consistent, `index.html` source + same-name PNG re-exported after every change + `prompt.md` (must preserve / suggested additions / visual direction / sister boundaries). Evidence pass before drawing; maturity encoding for shipped / in-build / future. See `references/diagrams.md` «Maintained diagram assets».
 
 **Data chart colors**: primary series `#1B365D` · secondary `#504e49` → `#6b6a64` → `#b8b7b0` → `#d4d3cd` → `#EEF2F7`.
 

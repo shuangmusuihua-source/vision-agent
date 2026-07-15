@@ -1604,12 +1604,11 @@
 .generation-activity-card {
   width: 100%;
   max-width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-border) 58%, transparent);
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin: 8px 0 10px;
   background: var(--color-bg-elevated);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   min-width: 0;
 }
 
@@ -1629,7 +1628,7 @@
   gap: 8px;
   min-height: 40px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
   background: color-mix(in srgb, var(--color-action) 3%, var(--color-bg-elevated));
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -1804,9 +1803,8 @@
 /* --- Dark mode skill output --- */
 
 [data-theme="dark"] .generation-activity-card {
-  border-color: var(--color-border);
+  border-color: color-mix(in srgb, var(--color-border) 58%, transparent);
   background: var(--color-bg-elevated);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
 }
 
 [data-theme="dark"] .generation-activity-card-header {

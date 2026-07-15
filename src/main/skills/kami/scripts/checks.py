@@ -14,12 +14,25 @@ Thresholds and DPI live in `references/checks_thresholds.json`.
 from __future__ import annotations
 
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 
-from optional_deps import MissingDepError, require_pymupdf
-from shared import EXAMPLES, PARCHMENT_RGB, ROOT, load_checks_thresholds
+from optional_deps import MissingDepError, require_pymupdf, require_pypdf_reader
+from shared import (
+    PARCHMENT_RGB,
+    ROOT,
+    default_example_pdfs,
+    load_checks_thresholds,
+    rel_to_root,
+)
 
 PLACEHOLDER = re.compile(r"\{\{[^}]+\}\}")
+MARKDOWN_THEMATIC_BREAK = re.compile(r"^\s*[-*_]{3,}\s*$")
+MARKDOWN_RESIDUE_MARKERS = (
+    ("markdown thematic break", MARKDOWN_THEMATIC_BREAK),
+    ("unconverted bold marker", re.compile(r"\*\*")),
+    ("unconverted inline-code marker", re.compile(r"`")),
+)
 
 # Parchment background RGB for pixel comparison (sourced from shared.PARCHMENT_RGB).
 _BG_R, _BG_G, _BG_B = PARCHMENT_RGB
@@ -42,7 +55,7 @@ def check_placeholders(paths: list[str]) -> int:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         hits = list(dict.fromkeys(PLACEHOLDER.findall(text)))
-        rel = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        rel = rel_to_root(path)
         if hits:
             print(f"ERROR: {rel}: unfilled placeholder(s): {', '.join(hits)}")
             failures += 1
@@ -52,7 +65,135 @@ def check_placeholders(paths: list[str]) -> int:
     return 0 if failures == 0 else 1
 
 
+# ---------- markdown residue check ----------
+
+class _VisibleTextParser(HTMLParser):
+    """Extract visible text from filled HTML while skipping code-like blocks."""
+
+    _SKIP_TAGS = {"code", "pre", "script", "style"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._skip_depth = 0
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in self._SKIP_TAGS:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in self._SKIP_TAGS and self._skip_depth > 0:
+            self._skip_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth == 0:
+            self.parts.append(data)
+
+
+def _visible_html_text(raw: str) -> str:
+    parser = _VisibleTextParser()
+    parser.feed(raw)
+    return "\n".join(parser.parts)
+
+
+def _markdown_residue_issues(text: str, *, page: int | None = None) -> list[str]:
+    issues: list[str] = []
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        for label, pattern in MARKDOWN_RESIDUE_MARKERS:
+            if pattern.search(line):
+                where = f"p{page}" if page is not None else f"line {line_no}"
+                sample = " ".join(line.strip().split())[:80]
+                issues.append(f"{where}: {label}: {sample!r}")
+    return issues
+
+
+def _markdown_text_chunks(path: Path) -> tuple[list[tuple[int | None, str]], str | None]:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        try:
+            PdfReader = require_pypdf_reader()
+        except MissingDepError as exc:
+            return [], str(exc)
+        try:
+            reader = PdfReader(str(path))
+        except Exception as exc:
+            return [], f"could not read PDF text: {exc}"
+        return [
+            (index, page.extract_text() or "")
+            for index, page in enumerate(reader.pages, start=1)
+        ], None
+
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    if suffix in {".html", ".htm"}:
+        return [(None, _visible_html_text(raw))], None
+    return [(None, raw)], None
+
+
+def check_markdown_residue(paths: list[str]) -> int:
+    """Scan filled HTML/PDF outputs for visible raw Markdown markers.
+
+    This catches common hand-conversion misses such as literal `---`, `**bold**`,
+    and inline-code backticks leaking into the final PDF.
+    """
+    if not paths:
+        paths = default_example_pdfs()
+        if not paths:
+            print("ERROR: no files to scan")
+            return 2
+
+    failures = 0
+    scanned = 0
+    for raw in paths:
+        path = Path(raw)
+        if not path.is_absolute():
+            path = ROOT / path
+        rel = rel_to_root(path)
+        if not path.exists():
+            print(f"ERROR: {raw}: file not found")
+            failures += 1
+            continue
+
+        chunks, error = _markdown_text_chunks(path)
+        if error:
+            print(f"ERROR: {rel}: {error}")
+            failures += 1
+            continue
+
+        scanned += 1
+        issues: list[str] = []
+        for page, text in chunks:
+            issues.extend(_markdown_residue_issues(text, page=page))
+        if issues:
+            failures += 1
+            print(f"ERROR: {rel}: markdown residue found")
+            for issue in issues:
+                print(f"  {issue}")
+        else:
+            print(f"OK: {rel}: no markdown residue")
+
+    if scanned == 0:
+        print("ERROR: no files scanned")
+        return 2
+    return 0 if failures == 0 else 1
+
+
 # ---------- orphan check ----------
+
+def _orphan_last_line(text: str, max_words: int, max_chars: int) -> str | None:
+    """Return a block's last line if it is an orphan, else None.
+
+    A block orphans when it has 2+ lines and the trailing line is short by
+    both word count (<= max_words) and length (< max_chars). Pure so the
+    predicate is unit-testable without a rendered PDF.
+    """
+    lines = text.strip().splitlines()
+    if len(lines) < 2:
+        return None
+    last = lines[-1].strip()
+    if len(last.split()) <= max_words and len(last) < max_chars:
+        return last
+    return None
+
 
 def check_orphans(paths: list[str]) -> int:
     """Scan PDF for text blocks whose last line has <= max_words and < max_chars."""
@@ -63,8 +204,7 @@ def check_orphans(paths: list[str]) -> int:
         return 2
 
     if not paths:
-        if EXAMPLES.exists():
-            paths = [str(p) for p in sorted(EXAMPLES.glob("*.pdf"))]
+        paths = default_example_pdfs()
         if not paths:
             print("ERROR: no PDF files to scan")
             return 2
@@ -82,23 +222,24 @@ def check_orphans(paths: list[str]) -> int:
             print(f"ERROR: {raw}: not found")
             missing += 1
             continue
+        try:
+            doc = fitz.open(str(path))
+        except Exception as exc:
+            print(f"ERROR: {raw}: could not read PDF: {exc}")
+            missing += 1
+            continue
         scanned += 1
-        doc = fitz.open(str(path))
-        rel = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        rel = rel_to_root(path)
         for page_num in range(len(doc)):
             page = doc[page_num]
             blocks = page.get_text("blocks")
             for bx0, by0, bx1, by1, text, block_no, block_type in blocks:
                 if block_type != 0:  # text blocks only
                     continue
-                lines = text.strip().splitlines()
-                if len(lines) < 2:
-                    continue
-                last = lines[-1].strip()
-                words = last.split()
-                if len(words) <= max_words and len(last) < max_chars:
+                last = _orphan_last_line(text, max_words, max_chars)
+                if last is not None:
                     total += 1
-                    print(f"  {rel} p{page_num + 1}: orphan: \"{last}\" ({len(words)} word(s), {len(last)} chars)")
+                    print(f"  {rel} p{page_num + 1}: orphan: \"{last}\" ({len(last.split())} word(s), {len(last)} chars)")
         doc.close()
 
     if scanned == 0:
@@ -153,6 +294,21 @@ def _last_content_y(samples: bytes, w: int, h: int, stride: int, n: int) -> int:
     return int(non_bg[-1]) if non_bg.size else 0
 
 
+def _density_bucket(empty: float, warn_pct: float, sparse_pct: float) -> str:
+    """Categorize a page by its trailing-whitespace fraction.
+
+    Pure so `_scan_density` and its tests share one decision. A test that
+    reimplements these comparisons would stay green if the real operators
+    drifted (`>` to `>=`, or warn/sparse swapped); calling this keeps the
+    assertion anchored to production logic.
+    """
+    if empty > sparse_pct:
+        return "SPARSE"
+    if empty > warn_pct:
+        return "WARN"
+    return "OK"
+
+
 def _scan_density(paths: list[str]) -> tuple[int, int, int, int] | None:
     """Scan PDFs and print SPARSE/WARN lines.
 
@@ -181,9 +337,14 @@ def _scan_density(paths: list[str]) -> tuple[int, int, int, int] | None:
             print(f"ERROR: {raw}: not found")
             missing += 1
             continue
+        try:
+            doc = fitz.open(str(path))
+        except Exception as exc:
+            print(f"ERROR: {raw}: could not read PDF: {exc}")
+            missing += 1
+            continue
         scanned += 1
-        doc = fitz.open(str(path))
-        rel = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        rel = rel_to_root(path)
         for page_num in range(len(doc)):
             if page_num == 0:
                 continue
@@ -195,10 +356,11 @@ def _scan_density(paths: list[str]) -> tuple[int, int, int, int] | None:
             last_content_y = _last_content_y(pix.samples, w, h, pix.stride, pix.n)
 
             empty = (h - last_content_y) / h
-            if empty > sparse_pct:
+            bucket = _density_bucket(empty, warn_pct, sparse_pct)
+            if bucket == "SPARSE":
                 print(f"  SPARSE: {rel} p{page_num + 1}: {empty:.0%} trailing whitespace")
                 sparse += 1
-            elif empty > warn_pct:
+            elif bucket == "WARN":
                 print(f"  WARN: {rel} p{page_num + 1}: {empty:.0%} trailing whitespace")
                 warn += 1
         doc.close()
@@ -209,8 +371,7 @@ def check_density(paths: list[str]) -> int:
     """Scan PDF pages for sparse content (large trailing whitespace from
     break-inside:avoid pushing content to the next page)."""
     if not paths:
-        if EXAMPLES.exists():
-            paths = [str(p) for p in sorted(EXAMPLES.glob("*.pdf"))]
+        paths = default_example_pdfs()
         if not paths:
             print("ERROR: no PDF files to scan")
             return 2
@@ -271,7 +432,11 @@ def _resume_page_fills(path: Path, dpi: int) -> tuple[list[float], int] | None:
         print(f"ERROR: {exc}")
         return None
 
-    doc = fitz.open(str(path))
+    try:
+        doc = fitz.open(str(path))
+    except Exception as exc:
+        print(f"ERROR: {path}: could not read PDF: {exc}")
+        return None
     fills: list[float] = []
     for page in doc:
         pix = page.get_pixmap(dpi=dpi)
@@ -289,6 +454,15 @@ def check_resume_balance(paths: list[str]) -> int:
     """Require resume PDFs to be exactly 2 pages with balanced content fill."""
     if not paths:
         print("ERROR: provide at least one filled resume PDF to scan")
+        return 2
+
+    # Resolve the dependency once up front so a missing PyMuPDF stays a
+    # tooling error (exit 2) while a single unreadable PDF inside the loop
+    # tallies as missing and lets the remaining files still get scanned.
+    try:
+        require_pymupdf()
+    except MissingDepError as exc:
+        print(f"ERROR: {exc}")
         return 2
 
     cfg = load_checks_thresholds()["resume_balance"]
@@ -309,11 +483,12 @@ def check_resume_balance(paths: list[str]) -> int:
 
         result = _resume_page_fills(path, dpi)
         if result is None:
-            return 2
+            missing += 1
+            continue
 
         fills, page_count = result
         scanned += 1
-        rel = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        rel = rel_to_root(path)
         fill_text = " / ".join(f"{fill:.0%}" for fill in fills)
         issues = _resume_balance_issues(fills, page_count, min_fill, max_fill, max_gap)
         if issues:
@@ -359,6 +534,37 @@ def _parse_slide_sequence(src: Path) -> list[str]:
     return sequence
 
 
+def _rhythm_issues(seq: list[str], max_content_run: int, divider_min_deck_size: int) -> list[str]:
+    """Return the rhythm warnings for one parsed slide sequence.
+
+    Pure so the three monotony rules are unit-testable without rendering a
+    deck, matching the `_resume_balance_issues` seam.
+    """
+    issues: list[str] = []
+
+    # Rule 1: no run of more than `max_content_run` consecutive content_slides.
+    run = 0
+    max_run = 0
+    for fn in seq:
+        if fn == "content_slide":
+            run += 1
+            max_run = max(max_run, run)
+        else:
+            run = 0
+    if max_run > max_content_run:
+        issues.append(f"longest content_slide run is {max_run} (limit {max_content_run})")
+
+    # Rule 2: large decks need at least one chapter_slide divider.
+    if len(seq) >= divider_min_deck_size and not any(fn in _DIVIDER_FUNCS for fn in seq):
+        issues.append(f"{len(seq)} slides with no chapter_slide divider")
+
+    # Rule 3: deck must contain at least one density-variation slide.
+    if not any(fn in _DENSITY_VARIATION_FUNCS for fn in seq):
+        issues.append("no quote_slide or metrics_slide for density variation")
+
+    return issues
+
+
 def check_rhythm(targets: list[str], pptx_targets: dict[str, str], templates_dir: Path) -> int:
     """Scan slide templates for monotony: too many consecutive content_slides,
     missing dividers, and missing density variation.
@@ -389,33 +595,20 @@ def check_rhythm(targets: list[str], pptx_targets: dict[str, str], templates_dir
             failures += 1
             continue
 
-        issues: list[str] = []
-
-        # Rule 1: no run of more than `max_content_run` consecutive content_slides.
-        run = 0
-        max_run = 0
-        for fn in seq:
-            if fn == "content_slide":
-                run += 1
-                max_run = max(max_run, run)
-            else:
-                run = 0
-        if max_run > max_content_run:
-            issues.append(f"longest content_slide run is {max_run} (limit {max_content_run})")
-
-        # Rule 2: large decks need at least one chapter_slide divider.
-        if len(seq) >= divider_min_deck_size and not any(fn in _DIVIDER_FUNCS for fn in seq):
-            issues.append(f"{len(seq)} slides with no chapter_slide divider")
-
-        # Rule 3: deck must contain at least one density-variation slide.
-        if not any(fn in _DENSITY_VARIATION_FUNCS for fn in seq):
-            issues.append("no quote_slide or metrics_slide for density variation")
+        issues = _rhythm_issues(seq, max_content_run, divider_min_deck_size)
 
         if issues:
+            # These fail the run (exit 1), so label them ERROR; WARN is
+            # reserved for advisory output that does not gate the build.
             for issue in issues:
-                print(f"WARN: {name}: {issue}")
+                print(f"ERROR: {name}: {issue}")
             failures += 1
         else:
+            content_run = 0
+            max_run = 0
+            for fn in seq:
+                content_run = content_run + 1 if fn == "content_slide" else 0
+                max_run = max(max_run, content_run)
             print(f"OK: {name}: rhythm ok ({len(seq)} slides, max run {max_run})")
 
     return 0 if failures == 0 else 1

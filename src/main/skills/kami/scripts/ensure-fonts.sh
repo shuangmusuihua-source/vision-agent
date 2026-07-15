@@ -20,6 +20,13 @@ REPO_FONT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)/assets/fonts"
 # each @font-face declaration.
 FONT_DIR="${KAMI_FONT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fonts/kami}"
 
+# Partial downloads from an interrupted run must not linger in FONT_DIR, and
+# two concurrent runs must not fight over one temp path: temp files carry this
+# run's PID and are swept on exit.
+TMP_SUFFIX="tmp.$$"
+cleanup_tmp() { rm -f "$FONT_DIR"/*."$TMP_SUFFIX" 2>/dev/null || true; }
+trap cleanup_tmp EXIT
+
 MIN_SIZE_CN=10000000  # 10MB for TsangerJinKai (large CJK glyph set)
 MIN_SIZE_KO=6500000   # 6.5MB for Source Han Serif K (Adobe full subset)
 
@@ -84,32 +91,32 @@ download_tsanger() {
   # Source 1: official tsanger.cn
   local official_url="https://tsanger.cn/download/${cn_name}"
   echo "  Trying: tsanger.cn (official)"
-  if curl --retry 2 --connect-timeout 15 --max-time 300 -fSL "$official_url" -o "$target.tmp" 2>/dev/null; then
-    if check_size "$target.tmp" "$MIN_SIZE_CN"; then
-      mv "$target.tmp" "$target"
+  if curl --retry 2 --connect-timeout 15 --max-time 300 -fSL "$official_url" -o "$target.$TMP_SUFFIX" 2>/dev/null; then
+    if check_size "$target.$TMP_SUFFIX" "$MIN_SIZE_CN"; then
+      mv "$target.$TMP_SUFFIX" "$target"
       echo "  OK: $local_name downloaded ($(du -h "$target" | cut -f1))"
       return 0
     else
-      rm -f "$target.tmp"
+      rm -f "$target.$TMP_SUFFIX"
     fi
   else
-    rm -f "$target.tmp"
+    rm -f "$target.$TMP_SUFFIX"
   fi
 
   # Source 2+: CDN mirrors (already named TsangerJinKai02-W0x.ttf)
   for src in "${MIRROR_SOURCES[@]}"; do
     local url="$src/$local_name"
     echo "  Trying: $url"
-    if curl --retry 2 --connect-timeout 15 --max-time 300 -fSL "$url" -o "$target.tmp" 2>/dev/null; then
-      if check_size "$target.tmp" "$MIN_SIZE_CN"; then
-        mv "$target.tmp" "$target"
+    if curl --retry 2 --connect-timeout 15 --max-time 300 -fSL "$url" -o "$target.$TMP_SUFFIX" 2>/dev/null; then
+      if check_size "$target.$TMP_SUFFIX" "$MIN_SIZE_CN"; then
+        mv "$target.$TMP_SUFFIX" "$target"
         echo "  OK: $local_name downloaded ($(du -h "$target" | cut -f1))"
         return 0
       else
-        rm -f "$target.tmp"
+        rm -f "$target.$TMP_SUFFIX"
       fi
     else
-      rm -f "$target.tmp"
+      rm -f "$target.$TMP_SUFFIX"
     fi
   done
 
@@ -126,16 +133,16 @@ download_ko_serif() {
   for src in "${MIRROR_SOURCES[@]}"; do
     local url="$src/$local_name"
     echo "  Trying: $url"
-    if curl --retry 2 --connect-timeout 15 --max-time 300 -fSL "$url" -o "$target.tmp" 2>/dev/null; then
-      if check_size "$target.tmp" "$MIN_SIZE_KO"; then
-        mv "$target.tmp" "$target"
+    if curl --retry 2 --connect-timeout 15 --max-time 300 -fSL "$url" -o "$target.$TMP_SUFFIX" 2>/dev/null; then
+      if check_size "$target.$TMP_SUFFIX" "$MIN_SIZE_KO"; then
+        mv "$target.$TMP_SUFFIX" "$target"
         echo "  OK: $local_name downloaded ($(du -h "$target" | cut -f1))"
         return 0
       else
-        rm -f "$target.tmp"
+        rm -f "$target.$TMP_SUFFIX"
       fi
     else
-      rm -f "$target.tmp"
+      rm -f "$target.$TMP_SUFFIX"
     fi
   done
 

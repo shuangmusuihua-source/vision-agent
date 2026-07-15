@@ -165,10 +165,16 @@
     flex: 1;
     color: var(--near-black);
     padding-left: 6pt;
+    text-decoration: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12pt;
   }
-  .toc-page {
+  .toc-title[href]::after {
+    content: target-counter(attr(href), page);
     color: var(--stone);
     font-variant-numeric: tabular-nums;
+    margin-left: auto;
   }
 
   /* HEADINGS */
@@ -183,7 +189,9 @@
     padding-left: 8pt;
     color: var(--near-black);
     break-after: avoid;
+    string-set: section-title content();
   }
+  .running-title { string-set: section-title content(); }
   h2 {
     font-size: 16pt;
     font-weight: 500;
@@ -191,7 +199,6 @@
     margin: 24pt 0 8pt 0;
     color: var(--near-black);
     break-after: avoid;
-    string-set: section-title content();
   }
   h3 {
     font-size: 13pt;
@@ -396,15 +403,15 @@
 <!-- TOC -->
 <section class="toc">
   <h2>Contents</h2>
-  <div class="toc-item"><span class="toc-num">01</span><span class="toc-title">Executive Summary</span><span class="toc-page">03</span></div>
-  <div class="toc-item"><span class="toc-num">02</span><span class="toc-title">Background &amp; Problem Statement</span><span class="toc-page">04</span></div>
-  <div class="toc-item"><span class="toc-num">03</span><span class="toc-title">Methodology &amp; Findings</span><span class="toc-page">06</span></div>
-  <div class="toc-item"><span class="toc-num">04</span><span class="toc-title">Conclusions &amp; Recommendations</span><span class="toc-page">09</span></div>
-  <div class="toc-item"><span class="toc-num">05</span><span class="toc-title">Appendix</span><span class="toc-page">11</span></div>
+  <div class="toc-item"><span class="toc-num">01</span><a class="toc-title" href="#ch-executive-summary">Executive Summary</a></div>
+  <div class="toc-item"><span class="toc-num">02</span><a class="toc-title" href="#ch-background">Background &amp; Problem Statement</a></div>
+  <div class="toc-item"><span class="toc-num">03</span><a class="toc-title" href="#ch-methodology">Methodology &amp; Findings</a></div>
+  <div class="toc-item"><span class="toc-num">04</span><a class="toc-title" href="#ch-conclusions">Conclusions &amp; Recommendations</a></div>
+  <div class="toc-item"><span class="toc-num">05</span><a class="toc-title" href="#ch-appendix">Appendix</a></div>
 </section>
 
 <!-- Chapter 01 -->
-<section class="chapter">
+<section class="chapter" id="ch-executive-summary">
   <div class="chapter-num">01 · Executive Summary</div>
   <h1>Executive Summary</h1>
 
@@ -426,7 +433,7 @@
 </section>
 
 <!-- Chapter 02 -->
-<section class="chapter">
+<section class="chapter" id="ch-background">
   <div class="chapter-num">02 · Background</div>
   <h1>Background &amp; Problem Statement</h1>
 
@@ -462,7 +469,7 @@
 </section>
 
 <!-- Chapter 03 -->
-<section class="chapter">
+<section class="chapter" id="ch-methodology">
   <div class="chapter-num">03 · Methodology</div>
   <h1>Methodology &amp; Findings</h1>
 
@@ -481,7 +488,7 @@
   <p>{{A paragraph with data: <span class="hl">specific numbers or ratios</span>.}}</p>
 
   <h3>Finding 2 - {{TITLE}}</h3>
-  <p>{{A paragraph.}}</p>
+  <p>{{A paragraph with data: <span class="hl">specific numbers or ratios</span>.}}</p>
 
   <blockquote>
     {{A quoted passage - user interview, expert perspective, or cited source.}}
@@ -490,7 +497,7 @@
 </section>
 
 <!-- Chapter 04 -->
-<section class="chapter">
+<section class="chapter" id="ch-conclusions">
   <div class="chapter-num">04 · Conclusions</div>
   <h1>Conclusions &amp; Recommendations</h1>
 
@@ -513,7 +520,7 @@
 </section>
 
 <!-- Chapter 05 -->
-<section class="chapter">
+<section class="chapter" id="ch-appendix">
   <div class="chapter-num">05 · Appendix</div>
   <h1>Appendix</h1>
 

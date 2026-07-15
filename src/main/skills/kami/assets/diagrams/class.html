@@ -42,6 +42,10 @@
     --mono:  "JetBrains Mono", "SF Mono", Consolas, "TsangerJinKai02", "Source Han Serif SC", monospace;
   }
 
+  /* Poster-size page so WeasyPrint exports the full diagram without
+     A4 clipping; browsers ignore @page. */
+  @page { size: 800px 1180px; margin: 0; }
+
   body {
     font-family: var(--sans);
     background: var(--parchment);

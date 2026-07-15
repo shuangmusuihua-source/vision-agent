@@ -97,7 +97,52 @@ Remove the `../fonts/` prefix that templates use when fonts are in the project t
 }
 ```
 
+### Print / white-paper variant (opt-in)
+
+Parchment is the default and keeps shipping. Override to white only when a single
+document is **headed for a home / office printer**: a full-page `#f5f4ed` tint
+bands unevenly and burns toner, where white paper prints clean. This is the one
+sanctioned exception to design.md invariant #1 ("never pure white"), and it is
+opt-in per document, never the default render.
+
+White is not a one-line background swap. Parchment also serves as the surface that
+`--ivory` cards, code blocks, and striped rows lift *off* of (they are "brighter
+than parchment"). Flip the page to white and those surfaces, only 1.5% lighter than
+white, vanish. So relocate the warmth instead of deleting it: sink parchment down
+into the lift surface. Three edits on the copied, filled template:
+
+```css
+@page      { background: #ffffff; }   /* was #f5f4ed */
+html, body { background: #ffffff; }   /* was var(--parchment) */
+:root      { --ivory: #f5f4ed; }      /* parchment becomes the card/code/table lift */
+```
+
+Everything else is unchanged: ink-blue accent, warm text grays, and `--border`
+hairlines all read fine on white. Leave the `--parchment` token itself alone (any
+`var(--parchment)` section fill then reads as an intentional warm band on white).
+A lifted surface that separated from parchment by fill *alone* (rare, most already
+carry a `0.5pt var(--border)` edge) wants that border added so it holds an edge on
+white.
+
+Notes:
+- Lint-safe by construction: `scripts/lint.py` off-palette and token-sync guards
+  scan only registered templates, not generated documents, so `#ffffff` in a
+  filled output never trips them.
+- Page-count and `--check-density` contracts are unaffected; still inspect that
+  cards, code, and tables read on white before shipping.
+- If white-paper output ever becomes a first-class, frequent ask, promote this from
+  a recipe to a `--page-bg` / `--surface` token pair in every template `:root`
+  (ships commented, like the `.brand-logo` slot). `@page { background: var(--page-bg) }`
+  is verified to resolve in WeasyPrint (68.1), so the token path is viable. Until
+  then, keep it a recipe: the project's contract is "no new mode unless a request
+  can't be met otherwise", and this recipe already meets the request.
+
 ### Headers & footers
+
+Long-doc running headers use `string(section-title)`. The default templates set
+that string on chapter `h1` elements, not on every `h2`, so a table of contents
+heading cannot pin the header to "Contents" / "目录". If a filled document uses a
+different element for chapter titles, add `.running-title` to that element.
 
 ```css
 @page {
@@ -126,6 +171,7 @@ Remove the `../fonts/` prefix that templates use when fonts are in the project t
 | `@font-face` | gradients (slow, use sparingly) | CSS animations / transitions |
 | `break-before` / `break-inside: avoid` | | |
 | CSS variables `var(--name)` | | |
+| `target-counter(attr(href), page)` for rendered TOC page numbers | | |
 | `::before` / `::after` | | |
 
 ### PDF metadata
@@ -387,7 +433,12 @@ python3 scripts/build.py               # all 12 examples
 python3 scripts/build.py resume-en     # one target + page count + fonts
 python3 scripts/build.py --check       # scan for CSS rule violations
 python3 scripts/build.py --check-density       # warn on pages with >25% trailing whitespace
+python3 scripts/build.py --check-markdown output.pdf  # scan for raw Markdown markers
 ```
+
+For long-doc templates, keep TOC entries as links to stable chapter ids. The page
+number is generated with CSS `target-counter()` at render time, so content edits
+do not require hand-updating page numbers.
 
 ### Page overflow (constrained templates)
 

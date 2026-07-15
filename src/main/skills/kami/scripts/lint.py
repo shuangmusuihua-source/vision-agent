@@ -19,14 +19,14 @@ from pathlib import Path
 
 from shared import (
     COOL_GRAY_BLOCKLIST,
-    DIAGRAMS,
     HTML_TEMPLATES,
     ROOT,
     SCREEN_TEMPLATES,
     TEMPLATES,
     TOKENS_FILE,
+    iter_template_files,
 )
-from tokens import CSS_VAR, ROOT_BLOCK
+from tokens import ROOT_BLOCK, parse_root_vars
 
 # Font-stack vars legitimately differ between a base template and its locale
 # variants (-en, -ko); every other :root var must match across the pair.
@@ -187,17 +187,13 @@ def scan_file(path: Path) -> list[Finding]:
 
 
 def check_all(verbose: bool) -> int:
-    targets: list[Path] = []
-    for p in TEMPLATES.glob("*.html"):
-        targets.append(p)
-    for p in TEMPLATES.glob("*.py"):
-        targets.append(p)
-    if DIAGRAMS.exists():
-        for p in DIAGRAMS.glob("*.html"):
-            targets.append(p)
+    targets = iter_template_files(include_py=True, include_diagrams=True, include_marp_css=True)
+    if not targets:
+        print("ERROR: no templates found to lint (bad checkout?)")
+        return 2
 
     findings: list[Finding] = []
-    for p in sorted(targets):
+    for p in targets:
         file_findings = scan_file(p)
         findings.extend(file_findings)
         if verbose:
@@ -277,6 +273,9 @@ def _off_palette_findings(path: Path, allowed: set[str]) -> list[Finding]:
 def check_off_palette(verbose: bool = False) -> int:
     allowed = _load_token_values()
     targets = sorted(TEMPLATES.glob("*.html"))
+    if not targets:
+        print("ERROR: no templates found for off-palette scan (bad checkout?)")
+        return 2
     findings: list[Finding] = []
     for p in targets:
         file_findings = _off_palette_findings(p, allowed)
@@ -288,7 +287,7 @@ def check_off_palette(verbose: bool = False) -> int:
         print(f"OK: no off-palette colors across {len(targets)} template(s)")
         return 0
 
-    print(f"\n[off-palette] {len(findings)}")
+    print(f"\nERROR: [off-palette] {len(findings)}")
     for f in findings:
         print(f"  {f.file.relative_to(ROOT)}:{f.line}  {f.excerpt}")
     return 1
@@ -337,20 +336,16 @@ def _source_for(name: str) -> tuple[Path, Path]:
 
 
 def _extract_root_vars(html_path: Path) -> dict[str, str]:
-    """Return {var_name: value} for the first `:root { ... }` block in the file."""
+    """Return {var_name: value} merged across every `:root { ... }` block."""
     text = html_path.read_text(encoding="utf-8", errors="replace")
-    match = ROOT_BLOCK.search(text)
-    if not match:
-        return {}
-    block = match.group(1)
-    return {
-        f"--{m.group(1)}": m.group(2).strip()
-        for m in CSS_VAR.finditer(block)
-    }
+    return parse_root_vars(text)
 
 
 def check_cross_template_consistency(verbose: bool = False) -> int:
     pairs = _pair_names()
+    if not pairs:
+        print("ERROR: no base-variant template pairs found (bad checkout?)")
+        return 2
     drift: list[tuple[str, str, str, str]] = []  # (pair, var, base_value, variant_value)
 
     for base_name, variant_name in pairs:
@@ -372,6 +367,16 @@ def check_cross_template_consistency(verbose: bool = False) -> int:
             if base_vars[key].lower() != variant_vars[key].lower():
                 drift.append((base_name, key, base_vars[key], variant_vars[key]))
 
+        # A var defined on only one side is drift too: it usually means a
+        # maintainer added or dropped a token on one side of the fork. That is
+        # exactly the "left the other side behind" failure this check exists
+        # to catch, so report it instead of silently comparing the overlap.
+        for key in sorted((set(base_vars) ^ set(variant_vars)) - CROSS_TEMPLATE_ALLOWED_VARS):
+            if key in base_vars:
+                drift.append((base_name, key, base_vars[key], f"missing from {variant_name}"))
+            else:
+                drift.append((base_name, key, f"missing from {base_name}", variant_vars[key]))
+
         if verbose:
             print(f"  pair {base_name}/{variant_name}: checked {len(shared_keys)} shared vars")
 
@@ -379,7 +384,7 @@ def check_cross_template_consistency(verbose: bool = False) -> int:
         print(f"OK: cross-template :root vars in sync across {len(pairs)} base-variant pair(s)")
         return 0
 
-    print(f"\n[cross-template-drift] {len(drift)}")
+    print(f"\nERROR: [cross-template-drift] {len(drift)}")
     for pair, var, base_val, variant_val in drift:
         print(f"  {pair}: {var} base={base_val} variant={variant_val}")
     return 1

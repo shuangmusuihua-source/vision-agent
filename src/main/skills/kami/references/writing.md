@@ -323,6 +323,10 @@ Structure is necessary but not sufficient. These bars define what separates comp
 
 **Density bar**: each body page carries 1 chapter heading + 2-4 paragraphs + at most 1 figure. A chapter that fits in under 40% of a page must merge into the next chapter rather than claiming its own page. Trailing whitespace at the bottom of a body page is a draft defect. See SKILL.md Step 4.1.
 
+After converting from Markdown, remove or convert thematic breaks, bold markers,
+and inline-code backticks before delivery, then run `python3 scripts/build.py
+--check-markdown path/to/filled.pdf` on the rendered PDF.
+
 **Rules**:
 1. Evidence density: at least one data point per paragraph. A paragraph with zero numbers is an opinion paragraph and should be rare
 2. Callout or figure after every 3-4 paragraphs of dense text. Long unbroken prose causes eye fatigue in print

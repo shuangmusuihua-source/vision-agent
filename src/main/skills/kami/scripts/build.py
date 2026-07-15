@@ -4,19 +4,21 @@
 Thin CLI shell. Implementation lives in:
   - lint.py    (scan_file, check_all, check_cross_template_consistency)
   - tokens.py  (sync_check)
+  - site_facts.py (check_site_facts)
   - verify.py  (verify_target, verify_all, show_fonts, font checks)
-  - checks.py  (check_placeholders, check_orphans, check_density, check_resume_balance, check_rhythm)
+  - checks.py  (check_placeholders, check_markdown_residue, check_orphans, check_density, check_resume_balance, check_rhythm)
 
 Usage:
     python3 scripts/build.py                      # build all examples (HTML + diagrams + PPTX)
     python3 scripts/build.py resume               # build one template, print pages + fonts
     python3 scripts/build.py landing-page         # check one browser-only static template
-    python3 scripts/build.py --check              # scan templates for CSS rule violations
+    python3 scripts/build.py --check              # lint + token/theme + public-site fact checks
     python3 scripts/build.py --check -v           # verbose (show each scanned file)
     python3 scripts/build.py --sync               # check CSS token drift across templates
     python3 scripts/build.py --verify             # build all + page count + font checks
     python3 scripts/build.py --verify resume-en   # single target full verification
     python3 scripts/build.py --check-placeholders path/to/doc.html
+    python3 scripts/build.py --check-markdown path/to/doc.pdf
     python3 scripts/build.py --check-orphans      # scan example PDFs for orphan text
     python3 scripts/build.py --check-orphans path/to/doc.pdf
     python3 scripts/build.py --check-density       # warn on pages with >25% trailing whitespace
@@ -54,11 +56,16 @@ from checks import (  # noqa: F401  re-exported for test_build.py
     _BG_B,
     _BG_G,
     _BG_R,
+    _density_bucket,
     _last_content_y,
+    _markdown_residue_issues,
+    _orphan_last_line,
     _parse_slide_sequence,
     _resume_balance_issues,
+    _rhythm_issues,
     _scan_density,
     check_density,
+    check_markdown_residue,
     check_orphans,
     check_placeholders,
     check_resume_balance,
@@ -73,11 +80,11 @@ from lint import (  # noqa: F401  re-exported for test_build.py
     check_off_palette,
     scan_file,
 )
+from site_facts import check_site_facts
 from tokens import sync_check
 from verify import (
     show_fonts,
     verify_all,
-    verify_target as _verify_target_impl,
 )
 
 # name -> (source, max_pages). max_pages=0 means no hard check.
@@ -292,15 +299,6 @@ def verify_slides_target(name: str) -> list[str]:
     return [] if build_slides(name) else ["slides build failed"]
 
 
-def verify_target(name: str, source: str, max_pages: int, src_dir: Path) -> list[str]:
-    """Compat wrapper that injects build.py's metadata helpers."""
-    return _verify_target_impl(
-        name, source, max_pages, src_dir,
-        infer_author_fn=infer_author,
-        set_pdf_metadata_fn=set_pdf_metadata,
-    )
-
-
 def _verify_all(target: str | None) -> int:
     return verify_all(
         target,
@@ -318,6 +316,21 @@ def _verify_all(target: str | None) -> int:
 
 # ------------------------- entry -------------------------
 
+def _unexpected_arg(args: list[str], allowed: set[str] | None = None) -> str | None:
+    for arg in args:
+        if allowed is not None:
+            if arg not in allowed:
+                return arg
+        elif arg.startswith("-"):
+            return arg
+    return None
+
+
+def _error_unexpected(arg: str) -> int:
+    print(f"ERROR: unexpected argument: {arg}")
+    return 2
+
+
 def main(argv: list[str]) -> int:
     args = argv[1:]
     if not args:
@@ -326,29 +339,54 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0
     if args[0] == "--check":
+        unexpected = _unexpected_arg(args[1:], {"-v", "--verbose"})
+        if unexpected:
+            return _error_unexpected(unexpected)
         verbose = "-v" in args[1:] or "--verbose" in args[1:]
         css_result = check_all(verbose)
         sync_result = sync_check(verbose)
         cross_result = check_cross_template_consistency(verbose)
         palette_result = check_off_palette(verbose)
-        return max(css_result, sync_result, cross_result, palette_result)
+        site_result = check_site_facts(verbose)
+        return max(css_result, sync_result, cross_result, palette_result, site_result)
     if args[0] == "--sync":
+        unexpected = _unexpected_arg(args[1:], {"-v", "--verbose"})
+        if unexpected:
+            return _error_unexpected(unexpected)
         verbose = "-v" in args[1:] or "--verbose" in args[1:]
         return sync_check(verbose)
     if args[0] == "--verify":
-        target = args[1] if len(args) > 1 and not args[1].startswith("-") else None
+        if len(args) > 2:
+            return _error_unexpected(args[2])
+        if len(args) == 2 and args[1].startswith("-"):
+            return _error_unexpected(args[1])
+        target = args[1] if len(args) > 1 else None
         return _verify_all(target)
-    if args[0] == "--check-orphans":
-        return check_orphans(args[1:])
-    if args[0] == "--check-density":
-        return check_density(args[1:])
-    if args[0] == "--check-resume-balance":
-        return check_resume_balance(args[1:])
-    if args[0] == "--check-placeholders":
-        return check_placeholders(args[1:])
+    # Path-taking check subcommands share one guard + dispatch table.
+    path_checks = {
+        "--check-orphans": check_orphans,
+        "--check-density": check_density,
+        "--check-resume-balance": check_resume_balance,
+        "--check-placeholders": check_placeholders,
+        "--check-markdown": check_markdown_residue,
+    }
+    handler = path_checks.get(args[0])
+    if handler is not None:
+        unexpected = _unexpected_arg(args[1:])
+        if unexpected:
+            return _error_unexpected(unexpected)
+        return handler(args[1:])
     if args[0] == "--check-rhythm":
+        unexpected = _unexpected_arg(args[1:])
+        if unexpected:
+            return _error_unexpected(unexpected)
         slide_targets = [a for a in args[1:] if not a.startswith("-")]
         return check_rhythm(slide_targets, PPTX_TARGETS, TEMPLATES)
+    if args[0].startswith("-"):
+        print(f"ERROR: unknown option: {args[0]}")
+        return 2
+    if len(args) > 1:
+        return _error_unexpected(args[1])
     return build_single(args[0])
 
 

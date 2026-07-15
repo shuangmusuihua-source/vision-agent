@@ -43,26 +43,24 @@ def require_weasyprint_html():
         ) from exc
 
 
-def require_pypdf_reader():
-    """Return the pypdf.PdfReader class."""
+def _require_pypdf_attr(name: str):
     try:
-        from pypdf import PdfReader
-        return PdfReader
+        import pypdf
     except ImportError as exc:
         raise MissingDepError(
             f"missing pypdf. {WEASYPRINT_INSTALL_HINT}"
         ) from exc
+    return getattr(pypdf, name)
+
+
+def require_pypdf_reader():
+    """Return the pypdf.PdfReader class."""
+    return _require_pypdf_attr("PdfReader")
 
 
 def require_pypdf_writer():
     """Return the pypdf.PdfWriter class."""
-    try:
-        from pypdf import PdfWriter
-        return PdfWriter
-    except ImportError as exc:
-        raise MissingDepError(
-            f"missing pypdf. {WEASYPRINT_INSTALL_HINT}"
-        ) from exc
+    return _require_pypdf_attr("PdfWriter")
 
 
 def require_pymupdf():

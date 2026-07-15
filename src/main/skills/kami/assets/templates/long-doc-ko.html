@@ -185,10 +185,16 @@
     flex: 1;
     color: var(--near-black);
     padding-left: 6pt;
+    text-decoration: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12pt;
   }
-  .toc-page {
+  .toc-title[href]::after {
+    content: target-counter(attr(href), page);
     color: var(--stone);
     font-variant-numeric: tabular-nums;
+    margin-left: auto;
   }
 
   /* ========== HEADINGS ========== */
@@ -202,7 +208,10 @@
     padding-left: 8pt;
     color: var(--near-black);
     break-after: avoid;
+    string-set: section-title content();
   }
+
+  .running-title { string-set: section-title content(); }
 
   h2 {
     font-size: 16pt;
@@ -211,7 +220,6 @@
     margin: 24pt 0 8pt 0;
     color: var(--near-black);
     break-after: avoid;
-    string-set: section-title content();
   }
 
   h3 {
@@ -444,33 +452,28 @@
   <h2>목차</h2>
   <div class="toc-item">
     <span class="toc-num">01</span>
-    <span class="toc-title">요약</span>
-    <span class="toc-page">03</span>
+    <a class="toc-title" href="#ch-executive-summary">요약</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">02</span>
-    <span class="toc-title">배경 및 문제 정의</span>
-    <span class="toc-page">04</span>
+    <a class="toc-title" href="#ch-background">배경 및 문제 정의</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">03</span>
-    <span class="toc-title">방법론 및 주요 발견</span>
-    <span class="toc-page">06</span>
+    <a class="toc-title" href="#ch-methodology">방법론 및 주요 발견</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">04</span>
-    <span class="toc-title">결론 및 제언</span>
-    <span class="toc-page">09</span>
+    <a class="toc-title" href="#ch-conclusions">결론 및 제언</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">05</span>
-    <span class="toc-title">부록</span>
-    <span class="toc-page">11</span>
+    <a class="toc-title" href="#ch-appendix">부록</a>
   </div>
 </section>
 
 <!-- ========== Chapter 01: 요약 ========== -->
-<section class="chapter">
+<section class="chapter" id="ch-executive-summary">
   <div class="chapter-num">01 · Executive Summary</div>
   <h1>요약</h1>
 
@@ -493,7 +496,7 @@
 </section>
 
 <!-- ========== Chapter 02: 배경 ========== -->
-<section class="chapter">
+<section class="chapter" id="ch-background">
   <div class="chapter-num">02 · Background</div>
   <h1>배경 및 문제 정의</h1>
 
@@ -539,7 +542,7 @@
 </section>
 
 <!-- ========== Chapter 03: 방법론 ========== -->
-<section class="chapter">
+<section class="chapter" id="ch-methodology">
   <div class="chapter-num">03 · Methodology</div>
   <h1>방법론 및 주요 발견</h1>
 
@@ -558,7 +561,7 @@
   <p>{{한 단락 논술. <span class="hl">구체적인 수치 / 비율</span>을 포함한다.}}</p>
 
   <h3>발견 2: {{제목}}</h3>
-  <p>{{한 단락 논술.}}</p>
+  <p>{{한 단락 논술. <span class="hl">구체적인 수치 / 비율</span>을 포함한다.}}</p>
 
   <blockquote>
     {{인용: 사용자 인터뷰, 전문가 의견, 또는 문헌 인용}}
@@ -567,7 +570,7 @@
 </section>
 
 <!-- ========== Chapter 04: 결론 ========== -->
-<section class="chapter">
+<section class="chapter" id="ch-conclusions">
   <div class="chapter-num">04 · Conclusions</div>
   <h1>결론 및 제언</h1>
 
@@ -590,7 +593,7 @@
 </section>
 
 <!-- ========== Chapter 05: 부록 ========== -->
-<section class="chapter">
+<section class="chapter" id="ch-appendix">
   <div class="chapter-num">05 · Appendix</div>
   <h1>부록</h1>
 

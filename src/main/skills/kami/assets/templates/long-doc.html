@@ -182,10 +182,16 @@
     flex: 1;
     color: var(--near-black);
     padding-left: 6pt;
+    text-decoration: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12pt;
   }
-  .toc-page {
+  .toc-title[href]::after {
+    content: target-counter(attr(href), page);
     color: var(--stone);
     font-variant-numeric: tabular-nums;
+    margin-left: auto;
   }
 
   /* ========== HEADINGS ========== */
@@ -199,7 +205,10 @@
     padding-left: 8pt;
     color: var(--near-black);
     break-after: avoid;
+    string-set: section-title content();
   }
+
+  .running-title { string-set: section-title content(); }
 
   h2 {
     font-size: 16pt;
@@ -208,7 +217,6 @@
     margin: 24pt 0 8pt 0;
     color: var(--near-black);
     break-after: avoid;
-    string-set: section-title content();
   }
 
   h3 {
@@ -453,33 +461,28 @@
   <h2>目录</h2>
   <div class="toc-item">
     <span class="toc-num">01</span>
-    <span class="toc-title">执行摘要</span>
-    <span class="toc-page">03</span>
+    <a class="toc-title" href="#ch-executive-summary">执行摘要</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">02</span>
-    <span class="toc-title">背景与问题定义</span>
-    <span class="toc-page">04</span>
+    <a class="toc-title" href="#ch-background">背景与问题定义</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">03</span>
-    <span class="toc-title">方法与发现</span>
-    <span class="toc-page">06</span>
+    <a class="toc-title" href="#ch-methodology">方法与发现</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">04</span>
-    <span class="toc-title">结论与建议</span>
-    <span class="toc-page">09</span>
+    <a class="toc-title" href="#ch-conclusions">结论与建议</a>
   </div>
   <div class="toc-item">
     <span class="toc-num">05</span>
-    <span class="toc-title">附录</span>
-    <span class="toc-page">11</span>
+    <a class="toc-title" href="#ch-appendix">附录</a>
   </div>
 </section>
 
 <!-- ═════════════ Chapter 01：执行摘要 ═════════════ -->
-<section class="chapter">
+<section class="chapter" id="ch-executive-summary">
   <div class="chapter-num">01 · Executive Summary</div>
   <h1>执行摘要</h1>
 
@@ -502,7 +505,7 @@
 </section>
 
 <!-- ═════════════ Chapter 02：背景 ═════════════ -->
-<section class="chapter">
+<section class="chapter" id="ch-background">
   <div class="chapter-num">02 · Background</div>
   <h1>背景与问题定义</h1>
 
@@ -548,7 +551,7 @@
 </section>
 
 <!-- ═════════════ Chapter 03：方法 ═════════════ -->
-<section class="chapter">
+<section class="chapter" id="ch-methodology">
   <div class="chapter-num">03 · Methodology</div>
   <h1>方法与发现</h1>
 
@@ -615,7 +618,7 @@
   <p>{{一段论述。包含数据：<span class="hl">具体数字 / 具体比例</span>。}}</p>
 
   <h3>发现 2：{{标题}}</h3>
-  <p>{{一段论述。}}</p>
+  <p>{{一段论述。包含数据：<span class="hl">具体数字 / 具体比例</span>。}}</p>
 
   <blockquote>
     {{一段引用，可以是用户访谈、专家观点、文献引用}}
@@ -624,7 +627,7 @@
 </section>
 
 <!-- ═════════════ Chapter 04：结论 ═════════════ -->
-<section class="chapter">
+<section class="chapter" id="ch-conclusions">
   <div class="chapter-num">04 · Conclusions</div>
   <h1>结论与建议</h1>
 
@@ -647,7 +650,7 @@
 </section>
 
 <!-- ═════════════ Chapter 05：附录 ═════════════ -->
-<section class="chapter">
+<section class="chapter" id="ch-appendix">
   <div class="chapter-num">05 · Appendix</div>
   <h1>附录</h1>
 
