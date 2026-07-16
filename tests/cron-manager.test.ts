@@ -156,6 +156,40 @@ describe('cron manager automation tasks', () => {
     expect(notifyCronTaskComplete).toHaveBeenCalledWith(task.name, 'done')
   })
 
+  it('records an SDK error result as a failed run and sends a failure notification', async () => {
+    const queryImpl = async function* queryMock() {
+      yield {
+        type: 'result',
+        subtype: 'error_during_execution',
+        errors: ['Model request failed'],
+      }
+    }
+    const { manager, notifyCronTaskComplete, sentEvents } = await loadCronManager({ queryImpl })
+    const task = manager.registerTask({
+      cronExpression: '0 9 * * *',
+      prompt: 'summarize updates',
+    })
+
+    await manager.executeTaskById(task.id)
+
+    expect(task.lastStatus).toBe('error')
+    expect(task.lastError).toBe('Model request failed')
+    expect(task.resultHistory?.[0]).toEqual(expect.objectContaining({
+      status: 'error',
+      result: 'Error: Model request failed',
+      error: 'Model request failed',
+    }))
+    expect(notifyCronTaskComplete).not.toHaveBeenCalled()
+    expect(sentEvents).toContainEqual([
+      'agent:notification',
+      expect.objectContaining({
+        type: 'error',
+        title: `自动化失败: ${task.name}`,
+        message: 'Model request failed',
+      }),
+    ])
+  })
+
   it('stops a running task and records a cancelled run', async () => {
     let releaseReady!: () => void
     const ready = new Promise<void>((resolve) => { releaseReady = resolve })

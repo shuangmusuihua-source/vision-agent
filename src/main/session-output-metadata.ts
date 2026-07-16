@@ -18,6 +18,22 @@ export interface SessionOutputMetadataFile {
 
 export type SessionOutputSnapshot = Record<string, { size: number; modifiedAt: number; createdAt: number }>
 
+export interface ScannedSessionOutput {
+  fileName: string
+  filePath: string
+  relativePath: string
+  size: number
+  modifiedAt: number
+  createdAt: number
+}
+
+export interface SessionOutputScan {
+  snapshot: SessionOutputSnapshot
+  files: ScannedSessionOutput[]
+}
+
+const metadataMutationTails = new Map<string, Promise<void>>()
+
 function isSafeRelativePath(value: string): boolean {
   return Boolean(value)
     && value !== '..'
@@ -25,7 +41,11 @@ function isSafeRelativePath(value: string): boolean {
     && !value.split(sep).some((part) => part.startsWith('.'))
 }
 
-async function collectSnapshot(root: string, directory: string, snapshot: SessionOutputSnapshot): Promise<void> {
+async function collectSessionOutputs(
+  root: string,
+  directory: string,
+  scan: SessionOutputScan,
+): Promise<void> {
   let entries
   try {
     entries = await readdir(directory, { withFileTypes: true })
@@ -37,7 +57,7 @@ async function collectSnapshot(root: string, directory: string, snapshot: Sessio
     if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue
     const filePath = join(directory, entry.name)
     if (entry.isDirectory()) {
-      await collectSnapshot(root, filePath, snapshot)
+      await collectSessionOutputs(root, filePath, scan)
       continue
     }
     if (!entry.isFile()) continue
@@ -45,21 +65,35 @@ async function collectSnapshot(root: string, directory: string, snapshot: Sessio
       const fileStat = await stat(filePath)
       const relativePath = relative(root, filePath)
       if (!isSafeRelativePath(relativePath)) continue
-      snapshot[relativePath] = {
+      const createdAt = fileStat.birthtimeMs || fileStat.ctimeMs || fileStat.mtimeMs
+      scan.snapshot[relativePath] = {
         size: fileStat.size,
         modifiedAt: fileStat.mtimeMs,
-        createdAt: fileStat.birthtimeMs || fileStat.ctimeMs || fileStat.mtimeMs,
+        createdAt,
       }
+      scan.files.push({
+        fileName: entry.name,
+        filePath,
+        relativePath,
+        size: fileStat.size,
+        modifiedAt: fileStat.mtimeMs,
+        createdAt,
+      })
     } catch {
       // Files may be atomically replaced while the SDK is writing them.
     }
   }
 }
 
+export async function scanSessionOutputs(workingDirectory: string): Promise<SessionOutputScan> {
+  const root = resolve(workingDirectory)
+  const scan: SessionOutputScan = { snapshot: {}, files: [] }
+  await collectSessionOutputs(root, root, scan)
+  return scan
+}
+
 export async function captureSessionOutputSnapshot(workingDirectory: string): Promise<SessionOutputSnapshot> {
-  const snapshot: SessionOutputSnapshot = {}
-  await collectSnapshot(resolve(workingDirectory), resolve(workingDirectory), snapshot)
-  return snapshot
+  return (await scanSessionOutputs(workingDirectory)).snapshot
 }
 
 export async function readSessionOutputMetadata(workingDirectory: string): Promise<SessionOutputMetadataFile> {
@@ -72,7 +106,7 @@ export async function readSessionOutputMetadata(workingDirectory: string): Promi
   return { version: 1, files: {} }
 }
 
-export async function writeSessionOutputMetadata(
+async function writeSessionOutputMetadata(
   workingDirectory: string,
   metadata: SessionOutputMetadataFile,
 ): Promise<void> {
@@ -83,11 +117,32 @@ export async function writeSessionOutputMetadata(
   )
 }
 
-export async function reconcileSessionOutputMetadata(
+async function withMetadataMutation<T>(
   workingDirectory: string,
+  mutation: () => Promise<T>,
+): Promise<T> {
+  const key = resolve(workingDirectory)
+  const previous = metadataMutationTails.get(key) || Promise.resolve()
+  let releaseTurn!: () => void
+  const turn = new Promise<void>((resolveTurn) => {
+    releaseTurn = resolveTurn
+  })
+  const tail = previous.catch(() => undefined).then(() => turn)
+  metadataMutationTails.set(key, tail)
+
+  await previous.catch(() => undefined)
+  try {
+    return await mutation()
+  } finally {
+    releaseTurn()
+    if (metadataMutationTails.get(key) === tail) metadataMutationTails.delete(key)
+  }
+}
+
+function applySnapshotToMetadata(
+  metadata: SessionOutputMetadataFile,
   snapshot: SessionOutputSnapshot,
-): Promise<SessionOutputMetadataFile> {
-  const metadata = await readSessionOutputMetadata(workingDirectory)
+): boolean {
   let changed = false
 
   for (const [relativePath, file] of Object.entries(snapshot)) {
@@ -103,8 +158,20 @@ export async function reconcileSessionOutputMetadata(
     }
   }
 
-  if (changed) await writeSessionOutputMetadata(workingDirectory, metadata)
-  return metadata
+  return changed
+}
+
+export async function reconcileSessionOutputMetadata(
+  workingDirectory: string,
+  snapshot: SessionOutputSnapshot,
+): Promise<SessionOutputMetadataFile> {
+  return withMetadataMutation(workingDirectory, async () => {
+    const metadata = await readSessionOutputMetadata(workingDirectory)
+    if (applySnapshotToMetadata(metadata, snapshot)) {
+      await writeSessionOutputMetadata(workingDirectory, metadata)
+    }
+    return metadata
+  })
 }
 
 export async function recordSessionOutputProvenance(options: {
@@ -114,29 +181,36 @@ export async function recordSessionOutputProvenance(options: {
   sourceDocumentPath?: string
 }): Promise<boolean> {
   const after = await captureSessionOutputSnapshot(options.workingDirectory)
-  const metadata = await reconcileSessionOutputMetadata(options.workingDirectory, after)
-  if (!options.skillId) return false
+  return withMetadataMutation(options.workingDirectory, async () => {
+    const metadata = await readSessionOutputMetadata(options.workingDirectory)
+    let metadataChanged = applySnapshotToMetadata(metadata, after)
+    let provenanceChanged = false
 
-  let changed = false
-  for (const [relativePath, file] of Object.entries(after)) {
-    const previous = options.before[relativePath]
-    const wasChanged = !previous
-      || previous.size !== file.size
-      || previous.modifiedAt !== file.modifiedAt
-    if (!wasChanged) continue
-    const fileType = artifactFileTypeFromPath(relativePath)
-    if (artifactCategoryFromFileType(fileType) !== 'skill_output') continue
-    const current = metadata.files[relativePath] || { createdAt: file.createdAt }
-    metadata.files[relativePath] = {
-      ...current,
-      skillId: options.skillId,
-      sourceDocumentPath: options.sourceDocumentPath,
+    if (options.skillId) {
+      for (const [relativePath, file] of Object.entries(after)) {
+        const previous = options.before[relativePath]
+        const wasChanged = !previous
+          || previous.size !== file.size
+          || previous.modifiedAt !== file.modifiedAt
+        if (!wasChanged) continue
+        const fileType = artifactFileTypeFromPath(relativePath)
+        if (artifactCategoryFromFileType(fileType) !== 'skill_output') continue
+        const current = metadata.files[relativePath] || { createdAt: file.createdAt }
+        metadata.files[relativePath] = {
+          ...current,
+          skillId: options.skillId,
+          sourceDocumentPath: options.sourceDocumentPath,
+        }
+        provenanceChanged = true
+        metadataChanged = true
+      }
     }
-    changed = true
-  }
 
-  if (changed) await writeSessionOutputMetadata(options.workingDirectory, metadata)
-  return changed
+    if (metadataChanged) {
+      await writeSessionOutputMetadata(options.workingDirectory, metadata)
+    }
+    return provenanceChanged
+  })
 }
 
 export async function removeSessionOutputMetadataEntry(
@@ -145,10 +219,12 @@ export async function removeSessionOutputMetadataEntry(
 ): Promise<void> {
   const relativePath = relative(resolve(workingDirectory), resolve(filePath))
   if (!isSafeRelativePath(relativePath)) return
-  const metadata = await readSessionOutputMetadata(workingDirectory)
-  if (!metadata.files[relativePath]) return
-  delete metadata.files[relativePath]
-  await writeSessionOutputMetadata(workingDirectory, metadata)
+  await withMetadataMutation(workingDirectory, async () => {
+    const metadata = await readSessionOutputMetadata(workingDirectory)
+    if (!metadata.files[relativePath]) return
+    delete metadata.files[relativePath]
+    await writeSessionOutputMetadata(workingDirectory, metadata)
+  })
 }
 
 export function sourceDocumentName(sourceDocumentPath?: string): string | undefined {

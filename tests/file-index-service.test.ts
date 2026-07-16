@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { FileIndexService } from '../src/main/file-index-service'
+import { FileIndexService, shouldIgnoreIndexPath } from '../src/main/file-index-service'
 
 const tempDirs: string[] = []
 
@@ -84,6 +84,15 @@ describe('FileIndexService knowledge graph identity', () => {
 })
 
 describe('FileIndexService workspace search', () => {
+  it('ignores only exact excluded path segments', () => {
+    expect(shouldIgnoreIndexPath('/workspace/.sumi/sessions/output.md')).toBe(true)
+    expect(shouldIgnoreIndexPath('/workspace/out/output.md')).toBe(true)
+    expect(shouldIgnoreIndexPath('C:\\workspace\\dist\\output.md')).toBe(true)
+    expect(shouldIgnoreIndexPath('/workspace/about.md')).toBe(false)
+    expect(shouldIgnoreIndexPath('/workspace/outline.md')).toBe(false)
+    expect(shouldIgnoreIndexPath('/workspace/distant.md')).toBe(false)
+  })
+
   it('searches markdown content across every configured workspace', async () => {
     const firstWorkspace = await createWorkspace('market.md', 'shared research phrase from market')
     const secondWorkspace = await createWorkspace('persona.md', 'shared research phrase from persona')
@@ -121,12 +130,17 @@ describe('FileIndexService workspace search', () => {
 
   it('lists wikilink candidates from the existing index and ignores dependency output', async () => {
     const workspace = await createWorkspace('root.md', '# Root')
+    await writeFile(join(workspace, 'about.md'), '# About')
+    await writeFile(join(workspace, 'outline.md'), '# Outline')
+    await writeFile(join(workspace, 'distant.md'), '# Distant')
     await mkdir(join(workspace, 'notes'))
     await writeFile(join(workspace, 'notes', 'nested.md'), '# Nested')
     await mkdir(join(workspace, 'node_modules'))
     await writeFile(join(workspace, 'node_modules', 'dependency.md'), '# Dependency')
     await mkdir(join(workspace, 'out'))
     await writeFile(join(workspace, 'out', 'generated.md'), '# Generated')
+    await mkdir(join(workspace, '.sumi'))
+    await writeFile(join(workspace, '.sumi', 'internal.md'), '# Internal')
     const index = new FileIndexService()
 
     try {
@@ -134,6 +148,9 @@ describe('FileIndexService workspace search', () => {
       const files = await index.listMarkdownFilesUnder(workspace)
       expect(files).toEqual([
         { label: 'root', path: join(workspace, 'root.md') },
+        { label: 'about', path: join(workspace, 'about.md') },
+        { label: 'outline', path: join(workspace, 'outline.md') },
+        { label: 'distant', path: join(workspace, 'distant.md') },
         { label: 'nested', path: join(workspace, 'notes', 'nested.md') },
       ].sort((left, right) => left.path.localeCompare(right.path)))
     } finally {

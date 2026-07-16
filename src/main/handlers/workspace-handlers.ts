@@ -16,6 +16,8 @@ import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 import { KNOWLEDGE_BASE_NAME, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 import { addMarkdownToKnowledge } from '../knowledge-curation'
 import { isAllowedExternalUrl } from '../navigation-policy'
+import { readImageAsset, savePastedImageAsset } from '../image-asset-storage'
+import type { IPCRequest } from '../../shared/ipc-types'
 
 export function registerWorkspaceHandlers(
   pushSettingsToRenderer: () => void,
@@ -31,6 +33,20 @@ export function registerWorkspaceHandlers(
     try { await atomicWriteTextFile(filePath, content); return { success: true } }
     catch (err) { return { success: false, error: (err as Error).message } }
   })
+
+  ipcMain.handle(
+    'workspace:savePastedImage',
+    async (_event, request: IPCRequest<'workspace:savePastedImage'>) => (
+      savePastedImageAsset(request, isPathAuthorized)
+    ),
+  )
+
+  ipcMain.handle(
+    'workspace:readImageAsset',
+    async (_event, request: IPCRequest<'workspace:readImageAsset'>) => (
+      readImageAsset(request, isPathAuthorized)
+    ),
+  )
 
   ipcMain.handle('workspace:addToKnowledge', async (_event, request: { sourcePath: string; sessionId?: string }) => {
     if (!isPathAuthorized(request.sourcePath)) {

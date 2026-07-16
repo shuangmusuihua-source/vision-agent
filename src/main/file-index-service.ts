@@ -7,6 +7,8 @@ import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
 interface IndexedFile {
   filePath: string
   content: string
+  lines: string[]
+  normalizedLines: string[]
   wikilinks: string[]
   mtimeMs: number
 }
@@ -15,6 +17,21 @@ interface KnowledgeEntry {
   filePath: string
   wikilinks: string[]
   mtimeMs: number
+}
+
+const IGNORED_INDEX_PATH_SEGMENTS = new Set([
+  '.git',
+  'node_modules',
+  '.vision',
+  '.claude',
+  '.sumi',
+  'out',
+  'dist',
+])
+
+/** Keep discovery and chokidar filters aligned without matching partial file names. */
+export function shouldIgnoreIndexPath(filePath: string): boolean {
+  return filePath.split(/[\\/]+/).some((segment) => IGNORED_INDEX_PATH_SEGMENTS.has(segment))
 }
 
 export class FileIndexService {
@@ -91,7 +108,6 @@ export class FileIndexService {
   /** Discover all .md files recursively */
   private async discoverMarkdownFiles(dir: string): Promise<string[]> {
     const results: string[] = []
-    const ignoredDirs = new Set(['.git', 'node_modules', '.vision', '.claude', 'out', 'dist'])
 
     const walk = async (currentDir: string) => {
       let entries: fs.Dirent[]
@@ -103,10 +119,9 @@ export class FileIndexService {
 
       for (const entry of entries) {
         const fullPath = path.join(currentDir, entry.name)
+        if (shouldIgnoreIndexPath(fullPath)) continue
         if (entry.isDirectory()) {
-          if (!ignoredDirs.has(entry.name)) {
-            await walk(fullPath)
-          }
+          await walk(fullPath)
         } else if (entry.isFile() && entry.name.endsWith('.md')) {
           results.push(fullPath)
         }
@@ -125,11 +140,14 @@ export class FileIndexService {
       if (existing && existing.mtimeMs === stat.mtimeMs) return
 
       const content = await fs.promises.readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
       const wikilinks = this.extractWikilinks(content)
 
       this.index.set(filePath, {
         filePath,
         content,
+        lines,
+        normalizedLines: lines.map((line) => line.toLowerCase()),
         wikilinks,
         mtimeMs: stat.mtimeMs
       })
@@ -158,7 +176,7 @@ export class FileIndexService {
     if (this.workspaceDirs.length === 0) return
 
     this.watcher = chokidar.watch(this.workspaceDirs, {
-      ignored: /(^|[\/\\])\.(git|vision|claude)|node_modules|out|dist/,
+      ignored: shouldIgnoreIndexPath,
       persistent: true,
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 100 },
@@ -250,7 +268,7 @@ export class FileIndexService {
     this.knowledgeReadyCallbacks = []
 
     this.knowledgeWatcher = chokidar.watch(knowledgeDir, {
-      ignored: /(^|[\/\\])\.(git|vision|claude)|node_modules|out|dist/,
+      ignored: shouldIgnoreIndexPath,
       persistent: true,
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 100 },
@@ -382,13 +400,13 @@ export class FileIndexService {
     for (const [, data] of this.index) {
       if (results.length >= limit) break
 
-      const lines = data.content.split('\n')
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < data.lines.length; i++) {
         if (results.length >= limit) break
 
-        const line = lines[i]
-        if (line.toLowerCase().includes(lowerQuery)) {
-          const start = Math.max(0, line.toLowerCase().indexOf(lowerQuery) - 30)
+        const line = data.lines[i]
+        const matchIndex = data.normalizedLines[i].indexOf(lowerQuery)
+        if (matchIndex >= 0) {
+          const start = Math.max(0, matchIndex - 30)
           const end = Math.min(line.length, start + query.length + 60)
           results.push({
             filePath: data.filePath,

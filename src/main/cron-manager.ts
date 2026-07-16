@@ -1,5 +1,5 @@
 import cron, { type ScheduledTask } from 'node-cron'
-import { query } from '@anthropic-ai/claude-agent-sdk'
+import { query, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './ipc-sender'
 import { getAuthorizedDirectories, getSessionRecordById } from './persistence/workspace-store'
@@ -18,6 +18,22 @@ const MAX_RUN_HISTORY = 10
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
 const runningTasks = new Map<string, AbortController>()
+
+function describeAutomationResultError(result: Exclude<SDKResultMessage, { subtype: 'success' }>): string {
+  const details = result.errors.map((error) => error.trim()).filter(Boolean)
+  if (details.length > 0) return details.join('\n')
+
+  switch (result.subtype) {
+    case 'error_max_turns':
+      return 'Agent reached the maximum number of turns'
+    case 'error_max_budget_usd':
+      return 'Agent reached the configured budget limit'
+    case 'error_max_structured_output_retries':
+      return 'Agent could not produce valid structured output'
+    case 'error_during_execution':
+      return 'Agent execution failed'
+  }
+}
 
 function createRunId(taskId: string): string {
   return `${taskId}-run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -280,14 +296,16 @@ export async function executeTask(task: CronTask): Promise<void> {
         abortController,
       },
     })
-    let result = ''
+    let terminalResult: SDKResultMessage | null = null
     for await (const message of messageStream) {
-      if (message.type === 'result' && message.subtype === 'success') {
-        result = message.result || ''
-      }
+      if (message.type === 'result') terminalResult = message
     }
     if (abortController.signal.aborted) {
       throw new Error('Task aborted')
+    }
+    if (!terminalResult) throw new Error('Agent did not return a terminal result')
+    if (terminalResult.subtype !== 'success') {
+      throw new Error(describeAutomationResultError(terminalResult))
     }
 
     const run: CronTaskRun = {
@@ -295,7 +313,7 @@ export async function executeTask(task: CronTask): Promise<void> {
       startedAt,
       finishedAt: Date.now(),
       status: 'success',
-      result: result || '任务已完成，但没有返回文本结果。',
+      result: terminalResult.result || '任务已完成，但没有返回文本结果。',
       error: null,
     }
     recordRun(task, run)

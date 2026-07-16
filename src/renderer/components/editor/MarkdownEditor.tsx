@@ -19,12 +19,14 @@ import { CodeBlockEnhanced } from './extensions/code-block-enhanced'
 import { FocusMode } from './extensions/focus-mode'
 import { HeadingAnchor } from './extensions/heading-anchor'
 import { ImagePaste } from './extensions/image-paste'
+import { WorkspaceImage } from './extensions/workspace-image'
 import { Frontmatter } from './extensions/frontmatter'
 import { MathInline } from './extensions/math-inline'
 import { MathBlock } from './extensions/math-block'
 import { SourceSaveController } from './source-save-controller'
-import Image from '@tiptap/extension-image'
-import { Extension, type JSONContent } from '@tiptap/core'
+import { EditorProjectionScheduler } from './editor-projection-scheduler'
+import { Extension, type Editor, type JSONContent } from '@tiptap/core'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 import AiInlineEditControls, { type InlineEditMode } from './AiInlineEditControls'
 import { AiInlineReview, setAiInlineReview } from './extensions/ai-inline-review'
@@ -34,6 +36,7 @@ import {
   replacementPlanForSelection,
   type InlineRewriteSelectionSnapshot,
 } from './inline-rewrite-selection'
+import { MAX_PASTED_IMAGE_BYTES } from '../../../shared/image-assets'
 
 const lowlight = createLowlight(common)
 
@@ -56,15 +59,15 @@ function prependFrontmatter(frontmatter: string, body: string): string {
   return `---\n${frontmatter}\n---\n${body}`
 }
 
-function getFullMarkdown(editor: { getJSON: () => Record<string, unknown>; getMarkdown: () => string }): string {
-  const doc = editor.getJSON()
+function getFullMarkdown(editor: Editor, sourceDoc: ProseMirrorNode = editor.state.doc): string {
+  const doc = sourceDoc.toJSON()
   const content = doc.content as Array<Record<string, unknown>> | undefined
   let frontmatter = ''
   if (content?.[0]?.type === 'frontmatter') {
     const attrs = content[0].attrs as { content?: string } | undefined
     frontmatter = attrs?.content || ''
   }
-  let bodyMd = editor.getMarkdown()
+  let bodyMd = editor.markdown?.serialize(doc) ?? editor.getMarkdown()
   // Strip empty placeholder — save as empty file on disk
   if (bodyMd === '\n\n' || bodyMd === '<p></p>') bodyMd = ''
   return prependFrontmatter(frontmatter, bodyMd)
@@ -126,7 +129,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const localChangeIdentityRef = useRef<string | null>(null)
   const sourceSaveControllerRef = useRef<SourceSaveController | null>(null)
   const editorSaveControllerRef = useRef<SourceSaveController | null>(null)
+  const editorProjectionSchedulerRef = useRef<EditorProjectionScheduler<ProseMirrorNode> | null>(null)
   const currentDocumentIdentity = editorDocumentIdentity(documentOwnerKey, filePath)
+  const currentDocumentIdentityRef = useRef(currentDocumentIdentity)
+  const currentFilePathRef = useRef(filePath)
+  currentDocumentIdentityRef.current = currentDocumentIdentity
+  currentFilePathRef.current = filePath
   const sourceDocumentIdentityRef = useRef(currentDocumentIdentity)
   const [inlineEditMode, setInlineEditMode] = useState<InlineEditMode>('idle')
   const [inlineEditInstruction, setInlineEditInstruction] = useState('')
@@ -150,6 +158,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 
   useImperativeHandle(ref, () => ({
     flushPendingSave: async () => {
+      editorProjectionSchedulerRef.current?.flush()
       const editorFlushed = await editorSaveController.flushAsync()
       const sourceFlushed = await sourceSaveController.flushAsync()
       return sourceFlushed || editorFlushed
@@ -222,8 +231,28 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       }),
       FocusMode,
       HeadingAnchor,
-      Image,
-      ImagePaste,
+      WorkspaceImage.configure({
+        getDocumentPath: () => currentFilePathRef.current,
+        loadImageAsset: (documentPath, relativePath) => window.api.workspace.readImageAsset({
+          documentPath,
+          relativePath,
+        }),
+      }),
+      ImagePaste.configure({
+        getDocumentIdentity: () => currentDocumentIdentityRef.current,
+        saveImage: async (file) => {
+          if (file.size <= 0 || file.size > MAX_PASTED_IMAGE_BYTES) {
+            return { success: false, error: '图片无效或超过 20 MB' }
+          }
+          const documentPath = currentFilePathRef.current
+          const bytes = new Uint8Array(await file.arrayBuffer())
+          return window.api.workspace.savePastedImage({
+            documentPath,
+            mimeType: file.type,
+            bytes,
+          })
+        },
+      }),
       Frontmatter,
       MathInline,
       MathBlock,
@@ -528,6 +557,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       if (!editor || editor.isDestroyed) return
       if (sourceMode) {
         // Entering source mode: save current full markdown to sourceText
+        editorProjectionSchedulerRef.current?.flush()
         editorSaveController.flush()
         sourceDocumentIdentityRef.current = currentDocumentIdentity
         setSourceText(getFullMarkdown(editor))
@@ -591,37 +621,40 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     }
   }, [cancelInlineRewrite, content, currentDocumentIdentity, editor])
 
-  // Auto-save with debounce
+  // Coalesce expensive Markdown/stat projections while retaining the immutable
+  // document snapshot so a tab switch flushes the old file, not the new editor state.
   useEffect(() => {
     if (!editor || editor.isDestroyed || !filePath) return
 
-    const handler = () => {
+    const publishStats = (doc: ProseMirrorNode) => {
+      const text = doc.textBetween(0, doc.content.size, '\n\n')
+      const trimmed = text.trim()
+      const words = trimmed ? trimmed.split(/\s+/).length : 0
+      onStatsUpdate(words, text.length)
+    }
+    const projection = new EditorProjectionScheduler<ProseMirrorNode>((doc) => {
       localChangeIdentityRef.current = currentDocumentIdentity
       if (editor.isDestroyed) return
-      editorSaveController.schedule(filePath, getFullMarkdown(editor))
+      editorSaveController.schedule(filePath, getFullMarkdown(editor, doc))
+      publishStats(doc)
+    })
+    editorProjectionSchedulerRef.current = projection
+    const handler = () => {
+      localChangeIdentityRef.current = currentDocumentIdentity
+      projection.schedule(editor.state.doc)
     }
 
     editor.on('update', handler)
+    publishStats(editor.state.doc)
     return () => {
       editor.off('update', handler)
-      // A tab switch or unmount tears down this effect before the debounce
-      // expires. Persist the captured markdown for the old path first.
+      projection.flush()
+      if (editorProjectionSchedulerRef.current === projection) {
+        editorProjectionSchedulerRef.current = null
+      }
       editorSaveController.flush()
     }
-  }, [currentDocumentIdentity, editor, editorSaveController, filePath])
-
-  useEffect(() => {
-    if (!editor || editor.isDestroyed) return
-    const updateCounts = () => {
-      if (editor.isDestroyed) return
-      const text = editor.getText()
-      const words = text.trim().split(/\s+/).filter(Boolean).length
-      onStatsUpdate(text.trim() ? words : 0, text.length)
-    }
-    editor.on('update', updateCounts)
-    updateCounts()
-    return () => { editor.off('update', updateCounts) }
-  }, [editor, onStatsUpdate])
+  }, [currentDocumentIdentity, editor, editorSaveController, filePath, onStatsUpdate])
 
   const handleInlineAgentAction = useCallback((action: 'explain' | 'review' | 'ask') => {
     if (!editor || editor.isDestroyed) return

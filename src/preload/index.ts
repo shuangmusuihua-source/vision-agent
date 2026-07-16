@@ -61,6 +61,10 @@ const api = {
     readFile: (filePath: string) => invoke('workspace:readFile', filePath),
     writeFile: (filePath: string, content: string) =>
       invoke('workspace:writeFile', filePath, content),
+    savePastedImage: (request: IPCRequest<'workspace:savePastedImage'>) =>
+      invoke('workspace:savePastedImage', request),
+    readImageAsset: (request: IPCRequest<'workspace:readImageAsset'>) =>
+      invoke('workspace:readImageAsset', request),
     addToKnowledge: (sourcePath: string, sessionId?: string) =>
       invoke('workspace:addToKnowledge', { sourcePath, sessionId }),
     listMarkdownFiles: (dirPath: string) => invoke('workspace:listMarkdownFiles', dirPath),

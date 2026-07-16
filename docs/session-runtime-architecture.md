@@ -33,13 +33,16 @@ type AgentSessionEnvelope = {
 ## 执行流程
 
 1. Renderer 为新对话创建临时 app session key，并乐观写入用户消息。
-2. Main 的 `query-runner.ts` 根据 context 创建受管 working directory。
-3. App session 元数据先写入 electron-store。
-4. `query()` 启动后，`SessionRuntimeController.registerRun()` 以 app session ID 注册 Query、AbortController 和 envelope。
-5. SDK 首次返回 `session_id` 时，runtime 将其附加为 `sdkSessionId`，但不改变 app session ID。
-6. 每条 SDK 消息统一经过 `sessionRuntime.emitSdkMessage()`：Skill bridge、文本批次或消息转换，然后附带 envelope 发往 renderer。
-7. Renderer 根据 envelope 更新 live slot 或后台 `sessionSlots[sessionId]`。
-8. 结束时 runtime flush 文本、清理 Skill 状态、pending requests 和 active run。
+2. Main 为 app session ID 获取启动所有权；同一会话的启动串行，不同会话仍可并行。
+3. `query-runner.ts` 在启动所有权内校验身份、终止并等待旧 run、准备受管 working directory。
+4. App session 元数据先写入 electron-store。
+5. `query()` 启动后，`SessionRuntimeController.registerRun()` 以 app session ID 注册 Query、AbortController 和 envelope；注册完成才释放启动所有权。
+6. SDK 首次返回 `session_id` 时，runtime 将其附加为 `sdkSessionId`，但不改变 app session ID。
+7. 每条 SDK 消息统一经过 `sessionRuntime.emitSdkMessage()`：Skill bridge、文本批次或消息转换，然后附带 envelope 发往 renderer。
+8. Renderer 根据 envelope 更新 live slot 或后台 `sessionSlots[sessionId]`。
+9. 结束时 runtime flush 文本、清理 Skill 状态、pending requests 和 active run。
+
+启动所有权在 active run 注册后立即释放，不覆盖 SDK 流执行期；因此不同会话始终可以并行，同一会话的下一次启动也可以进入 abort-and-wait 来替换当前 run。
 
 ## Working directory
 
@@ -68,6 +71,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 - GenerationActivityProjector 生命周期
 - 权限与 AskUser pending Promise、五分钟超时和 abort 清理
 - session-scoped abort 与 completion 等待
+- 按 app session ID 隔离的启动所有权；封装 abort / prepare / register 的有序 seam
 - 带 envelope 的 main-to-renderer 事件
 
 它不拥有：
@@ -136,7 +140,8 @@ Claude SDK JSONL 保存 transcript。electron-store `SessionRecord` 保存：
 3. Session materialization 只合并临时 app slot 和 SDK 信息，不重命名 app session key。
 4. 权限、AskUser 和 Skill 输出按 request/session ID 路由。
 5. IPC 静默只能触发非阻断提示，不能作为自动 abort 的依据。
-6. 新查询替换旧查询时必须等待旧 runtime 的 finally 完成，避免旧清理删除新状态。
+6. 新查询替换旧查询时，同一 app session 的启动必须串行覆盖 identity validation、abort、prepare 和 register，并等待旧 runtime 的 finally 完成；不同 session 不得共享这把锁。
+7. `registerRun()` 不允许覆盖 active run；实例保护仍负责阻止迟到的旧 cleanup 删除当前 run。
 
 Renderer 的双表示规则由 `store/session-slot-state.ts` 独占：caller 不应自行在
 `slots[context]` 与 `sessionSlots[sessionId]` 之间回退，也不应自行维护 LRU 顺序。

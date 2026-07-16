@@ -162,6 +162,14 @@ export type IPCChannelMap = {
     request: [string, string]
     response: { success: boolean; error?: string }
   }
+  'workspace:savePastedImage': {
+    request: { documentPath: string; mimeType: string; bytes: Uint8Array }
+    response: { success: boolean; relativePath?: string; error?: string }
+  }
+  'workspace:readImageAsset': {
+    request: { documentPath: string; relativePath: string }
+    response: { success: boolean; mimeType?: string; bytes?: Uint8Array; error?: string }
+  }
   'workspace:addToKnowledge': {
     request: { sourcePath: string; sessionId?: string }
     response: {

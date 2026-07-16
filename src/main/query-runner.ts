@@ -349,6 +349,9 @@ export async function sendMessage(
   approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
 ): Promise<void> {
   const queryKey = clientSessionKey || sessionId || context
+  // Same-session starts are ordered from identity validation through
+  // registration. Starts for different sessions use independent leases.
+  const startLease = await sessionRuntime.acquireSessionStart(queryKey)
   const existingRecord = getSessionRecordById(queryKey)
   let effectiveContext = context
   let effectiveWorkspacePath: string
@@ -370,6 +373,7 @@ export async function sendMessage(
         workspacePath: existingRecord.workspacePath,
         sdkSessionId: existingRecord.sdkSessionId,
       }), '会话归属信息不匹配，请重新选择会话。')
+      startLease.release()
       return
     }
     effectiveContext = existingRecord.context
@@ -386,16 +390,15 @@ export async function sendMessage(
         workspacePath: effectiveWorkspacePath,
         sdkSessionId: sessionId,
       }), '工作区未授权，请重新选择工作区。')
+      startLease.release()
       return
     }
   }
 
-  // A session has one ordered execution stream. Wait for the previous run's
-  // finally block before starting its replacement so stale cleanup cannot
-  // discard the new run's text, Skill state, or permission requests.
   try {
     await abortActiveQueryAndWait(queryKey)
   } catch (error) {
+    startLease.release()
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
       context: effectiveContext,
       sessionId: queryKey,
@@ -404,6 +407,11 @@ export async function sendMessage(
     }), toUserFacingQueryError(error))
     return
   }
+
+  // The previous run may materialize its SDK transcript while responding to
+  // abort. Resume that transcript instead of using the pre-abort snapshot.
+  const latestRecord = getSessionRecordById(queryKey) || existingRecord
+  effectiveSdkSessionId = latestRecord?.sdkSessionId || effectiveSdkSessionId
 
   let effectiveWorkingDirectory = effectiveWorkspacePath
 
@@ -418,12 +426,13 @@ export async function sendMessage(
       workspacePath: effectiveWorkspacePath,
       workingDirectory: effectiveWorkingDirectory,
       context: effectiveContext,
-      status: existingRecord?.status || 'empty',
-      createdAt: existingRecord?.createdAt || Date.now(),
+      status: latestRecord?.status || 'empty',
+      createdAt: latestRecord?.createdAt || Date.now(),
       lastModified: Date.now(),
-      messageCount: existingRecord?.messageCount || 0,
+      messageCount: latestRecord?.messageCount || 0,
     })
   } catch (error) {
+    startLease.release()
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
       context: effectiveContext,
       sessionId: queryKey,
@@ -494,13 +503,14 @@ export async function sendMessage(
         abortController,
       }
     })
-    sessionRuntime.beginSession(runtimeEnvelope, skillId ?? null)
     queryInstanceId = sessionRuntime.registerRun({
       query: messageStream as Query,
       skillId: skillId ?? null,
       abortController,
       envelope: runtimeEnvelope,
     })
+    sessionRuntime.beginSession(runtimeEnvelope, skillId ?? null)
+    startLease.release()
 
     for await (const message of messageStream) {
       if (mainWindow.isDestroyed()) break
@@ -554,6 +564,7 @@ export async function sendMessage(
       }, toUserFacingQueryError(error))
     }
   } finally {
+    startLease.release()
     if (effectiveContext === 'editor' && skillId) {
       try {
         const changed = await recordSessionOutputProvenance({

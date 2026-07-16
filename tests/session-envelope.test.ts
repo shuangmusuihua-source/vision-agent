@@ -930,6 +930,93 @@ describe('session runtime event routing', () => {
     expect(completed).toBe(true)
   })
 
+  it('serializes same-session starts while allowing other sessions to start', async () => {
+    const runtime = new SessionRuntimeController()
+    const first = await runtime.acquireSessionStart('session-a')
+    let secondAcquired = false
+    const secondPromise = runtime.acquireSessionStart('session-a').then((lease) => {
+      secondAcquired = true
+      return lease
+    })
+
+    const otherSession = await runtime.acquireSessionStart('session-b')
+    expect(secondAcquired).toBe(false)
+
+    first.release()
+    const second = await secondPromise
+    expect(secondAcquired).toBe(true)
+
+    second.release()
+    otherSession.release()
+  })
+
+  it('keeps only the latest concurrently started run active for a session', async () => {
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-concurrent-start',
+      workspacePath: '/workspace/concurrent-start',
+    })
+
+    const startRun = async (skillId: string) => {
+      const lease = await runtime.acquireSessionStart(envelope.sessionId)
+      try {
+        await runtime.abortAndWait(envelope.sessionId, 1000)
+        const abortController = new AbortController()
+        const instanceId = runtime.registerRun({
+          query: {} as never,
+          skillId,
+          abortController,
+          envelope,
+        })
+        abortController.signal.addEventListener('abort', () => {
+          runtime.cleanupRun(envelope.sessionId, instanceId)
+        }, { once: true })
+        return { abortController, instanceId }
+      } finally {
+        lease.release()
+      }
+    }
+
+    const [first, second] = await Promise.all([
+      startRun('first-skill'),
+      startRun('second-skill'),
+    ])
+
+    expect(first.abortController.signal.aborted).toBe(true)
+    expect(second.abortController.signal.aborted).toBe(false)
+    expect(runtime.getActiveSkillId(envelope.sessionId)).toBe('second-skill')
+
+    runtime.cleanupRun(envelope.sessionId, second.instanceId)
+  })
+
+  it('rejects a direct active-run overwrite and aborts the rejected run', () => {
+    const runtime = new SessionRuntimeController()
+    const envelope = createSessionEnvelope({
+      context: 'editor',
+      sessionId: 'app-session-overwrite',
+      workspacePath: '/workspace/overwrite',
+    })
+    const activeInstance = runtime.registerRun({
+      query: {} as never,
+      skillId: 'active-skill',
+      abortController: new AbortController(),
+      envelope,
+    })
+    const rejectedAbortController = new AbortController()
+
+    expect(() => runtime.registerRun({
+      query: {} as never,
+      skillId: 'rejected-skill',
+      abortController: rejectedAbortController,
+      envelope,
+    })).toThrow('Session already has an active run')
+    expect(rejectedAbortController.signal.aborted).toBe(true)
+    expect(runtime.getActiveSkillId(envelope.sessionId)).toBe('active-skill')
+
+    runtime.cleanupRun(envelope.sessionId, activeInstance)
+  })
+
   it('does not let stale run cleanup affect a replacement run in the same session', async () => {
     const { win, sent } = fakeWindow()
     const runtime = new SessionRuntimeController()
@@ -944,6 +1031,7 @@ describe('session runtime event routing', () => {
       abortController: new AbortController(),
       envelope,
     })
+    runtime.cleanupRun(envelope.sessionId, staleInstance)
     runtime.registerRun({
       query: {} as never,
       skillId: null,

@@ -14,7 +14,13 @@ vi.mock('../src/main/persistence/store-core', () => ({
 
 const { ensureSessionWorkingDirectory } = await import('../src/main/session-files')
 const { getSessionFileOutputs, isSessionFileMutationTool } = await import('../src/main/session-file-catalog')
-const { captureSessionOutputSnapshot, recordSessionOutputProvenance } = await import('../src/main/session-output-metadata')
+const {
+  captureSessionOutputSnapshot,
+  readSessionOutputMetadata,
+  reconcileSessionOutputMetadata,
+  recordSessionOutputProvenance,
+  scanSessionOutputs,
+} = await import('../src/main/session-output-metadata')
 const tempDirs: string[] = []
 
 afterEach(async () => {
@@ -89,5 +95,52 @@ describe('session file catalog', () => {
     })
     expect(output?.modifiedAt).toEqual(expect.any(Number))
     expect(output?.relativePath).toBe('research.html')
+  })
+
+  it('collects catalog fields and the metadata snapshot in one scan', async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), 'sumi-session-catalog-'))
+    tempDirs.push(workingDirectory)
+    await mkdir(join(workingDirectory, 'nested'), { recursive: true })
+    await writeFile(join(workingDirectory, 'nested', 'report.md'), '# Report')
+    await mkdir(join(workingDirectory, '.sumi'), { recursive: true })
+    await writeFile(join(workingDirectory, '.sumi', 'private.md'), '# Private')
+
+    const scan = await scanSessionOutputs(workingDirectory)
+
+    expect(scan.files).toHaveLength(1)
+    expect(scan.files[0]).toMatchObject({
+      fileName: 'report.md',
+      relativePath: join('nested', 'report.md'),
+      size: 8,
+    })
+    expect(scan.snapshot[join('nested', 'report.md')]).toMatchObject({ size: 8 })
+    expect(scan.snapshot[join('.sumi', 'private.md')]).toBeUndefined()
+  })
+
+  it('serializes metadata reconciliation with Skill provenance updates', async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), 'sumi-session-catalog-'))
+    tempDirs.push(workingDirectory)
+    const sourceDocument = join(workingDirectory, 'brief.md')
+    await writeFile(sourceDocument, '# Brief')
+    const before = await captureSessionOutputSnapshot(workingDirectory)
+    await writeFile(join(workingDirectory, 'brief.pptx'), 'deck')
+    const after = await captureSessionOutputSnapshot(workingDirectory)
+
+    await Promise.all([
+      recordSessionOutputProvenance({
+        workingDirectory,
+        before,
+        skillId: 'slides',
+        sourceDocumentPath: sourceDocument,
+      }),
+      reconcileSessionOutputMetadata(workingDirectory, after),
+      reconcileSessionOutputMetadata(workingDirectory, after),
+    ])
+
+    const metadata = await readSessionOutputMetadata(workingDirectory)
+    expect(metadata.files['brief.pptx']).toMatchObject({
+      skillId: 'slides',
+      sourceDocumentPath: sourceDocument,
+    })
   })
 })

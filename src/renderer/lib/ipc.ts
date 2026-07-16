@@ -43,7 +43,7 @@ import type {
   CronTaskRegistration,
   CronTaskTarget,
 } from '../../shared/cron-types'
-import type { IPCRequest } from '../../shared/ipc-types'
+import type { IPCRequest, IPCResponse } from '../../shared/ipc-types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -88,6 +88,12 @@ interface SearchResult {
 interface WorkspaceApi {
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
+  savePastedImage: (
+    request: IPCRequest<'workspace:savePastedImage'>,
+  ) => Promise<IPCResponse<'workspace:savePastedImage'>>
+  readImageAsset: (
+    request: IPCRequest<'workspace:readImageAsset'>,
+  ) => Promise<IPCResponse<'workspace:readImageAsset'>>
   addToKnowledge: (sourcePath: string, sessionId?: string) => Promise<{
     success: boolean
     filePath?: string

@@ -44,6 +44,10 @@ export type SessionRuntimeStart = {
   envelope: AgentSessionEnvelope
 }
 
+export type SessionStartLease = {
+  release: () => void
+}
+
 type PermissionRequestInput = Omit<PermissionRequestIPC, keyof AgentSessionEnvelope | 'id'>
 type AskUserRequestInput = Omit<AskUserRequestIPC, keyof AgentSessionEnvelope | 'id'>
 
@@ -54,6 +58,7 @@ export class SessionRuntimeController {
   private pendingInteractions = new PendingInteractionController()
   private generationWindow: BrowserWindow | null = null
   private completionResolvers = new Map<number, () => void>()
+  private startTails = new Map<string, Promise<void>>()
 
   constructor() {
     this.generationProjector.setEmitter((state) => {
@@ -71,7 +76,37 @@ export class SessionRuntimeController {
     this.generationProjector.reset(envelope.sessionId, envelope, skillId)
   }
 
+  async acquireSessionStart(sessionId: string): Promise<SessionStartLease> {
+    const previous = this.startTails.get(sessionId) ?? Promise.resolve()
+    const previousSettled = previous.catch(() => undefined)
+    let releaseTurn!: () => void
+    const turn = new Promise<void>((resolve) => {
+      releaseTurn = resolve
+    })
+    const tail = previousSettled.then(() => turn)
+    this.startTails.set(sessionId, tail)
+
+    await previousSettled
+
+    let released = false
+    return {
+      release: () => {
+        if (released) return
+        released = true
+        releaseTurn()
+        if (this.startTails.get(sessionId) === tail) {
+          this.startTails.delete(sessionId)
+        }
+      },
+    }
+  }
+
   registerRun(input: SessionRuntimeStart): number {
+    if (this.activeRuns.has(input.envelope.sessionId)) {
+      input.abortController.abort()
+      throw new Error(`Session already has an active run: ${input.envelope.sessionId}`)
+    }
+
     const instanceId = ++this.instanceCounter
     let resolveCompletion!: () => void
     const completion = new Promise<void>((resolve) => {
