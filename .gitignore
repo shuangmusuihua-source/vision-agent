@@ -11,3 +11,4 @@ mockups/
 .vision/
 .coverage
 htmlcov/
+.agents/skills/**/scripts/tests/coverage-*.json

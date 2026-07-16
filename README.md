@@ -65,4 +65,4 @@ npm run dist
 
 ## 发布说明
 
-Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程完成 hardened runtime、签名和 notarization。仓库本地缺少发布证书时，`npm run pack` 仍会生成未签名的验证包。
+Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程完成 hardened runtime、签名和 notarization。签名使用 `CSC_LINK`、`CSC_KEY_PASSWORD`；notarization 使用 `APPLE_API_KEY`、`APPLE_API_KEY_ID`、`APPLE_API_ISSUER`，或 Apple ID 方式的 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`。仓库本地缺少发布证书时，`npm run pack` 仍会生成未签名的验证包；完整变量见 `.env.example`。
