@@ -46,6 +46,7 @@ import {
   recordSessionOutputProvenance,
   type SessionOutputSnapshot,
 } from './session-output-metadata'
+import { getGlobalMemoryDirectory } from './memory-policy'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -168,11 +169,13 @@ function buildOptions(
     ...sessionEnvelope,
     sdkSessionId: getSessionId?.() || sessionEnvelope.sdkSessionId,
   })
+  const memoryMode = 'global' as const
   const decideFileAccess = (toolName: string, input: Record<string, unknown>) => decideSessionFileAccess({
     toolName,
     input,
     workingDirectory,
     skillsDirectory,
+    authorizedMemoryDirectory: memoryMode === 'global' ? getGlobalMemoryDirectory() : null,
     authorizedExternalReadPaths: authorizedAttachmentPaths,
     explicitExternalPaths,
   })
@@ -205,7 +208,7 @@ JSON 格式：{ root: "id", elements: { "id": { type: "组件名", props: {...},
   ].filter(Boolean).join('\n')
 
   return buildAgentOptions({
-    memoryMode: 'global',
+    memoryMode,
     permissionMode: approvalMode === 'auto' ? 'auto' : 'default',
     // Bare allow-list entries bypass canUseTool in recent SDK versions. Keep
     // this empty so every tool request reaches the session authorization gate.

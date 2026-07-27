@@ -65,7 +65,7 @@ Cron、持久化和索引 Adapter。IPC handler 不得绕过该 Module 直接修
 
 ### 文件与授权
 
-每个 workspace session 使用独立的 `.sumi/sessions/<hash>/` 工作目录。`session-file-access.ts` 根据工作目录、内置 Skill 目录、附件授权和用户显式路径决定工具访问；renderer 提供的路径不能直接作为授权依据。
+每个 workspace session 使用独立的 `.sumi/sessions/<hash>/` 工作目录。`session-file-access.ts` 根据工作目录、交互会话的应用全局记忆目录、内置 Skill 目录、附件授权和用户显式路径决定工具访问；renderer 提供的路径不能直接作为授权依据。
 
 `session-file-catalog.ts` 从受管会话目录实时发现产物，不维护另一份 artifact 数据库。
 

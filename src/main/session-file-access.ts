@@ -47,17 +47,26 @@ export function decideSessionFileAccess(options: {
   input: Record<string, unknown>
   workingDirectory: string
   skillsDirectory: string
+  authorizedMemoryDirectory: string | null
   authorizedExternalReadPaths?: string[]
   explicitExternalPaths?: string[]
 }): SessionFileAccessDecision {
   const { toolName, input, workingDirectory, skillsDirectory } = options
   if (toolName === 'Bash') return 'prompt'
 
+  const memoryRoots = options.authorizedMemoryDirectory
+    ? [options.authorizedMemoryDirectory]
+    : []
   let defaultRoots: string[]
   if (READ_TOOLS.has(toolName)) {
-    defaultRoots = [workingDirectory, skillsDirectory, ...(options.authorizedExternalReadPaths || [])]
+    defaultRoots = [
+      workingDirectory,
+      skillsDirectory,
+      ...memoryRoots,
+      ...(options.authorizedExternalReadPaths || []),
+    ]
   } else if (WRITE_TOOLS.has(toolName)) {
-    defaultRoots = [workingDirectory]
+    defaultRoots = [workingDirectory, ...memoryRoots]
   } else {
     return 'not-file-tool'
   }

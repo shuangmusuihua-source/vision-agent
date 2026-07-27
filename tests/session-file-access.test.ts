@@ -9,12 +9,14 @@ function decide(
   input: Record<string, unknown>,
   explicitExternalPaths: string[] = [],
   authorizedExternalReadPaths: string[] = [],
+  authorizedMemoryDirectory: string | null = null,
 ) {
   return decideSessionFileAccess({
     toolName,
     input,
     workingDirectory,
     skillsDirectory,
+    authorizedMemoryDirectory,
     authorizedExternalReadPaths,
     explicitExternalPaths,
   })
@@ -52,6 +54,36 @@ describe('session file access', () => {
     expect(decide('Read', { file_path: selectedFile }, [], [selectedFile])).toBe('allow')
     expect(decide('Write', { file_path: selectedFile }, [], [selectedFile])).toBe('deny')
     expect(decide('Read', { file_path: '/Users/me/Documents/other.md' }, [], [selectedFile])).toBe('deny')
+  })
+
+  it('allows interactive auto-memory access without authorizing adjacent app data', () => {
+    const memoryDirectory = '/app-data/sumi/memory'
+
+    expect(decide('Read', {
+      file_path: `${memoryDirectory}/MEMORY.md`,
+    }, [], [], memoryDirectory)).toBe('allow')
+    expect(decide('Glob', {
+      path: memoryDirectory,
+      pattern: '*.md',
+    }, [], [], memoryDirectory)).toBe('allow')
+    expect(decide('Write', {
+      file_path: `${memoryDirectory}/user-name.md`,
+    }, [], [], memoryDirectory)).toBe('allow')
+    expect(decide('Edit', {
+      file_path: `${memoryDirectory}/preferences.md`,
+    }, [], [], memoryDirectory)).toBe('allow')
+    expect(decide('Write', {
+      file_path: '/app-data/sumi/settings.json',
+    }, [], [], memoryDirectory)).toBe('deny')
+  })
+
+  it('does not grant global memory access when the runtime disables memory', () => {
+    expect(decide('Read', {
+      file_path: '/app-data/sumi/memory/MEMORY.md',
+    })).toBe('deny')
+    expect(decide('Write', {
+      file_path: '/app-data/sumi/memory/user-name.md',
+    })).toBe('deny')
   })
 
   it('extracts absolute paths explicitly included in the user message', () => {
