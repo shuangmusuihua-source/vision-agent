@@ -1,10 +1,10 @@
 import { execFile } from 'child_process'
-import { randomUUID } from 'crypto'
-import { mkdir, readFile, readdir, rename, rm } from 'fs/promises'
+import { mkdir, readFile, readdir } from 'fs/promises'
 import { homedir } from 'os'
 import { dirname, join, resolve, sep } from 'path'
 import { atomicWriteTextFile } from './atomic-write'
 import { getAppUserDataDir } from './app-identity'
+import { ManagedRuntimeInstallTransaction } from './managed-runtime-install'
 import {
   MARKITDOWN_FORMATS,
   type MarkitdownFormat,
@@ -170,8 +170,8 @@ export class MarkitdownRuntimeManager {
   private readonly env: NodeJS.ProcessEnv
   private readonly fixedCandidates?: string[]
   private readonly runCommand: MarkitdownCommandRunner
+  private readonly installer: ManagedRuntimeInstallTransaction<MarkitdownRuntimeInstallResult>
   private readyProbe: PythonProbe | null = null
-  private installPromise: Promise<MarkitdownRuntimeInstallResult> | null = null
 
   constructor(options: MarkitdownRuntimeManagerOptions) {
     this.runtimeRoot = options.runtimeRoot
@@ -179,6 +179,7 @@ export class MarkitdownRuntimeManager {
     this.env = options.env || process.env
     this.fixedCandidates = options.candidates
     this.runCommand = options.runCommand || defaultRunCommand
+    this.installer = new ManagedRuntimeInstallTransaction(this.managedVenvPath)
   }
 
   private get managedVenvPath(): string {
@@ -312,63 +313,61 @@ export class MarkitdownRuntimeManager {
   }
 
   install(): Promise<MarkitdownRuntimeInstallResult> {
-    if (!this.installPromise) {
-      this.installPromise = this.performInstall().finally(() => {
-        this.installPromise = null
-      })
-    }
-    return this.installPromise
-  }
+    return this.installer.run({
+      preflight: async () => {
+        const status = await this.getStatus()
+        if (status.state === 'ready') {
+          return { install: false, result: { success: true, status } }
+        }
+        if (status.state === 'python-missing') {
+          return {
+            install: false,
+            result: {
+              success: false,
+              error: `未找到可用的 Python ${MINIMUM_PYTHON_VERSION} 或更高版本，请先安装 Python。`,
+            },
+          }
+        }
+        return { install: true, context: { pythonPath: status.pythonPath } }
+      },
+      stage: async (stagingPath, context) => {
+        const stagingPythonPath = join(stagingPath, 'bin', 'python3')
+        await this.runCommand(
+          context.pythonPath,
+          ['-m', 'venv', '--copies', stagingPath],
+          INSTALL_TIMEOUT_MS,
+        )
+        await this.runCommand(stagingPythonPath, [
+          '-m',
+          'pip',
+          'install',
+          '--disable-pip-version-check',
+          '--no-input',
+          '--index-url',
+          'https://pypi.org/simple',
+          MARKITDOWN_PACKAGE_SPEC,
+        ], INSTALL_TIMEOUT_MS)
 
-  private async performInstall(): Promise<MarkitdownRuntimeInstallResult> {
-    const status = await this.getStatus()
-    if (status.state === 'ready') return { success: true, status }
-    if (status.state === 'python-missing') {
-      return {
-        success: false,
-        error: `未找到可用的 Python ${MINIMUM_PYTHON_VERSION} 或更高版本，请先安装 Python。`,
-      }
-    }
+        const stagingProbe = await this.probe(stagingPythonPath)
+        if (!stagingProbe || !supportsFormats(stagingProbe, [...MARKITDOWN_FORMATS])) {
+          throw new Error('Installed runtime did not pass capability checks')
+        }
+      },
+      activate: async (targetPath) => {
+        const managedProbe = await this.probe(join(targetPath, 'bin', 'python3'))
+        if (!managedProbe || !supportsFormats(managedProbe, [...MARKITDOWN_FORMATS])) {
+          throw new Error('Managed runtime did not pass final capability checks')
+        }
 
-    await mkdir(this.runtimeRoot, { recursive: true })
-    const temporaryVenvPath = join(this.runtimeRoot, `venv.install-${randomUUID()}`)
-    const temporaryPythonPath = join(temporaryVenvPath, 'bin', 'python3')
-
-    try {
-      await this.runCommand(status.pythonPath, ['-m', 'venv', '--copies', temporaryVenvPath], INSTALL_TIMEOUT_MS)
-      await this.runCommand(temporaryPythonPath, [
-        '-m',
-        'pip',
-        'install',
-        '--disable-pip-version-check',
-        '--no-input',
-        '--index-url',
-        'https://pypi.org/simple',
-        MARKITDOWN_PACKAGE_SPEC,
-      ], INSTALL_TIMEOUT_MS)
-
-      const temporaryProbe = await this.probe(temporaryPythonPath)
-      if (!temporaryProbe || !supportsFormats(temporaryProbe, [...MARKITDOWN_FORMATS])) {
-        throw new Error('Installed runtime did not pass capability checks')
-      }
-
-      await rm(this.managedVenvPath, { recursive: true, force: true })
-      await rename(temporaryVenvPath, this.managedVenvPath)
-
-      const managedProbe = await this.probe(this.managedPythonPath)
-      if (!managedProbe || !supportsFormats(managedProbe, [...MARKITDOWN_FORMATS])) {
-        throw new Error('Managed runtime did not pass final capability checks')
-      }
-
-      this.readyProbe = managedProbe
-      await this.writeCache(managedProbe.executable)
-      return { success: true, status: this.readyStatus(managedProbe) }
-    } catch (error) {
-      console.error('[MarkItDown] runtime installation failed:', error)
-      return { success: false, error: formatInstallError(error) }
-    } finally {
-      await rm(temporaryVenvPath, { recursive: true, force: true }).catch(() => undefined)
-    }
+        this.readyProbe = managedProbe
+        await this.writeCache(managedProbe.executable)
+        return { success: true, status: this.readyStatus(managedProbe) }
+      },
+      failure: (error) => {
+        console.error('[MarkItDown] runtime installation failed:', error)
+        return { success: false, error: formatInstallError(error) }
+      },
+    })
   }
 }
 
