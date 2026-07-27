@@ -1,8 +1,9 @@
-import { createHash, randomUUID } from 'crypto'
+import { createHash } from 'crypto'
 import { execFile } from 'child_process'
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
+import { chmod, mkdir, readFile, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { getAppUserDataDir } from './app-identity'
+import { ManagedRuntimeInstallTransaction } from './managed-runtime-install'
 import {
   OFFICECLI_VERSION,
   type OfficeCliRuntimeInstallResult,
@@ -128,7 +129,7 @@ export class OfficeCliRuntimeManager {
   private readonly runCommand: OfficeCliCommandRunner
   private readonly download: OfficeCliDownloader
   private readonly releaseAssetOverride: OfficeCliReleaseAsset | null | undefined
-  private installPromise: Promise<OfficeCliRuntimeInstallResult> | null = null
+  private readonly installer: ManagedRuntimeInstallTransaction<OfficeCliRuntimeInstallResult>
 
   constructor(options: OfficeCliRuntimeManagerOptions) {
     this.runtimeRoot = options.runtimeRoot
@@ -137,6 +138,9 @@ export class OfficeCliRuntimeManager {
     this.runCommand = options.runCommand ?? defaultRunCommand
     this.download = options.download ?? defaultDownload
     this.releaseAssetOverride = options.releaseAsset
+    this.installer = new ManagedRuntimeInstallTransaction(
+      join(this.runtimeRoot, OFFICECLI_VERSION),
+    )
   }
 
   private asset(): OfficeCliReleaseAsset | null {
@@ -195,56 +199,52 @@ export class OfficeCliRuntimeManager {
   }
 
   install(): Promise<OfficeCliRuntimeInstallResult> {
-    if (!this.installPromise) {
-      this.installPromise = this.performInstall().finally(() => {
-        this.installPromise = null
-      })
-    }
-    return this.installPromise
-  }
+    return this.installer.run({
+      preflight: async () => {
+        const existingStatus = await this.getStatus()
+        if (existingStatus.state === 'ready') {
+          return { install: false, result: { success: true, status: existingStatus } }
+        }
 
-  private async performInstall(): Promise<OfficeCliRuntimeInstallResult> {
-    const existingStatus = await this.getStatus()
-    if (existingStatus.state === 'ready') return { success: true, status: existingStatus }
+        const asset = this.asset()
+        if (!asset) {
+          return {
+            install: false,
+            result: {
+              success: false,
+              error: `当前系统暂不支持 Office 文档能力（${this.platform}/${this.arch}）`,
+            },
+          }
+        }
+        return { install: true, context: asset }
+      },
+      stage: async (stagingPath, asset) => {
+        const stagingBinDir = join(stagingPath, 'bin')
+        const stagingExecutable = join(stagingBinDir, 'officecli')
+        await mkdir(stagingBinDir, { recursive: true })
+        await this.download(`${RELEASE_BASE_URL}/${asset.fileName}`, stagingExecutable, asset.size)
 
-    const asset = this.asset()
-    if (!asset) {
-      return { success: false, error: `当前系统暂不支持 Office 文档能力（${this.platform}/${this.arch}）` }
-    }
+        if (await fileSha256(stagingExecutable) !== asset.sha256) {
+          throw new Error('OfficeCLI 校验失败，安装已取消')
+        }
 
-    await mkdir(this.runtimeRoot, { recursive: true })
-    const stagingRoot = join(this.runtimeRoot, `.install-${randomUUID()}`)
-    const stagingBinDir = join(stagingRoot, 'bin')
-    const stagingExecutable = join(stagingBinDir, 'officecli')
-    const targetRoot = join(this.runtimeRoot, OFFICECLI_VERSION)
-
-    try {
-      await mkdir(stagingBinDir, { recursive: true })
-      await this.download(`${RELEASE_BASE_URL}/${asset.fileName}`, stagingExecutable, asset.size)
-
-      if (await fileSha256(stagingExecutable) !== asset.sha256) {
-        throw new Error('OfficeCLI 校验失败，安装已取消')
-      }
-
-      await chmod(stagingExecutable, 0o755)
-      const probe = await this.runCommand(stagingExecutable, ['--version'], PROBE_TIMEOUT_MS)
-      if (!`${probe.stdout}\n${probe.stderr}`.includes(OFFICECLI_VERSION)) {
-        throw new Error('OfficeCLI 版本检查失败')
-      }
-
-      await rm(targetRoot, { recursive: true, force: true })
-      await rename(stagingRoot, targetRoot)
-
-      const status = await this.getStatus()
-      if (status.state !== 'ready') throw new Error('OfficeCLI 安装后未通过完整性检查')
-      return { success: true, status }
-    } catch (error) {
-      console.error('[OfficeCLI] runtime installation failed:', error)
-      const message = error instanceof Error ? error.message : '未知错误'
-      return { success: false, error: `Office 文档能力安装失败：${message}` }
-    } finally {
-      await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined)
-    }
+        await chmod(stagingExecutable, 0o755)
+        const probe = await this.runCommand(stagingExecutable, ['--version'], PROBE_TIMEOUT_MS)
+        if (!`${probe.stdout}\n${probe.stderr}`.includes(OFFICECLI_VERSION)) {
+          throw new Error('OfficeCLI 版本检查失败')
+        }
+      },
+      activate: async () => {
+        const status = await this.getStatus()
+        if (status.state !== 'ready') throw new Error('OfficeCLI 安装后未通过完整性检查')
+        return { success: true, status }
+      },
+      failure: (error) => {
+        console.error('[OfficeCLI] runtime installation failed:', error)
+        const message = error instanceof Error ? error.message : '未知错误'
+        return { success: false, error: `Office 文档能力安装失败：${message}` }
+      },
+    })
   }
 }
 
