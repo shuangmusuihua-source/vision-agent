@@ -12,6 +12,10 @@ function normalizeSeparators(value: string): string {
   return trimTrailingSeparators(value).replace(/\\/g, '/')
 }
 
+export function isSameWorkspacePath(first: string, second: string): boolean {
+  return normalizeSeparators(first) === normalizeSeparators(second)
+}
+
 function basename(value: string): string {
   const normalized = trimTrailingSeparators(value)
   const index = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'))
@@ -37,7 +41,31 @@ export function isReservedKnowledgeWorkspacePath(path: string, fixedPaths: strin
 }
 
 export function filterUserWorkspacePaths(paths: string[], fixedPaths: string[] = []): string[] {
-  return paths.filter((path) => !isReservedKnowledgeWorkspacePath(path, fixedPaths))
+  const seen = new Set<string>()
+  return paths.filter((path) => {
+    if (isReservedKnowledgeWorkspacePath(path, fixedPaths)) return false
+    const key = normalizeSeparators(path)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+export function appendUserWorkspacePath(
+  paths: string[],
+  path: string,
+  fixedPaths: string[] = [],
+): string[] {
+  return filterUserWorkspacePaths([...paths, path], fixedPaths)
+}
+
+export function removeUserWorkspacePath(
+  paths: string[],
+  path: string,
+  fixedPaths: string[] = [],
+): string[] {
+  return filterUserWorkspacePaths(paths, fixedPaths)
+    .filter((candidate) => !isSameWorkspacePath(candidate, path))
 }
 
 export function findContainingWorkspacePath(

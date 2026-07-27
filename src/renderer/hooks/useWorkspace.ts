@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { filterUserWorkspacePaths, KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
+import {
+  appendUserWorkspacePath,
+  filterUserWorkspacePaths,
+  KNOWLEDGE_BASE_NAME,
+  removeUserWorkspacePath,
+} from '../../shared/workspace-paths'
 
 export interface WorkspaceDeleteResult {
   success: boolean
@@ -119,9 +124,9 @@ export function useWorkspace() {
     try {
       const dirPath = await window.api.workspace.createWorkspace(name)
       if (dirPath) {
-        if (!workspacePaths.includes(dirPath)) {
-          setWorkspacePaths((prev) => [...prev, dirPath])
-        }
+        // The main process pushes updated settings before this invoke resolves.
+        // Merge against the latest state so either event ordering stays idempotent.
+        setWorkspacePaths((prev) => appendUserWorkspacePath(prev, dirPath, fixedWorkspacePaths))
         handleCloseNewWorkspaceModal()
       } else {
         setNewWorkspaceError('工作区已存在，请使用其他名称')
@@ -131,7 +136,7 @@ export function useWorkspace() {
     } finally {
       setIsCreatingWorkspace(false)
     }
-  }, [newWorkspaceName, workspacePaths, handleCloseNewWorkspaceModal])
+  }, [newWorkspaceName, fixedWorkspacePaths, handleCloseNewWorkspaceModal])
 
   // ── Delete workspace modal ─────────────────────────────────────────
 
@@ -147,11 +152,11 @@ export function useWorkspace() {
     if (!deleteWsPath) return { success: false }
     const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
     if (result.success) {
-      setWorkspacePaths((prev) => prev.filter((p) => p !== deleteWsPath))
+      setWorkspacePaths((prev) => removeUserWorkspacePath(prev, deleteWsPath, fixedWorkspacePaths))
       handleCloseDeleteWorkspace()
     }
     return result
-  }, [deleteWsPath, handleCloseDeleteWorkspace])
+  }, [deleteWsPath, fixedWorkspacePaths, handleCloseDeleteWorkspace])
 
   return {
     // State

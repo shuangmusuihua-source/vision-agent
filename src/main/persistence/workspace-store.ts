@@ -2,7 +2,11 @@ import { mkdirSync } from 'fs'
 import path from 'path'
 import type { SessionRecord } from '../../shared/types'
 import { store, getKnowledgeBaseDir } from './store-core'
-import { filterUserWorkspacePaths, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
+import {
+  filterUserWorkspacePaths,
+  isReservedKnowledgeWorkspacePath,
+  isSameWorkspacePath,
+} from '../../shared/workspace-paths'
 
 function isSessionContext(value: unknown): value is SessionRecord['context'] {
   return value === 'editor' || value === 'ask'
@@ -25,7 +29,7 @@ export function getAuthorizedDirectories(): string[] {
 export function addAuthorizedDirectory(dir: string): void {
   if (isReservedKnowledgeWorkspacePath(dir, store.get('fixedDirectories'))) return
   const dirs = getAuthorizedDirectories()
-  if (!dirs.includes(dir)) {
+  if (!dirs.some((candidate) => isSameWorkspacePath(candidate, dir))) {
     store.set('authorizedDirectories', [dir, ...dirs])
   }
 }
@@ -34,10 +38,10 @@ export function removeAuthorizedDirectory(dir: string): void {
   const fixed = store.get('fixedDirectories')
   const dirs = store.get('authorizedDirectories')
   if (fixed.includes(dir) || isReservedKnowledgeWorkspacePath(dir, fixed)) {
-    store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
+    store.set('authorizedDirectories', dirs.filter((candidate) => !isSameWorkspacePath(candidate, dir)))
     return
   }
-  store.set('authorizedDirectories', dirs.filter((d) => d !== dir))
+  store.set('authorizedDirectories', dirs.filter((candidate) => !isSameWorkspacePath(candidate, dir)))
 }
 
 export function reorderAuthorizedDirectories(paths: string[]): void {
@@ -45,7 +49,7 @@ export function reorderAuthorizedDirectories(paths: string[]): void {
   const current = getAuthorizedDirectories()
   const nextPaths = filterUserWorkspacePaths(paths, fixed)
   if (nextPaths.length !== current.length) return
-  if (!nextPaths.every((p) => current.includes(p))) return
+  if (!nextPaths.every((path) => current.some((candidate) => isSameWorkspacePath(candidate, path)))) return
   store.set('authorizedDirectories', nextPaths)
 }
 

@@ -83,10 +83,10 @@ export function registerWorkspaceHandlers(
   ipcMain.handle('workspace:deleteWorkspace', async (_event, dirPath: string) => {
     const registeredRoot = findAuthorizedWorkspaceRoot(dirPath)
     if (!registeredRoot) {
-      return { success: false, error: 'Only a registered workspace root can be deleted' }
+      return { success: false, error: '该工作区不存在或已从工作区列表移除' }
     }
     if (isReservedKnowledgeWorkspacePath(dirPath, [getKnowledgeBaseDir()])) {
-      return { success: false, error: 'Cannot delete system workspace' }
+      return { success: false, error: '系统工作区不能删除' }
     }
     try {
       await shell.trashItem(registeredRoot)
