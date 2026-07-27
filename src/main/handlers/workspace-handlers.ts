@@ -1,26 +1,19 @@
 import { ipcMain, dialog, shell, app } from 'electron'
 import { lstat, readFile, mkdir } from 'fs/promises'
 import { extname, join } from 'path'
-import { existsSync } from 'fs'
 import { getMainWindow } from '../ipc-sender'
-import {
-  removeAuthorizedDirectory,
-  addAuthorizedDirectory,
-  getAuthorizedDirectories,
-} from '../persistence/workspace-store'
 import { getKnowledgeBaseDir } from '../persistence/store-core'
 import { fileIndexService } from '../file-index-service'
-import { findAuthorizedWorkspaceRoot, isPathAuthorized, sanitizeFileName } from '../path-validator'
+import { isPathAuthorized, sanitizeFileName } from '../path-validator'
 import { atomicWriteTextFile } from '../atomic-write'
-import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
-import { KNOWLEDGE_BASE_NAME, isReservedKnowledgeWorkspacePath } from '../../shared/workspace-paths'
 import { addMarkdownToKnowledge } from '../knowledge-curation'
 import { isAllowedExternalUrl } from '../navigation-policy'
 import { readImageAsset, savePastedImageAsset } from '../image-asset-storage'
 import type { IPCRequest } from '../../shared/ipc-types'
+import type { WorkspaceLifecycle } from '../workspace-lifecycle'
 
 export function registerWorkspaceHandlers(
-  pushSettingsToRenderer: () => void,
+  workspaceLifecycle: WorkspaceLifecycle,
 ): void {
   ipcMain.handle('workspace:readFile', async (_event, filePath: string) => {
     if (!isPathAuthorized(filePath)) return { success: false, error: 'Path not authorized' }
@@ -60,45 +53,11 @@ export function registerWorkspaceHandlers(
   })
 
   ipcMain.handle('workspace:createWorkspace', async (_event, name: string) => {
-    try {
-      const safeName = sanitizeFileName(name.trim())
-      if (!safeName || safeName !== name.trim()) return null
-      if (safeName === KNOWLEDGE_BASE_NAME) return null
-      const docsDir = join(app.getPath('documents'), DOCUMENTS_DIR_NAME)
-      if (!existsSync(docsDir)) await mkdir(docsDir, { recursive: true })
-      const dirPath = join(docsDir, safeName)
-      if (existsSync(dirPath)) return null
-      await mkdir(dirPath, { recursive: true })
-      addAuthorizedDirectory(dirPath)
-      try {
-        await fileIndexService.init(getAuthorizedDirectories())
-      } catch (error) {
-        console.error('[workspace:createWorkspace] index refresh failed:', error)
-      }
-      pushSettingsToRenderer()
-      return dirPath
-    } catch (err) { console.error('Failed to create workspace:', err); return null }
+    return await workspaceLifecycle.create(name)
   })
 
   ipcMain.handle('workspace:deleteWorkspace', async (_event, dirPath: string) => {
-    const registeredRoot = findAuthorizedWorkspaceRoot(dirPath)
-    if (!registeredRoot) {
-      return { success: false, error: '该工作区不存在或已从工作区列表移除' }
-    }
-    if (isReservedKnowledgeWorkspacePath(dirPath, [getKnowledgeBaseDir()])) {
-      return { success: false, error: '系统工作区不能删除' }
-    }
-    try {
-      await shell.trashItem(registeredRoot)
-      removeAuthorizedDirectory(registeredRoot)
-      try {
-        await fileIndexService.init(getAuthorizedDirectories())
-      } catch (error) {
-        console.error('[workspace:deleteWorkspace] index refresh failed:', error)
-      }
-      pushSettingsToRenderer()
-      return { success: true }
-    } catch (err) { return { success: false, error: (err as Error).message } }
+    return await workspaceLifecycle.delete(dirPath)
   })
 
   ipcMain.handle('workspace:listMarkdownFiles', async (_event, dirPath: string) => {

@@ -96,7 +96,6 @@ const api = {
       invoke('settings:updateProfile', id, updates),
     removeProfile: (id: string) => invoke('settings:removeProfile', id),
     setActiveProfile: (id: string) => invoke('settings:setActiveProfile', id),
-    removeDirectory: (dir: string) => invoke('settings:removeDirectory', dir),
     reorderDirectories: (paths: string[]) => invoke('settings:reorderDirectories', paths),
     setTheme: (theme: 'light' | 'dark' | 'system') => invoke('settings:setTheme', theme),
     onChanged: (callback: (settings: Record<string, unknown>) => void) => {

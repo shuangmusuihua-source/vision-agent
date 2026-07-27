@@ -35,6 +35,7 @@ import {
   resolvePermissionInteraction,
   resolveSessionSlot,
 } from './session-slot-state'
+import { isSameWorkspacePath } from '../../shared/workspace-paths'
 
 function mergeLoadedMessages(
   loadedMessages: ConversationMessage[],
@@ -500,12 +501,116 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // ─── Workspace Actions ────────────────────────────────────────────────
 
     setActiveWorkspace(path: string | null) {
-      set((s) => {
-        const base: Partial<AgentStore> = { activeWorkspacePath: path }
-        if (path) {
-          Object.assign(base, patchSessionSlot(s, 'editor', { workspacePath: path }))
+      set((state) => {
+        const currentSlot = state.slots.editor
+        const currentSessionId = state.activeSessionId.editor || currentSlot.currentSessionId
+        const listedWorkspacePath = currentSessionId
+          ? state.sessionList.find((session) => (
+              session.id === currentSessionId || session.sdkSessionId === currentSessionId
+            ))?.workspacePath
+          : null
+        const currentSessionWorkspacePath = currentSlot.workspacePath
+          || (currentSessionId ? state.sessionSlots[currentSessionId]?.workspacePath : null)
+          || listedWorkspacePath
+          || null
+        const canRetainEditorSession = Boolean(
+          path
+          && currentSessionId
+          && currentSessionWorkspacePath
+          && isSameWorkspacePath(currentSessionWorkspacePath, path),
+        )
+        const canRetainUnmaterializedSlot = Boolean(
+          path
+          && !currentSessionId
+          && (
+            (currentSlot.workspacePath && isSameWorkspacePath(currentSlot.workspacePath, path))
+            || (state.activeWorkspacePath && isSameWorkspacePath(state.activeWorkspacePath, path))
+          ),
+        )
+
+        if (canRetainEditorSession || canRetainUnmaterializedSlot) {
+          return {
+            activeWorkspacePath: path,
+            ...patchSessionSlot(state, 'editor', { workspacePath: path }, currentSessionId),
+          }
         }
-        return base
+
+        const cachePatch = currentSessionId
+          ? cacheSessionSlot(state, currentSessionId, { ...currentSlot })
+          : {}
+        return {
+          activeWorkspacePath: path,
+          activeSessionId: { ...state.activeSessionId, editor: null },
+          sessionOutputs: null,
+          sessionOutputsLoading: false,
+          sessionLoadError: null,
+          ...cachePatch,
+          slots: {
+            ...state.slots,
+            editor: { ...emptySlot(), workspacePath: path },
+          },
+        }
+      })
+    },
+
+    removeWorkspaceState(workspacePath, fallbackWorkspacePath, removedSessionIds = []) {
+      set((state) => {
+        const removedIds = new Set(removedSessionIds)
+        for (const session of state.sessionList) {
+          if (session.workspacePath && isSameWorkspacePath(session.workspacePath, workspacePath)) {
+            removedIds.add(session.id)
+            if (session.sdkSessionId) removedIds.add(session.sdkSessionId)
+          }
+        }
+        for (const [sessionId, slot] of Object.entries(state.sessionSlots)) {
+          if (slot.workspacePath && isSameWorkspacePath(slot.workspacePath, workspacePath)) {
+            removedIds.add(sessionId)
+          }
+        }
+
+        const editorSessionId = state.activeSessionId.editor || state.slots.editor.currentSessionId
+        const editorBelongsToDeletedWorkspace = Boolean(
+          (state.activeWorkspacePath
+            && isSameWorkspacePath(state.activeWorkspacePath, workspacePath))
+          || (state.slots.editor.workspacePath
+            && isSameWorkspacePath(state.slots.editor.workspacePath, workspacePath))
+          || (editorSessionId && removedIds.has(editorSessionId)),
+        )
+        const sessionSlots = Object.fromEntries(
+          Object.entries(state.sessionSlots)
+            .filter(([sessionId, slot]) => (
+              !removedIds.has(sessionId)
+              && (!slot.workspacePath || !isSameWorkspacePath(slot.workspacePath, workspacePath))
+            )),
+        )
+
+        return {
+          activeWorkspacePath: editorBelongsToDeletedWorkspace
+            ? fallbackWorkspacePath
+            : state.activeWorkspacePath,
+          activeSessionId: editorBelongsToDeletedWorkspace
+            ? { ...state.activeSessionId, editor: null }
+            : state.activeSessionId,
+          sessionList: state.sessionList.filter((session) => (
+            !removedIds.has(session.id)
+            && (!session.workspacePath || !isSameWorkspacePath(session.workspacePath, workspacePath))
+          )),
+          sessionSlots,
+          sessionAccessOrder: state.sessionAccessOrder.filter((sessionId) => (
+            !removedIds.has(sessionId) && Boolean(sessionSlots[sessionId])
+          )),
+          ...(editorBelongsToDeletedWorkspace
+            ? {
+                slots: {
+                  ...state.slots,
+                  editor: { ...emptySlot(), workspacePath: fallbackWorkspacePath },
+                },
+                sessionOutputs: null,
+                sessionOutputsLoading: false,
+                sessionLoadError: null,
+              }
+            : {}),
+        }
       })
     },
 

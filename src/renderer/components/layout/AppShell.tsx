@@ -24,7 +24,12 @@ import { useSessionOutputWorkflow } from '../../workflows/session-output-workflo
 import { useAgentStore } from '../../store/agent-store-impl'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
 import { isFileTab } from '../../../shared/types'
-import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
+import {
+  filterUserWorkspacePaths,
+  findContainingWorkspacePath,
+  isSameWorkspacePath,
+} from '../../../shared/workspace-paths'
+import type { WorkspaceDeleteResult } from '../../../shared/workspace-lifecycle'
 import { useChangedFileCount, useGraphStore } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
 import type { SkillDefinition } from '../../lib/ipc'
@@ -86,11 +91,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const [automationFocusTaskId, setAutomationFocusTaskId] = useState<string | null>(null)
   const activeFilePathRef = useRef(activeFilePath)
   activeFilePathRef.current = activeFilePath
-
-  // Stable refs for workspace values used in useCallback/useEffect deps
-  // (the workspace object changes every render — avoid putting it in dep arrays)
-  const workspacePathsRef = useRef(workspace.workspacePaths)
-  workspacePathsRef.current = workspace.workspacePaths
 
   // ── Layout hooks ────────────────────────────────────────────────────
 
@@ -345,7 +345,13 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     workspace.syncFromSettings(settings.authorizedDirectories, settings.fixedDirectories)
     // Set initial active workspace if not yet set
     const currentActiveWorkspace = useAgentStore.getState().activeWorkspacePath
-    if ((!currentActiveWorkspace || !userDirectories.includes(currentActiveWorkspace)) && userDirectories.length > 0) {
+    const activeWorkspaceIsRegistered = Boolean(
+      currentActiveWorkspace
+      && userDirectories.some((workspacePath) => (
+        isSameWorkspacePath(workspacePath, currentActiveWorkspace)
+      )),
+    )
+    if ((!currentActiveWorkspace || !activeWorkspaceIsRegistered) && userDirectories.length > 0) {
       useAgentStore.getState().setActiveWorkspace(userDirectories[0])
     } else if (currentActiveWorkspace && userDirectories.length === 0) {
       useAgentStore.getState().setActiveWorkspace(null)
@@ -452,11 +458,17 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     })
   }, [activeFilePath, editorSendMessage, linkedFile])
 
-  const handleWorkspaceDeleted = useCallback((deletedPath: string) => {
+  const handleWorkspaceDeleted = useCallback((
+    deletedPath: string,
+    result: Extract<WorkspaceDeleteResult, { success: true }>,
+  ) => {
     closeTabsByPrefix(`${deletedPath}/`)
-    const remaining = workspace.workspacePaths.filter((path) => path !== deletedPath)
-    useAgentStore.getState().setActiveWorkspace(remaining[0] || null)
-  }, [closeTabsByPrefix, workspace.workspacePaths])
+    useAgentStore.getState().removeWorkspaceState(
+      deletedPath,
+      result.workspacePaths[0] || null,
+      result.removedSessionIds,
+    )
+  }, [closeTabsByPrefix])
 
   const handleSidebarNavigate = useCallback((nextView: Exclude<PrimaryView, 'editor'>) => {
     if (nextView === 'ask') {

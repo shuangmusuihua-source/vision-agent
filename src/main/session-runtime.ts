@@ -27,6 +27,7 @@ import {
   isTextDeltaEvent,
   scheduleTextBatch,
 } from './agent-text-batch'
+import { isSameWorkspacePath } from '../shared/workspace-paths'
 
 interface ActiveSessionRun {
   query: Query
@@ -372,6 +373,34 @@ export class SessionRuntimeController {
     } finally {
       if (timeout) clearTimeout(timeout)
     }
+  }
+
+  async abortWorkspaceAndWait(workspacePath: string, timeoutMs = 6500): Promise<string[]> {
+    const matchingRuns = Array.from(this.activeRuns.entries())
+      .filter(([, run]) => isSameWorkspacePath(run.envelope.workspacePath, workspacePath))
+      .map(([sessionId, run]) => ({ sessionId, completion: run.completion }))
+    if (matchingRuns.length === 0) return []
+
+    for (const { sessionId } of matchingRuns) {
+      this.abort(sessionId)
+    }
+
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        Promise.all(matchingRuns.map(({ completion }) => completion)).then(() => undefined),
+        new Promise<void>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Workspace Agent runs did not stop in time')),
+            timeoutMs,
+          )
+        }),
+      ])
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+
+    return matchingRuns.map(({ sessionId }) => sessionId)
   }
 
   async setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {

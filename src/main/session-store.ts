@@ -7,6 +7,7 @@ import { getCompactionSessionIds, deleteCompactionSessionId } from './persistenc
 import { resolveClaudeSessionJsonlPath } from './claude-session-path'
 import { readJsonlTailPage } from './jsonl-tail-reader'
 import { removeSessionWorkingDirectory } from './session-files'
+import { isSameWorkspacePath } from '../shared/workspace-paths'
 
 // ─── Compaction tracking ───────────────────────────────────────────────
 // Track session IDs created by SDK mid-stream compaction.
@@ -95,7 +96,7 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
     const seenIds = new Set<string>()
     const sessionDirs = new Set<string>()
     for (const record of records) {
-      if (workspaceCwd && record.workspacePath !== workspaceCwd) continue
+      if (workspaceCwd && !isSameWorkspacePath(record.workspacePath, workspaceCwd)) continue
       if (record.workingDirectory) sessionDirs.add(record.workingDirectory)
     }
 

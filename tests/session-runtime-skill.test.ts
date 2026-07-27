@@ -22,4 +22,39 @@ describe('SessionRuntimeController Skill activity', () => {
     runtime.cleanupRun('session-1', instanceId)
     expect(runtime.isSkillActive('frontend-design')).toBe(false)
   })
+
+  it('aborts and waits for every run owned by one workspace', async () => {
+    const runtime = new SessionRuntimeController()
+    const workspaceAAbort = new AbortController()
+    const workspaceBAbort = new AbortController()
+    const workspaceAInstance = runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: workspaceAAbort,
+      envelope: createSessionEnvelope({
+        context: 'editor',
+        sessionId: 'session-a',
+        workspacePath: '/workspace/a',
+      }),
+    })
+    const workspaceBInstance = runtime.registerRun({
+      query: {} as never,
+      skillId: null,
+      abortController: workspaceBAbort,
+      envelope: createSessionEnvelope({
+        context: 'editor',
+        sessionId: 'session-b',
+        workspacePath: '/workspace/b',
+      }),
+    })
+
+    const pending = runtime.abortWorkspaceAndWait('/workspace/a')
+    expect(workspaceAAbort.signal.aborted).toBe(true)
+    expect(workspaceBAbort.signal.aborted).toBe(false)
+
+    runtime.cleanupRun('session-a', workspaceAInstance)
+    await expect(pending).resolves.toEqual(['session-a'])
+
+    runtime.cleanupRun('session-b', workspaceBInstance)
+  })
 })

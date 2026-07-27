@@ -44,6 +44,11 @@ import type {
   CronTaskTarget,
 } from '../../shared/cron-types'
 import type { IPCEventPayload, IPCRequest, IPCResponse } from '../../shared/ipc-types'
+import type {
+  WorkspaceCreateResult,
+  WorkspaceDeleteResult,
+  WorkspaceReorderResult,
+} from '../../shared/workspace-lifecycle'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -102,8 +107,8 @@ interface WorkspaceApi {
     updated?: boolean
     error?: string
   }>
-  createWorkspace: (name: string) => Promise<string | null>
-  deleteWorkspace: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+  createWorkspace: (name: string) => Promise<WorkspaceCreateResult>
+  deleteWorkspace: (dirPath: string) => Promise<WorkspaceDeleteResult>
   knowledgeDir: () => Promise<string>
   selectFiles: () => Promise<{ canceled: boolean; filePaths: string[]; attachmentGrantId?: string }>
   listMarkdownFiles: (dirPath: string) => Promise<Array<{ label: string; path: string }>>
@@ -125,8 +130,7 @@ interface SettingsApi {
   updateProfile: (id: string, updates: Partial<ModelProfile>) => Promise<{ success: boolean }>
   removeProfile: (id: string) => Promise<{ success: boolean }>
   setActiveProfile: (id: string) => Promise<{ success: boolean }>
-  removeDirectory: (dir: string) => Promise<{ success: boolean }>
-  reorderDirectories: (paths: string[]) => Promise<{ success: boolean }>
+  reorderDirectories: (paths: string[]) => Promise<WorkspaceReorderResult>
   setTheme: (theme: 'light' | 'dark' | 'system') => Promise<{ success: boolean }>
   onChanged: (callback: (settings: Record<string, unknown>) => void) => () => void
   testConnection: (options: { baseUrl: string; apiKey: string; model: string }) => Promise<{ success: boolean; message: string }>

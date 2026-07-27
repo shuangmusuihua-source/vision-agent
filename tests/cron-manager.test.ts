@@ -56,6 +56,9 @@ async function loadCronManager(options?: {
   vi.doMock('../src/main/agent-path-utils', () => ({
     extractToolPathInput: vi.fn(() => null),
     isExactAuthorizedRoot: vi.fn((path: string, roots: string[]) => roots.includes(path)),
+    isPathAuthorized: vi.fn((path: string, roots: string[]) => (
+      roots.some((root) => path === root || path.startsWith(`${root}/`))
+    )),
     isToolUsePathAuthorized,
     toolRequiresPath: vi.fn(() => false),
   }))
@@ -273,5 +276,83 @@ describe('cron manager automation tasks', () => {
     expect(active.status).toBe('active')
     expect(job.start).toHaveBeenCalled()
     expect(savedTasks()[0].status).toBe('active')
+  })
+
+  it('suspends workspace automation and records why it cannot resume after deletion', async () => {
+    const { manager, savedTasks, schedule } = await loadCronManager()
+    const task = manager.registerTask({
+      cronExpression: '0 9 * * *',
+      prompt: 'daily digest',
+      target: {
+        type: 'workspace',
+        workspacePath: '/tmp/workspace',
+      },
+    })
+    const job = schedule.mock.results[0].value
+
+    const suspension = await manager.suspendTasksForWorkspace('/tmp/workspace')
+    expect(suspension.taskIds).toEqual([task.id])
+    expect(manager.listTasks()[0].status).toBe('paused')
+    expect(job.stop).toHaveBeenCalled()
+
+    suspension.commitDeletion()
+
+    expect(savedTasks()[0].status).toBe('paused')
+    expect(savedTasks()[0].lastError).toBe('关联工作区已删除')
+  })
+
+  it('restores active automation schedules when workspace deletion is rolled back', async () => {
+    const { manager, schedule } = await loadCronManager()
+    manager.registerTask({
+      cronExpression: '0 9 * * *',
+      prompt: 'daily digest',
+      target: {
+        type: 'workspace',
+        workspacePath: '/tmp/workspace',
+      },
+    })
+    const job = schedule.mock.results[0].value
+
+    const suspension = await manager.suspendTasksForWorkspace('/tmp/workspace')
+    suspension.rollback()
+
+    expect(manager.listTasks()[0].status).toBe('active')
+    expect(job.start).toHaveBeenCalled()
+  })
+
+  it('waits for a running workspace automation before allowing deletion to continue', async () => {
+    let releaseReady!: () => void
+    const ready = new Promise<void>((resolve) => { releaseReady = resolve })
+    const queryImpl = async function* queryMock(args: { options: { abortController: AbortController } }) {
+      releaseReady()
+      await new Promise<void>((_resolve, reject) => {
+        args.options.abortController.signal.addEventListener(
+          'abort',
+          () => reject(new Error('aborted')),
+          { once: true },
+        )
+      })
+    }
+    const { manager } = await loadCronManager({ queryImpl })
+    const task = manager.registerTask({
+      cronExpression: '*/5 * * * *',
+      prompt: 'watch workspace',
+      target: {
+        type: 'workspace',
+        workspacePath: '/tmp/workspace',
+      },
+    })
+    const pendingRun = manager.executeTaskById(task.id)
+    await ready
+
+    const suspension = await manager.suspendTasksForWorkspace('/tmp/workspace')
+    await pendingRun
+
+    expect(suspension.taskIds).toEqual([task.id])
+    expect(manager.listTasks()[0]).toMatchObject({
+      status: 'paused',
+      isRunning: false,
+      lastStatus: 'cancelled',
+    })
   })
 })

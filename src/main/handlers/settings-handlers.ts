@@ -2,14 +2,13 @@ import { ipcMain, nativeTheme } from 'electron'
 import {
   getSettings, addProfile, updateProfile, removeProfile, setActiveProfile,
 } from '../persistence/profile-store'
-import {
-  removeAuthorizedDirectory, reorderAuthorizedDirectories,
-  getAuthorizedDirectories,
-} from '../persistence/workspace-store'
 import { setTheme } from '../persistence/settings-store'
-import { fileIndexService } from '../file-index-service'
+import type { WorkspaceLifecycle } from '../workspace-lifecycle'
 
-export function registerSettingsHandlers(pushSettingsToRenderer: () => void): void {
+export function registerSettingsHandlers(
+  pushSettingsToRenderer: () => void,
+  workspaceLifecycle: WorkspaceLifecycle,
+): void {
   ipcMain.handle('settings:get', () => getSettings())
 
   ipcMain.handle('settings:addProfile', (_event, profile: Record<string, unknown>) => {
@@ -40,18 +39,8 @@ export function registerSettingsHandlers(pushSettingsToRenderer: () => void): vo
     return { success: true }
   })
 
-  ipcMain.handle('settings:removeDirectory', async (_event, dir: string) => {
-    removeAuthorizedDirectory(dir)
-    await fileIndexService.init(getAuthorizedDirectories())
-    pushSettingsToRenderer()
-    return { success: true }
-  })
-
   ipcMain.handle('settings:reorderDirectories', async (_event, paths: string[]) => {
-    reorderAuthorizedDirectories(paths)
-    await fileIndexService.init(getAuthorizedDirectories())
-    pushSettingsToRenderer()
-    return { success: true }
+    return await workspaceLifecycle.reorder(paths)
   })
 
   ipcMain.handle('settings:setTheme', (_event, theme: 'light' | 'dark' | 'system') => {

@@ -7,8 +7,15 @@ import { getCronTasks, saveCronTasks } from './persistence/settings-store'
 import type { CronTask, CronTaskRegistration, CronTaskRun, CronTaskTarget } from '../shared/cron-types'
 import { buildAgentOptions } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
-import { extractToolPathInput, isExactAuthorizedRoot, isToolUsePathAuthorized, toolRequiresPath } from './agent-path-utils'
+import {
+  extractToolPathInput,
+  isExactAuthorizedRoot,
+  isPathAuthorized,
+  isToolUsePathAuthorized,
+  toolRequiresPath,
+} from './agent-path-utils'
 import { normalizeCronLinkedUrls, sanitizeCronLinkedUrls } from '../shared/cron-linked-urls'
+import { isSameWorkspacePath } from '../shared/workspace-paths'
 import { canonicalGrantedDirectory, consumeSelectedDirectoryGrant } from './directory-grants'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -17,7 +24,19 @@ import { mkdir } from 'fs/promises'
 const MAX_RUN_HISTORY = 10
 
 const tasks = new Map<string, { task: CronTask; job: ScheduledTask }>()
-const runningTasks = new Map<string, AbortController>()
+interface RunningTask {
+  abortController: AbortController
+  completion: Promise<void>
+  resolveCompletion: () => void
+}
+
+const runningTasks = new Map<string, RunningTask>()
+
+export interface WorkspaceTaskSuspension {
+  taskIds: string[]
+  commitDeletion: () => void
+  rollback: () => void
+}
 
 function describeAutomationResultError(result: Exclude<SDKResultMessage, { subtype: 'success' }>): string {
   const details = result.errors.map((error) => error.trim()).filter(Boolean)
@@ -229,7 +248,7 @@ export function removeTask(taskId: string): boolean {
   const entry = tasks.get(taskId)
   if (!entry) return false
   entry.job.stop()
-  runningTasks.get(taskId)?.abort()
+  runningTasks.get(taskId)?.abortController.abort()
   tasks.delete(taskId)
   persistTasks()
   return true
@@ -242,7 +261,11 @@ export function listTasks(): CronTask[] {
 export async function executeTask(task: CronTask): Promise<void> {
   if (runningTasks.has(task.id)) return
   const abortController = new AbortController()
-  runningTasks.set(task.id, abortController)
+  let resolveCompletion!: () => void
+  const completion = new Promise<void>((resolve) => {
+    resolveCompletion = resolve
+  })
+  runningTasks.set(task.id, { abortController, completion, resolveCompletion })
 
   const startedAt = Date.now()
   task.lastStartedAt = startedAt
@@ -349,7 +372,11 @@ export async function executeTask(task: CronTask): Promise<void> {
       wasCancelled ? 'info' : 'error'
     )
   } finally {
-    runningTasks.delete(task.id)
+    const runningTask = runningTasks.get(task.id)
+    if (runningTask?.abortController === abortController) {
+      runningTasks.delete(task.id)
+      runningTask.resolveCompletion()
+    }
     if (tasks.has(task.id)) notifyRendererTaskUpdated(task)
   }
 }
@@ -362,9 +389,9 @@ export async function executeTaskById(taskId: string): Promise<string> {
 }
 
 export function stopTaskById(taskId: string): boolean {
-  const controller = runningTasks.get(taskId)
-  if (!controller) return false
-  controller.abort()
+  const runningTask = runningTasks.get(taskId)
+  if (!runningTask) return false
+  runningTask.abortController.abort()
   const entry = tasks.get(taskId)
   if (entry) notifyRendererTaskUpdated(entry.task)
   return true
@@ -380,8 +407,7 @@ export function setTaskStatus(taskId: string, status: CronTask['status']): CronT
   entry.task.status = status
   if (status === 'paused') {
     entry.job.stop()
-    const controller = runningTasks.get(taskId)
-    if (controller) controller.abort()
+    runningTasks.get(taskId)?.abortController.abort()
   } else {
     entry.job.start()
   }
@@ -391,9 +417,92 @@ export function setTaskStatus(taskId: string, status: CronTask['status']): CronT
   return withRuntimeState(entry.task)
 }
 
+function taskTargetsWorkspace(task: CronTask, workspacePath: string): boolean {
+  const target = task.target
+  if (!target) return false
+  if (target.workspacePath && isSameWorkspacePath(target.workspacePath, workspacePath)) return true
+  return target.type === 'directory'
+    && Boolean(target.directoryPath)
+    && isPathAuthorized(target.directoryPath!, [workspacePath])
+}
+
+export async function suspendTasksForWorkspace(
+  workspacePath: string,
+  timeoutMs = 6500,
+): Promise<WorkspaceTaskSuspension> {
+  const affected = Array.from(tasks.values()).filter(({ task }) => (
+    taskTargetsWorkspace(task, workspacePath)
+  ))
+  const snapshots = affected.map(({ task }) => ({
+    taskId: task.id,
+    status: task.status,
+    lastError: task.lastError,
+  }))
+  const running = affected
+    .map(({ task }) => runningTasks.get(task.id))
+    .filter((entry): entry is RunningTask => Boolean(entry))
+
+  for (const { task, job } of affected) {
+    task.status = 'paused'
+    job.stop()
+    runningTasks.get(task.id)?.abortController.abort()
+    notifyRendererTaskUpdated(task)
+  }
+  if (affected.length > 0) persistTasks()
+
+  const rollback = (): void => {
+    for (const snapshot of snapshots) {
+      const entry = tasks.get(snapshot.taskId)
+      if (!entry) continue
+      entry.task.status = snapshot.status
+      entry.task.lastError = snapshot.lastError
+      if (snapshot.status === 'active') entry.job.start()
+      notifyRendererTaskUpdated(entry.task)
+    }
+    if (snapshots.length > 0) persistTasks()
+  }
+
+  if (running.length > 0) {
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        Promise.all(running.map(({ completion }) => completion)).then(() => undefined),
+        new Promise<void>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Workspace automation tasks did not stop in time')),
+            timeoutMs,
+          )
+        }),
+      ])
+    } catch (error) {
+      rollback()
+      throw error
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+  }
+
+  return {
+    taskIds: snapshots.map(({ taskId }) => taskId),
+    commitDeletion: () => {
+      for (const { taskId } of snapshots) {
+        const entry = tasks.get(taskId)
+        if (!entry) continue
+        entry.task.status = 'paused'
+        entry.task.lastError = '关联工作区已删除'
+        notifyRendererTaskUpdated(entry.task)
+      }
+      if (snapshots.length > 0) persistTasks()
+    },
+    rollback,
+  }
+}
+
 export function stopAllCronJobs(): void {
   for (const [, entry] of tasks) {
     entry.job.stop()
   }
-  for (const controller of runningTasks.values()) controller.abort()
+  for (const runningTask of runningTasks.values()) {
+    runningTask.abortController.abort()
+  }
 }

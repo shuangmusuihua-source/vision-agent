@@ -1,10 +1,12 @@
+import { useRef } from 'react'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
+import type { WorkspaceDeleteResult } from '../../../shared/workspace-lifecycle'
 import type { WorkspaceDialogsController } from '../../hooks/useWorkspace'
 import { useModal } from '../common/ModalSystem'
 
 interface WorkspaceDialogsProps {
   controller: WorkspaceDialogsController
-  onDeleted: (path: string) => void
+  onDeleted: (path: string, result: Extract<WorkspaceDeleteResult, { success: true }>) => void
 }
 
 function trapFocus(event: React.KeyboardEvent<HTMLDivElement>): void {
@@ -27,17 +29,28 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
   const create = controller.create
   const remove = controller.remove
   const workspaceName = remove.path?.split('/').pop() || ''
-  const canDelete = !!remove.path && remove.confirmation === workspaceName
+  const canDelete = !!remove.path && remove.confirmation === workspaceName && !remove.pending
+  const deleteRequestRef = useRef<Promise<void> | null>(null)
 
-  const handleDelete = async () => {
+  const handleDelete = (): Promise<void> => {
+    if (deleteRequestRef.current) return deleteRequestRef.current
     const deletingPath = remove.path
-    if (!deletingPath || !canDelete) return
-    const result = await remove.submit()
-    if (result.success) {
-      onDeleted(deletingPath)
-    } else {
-      await modal.alert({ title: '删除失败', message: result.error || '删除失败' })
+    if (!deletingPath || !canDelete) return Promise.resolve()
+
+    const request = (async () => {
+      const result = await remove.submit()
+      if (result.success) {
+        onDeleted(deletingPath, result)
+      } else {
+        await modal.alert({ title: '删除失败', message: result.error || '删除失败' })
+      }
+    })()
+    deleteRequestRef.current = request
+    const clearRequest = () => {
+      if (deleteRequestRef.current === request) deleteRequestRef.current = null
     }
+    void request.then(clearRequest, clearRequest)
+    return request
   }
 
   return (
@@ -82,11 +95,17 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
         </div>
       )}
       {remove.path && (
-        <div className="modal-overlay modal-overlay-visible" onClick={remove.close}>
+        <div
+          className="modal-overlay modal-overlay-visible"
+          onClick={() => {
+            if (!remove.pending) remove.close()
+          }}
+        >
           <div
             className="modal-window modal-window-visible"
             role="dialog"
             aria-modal="true"
+            aria-busy={remove.pending}
             aria-label="删除工作区"
             onClick={(event) => event.stopPropagation()}
           >
@@ -101,21 +120,22 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
               value={remove.confirmation}
               onChange={(event) => remove.setConfirmation(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Escape') remove.close()
+                if (event.key === 'Escape' && !remove.pending) remove.close()
                 if (event.key === 'Enter' && !event.isComposing && canDelete) {
                   void handleDelete()
                 }
               }}
+              disabled={remove.pending}
               autoFocus
             />
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={remove.close}>取消</button>
+              <button className="btn-modal btn-modal-cancel" onClick={remove.close} disabled={remove.pending}>取消</button>
               <button
                 className="btn-modal btn-modal-primary btn-modal-danger"
                 disabled={!canDelete}
                 onClick={() => void handleDelete()}
               >
-                删除
+                {remove.pending ? '删除中...' : '删除'}
               </button>
             </div>
           </div>

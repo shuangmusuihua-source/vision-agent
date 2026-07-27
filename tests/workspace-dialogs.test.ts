@@ -28,6 +28,7 @@ function controller(overrides: Partial<WorkspaceDialogsController> = {}): Worksp
     remove: {
       path: null,
       confirmation: '',
+      pending: false,
       setConfirmation: vi.fn(),
       close: vi.fn(),
       submit: vi.fn(async () => ({ success: true })),
@@ -76,5 +77,21 @@ describe('WorkspaceDialogs', () => {
     expect(disabledHtml).toContain('aria-label="删除工作区"')
     expect(disabledHtml).toContain('disabled=""')
     expect(enabledHtml).not.toContain('class="btn-modal btn-modal-primary btn-modal-danger" disabled=""')
+  })
+
+  it('locks every delete control while the lifecycle request is pending', () => {
+    const base = controller()
+    const html = renderDialogs(controller({
+      remove: {
+        ...base.remove,
+        path: '/workspace/Research',
+        confirmation: 'Research',
+        pending: true,
+      },
+    }))
+
+    expect(html).toContain('aria-busy="true"')
+    expect(html).toContain('删除中...')
+    expect(html.match(/disabled=""/g)).toHaveLength(3)
   })
 })

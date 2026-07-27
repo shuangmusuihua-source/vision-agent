@@ -6,6 +6,7 @@ import { registerSettingsHandlers } from './handlers/settings-handlers'
 import { registerAgentHandlers } from './handlers/agent-handlers'
 import { registerSystemHandlers } from './handlers/system-handlers'
 import { registerEditorHandlers } from './handlers/editor-handlers'
+import { createWorkspaceLifecycle } from './workspace-lifecycle-adapter'
 
 // ─── Shared helpers ──────────────────────────────────────────────
 
@@ -23,8 +24,9 @@ export { pushSettingsToRenderer }
 export function registerIpcHandlers(): void {
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
-  registerWorkspaceHandlers(pushSettingsToRenderer)
-  registerSettingsHandlers(pushSettingsToRenderer)
+  const workspaceLifecycle = createWorkspaceLifecycle(pushSettingsToRenderer)
+  registerWorkspaceHandlers(workspaceLifecycle)
+  registerSettingsHandlers(pushSettingsToRenderer, workspaceLifecycle)
   registerAgentHandlers()
   registerEditorHandlers()
   registerSystemHandlers()

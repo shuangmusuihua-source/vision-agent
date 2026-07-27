@@ -167,6 +167,129 @@ describe('agent store intent actions', () => {
     expect(state.sessionAccessOrder).toEqual([])
   })
 
+  it('clears the active editor session instead of changing its workspace ownership', () => {
+    const sessionA = {
+      ...emptySlot(),
+      currentSessionId: 'session-a',
+      workspacePath: '/workspace/a',
+      messages: [{ kind: 'user', id: 'user-a', role: 'user', textContent: 'hello', createdAt: 1 }] as ConversationMessage[],
+    }
+    useAgentStore.setState({
+      activeWorkspacePath: '/workspace/a',
+      activeSessionId: { editor: 'session-a', ask: null },
+      slots: { editor: sessionA, ask: emptySlot() },
+      sessionSlots: { 'session-a': sessionA },
+      sessionAccessOrder: ['session-a'],
+    })
+
+    useAgentStore.getState().setActiveWorkspace('/workspace/b')
+
+    const state = useAgentStore.getState()
+    expect(state.activeWorkspacePath).toBe('/workspace/b')
+    expect(state.activeSessionId.editor).toBeNull()
+    expect(state.slots.editor).toEqual({
+      ...emptySlot(),
+      workspacePath: '/workspace/b',
+    })
+    expect(state.sessionSlots['session-a']).toMatchObject({
+      currentSessionId: 'session-a',
+      workspacePath: '/workspace/a',
+    })
+  })
+
+  it('removes only the deleted workspace projection and preserves another active workspace', () => {
+    const activeSlot = {
+      ...emptySlot(),
+      currentSessionId: 'session-b',
+      workspacePath: '/workspace/b',
+    }
+    const deletedSlot = {
+      ...emptySlot(),
+      currentSessionId: 'session-a',
+      workspacePath: '/workspace/a',
+    }
+    useAgentStore.setState({
+      activeWorkspacePath: '/workspace/b',
+      activeSessionId: { editor: 'session-b', ask: null },
+      slots: { editor: activeSlot, ask: emptySlot() },
+      sessionList: [
+        {
+          id: 'session-a',
+          title: 'A',
+          workspacePath: '/workspace/a',
+          createdAt: 1,
+          lastModified: 1,
+          messageCount: 0,
+        },
+        {
+          id: 'session-b',
+          title: 'B',
+          workspacePath: '/workspace/b',
+          createdAt: 2,
+          lastModified: 2,
+          messageCount: 0,
+        },
+      ],
+      sessionSlots: { 'session-a': deletedSlot, 'session-b': activeSlot },
+      sessionAccessOrder: ['session-a', 'session-b'],
+    })
+
+    useAgentStore.getState().removeWorkspaceState(
+      '/workspace/a',
+      '/workspace/b',
+      ['session-a'],
+    )
+
+    const state = useAgentStore.getState()
+    expect(state.activeWorkspacePath).toBe('/workspace/b')
+    expect(state.activeSessionId.editor).toBe('session-b')
+    expect(state.slots.editor).toBe(activeSlot)
+    expect(state.sessionList.map(({ id }) => id)).toEqual(['session-b'])
+    expect(state.sessionSlots).toEqual({ 'session-b': activeSlot })
+    expect(state.sessionAccessOrder).toEqual(['session-b'])
+  })
+
+  it('moves an active deleted workspace to a clean fallback without retaining session state', () => {
+    const deletedSlot = {
+      ...emptySlot(),
+      currentSessionId: 'session-a',
+      workspacePath: '/workspace/a',
+      permissionRequest: {
+        id: 'permission-a',
+        toolName: 'Write',
+        input: {},
+      },
+    }
+    useAgentStore.setState({
+      activeWorkspacePath: '/workspace/a',
+      activeSessionId: { editor: 'session-a', ask: null },
+      slots: { editor: deletedSlot, ask: emptySlot() },
+      sessionSlots: { 'session-a': deletedSlot },
+      sessionAccessOrder: ['session-a'],
+      sessionOutputs: {
+        sessionId: 'session-a',
+        workspacePath: '/workspace/a',
+        files: [],
+      },
+    })
+
+    useAgentStore.getState().removeWorkspaceState(
+      '/workspace/a',
+      '/workspace/b',
+      ['session-a'],
+    )
+
+    const state = useAgentStore.getState()
+    expect(state.activeWorkspacePath).toBe('/workspace/b')
+    expect(state.activeSessionId.editor).toBeNull()
+    expect(state.slots.editor).toEqual({
+      ...emptySlot(),
+      workspacePath: '/workspace/b',
+    })
+    expect(state.sessionSlots).toEqual({})
+    expect(state.sessionOutputs).toBeNull()
+  })
+
   it('clears the Ask session through one store action', () => {
     useAgentStore.setState({
       context: 'ask',

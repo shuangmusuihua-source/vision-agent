@@ -17,6 +17,7 @@
  */
 
 import type { SdkSessionInfo } from '../../shared/types'
+import { isSameWorkspacePath } from '../../shared/workspace-paths'
 
 const isTempSession = (session: SdkSessionInfo) => session.id.startsWith('new-')
 
@@ -171,7 +172,9 @@ export function sessionListReducer(
 
       const isInRefreshScope = (session: SdkSessionInfo): boolean => {
         const workspacePath = sessionWorkspacePath(session)
-        if (action.workspacePath) return workspacePath === action.workspacePath
+        if (action.workspacePath) {
+          return Boolean(workspacePath && isSameWorkspacePath(workspacePath, action.workspacePath))
+        }
         return !workspacePath || session.context === 'ask'
       }
 

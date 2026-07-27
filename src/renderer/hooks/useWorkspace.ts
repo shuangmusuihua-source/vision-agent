@@ -5,11 +5,7 @@ import {
   KNOWLEDGE_BASE_NAME,
   removeUserWorkspacePath,
 } from '../../shared/workspace-paths'
-
-export interface WorkspaceDeleteResult {
-  success: boolean
-  error?: string
-}
+import type { WorkspaceDeleteResult } from '../../shared/workspace-lifecycle'
 
 export interface WorkspaceDialogsController {
   create: {
@@ -25,6 +21,7 @@ export interface WorkspaceDialogsController {
   remove: {
     path: string | null
     confirmation: string
+    pending: boolean
     setConfirmation: (value: string) => void
     close: () => void
     submit: () => Promise<WorkspaceDeleteResult>
@@ -67,8 +64,13 @@ export function useWorkspace() {
   const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
     const userPaths = filterUserWorkspacePaths(paths, fixedWorkspacePaths)
     setWorkspacePaths(userPaths)
-    await window.api.settings.reorderDirectories(userPaths)
-  }, [fixedWorkspacePaths])
+    try {
+      const result = await window.api.settings.reorderDirectories(userPaths)
+      setWorkspacePaths(result.workspacePaths)
+    } catch {
+      setWorkspacePaths(workspacePaths)
+    }
+  }, [fixedWorkspacePaths, workspacePaths])
 
   const handleRemoveWorkspace = useCallback((path: string) => {
     setDeleteWsPath(path)
@@ -82,6 +84,7 @@ export function useWorkspace() {
   const [newWorkspaceName, setNewWorkspaceName] = useState('')
   const [newWorkspaceError, setNewWorkspaceError] = useState('')
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
+  const createInFlightRef = useRef<Promise<void> | null>(null)
 
   const handleOpenNewWorkspaceModal = useCallback(() => {
     setNewWorkspaceName('')
@@ -91,6 +94,7 @@ export function useWorkspace() {
   }, [])
 
   const handleCloseNewWorkspaceModal = useCallback(() => {
+    if (createInFlightRef.current) return
     setModalVisible(false)
     setTimeout(() => {
       setShowNewWorkspaceModal(false)
@@ -105,58 +109,116 @@ export function useWorkspace() {
     setNewWorkspaceError('')
   }, [])
 
-  const handleCreateWorkspace = useCallback(async () => {
+  const handleCreateWorkspace = useCallback((): Promise<void> => {
+    if (createInFlightRef.current) return createInFlightRef.current
     const name = newWorkspaceName.trim()
     if (!name) {
       setNewWorkspaceError('请输入工作区名称')
-      return
+      return Promise.resolve()
     }
     if (name === KNOWLEDGE_BASE_NAME) {
       setNewWorkspaceError('Knowledge 是系统保留工作区名称')
-      return
+      return Promise.resolve()
     }
     if (/[/\\]/.test(name) || name.includes('..')) {
       setNewWorkspaceError('工作区名称不能包含 / \\ 或 ..')
-      return
+      return Promise.resolve()
     }
-    setIsCreatingWorkspace(true)
-    setNewWorkspaceError('')
-    try {
-      const dirPath = await window.api.workspace.createWorkspace(name)
-      if (dirPath) {
-        // The main process pushes updated settings before this invoke resolves.
-        // Merge against the latest state so either event ordering stays idempotent.
-        setWorkspacePaths((prev) => appendUserWorkspacePath(prev, dirPath, fixedWorkspacePaths))
-        handleCloseNewWorkspaceModal()
-      } else {
-        setNewWorkspaceError('工作区已存在，请使用其他名称')
+
+    const operation = (async () => {
+      setIsCreatingWorkspace(true)
+      setNewWorkspaceError('')
+      try {
+        const result = await window.api.workspace.createWorkspace(name)
+        setWorkspacePaths(result.workspacePaths)
+        if (result.success) {
+          // Keep this merge idempotent when settings:changed arrives first.
+          setWorkspacePaths((prev) => appendUserWorkspacePath(
+            prev,
+            result.workspacePath,
+            fixedWorkspacePaths,
+          ))
+          setModalVisible(false)
+          setTimeout(() => {
+            setShowNewWorkspaceModal(false)
+            setNewWorkspaceName('')
+            setNewWorkspaceError('')
+          }, 200)
+        } else {
+          setNewWorkspaceError(result.error)
+        }
+      } catch {
+        setNewWorkspaceError('创建工作区失败，请重试')
+      } finally {
+        setIsCreatingWorkspace(false)
       }
-    } catch {
-      setNewWorkspaceError('创建工作区失败，请重试')
-    } finally {
-      setIsCreatingWorkspace(false)
+    })()
+    createInFlightRef.current = operation
+    const clearCreation = () => {
+      if (createInFlightRef.current === operation) createInFlightRef.current = null
     }
-  }, [newWorkspaceName, fixedWorkspacePaths, handleCloseNewWorkspaceModal])
+    void operation.then(clearCreation, clearCreation)
+    return operation
+  }, [newWorkspaceName, fixedWorkspacePaths])
 
   // ── Delete workspace modal ─────────────────────────────────────────
 
   const [deleteWsPath, setDeleteWsPath] = useState<string | null>(null)
   const [deleteWsConfirm, setDeleteWsConfirm] = useState('')
+  const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false)
+  const deleteInFlightRef = useRef<Promise<WorkspaceDeleteResult> | null>(null)
 
   const handleCloseDeleteWorkspace = useCallback(() => {
+    if (deleteInFlightRef.current) return
     setDeleteWsPath(null)
     setDeleteWsConfirm('')
   }, [])
 
-  const handleDeleteWorkspace = useCallback(async (): Promise<WorkspaceDeleteResult> => {
-    if (!deleteWsPath) return { success: false }
-    const result = await window.api.workspace.deleteWorkspace(deleteWsPath)
-    if (result.success) {
-      setWorkspacePaths((prev) => removeUserWorkspacePath(prev, deleteWsPath, fixedWorkspacePaths))
-      handleCloseDeleteWorkspace()
+  const handleDeleteWorkspace = useCallback((): Promise<WorkspaceDeleteResult> => {
+    if (deleteInFlightRef.current) return deleteInFlightRef.current
+    if (!deleteWsPath) {
+      return Promise.resolve({
+        success: false,
+        code: 'not_registered',
+        error: '未选择工作区',
+        workspacePaths,
+      })
     }
-    return result
-  }, [deleteWsPath, fixedWorkspacePaths, handleCloseDeleteWorkspace])
+
+    const deletingPath = deleteWsPath
+    const operation = (async (): Promise<WorkspaceDeleteResult> => {
+      setIsDeletingWorkspace(true)
+      try {
+        const result = await window.api.workspace.deleteWorkspace(deletingPath)
+        setWorkspacePaths(result.workspacePaths)
+        if (result.success) {
+          setWorkspacePaths((prev) => removeUserWorkspacePath(
+            prev,
+            deletingPath,
+            fixedWorkspacePaths,
+          ))
+          setDeleteWsPath(null)
+          setDeleteWsConfirm('')
+        }
+        return result
+      } catch {
+        return {
+          success: false,
+          code: 'filesystem_error',
+          error: '删除工作区失败，请重试',
+          workspacePaths,
+        }
+      } finally {
+        setIsDeletingWorkspace(false)
+      }
+    })()
+    deleteInFlightRef.current = operation
+    const clearDeletion = () => {
+      if (deleteInFlightRef.current === operation) deleteInFlightRef.current = null
+    }
+    void operation.then(clearDeletion, clearDeletion)
+    return operation
+  }, [deleteWsPath, fixedWorkspacePaths, workspacePaths])
 
   return {
     // State
@@ -183,6 +245,7 @@ export function useWorkspace() {
       remove: {
         path: deleteWsPath,
         confirmation: deleteWsConfirm,
+        pending: isDeletingWorkspace,
         setConfirmation: setDeleteWsConfirm,
         close: handleCloseDeleteWorkspace,
         submit: handleDeleteWorkspace,

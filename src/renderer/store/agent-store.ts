@@ -185,6 +185,11 @@ export type AgentStore = {
   ) => string
   startNewSession: (context: AgentContext) => void
   setActiveWorkspace: (path: string | null) => void
+  removeWorkspaceState: (
+    workspacePath: string,
+    fallbackWorkspacePath: string | null,
+    removedSessionIds?: string[],
+  ) => void
   setActiveSession: (sessionId: string | null, context?: AgentContext) => void
   setSessionOutputs: (outputs: SessionOutputs | null) => void
   setSessionOutputsLoading: (loading: boolean) => void

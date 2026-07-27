@@ -4,7 +4,12 @@ import { useUiStore } from '../store/ui-slice'
 import { useShallow } from 'zustand/react/shallow'
 import type { TabDescriptor } from '../../shared/types'
 import { OVERVIEW_TAB_ID } from '../../shared/types'
+import { isSameWorkspacePath } from '../../shared/workspace-paths'
 import { useAgentStore } from '../store/agent-store-impl'
+
+function isDifferentWorkspace(first: string, second: string | null): boolean {
+  return !second || !isSameWorkspacePath(first, second)
+}
 
 interface EditorSessionWorkflowPort {
   getActiveWorkspacePath: () => string | null
@@ -70,7 +75,7 @@ export class EditorSessionWorkflow {
   select(sessionId: string, workspacePath: string): void {
     this.port.switchToSession(sessionId, workspacePath || null)
     this.port.restoreSessionLinkedFile()
-    if (workspacePath && workspacePath !== this.port.getActiveWorkspacePath()) {
+    if (workspacePath && isDifferentWorkspace(workspacePath, this.port.getActiveWorkspacePath())) {
       this.port.setActiveWorkspace(workspacePath)
     }
     this.port.showEditor()
@@ -94,12 +99,12 @@ export class EditorSessionWorkflow {
       this.creatingSession = false
     }
 
-    if (workspacePath !== this.port.getActiveWorkspacePath()) {
+    if (isDifferentWorkspace(workspacePath, this.port.getActiveWorkspacePath())) {
       this.skipNextWorkspaceLoad = true
     }
     this.port.switchToSession(sessionId, workspacePath)
     this.port.clearEditorLinkedFile()
-    if (workspacePath !== this.port.getActiveWorkspacePath()) {
+    if (isDifferentWorkspace(workspacePath, this.port.getActiveWorkspacePath())) {
       this.port.setActiveWorkspace(workspacePath)
     }
     this.port.addTemporarySession(sessionId, title, workspacePath)

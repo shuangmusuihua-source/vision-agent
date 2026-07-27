@@ -35,6 +35,11 @@ implementation 隐藏 electron-updater 配置、24 小时节流、缺失 feed �
 以及下载、安装、手动检查和打开发布页的 IPC。生产 updater 与测试 fake 通过同一 adapter
 seam 验证生命周期行为。
 
+`workspace-lifecycle.ts` 是工作区变更的深 Module。它用一个串行 interface 处理创建、排序
+和删除；implementation 协调交互 Agent 停止、关联自动化暂停、废纸篓、electron-store
+提交、索引刷新和 settings 投影。`workspace-lifecycle-adapter.ts` 连接 Electron、运行时、
+Cron、持久化和索引 Adapter。IPC handler 不得绕过该 Module 直接修改授权工作区。
+
 ### IPC 层
 
 `src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、office、search 和 connection。
@@ -71,7 +76,7 @@ seam 验证生命周期行为。
 共享的 electron-store 实例位于 `persistence/store-core.ts`：
 
 - `profile-store.ts`：Profile、API Key、模型和服务地址
-- `workspace-store.ts`：授权目录、workspace、app session 元数据、知识库
+- `workspace-store.ts`：授权目录、兼容 workspace 记录、app session 元数据、知识库；删除工作区时以一次 store 提交同步移除授权、兼容身份和会话元数据
 - `settings-store.ts`：主题、Cron、Skill 开关和 compaction IDs
 
 Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级映射和展示元数据。两者职责不同。
@@ -90,7 +95,7 @@ Renderer 是单页 React 应用：
 - `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱的顶层视图编排
 - `workflows/editor-session-workflow.ts`：集中 editor session 的持久化顺序、app/SDK ID 删除路由、workspace/session 切换、Overview 激活和新会话草稿生命周期
 - `workflows/session-output-workflow.ts`：集中 session output 的 latest-only 请求投影、文件事件/Agent 完成刷新合并，以及知识库、打开、访达和删除动作
-- `agent-store*`：按 context 与 session 隔离的流式状态
+- `agent-store*`：按 context 与 session 隔离的流式状态；工作区切换会先保存旧 session slot 再清空 live editor slot，绝不改写已有 session 的 workspace 所有权
 - `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、权限/AskUser 队列推进、镜像写入与 LRU 淘汰
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions

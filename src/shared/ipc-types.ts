@@ -23,6 +23,11 @@ import type {
   MemoryEntry,
 } from './types'
 import type {
+  WorkspaceCreateResult,
+  WorkspaceDeleteResult,
+  WorkspaceReorderResult,
+} from './workspace-lifecycle'
+import type {
   MarkitdownFormat,
   MarkitdownRuntimeInstallResult,
   MarkitdownRuntimeStatus,
@@ -196,11 +201,11 @@ export type IPCChannelMap = {
   }
   'workspace:createWorkspace': {
     request: string
-    response: string | null
+    response: WorkspaceCreateResult
   }
   'workspace:deleteWorkspace': {
     request: string
-    response: { success: boolean; error?: string }
+    response: WorkspaceDeleteResult
   }
   'workspace:knowledgeDir': {
     request: void
@@ -248,13 +253,9 @@ export type IPCChannelMap = {
     request: string
     response: { success: boolean }
   }
-  'settings:removeDirectory': {
-    request: string
-    response: { success: boolean }
-  }
   'settings:reorderDirectories': {
     request: string[]
-    response: { success: boolean }
+    response: WorkspaceReorderResult
   }
   'settings:setTheme': {
     request: 'light' | 'dark' | 'system'

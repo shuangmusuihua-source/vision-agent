@@ -39,6 +39,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `index.ts` — boot, BrowserWindow, Sentry, indexing, Skill initialization, persisted cron restoration
 - `app-update-lifecycle.ts` — electron-updater configuration, launch/foreground checks, throttling, event projection, and update IPC
 - `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
+- `workspace-lifecycle.ts` / `workspace-lifecycle-adapter.ts` — serialized workspace creation, ordering, and deletion; coordinates Agent shutdown, automation suspension, Trash, persistence, indexing, and settings projection
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
 - `pending-interactions.ts` — permission and AskUser registration, timeout, SDK cancellation, notification cleanup, resolution, and session-scoped rejection
@@ -88,6 +89,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - File access must pass the session-scoped authorization checks in `session-file-access.ts`.
 - Tool approval and AskUser requests are session-routed and time out after five minutes.
 - Renderer inactivity is only a notice; it must not automatically abort a healthy long-running task.
+- Workspace changes must go through the Main-process Workspace Lifecycle Module. Switching workspace never rewrites an existing session's `workspacePath`; deleting a workspace stops its runs, pauses its automation, and removes its app-owned session metadata.
 - Auto-memory is global across workspaces and reserved for stable, user-specific, cross-task information. Automation, inline rewrites, parsers, and other ephemeral Agent runs must disable it explicitly; task logs belong to automation history.
 
 ## Persistence

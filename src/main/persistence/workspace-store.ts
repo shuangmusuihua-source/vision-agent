@@ -44,13 +44,16 @@ export function removeAuthorizedDirectory(dir: string): void {
   store.set('authorizedDirectories', dirs.filter((candidate) => !isSameWorkspacePath(candidate, dir)))
 }
 
-export function reorderAuthorizedDirectories(paths: string[]): void {
+export function reorderAuthorizedDirectories(paths: string[]): boolean {
   const fixed = store.get('fixedDirectories')
   const current = getAuthorizedDirectories()
   const nextPaths = filterUserWorkspacePaths(paths, fixed)
-  if (nextPaths.length !== current.length) return
-  if (!nextPaths.every((path) => current.some((candidate) => isSameWorkspacePath(candidate, path)))) return
+  if (nextPaths.length !== current.length) return false
+  if (!nextPaths.every((path) => current.some((candidate) => isSameWorkspacePath(candidate, path)))) {
+    return false
+  }
   store.set('authorizedDirectories', nextPaths)
+  return true
 }
 
 // ─── Session records ──────────────────────────────────────────────────
@@ -77,6 +80,28 @@ export function addSessionRecord(record: SessionRecord): void {
 export function removeSessionRecord(id: string): void {
   const sessions = store.get('sessions').filter(s => s.id !== id)
   store.set('sessions', sessions)
+}
+
+export function removeWorkspacePersistence(workspacePath: string): {
+  removedSessionIds: string[]
+} {
+  const sessions = store.get('sessions')
+  const removedSessions = sessions.filter((session) => (
+    isSameWorkspacePath(session.workspacePath, workspacePath)
+  ))
+
+  store.store = {
+    ...store.store,
+    authorizedDirectories: store.get('authorizedDirectories')
+      .filter((candidate) => !isSameWorkspacePath(candidate, workspacePath)),
+    workspaces: store.get('workspaces')
+      .filter((workspace) => !isSameWorkspacePath(workspace.path, workspacePath)),
+    sessions: sessions.filter((session) => (
+      !isSameWorkspacePath(session.workspacePath, workspacePath)
+    )),
+  }
+
+  return { removedSessionIds: removedSessions.map((session) => session.id) }
 }
 
 export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): void {

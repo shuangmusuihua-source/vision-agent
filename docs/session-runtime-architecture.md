@@ -71,6 +71,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 - GenerationActivityProjector 生命周期
 - 权限与 AskUser pending Promise、五分钟超时和 abort 清理
 - session-scoped abort 与 completion 等待
+- workspace-scoped abort 与 completion 等待；工作区删除必须等待该 workspace 的所有 run 结束
 - 按 app session ID 隔离的启动所有权；封装 abort / prepare / register 的有序 seam
 - 带 envelope 的 main-to-renderer 事件
 
@@ -85,6 +86,21 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 权限与 AskUser 的具体 pending 生命周期由 `pending-interactions.ts` 实现，
 `SessionRuntimeController` 只提供带 envelope 的事件回调和 session 级终止意图。
 生产通知与测试 fake 通过同一 notification adapter seam。
+
+## Workspace lifecycle interaction
+
+`workspace-lifecycle.ts` 是注册工作区变更的唯一 Main-process Module。删除工作区按以下顺序：
+
+1. 校验请求对应已注册且非系统 Workspace。
+2. `SessionRuntimeController` 按稳定 envelope 中的 `workspacePath` 终止并等待所有 run。
+3. `cron-manager.ts` 暂停并等待关联 Workspace、Workspace session 或其子目录的自动化。
+4. 将 Workspace 移入废纸篓；失败时恢复此前活动的自动化计划。
+5. 一次性移除授权目录、兼容 Workspace 记录和 app session metadata。
+6. 刷新索引并把规范工作区列表投影给 Renderer。
+
+Renderer 切换 Workspace 时，如果 live editor slot 属于另一个 Workspace，必须缓存旧 slot
+并清空活动 session；不得通过修改 live slot 的 `workspacePath` 把旧 session 迁移到新
+Workspace。
 
 ## Event protocol
 
