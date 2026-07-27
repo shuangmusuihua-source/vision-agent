@@ -87,7 +87,9 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 Renderer 是单页 React 应用：
 
 - `App.tsx`：主题、设置缓存、更新订阅和全局 provider
-- `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱编排
+- `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱的顶层视图编排
+- `workflows/editor-session-workflow.ts`：集中 editor session 的持久化顺序、app/SDK ID 删除路由、workspace/session 切换、Overview 激活和新会话草稿生命周期
+- `workflows/session-output-workflow.ts`：集中 session output 的 latest-only 请求投影、文件事件/Agent 完成刷新合并，以及知识库、打开、访达和删除动作
 - `agent-store*`：按 context 与 session 隔离的流式状态
 - `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、权限/AskUser 队列推进、镜像写入与 LRU 淘汰
 - `ui-slice.ts`：非 Agent UI 状态
