@@ -36,7 +36,8 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 
 ### Main process
 
-- `index.ts` — boot, BrowserWindow, Sentry, updater, indexing, Skill initialization, persisted cron restoration
+- `index.ts` — boot, BrowserWindow, Sentry, indexing, Skill initialization, persisted cron restoration
+- `app-update-lifecycle.ts` — electron-updater configuration, launch/foreground checks, throttling, event projection, and update IPC
 - `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
