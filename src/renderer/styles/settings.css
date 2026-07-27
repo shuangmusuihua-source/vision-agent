@@ -96,8 +96,8 @@
 
 .settings-brand-subtitle {
   margin-top: 2px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .settings-nav {
@@ -187,8 +187,8 @@
 
 .settings-sidebar-desc {
   overflow: hidden;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -207,8 +207,8 @@
 }
 
 .settings-summary-label {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
 
@@ -224,13 +224,13 @@
 
 .settings-summary-meta {
   margin-top: 2px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .settings-sidebar-version {
   padding: 0 8px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -295,7 +295,7 @@
 
 .settings-kicker {
   margin-bottom: 7px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: 720;
   letter-spacing: 0;
@@ -403,7 +403,7 @@
 
 .settings-section-subtitle {
   margin-top: 4px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1.45;
 }
@@ -482,8 +482,8 @@
 }
 
 .theme-option-desc {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.45;
 }
 
@@ -563,9 +563,9 @@
   overflow: hidden;
   max-width: 360px;
   margin-top: 2px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -599,7 +599,7 @@
 
 .profile-status-inactive {
   background: var(--color-bg-tertiary);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .profile-status-dot {
@@ -711,8 +711,8 @@
 .profile-field-label {
   display: block;
   margin-bottom: 6px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   font-weight: 680;
   line-height: 1.2;
 }
@@ -766,7 +766,7 @@
 }
 
 .profile-field-input::placeholder {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .profile-field.field-error .profile-field-input {
@@ -862,8 +862,8 @@
 
 .profile-test-result {
   margin-right: auto;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.35;
 }
 
@@ -920,7 +920,7 @@
 
 .about-version {
   margin-top: 6px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
 }
 
@@ -981,8 +981,8 @@
 
 .about-update-status {
   max-width: 360px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   font-weight: 620;
   line-height: 1.45;
   overflow-wrap: anywhere;

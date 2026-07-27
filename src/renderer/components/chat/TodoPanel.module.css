@@ -50,7 +50,7 @@
 }
 
 .barCount {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
@@ -101,8 +101,8 @@
 }
 
 .taskLabel {
-  font-size: 11px;
-  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
 .taskSubject {
@@ -112,7 +112,7 @@
 
 .task-completed .taskSubject {
   text-decoration: line-through;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .task-in_progress .taskSubject {
@@ -121,7 +121,7 @@
 }
 
 .taskDesc {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-weight: 400;
 }
 

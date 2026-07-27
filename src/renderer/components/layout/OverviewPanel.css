@@ -128,7 +128,7 @@
   min-width: 0;
   overflow: hidden;
   min-height: 154px;
-  padding: 14px;
+  padding: 14px 14px 8px;
   border: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
   border-radius: var(--overview-card-radius);
   background: var(--color-bg-elevated);
@@ -233,8 +233,8 @@
   display: block;
   min-width: 0;
   overflow: hidden;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -281,8 +281,8 @@
 
 .overview-meta-grid dt {
   margin: 0;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-2xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
 }
 
 .overview-meta-grid dd {
@@ -303,7 +303,7 @@
   justify-content: flex-end;
   gap: var(--space-2xs);
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid color-mix(in srgb, var(--color-border-soft) 72%, transparent);
 }
 
@@ -451,7 +451,7 @@
 }
 
 .overview-other-list small {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .overview-empty {

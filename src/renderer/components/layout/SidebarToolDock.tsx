@@ -123,7 +123,7 @@ function SidebarToolDock({
             <img src={assistantLogo} alt="" />
           </button>
           <span className="sidebar-tool-separator" aria-hidden="true" />
-          <button className="sidebar-icon-btn" onClick={onOpenSearch} title="搜索" aria-label="搜索">
+          <button className="sidebar-icon-btn" onClick={() => onOpenSearch()} title="搜索" aria-label="搜索">
             <Search size={16} />
           </button>
           <button className="sidebar-icon-btn" onClick={onOpenSettings} title="设置" aria-label="设置">

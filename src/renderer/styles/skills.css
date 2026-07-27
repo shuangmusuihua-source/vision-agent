@@ -61,7 +61,7 @@
 }
 
 .skill-search-field input::placeholder {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .skill-search-field input::-webkit-search-cancel-button {
@@ -142,7 +142,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 18px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   white-space: nowrap;
 }
@@ -197,14 +197,14 @@
 
 .skill-section-heading p {
   margin: 5px 0 0;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
 }
 
 .skill-section-heading > span {
   flex: 0 0 auto;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -290,8 +290,8 @@
 .skill-catalog-card-identity > span {
   display: block;
   overflow: hidden;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -368,8 +368,8 @@
   gap: var(--space-sm);
   margin-top: auto;
   padding-top: 11px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .skill-catalog-card-footer > span:last-child {
@@ -404,7 +404,7 @@
   flex-direction: column;
   gap: 7px;
   margin-top: 14px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   background: var(--color-bg-secondary);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-lg);
@@ -417,7 +417,7 @@
 }
 
 .skill-catalog-empty span {
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
 }
 
 .skill-catalog-empty button {
@@ -443,7 +443,7 @@
   justify-content: space-between;
   gap: var(--space-md);
   padding-bottom: 12px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   border-bottom: 1px solid var(--color-border-soft);
   font-size: var(--font-size-xs);
 }
@@ -498,8 +498,8 @@
 
 .skill-detail-title > span,
 .skill-detail-title > p {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .skill-detail-title h1 {
@@ -576,9 +576,9 @@
 .skill-detail-availability {
   margin: 18px 0 0;
   padding-top: 14px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   border-top: 1px solid var(--color-border-soft);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
 }
 
@@ -665,8 +665,8 @@
 }
 
 .skill-detail-section-head > span {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-2xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -693,7 +693,7 @@
 
 .skill-audit-row-reviewed svg,
 .skill-audit-row-reviewed span:last-child {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .skill-audit-row-warning svg,
@@ -910,7 +910,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-md);
 }
 

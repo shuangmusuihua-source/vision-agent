@@ -45,7 +45,7 @@
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   pointer-events: none;
   height: 0;
   text-align: left;
@@ -246,7 +246,7 @@
 
 .code-block-language {
   font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -872,7 +872,7 @@
 }
 
 .ai-inline-prompt-row input::placeholder {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .ai-inline-submit,
@@ -1094,7 +1094,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 /* --- Editor status bar --- */
@@ -1104,8 +1104,8 @@
   align-items: center;
   gap: 12px;
   padding: 4px 24px;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
@@ -1232,7 +1232,7 @@
 .wikilink-suggestion-empty {
   padding: 8px 12px;
   font-size: var(--font-size-md);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .wikilink-suggestion-item {
@@ -1255,8 +1255,8 @@
 }
 
 .wikilink-suggestion-path {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
 .editor-tab:active {
@@ -1428,7 +1428,7 @@
 .frontmatter-label {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -1612,7 +1612,7 @@
   min-width: 44px;
   text-align: center;
   font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 

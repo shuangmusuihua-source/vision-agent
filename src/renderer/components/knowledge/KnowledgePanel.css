@@ -71,8 +71,8 @@
   min-width: 0;
   gap: var(--space-md);
   margin-left: auto;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   white-space: nowrap;
 }
 

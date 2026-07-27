@@ -74,8 +74,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 680,
-    minHeight: 400,
+    minWidth: 720,
+    minHeight: 560,
     show: false,
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 8, y: 8 },

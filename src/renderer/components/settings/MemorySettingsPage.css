@@ -92,7 +92,7 @@
 
 .memory-settings-list-heading strong {
   min-width: 24px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   text-align: center;
@@ -140,8 +140,8 @@
 
 .memory-settings-list-state {
   padding: 28px 12px;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   text-align: center;
 }
@@ -198,8 +198,8 @@
 }
 
 .memory-settings-list-item small {
-  color: var(--color-text-tertiary);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .memory-settings-detail {
@@ -216,7 +216,7 @@
   align-items: center;
   justify-content: center;
   gap: 9px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
 }
 
@@ -248,8 +248,8 @@
 .memory-settings-detail-title span {
   display: block;
   margin-top: 3px;
-  color: var(--color-text-tertiary);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .memory-settings-actions {
@@ -316,8 +316,8 @@
   min-height: 36px;
   padding: 7px 16px;
   border-bottom: 1px solid var(--color-border-soft);
-  color: var(--color-text-tertiary);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .memory-settings-meta span {
@@ -359,8 +359,8 @@
 }
 
 .memory-settings-rendering {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .memory-settings-editor {

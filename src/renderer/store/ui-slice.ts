@@ -75,7 +75,10 @@ export const useUiStore = create<UiSlice>((set) => ({
 
   showSearch: false,
   searchQuery: '',
-  openSearch: (query) => set({ showSearch: true, searchQuery: query || '' }),
+  openSearch: (query) => set({
+    showSearch: true,
+    searchQuery: typeof query === 'string' ? query : '',
+  }),
   closeSearch: () => set({ showSearch: false, searchQuery: '' }),
 
   sourceMode: false,

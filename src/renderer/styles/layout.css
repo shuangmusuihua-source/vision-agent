@@ -396,8 +396,8 @@
 .sidebar-quick-subtitle {
   max-width: 210px;
   margin-top: 2px;
-  color: var(--color-text-tertiary);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -417,7 +417,7 @@
 }
 
 .sidebar-quick-section-title {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.08em;
@@ -427,7 +427,7 @@
 .sidebar-quick-link {
   padding: 2px 4px;
   border-radius: 6px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 11px;
 }
 
@@ -542,8 +542,8 @@
 
 .sidebar-quick-model-meta {
   margin-top: 2px;
-  color: var(--color-text-tertiary);
-  font-size: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
   line-height: 1.25;
 }
 
@@ -555,7 +555,7 @@
 .sidebar-quick-empty {
   justify-content: center;
   border: 1px dashed color-mix(in srgb, var(--color-border) 70%, transparent);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 
@@ -647,7 +647,7 @@
 .sidebar-workspace-module-title {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   user-select: none;
@@ -682,7 +682,7 @@
   padding: 6px 4px 6px 22px;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   letter-spacing: 0.25px;
   user-select: none;
   cursor: pointer;
@@ -866,7 +866,7 @@
 
 .modal-subtitle {
   font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   margin-bottom: 16px;
   line-height: 1.5;
 }
@@ -880,8 +880,8 @@
 .modal-body strong { color: var(--color-text-primary); }
 
 .modal-hint {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
   margin-bottom: 6px;
 }
 
@@ -1196,8 +1196,8 @@
 .sidebar-session-time {
   grid-column: 2;
   justify-self: end;
-  font-size: 11px;
-  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   white-space: nowrap;
   transition: opacity 0.12s ease, transform 0.12s ease;
@@ -1308,9 +1308,9 @@
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   text-align: center;
 }
 
@@ -1368,7 +1368,7 @@
 .move-dropdown-title {
   padding: var(--space-xs) var(--space-md);
   font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-weight: var(--font-weight-medium);
 }
 
@@ -1506,7 +1506,7 @@
 
 .editor-empty-hint {
   font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 /* --- Agent Panel --- */
@@ -2405,8 +2405,8 @@
 
 .notification-inbox-item-head span {
   flex: 0 0 auto;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .notification-inbox-markdown {
@@ -2464,8 +2464,8 @@
 }
 
 .notification-detail-title span {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .notification-detail-markdown {
@@ -2484,7 +2484,7 @@
 
 .notification-inbox-empty {
   padding: 28px 14px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   text-align: center;
 }
@@ -2634,6 +2634,9 @@
   }
   .main-content-cover-sidebar {
     margin-left: 0;
+  }
+  .main-content-ask-zuovis.main-content-cover-sidebar {
+    margin-left: 0 !important;
   }
   .agent-panel-shell-cover-sidebar {
     margin-left: 0;
