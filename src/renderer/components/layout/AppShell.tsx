@@ -149,6 +149,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     return saveFile(filePath, content)
   }, [saveFile])
 
+  const handleExplicitSave = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    void editor.flushPendingSave().catch((error) => {
+      setMainError(`保存失败：${error instanceof Error ? error.message : String(error)}`)
+    })
+  }, [setMainError])
+
   useEffect(() => {
     setIsRetryingSave(false)
   }, [activeFilePath])
@@ -424,10 +432,11 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         case 'open-search': openSearch(); break
         case 'toggle-source-mode': setSourceMode(!sourceModeRef.current); break
         case 'toggle-focus-mode': setFocusMode(!focusModeRef.current); break
-        case 'save-file': break
+        case 'save-file': handleExplicitSave(); break
+        default: action satisfies never
       }
     })
-  }, [onOpenSettings, handleToggleAgent])
+  }, [handleExplicitSave, handleToggleAgent, onOpenSettings])
 
   // ── Singleton IPC → agent store ─────────────────────────────────────
 

@@ -44,6 +44,15 @@ import type {
   CronTaskRegistration,
 } from './cron-types'
 
+export type MenuAction =
+  | 'open-settings'
+  | 'toggle-sidebar'
+  | 'toggle-agent-panel'
+  | 'open-search'
+  | 'toggle-source-mode'
+  | 'toggle-focus-mode'
+  | 'save-file'
+
 // ─── Request/Response Channels ───────────────────────────────────────
 
 export type IPCChannelMap = {
@@ -409,7 +418,7 @@ export type IPCEventMap = {
   'settings:changed': Record<string, unknown>
   'graph:filesChanged': { count: number; files: string[]; version: number }
   'cron:taskCompleted': CronTaskCompletedEvent
-  'menu-action': string
+  'menu-action': MenuAction
   'main:error': { type: 'unhandledRejection' | 'uncaughtException'; message: string }
   'update:available': { version: string }
   'update:downloaded': void

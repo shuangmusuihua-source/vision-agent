@@ -1,6 +1,7 @@
 import type {
   AgentContext,
   AskUserRequestIPC,
+  ConversationMessage,
   PermissionRequestIPC,
 } from '../../shared/types'
 import type { AgentStore, ContextSlot } from './agent-store'
@@ -13,9 +14,24 @@ type CacheOptions = {
   protectIds?: Array<string | null | undefined>
 }
 
-export type AskUserTarget = {
+export type SessionInteractionTarget = {
   context: AgentContext
   sessionId: string | null
+}
+
+export type SessionInteractionMutation = {
+  patch: Partial<AgentStore>
+  target: SessionInteractionTarget | null
+}
+
+type PendingInteractionKind = 'permission' | 'askUser'
+type PendingInteractionRequest = PermissionRequestIPC | AskUserRequestIPC
+
+type PendingInteractionLocation = {
+  context: AgentContext
+  sessionId: string | null
+  slot: ContextSlot
+  queueIndex: number | null
 }
 
 function collectProtectedIds(
@@ -328,34 +344,251 @@ export function selectIsResumingSession(state: AgentStore, context: AgentContext
   return slot._isLoadingMoreMessages && slot.messages.length === 0
 }
 
-export function findAskUserTarget(
+function currentInteraction(
+  slot: ContextSlot,
+  kind: PendingInteractionKind,
+): PendingInteractionRequest | null {
+  return kind === 'permission' ? slot.permissionRequest : slot.askUserRequest
+}
+
+function interactionQueue(
+  slot: ContextSlot,
+  kind: PendingInteractionKind,
+): PendingInteractionRequest[] {
+  return kind === 'permission' ? slot.permissionQueue : slot.askUserQueue
+}
+
+function interactionPatch(
+  slot: ContextSlot,
+  kind: PendingInteractionKind,
+  queueIndex: number | null,
+): Partial<ContextSlot> {
+  if (kind === 'permission') {
+    if (queueIndex === null) {
+      return {
+        permissionRequest: slot.permissionQueue[0] ?? null,
+        permissionQueue: slot.permissionQueue.slice(1),
+      }
+    }
+    return {
+      permissionQueue: slot.permissionQueue.filter((_, index) => index !== queueIndex),
+    }
+  }
+
+  if (queueIndex === null) {
+    return {
+      askUserRequest: slot.askUserQueue[0] ?? null,
+      askUserQueue: slot.askUserQueue.slice(1),
+    }
+  }
+  return {
+    askUserQueue: slot.askUserQueue.filter((_, index) => index !== queueIndex),
+  }
+}
+
+function findInteractionLocation(
   state: AgentStore,
+  kind: PendingInteractionKind,
   requestId: string,
   fallbackContext: AgentContext,
-): AskUserTarget | null {
-  for (const context of ['ask', 'editor'] as AgentContext[]) {
+): PendingInteractionLocation | null {
+  const contexts: AgentContext[] = fallbackContext === 'editor'
+    ? ['editor', 'ask']
+    : ['ask', 'editor']
+
+  for (const context of contexts) {
     const slot = state.slots[context]
-    const request = slot.askUserRequest?.id === requestId
-      ? slot.askUserRequest
-      : slot.askUserQueue.find((item) => item.id === requestId)
-    if (request) {
+    const current = currentInteraction(slot, kind)
+    if (current?.id === requestId) {
       return {
         context,
-        sessionId: request.sessionId || slot.currentSessionId || state.activeSessionId[context],
+        sessionId: resolveClientSessionId(
+          state,
+          current.clientSessionKey
+            || current.sessionId
+            || slot.currentSessionId
+            || state.activeSessionId[context],
+        ),
+        slot,
+        queueIndex: null,
+      }
+    }
+
+    const queue = interactionQueue(slot, kind)
+    const queueIndex = queue.findIndex((item) => item.id === requestId)
+    if (queueIndex !== -1) {
+      const request = queue[queueIndex]
+      return {
+        context,
+        sessionId: resolveClientSessionId(
+          state,
+          request.clientSessionKey
+            || request.sessionId
+            || slot.currentSessionId
+            || state.activeSessionId[context],
+        ),
+        slot,
+        queueIndex,
       }
     }
   }
 
   for (const [sessionId, slot] of Object.entries(state.sessionSlots)) {
-    const request = slot.askUserRequest?.id === requestId
-      ? slot.askUserRequest
-      : slot.askUserQueue.find((item) => item.id === requestId)
-    if (request) {
+    const current = currentInteraction(slot, kind)
+    if (current?.id === requestId) {
+      return {
+        context: current.context || fallbackContext,
+        sessionId: resolveClientSessionId(
+          state,
+          current.clientSessionKey || current.sessionId || sessionId,
+        ),
+        slot,
+        queueIndex: null,
+      }
+    }
+
+    const queue = interactionQueue(slot, kind)
+    const queueIndex = queue.findIndex((item) => item.id === requestId)
+    if (queueIndex !== -1) {
+      const request = queue[queueIndex]
       return {
         context: request.context || fallbackContext,
-        sessionId: request.sessionId || sessionId,
+        sessionId: resolveClientSessionId(
+          state,
+          request.clientSessionKey || request.sessionId || sessionId,
+        ),
+        slot,
+        queueIndex,
       }
     }
   }
   return null
+}
+
+function enqueueInteraction(
+  state: AgentStore,
+  kind: PendingInteractionKind,
+  request: PendingInteractionRequest,
+  fallbackContext: AgentContext,
+): SessionInteractionMutation {
+  const context = request.context || fallbackContext
+  const sessionId = resolveClientSessionId(
+    state,
+    request.clientSessionKey || request.sessionId,
+  )
+  const liveSlot = state.slots[context]
+  const liveSessionId = liveSlot.currentSessionId
+  const activeSessionId = state.activeSessionId[context]
+  const belongsToLiveSession = Boolean(
+    sessionId && (sessionId === liveSessionId || sessionId === activeSessionId),
+  )
+  const belongsToBackgroundSession = Boolean(sessionId && !belongsToLiveSession)
+  const cannotRouteLegacyRequest = Boolean(
+    !request.sessionId && liveSessionId && !liveSessionId.startsWith('new-'),
+  )
+
+  if (belongsToBackgroundSession || cannotRouteLegacyRequest) {
+    if (!sessionId) return { patch: {}, target: null }
+    const backgroundSlot = state.sessionSlots[sessionId]
+      || { ...emptySlot(), currentSessionId: sessionId }
+    const patch = kind === 'permission'
+      ? backgroundSlot.permissionRequest
+        ? {
+            currentSessionId: backgroundSlot.currentSessionId || sessionId,
+            permissionQueue: [...backgroundSlot.permissionQueue, request as PermissionRequestIPC],
+          }
+        : {
+            currentSessionId: backgroundSlot.currentSessionId || sessionId,
+            permissionRequest: request as PermissionRequestIPC,
+          }
+      : backgroundSlot.askUserRequest
+        ? {
+            currentSessionId: backgroundSlot.currentSessionId || sessionId,
+            askUserQueue: [...backgroundSlot.askUserQueue, request as AskUserRequestIPC],
+          }
+        : {
+            currentSessionId: backgroundSlot.currentSessionId || sessionId,
+            askUserRequest: request as AskUserRequestIPC,
+          }
+    return {
+      patch: patchSessionSlot(state, context, patch, sessionId),
+      target: { context, sessionId },
+    }
+  }
+
+  const patch = kind === 'permission'
+    ? liveSlot.permissionRequest
+      ? { permissionQueue: [...liveSlot.permissionQueue, request as PermissionRequestIPC] }
+      : { permissionRequest: request as PermissionRequestIPC }
+    : liveSlot.askUserRequest
+      ? { askUserQueue: [...liveSlot.askUserQueue, request as AskUserRequestIPC] }
+      : { askUserRequest: request as AskUserRequestIPC }
+  return {
+    patch: patchSessionSlot(state, context, patch),
+    target: { context, sessionId },
+  }
+}
+
+function resolveInteraction(
+  state: AgentStore,
+  kind: PendingInteractionKind,
+  requestId: string,
+  fallbackContext: AgentContext,
+  message?: ConversationMessage,
+): SessionInteractionMutation {
+  const location = findInteractionLocation(state, kind, requestId, fallbackContext)
+  if (!location) return { patch: {}, target: null }
+
+  const slotPatch = interactionPatch(
+    location.slot,
+    kind,
+    location.queueIndex,
+  )
+  if (message) slotPatch.messages = [...location.slot.messages, message]
+
+  return {
+    patch: patchSessionScopedSlot(
+      state,
+      location.context,
+      slotPatch,
+      location.sessionId,
+    ),
+    target: {
+      context: location.context,
+      sessionId: location.sessionId,
+    },
+  }
+}
+
+export function enqueuePermissionInteraction(
+  state: AgentStore,
+  request: PermissionRequestIPC,
+  fallbackContext: AgentContext,
+): SessionInteractionMutation {
+  return enqueueInteraction(state, 'permission', request, fallbackContext)
+}
+
+export function enqueueAskUserInteraction(
+  state: AgentStore,
+  request: AskUserRequestIPC,
+  fallbackContext: AgentContext,
+): SessionInteractionMutation {
+  return enqueueInteraction(state, 'askUser', request, fallbackContext)
+}
+
+export function resolvePermissionInteraction(
+  state: AgentStore,
+  requestId: string,
+  fallbackContext: AgentContext,
+): SessionInteractionMutation {
+  return resolveInteraction(state, 'permission', requestId, fallbackContext)
+}
+
+export function resolveAskUserInteraction(
+  state: AgentStore,
+  requestId: string,
+  fallbackContext: AgentContext,
+  message?: ConversationMessage,
+): SessionInteractionMutation {
+  return resolveInteraction(state, 'askUser', requestId, fallbackContext, message)
 }

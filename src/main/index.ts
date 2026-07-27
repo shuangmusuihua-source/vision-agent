@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'path'
+import { homedir } from 'os'
 import { pathToFileURL } from 'url'
 import { configureAppIdentity } from './app-identity'
 configureAppIdentity()
@@ -8,7 +9,7 @@ import * as Sentry from '@sentry/electron/main'
 import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
-import { getSettings } from './persistence/profile-store'
+import { getApiKey, getSettings } from './persistence/profile-store'
 import { getAuthorizedDirectories, ensureKnowledgeBase } from './persistence/workspace-store'
 import { fileIndexService } from './file-index-service'
 import { initAppSkills } from './skill-init'
@@ -21,6 +22,7 @@ import { flushAuditLog } from './agent-audit'
 import { APP_NAME, GITHUB_LATEST_RELEASE_URL } from '../shared/branding'
 import { toUpdateErrorPayload, type UpdateDownloadProgress } from '../shared/update-types'
 import { isAllowedExternalUrl, isAllowedRendererNavigation } from './navigation-policy'
+import { sanitizeTelemetryEvent } from '../shared/telemetry-sanitizer'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -28,16 +30,16 @@ Sentry.init({
   environment: app.isPackaged ? 'production' : 'development',
   sendDefaultPii: false,
   beforeSend(event) {
-    // Recursively scan string values for 'apiKey' to prevent credential leaks.
-    // Avoids JSON.stringify on every event — field-level traversal with early exit.
-    const containsApiKey = (obj: unknown): boolean => {
-      if (typeof obj === 'string') return obj.includes('apiKey')
-      if (Array.isArray(obj)) return obj.some(containsApiKey)
-      if (obj && typeof obj === 'object') return Object.values(obj as Record<string, unknown>).some(containsApiKey)
-      return false
+    try {
+      return sanitizeTelemetryEvent(event, {
+        secretValues: [getApiKey(), process.env.SENTRY_DSN],
+        privatePathPrefixes: getAuthorizedDirectories(),
+        homeDirectory: homedir(),
+      })
+    } catch {
+      // Privacy wins over telemetry if settings or sanitization fail.
+      return null
     }
-    if (containsApiKey(event)) return null
-    return event
   },
 })
 

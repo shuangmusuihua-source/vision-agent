@@ -21,6 +21,8 @@ import { reduceAgentEvent } from './agent-state-machine'
 import {
   buildSessionSwitchPatch,
   cacheSessionSlot,
+  enqueueAskUserInteraction,
+  enqueuePermissionInteraction,
   ensureSessionSlotPatch,
   getSdkSessionIdForClient,
   normalizeSessionId,
@@ -28,7 +30,9 @@ import {
   patchSessionScopedSlot,
   patchSessionSlot,
   removeSessionSlotPatch,
+  resolveAskUserInteraction,
   resolveClientSessionId,
+  resolvePermissionInteraction,
   resolveSessionSlot,
 } from './session-slot-state'
 
@@ -159,239 +163,66 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
     handlePermissionRequest(req: PermissionRequestIPC) {
-      // Use the context slot's own sessionId, not global activeSessionId.
-      // activeSessionId tracks the editor's UI-state session; the ask context
-      // operates independently and must not be gatekept by editor state.
-      const ctx = (req.context as AgentContext) || get().context
-      const reqSessionId = resolveClientSessionId(get(), req.clientSessionKey || req.sessionId)
-      const slotSid = get().slots[ctx]?.currentSessionId
-      const activeSid = get().activeSessionId[ctx]
-      const belongsToLiveSession = !!(reqSessionId && (reqSessionId === slotSid || reqSessionId === activeSid))
-      const isOtherSession = !!(reqSessionId && !belongsToLiveSession)
-      const isNewSessionGuard = !!(!req.sessionId && slotSid && !slotSid.startsWith('new-'))
-      if (isOtherSession || isNewSessionGuard) {
-        // The request belongs to a background session — don't show the dialog,
-        // but DO persist into sessionSlots so it appears when the user switches.
-        if (reqSessionId) {
-          set((state) => {
-            const sid = reqSessionId
-            const isNew = !state.sessionSlots[sid]
-            const bgSlot = isNew ? { ...emptySlot(), currentSessionId: sid } : state.sessionSlots[sid]
-            const patch = bgSlot.permissionRequest
-              ? { permissionQueue: [...bgSlot.permissionQueue, req] }
-              : { permissionRequest: req }
-            return patchSessionSlot(state, ctx, patch, sid)
-          })
-        }
-        return
-      }
-
-      set((state) => {
-        const slot = state.slots[ctx]
-        if (slot.permissionRequest) {
-          return patchSessionSlot(state, ctx, { permissionQueue: [...slot.permissionQueue, req] })
-        }
-        return patchSessionSlot(state, ctx, { permissionRequest: req })
-      })
-
+      set((state) => enqueuePermissionInteraction(state, req, state.context).patch)
     },
 
     // ─── Permission / AskUser response & timeout handlers ──────────────────
-    // These search BOTH the active slots and sessionSlots, because a
-    // permission or AskUser request belongs to a specific session and may
-    // be resident in either location depending on timing.
+    // session-slot-state owns the live/cache representation and routing seam.
 
     handlePermissionResponse(requestId: string, _behavior: 'allow' | 'deny') {
-      set((state) => {
-        // 1) Search active slots
-        for (const ctx of ['editor', 'ask'] as AgentContext[]) {
-          const slot = state.slots[ctx]
-          if (slot.permissionRequest?.id === requestId) {
-            const permRespSid = slot.permissionRequest.sessionId || null
-            const next = slot.permissionQueue[0] ?? null
-            const rest = slot.permissionQueue.slice(1)
-            return patchSessionScopedSlot(state, ctx, { permissionRequest: next, permissionQueue: rest }, permRespSid)
-          }
-          const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
-          if (qIdx !== -1) {
-            const queuedSid = slot.permissionQueue[qIdx].sessionId || null
-            const filtered = [...slot.permissionQueue]
-            filtered.splice(qIdx, 1)
-            return patchSessionScopedSlot(state, ctx, { permissionQueue: filtered }, queuedSid)
-          }
-        }
-        // 2) Search sessionSlots for sessions that are not currently active
-        for (const [sid, slot] of Object.entries(state.sessionSlots)) {
-          if (slot.permissionRequest?.id === requestId) {
-            const next = slot.permissionQueue[0] ?? null
-            const rest = slot.permissionQueue.slice(1)
-            return patchSessionScopedSlot(state, slot.permissionRequest.context || 'editor', { permissionRequest: next, permissionQueue: rest }, sid)
-          }
-          const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
-          if (qIdx !== -1) {
-            const filtered = [...slot.permissionQueue]
-            const queuedSid = filtered[qIdx].sessionId || sid
-            const queuedContext = filtered[qIdx].context || 'editor'
-            filtered.splice(qIdx, 1)
-            return patchSessionScopedSlot(state, queuedContext, { permissionQueue: filtered }, queuedSid)
-          }
-        }
-        return {}
-      })
+      set((state) => resolvePermissionInteraction(state, requestId, state.context).patch)
     },
 
     handleAskUserRequest(req: AskUserRequestIPC) {
-      // Use the context slot's own sessionId, not global activeSessionId.
-      const ctx = (req.context as AgentContext) || get().context
-      const reqSessionId = resolveClientSessionId(get(), req.clientSessionKey || req.sessionId)
-      const slotSid = get().slots[ctx]?.currentSessionId
-      const activeSid = get().activeSessionId[ctx]
-      const belongsToLiveSession = !!(reqSessionId && (reqSessionId === slotSid || reqSessionId === activeSid))
-      const isOtherSession = !!(reqSessionId && !belongsToLiveSession)
-      const isNewSessionGuard = !!(!req.sessionId && slotSid && !slotSid.startsWith('new-'))
-      if (isOtherSession || isNewSessionGuard) {
-        // Background session — persist into sessionSlots so the dialog
-        // appears naturally when the user switches to this session.
-        if (reqSessionId) {
-          set((state) => {
-            const sid = reqSessionId
-            const isNew = !state.sessionSlots[sid]
-            const bgSlot = isNew ? { ...emptySlot(), currentSessionId: sid } : state.sessionSlots[sid]
-            const patch = bgSlot.askUserRequest
-              ? { askUserQueue: [...bgSlot.askUserQueue, req] }
-              : { askUserRequest: req }
-            return patchSessionSlot(state, ctx, patch, sid)
-          })
-          get().dispatchAgentEvent({ type: 'ASK_USER_REQUEST' }, ctx, reqSessionId)
-        }
-        return
+      const mutation = enqueueAskUserInteraction(get(), req, get().context)
+      set(mutation.patch)
+      if (mutation.target) {
+        get().dispatchAgentEvent(
+          { type: 'ASK_USER_REQUEST' },
+          mutation.target.context,
+          mutation.target.sessionId,
+        )
       }
-
-      set((state) => {
-        const slot = state.slots[ctx]
-        if (slot.askUserRequest) {
-          return patchSessionSlot(state, ctx, { askUserQueue: [...slot.askUserQueue, req] })
-        }
-        return patchSessionSlot(state, ctx, { askUserRequest: req })
-      })
-      get().dispatchAgentEvent({ type: 'ASK_USER_REQUEST' }, ctx, reqSessionId)
-
     },
 
     handleAskUserResponse(requestId: string, answers: Record<string, string>) {
       const displayAnswer = Object.values(answers).filter(Boolean).join('；') || Object.keys(answers).join(', ')
-      set((state) => {
-        // 1) Search active slots
-        let ctx: AgentContext = state.context
-        if (state.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
-        else if (state.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
-        else {
-          // 2) Search sessionSlots
-          for (const [sid, slot] of Object.entries(state.sessionSlots)) {
-            if (slot.askUserRequest?.id === requestId) {
-              const next = slot.askUserQueue[0] ?? null
-              const rest = slot.askUserQueue.slice(1)
-              return patchSessionScopedSlot(state, slot.askUserRequest.context || 'editor', {
-                messages: [...slot.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: displayAnswer, createdAt: Date.now() }],
-                askUserRequest: next, askUserQueue: rest,
-              }, sid)
-            }
-          }
-          return {}
-        }
-
-        const s = state.slots[ctx]
-        const askRespSid = s.askUserRequest?.sessionId || null
-        const next = s.askUserQueue[0] ?? null
-        const rest = s.askUserQueue.slice(1)
-        return patchSessionScopedSlot(state, ctx, {
-          messages: [...s.messages, { kind: 'user' as const, id: `user-answer-${Date.now()}`, role: 'user', textContent: displayAnswer, createdAt: Date.now() }],
-          askUserRequest: next, askUserQueue: rest,
-        }, askRespSid)
+      const createdAt = Date.now()
+      const state = get()
+      const mutation = resolveAskUserInteraction(state, requestId, state.context, {
+        kind: 'user',
+        id: `user-answer-${createdAt}`,
+        role: 'user',
+        textContent: displayAnswer,
+        createdAt,
       })
+      set(mutation.patch)
+      return mutation.target
     },
 
     handleAskUserTimeout(requestId: string) {
-      let timeoutEventContext: AgentContext | null = null
-      let timeoutEventSessionId: string | null = null
-      set((state) => {
-        // 1) Search active slots
-        let ctx: AgentContext = state.context
-        if (state.slots.ask.askUserRequest?.id === requestId) ctx = 'ask'
-        else if (state.slots.editor.askUserRequest?.id === requestId) ctx = 'editor'
-        else {
-          // 2) Search sessionSlots
-          for (const [sid, slot] of Object.entries(state.sessionSlots)) {
-            if (slot.askUserRequest?.id === requestId) {
-              const next = slot.askUserQueue[0] ?? null
-              const rest = slot.askUserQueue.slice(1)
-              const requestContext = slot.askUserRequest.context || 'editor'
-              const updated = patchSessionScopedSlot(state, requestContext, {
-                messages: [...slot.messages, { kind: 'status' as const, id: `timeout-${Date.now()}`, role: 'system', phase: 'complete', textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通', createdAt: Date.now() }],
-                askUserRequest: next, askUserQueue: rest,
-              }, sid)
-              timeoutEventContext = requestContext
-              timeoutEventSessionId = sid
-              return updated
-            }
-          }
-          return {}
-        }
-
-        const s = state.slots[ctx]
-        const askTimeoutSid = s.askUserRequest?.sessionId || null
-        const next = s.askUserQueue[0] ?? null
-        const rest = s.askUserQueue.slice(1)
-        const updated = patchSessionScopedSlot(state, ctx, {
-          messages: [...s.messages, { kind: 'status' as const, id: `timeout-${Date.now()}`, role: 'system', phase: 'complete', textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通', createdAt: Date.now() }],
-          askUserRequest: next, askUserQueue: rest,
-        }, askTimeoutSid)
-        timeoutEventContext = ctx
-        timeoutEventSessionId = askTimeoutSid
-        return updated
+      const createdAt = Date.now()
+      const state = get()
+      const mutation = resolveAskUserInteraction(state, requestId, state.context, {
+        kind: 'status',
+        id: `timeout-${createdAt}`,
+        role: 'system',
+        phase: 'complete',
+        textContent: '☕ 等了很久没有回应，我先休息一下，有事随时沟通',
+        createdAt,
       })
-      if (timeoutEventContext) {
-        get().dispatchAgentEvent({ type: 'ASK_USER_TIMEOUT' }, timeoutEventContext, timeoutEventSessionId)
+      set(mutation.patch)
+      if (mutation.target) {
+        get().dispatchAgentEvent(
+          { type: 'ASK_USER_TIMEOUT' },
+          mutation.target.context,
+          mutation.target.sessionId,
+        )
       }
     },
 
     handlePermissionTimeout(requestId: string) {
-      set((state) => {
-        // 1) Search active slots
-        for (const ctx of ['editor', 'ask'] as AgentContext[]) {
-          const slot = state.slots[ctx]
-          if (slot.permissionRequest?.id === requestId) {
-            const permTOSid = slot.permissionRequest.sessionId || null
-            const next = slot.permissionQueue[0] ?? null
-            const rest = slot.permissionQueue.slice(1)
-            return patchSessionScopedSlot(state, ctx, { permissionRequest: next, permissionQueue: rest }, permTOSid)
-          }
-          const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
-          if (qIdx !== -1) {
-            const queuedSid = slot.permissionQueue[qIdx].sessionId || null
-            const filtered = [...slot.permissionQueue]
-            filtered.splice(qIdx, 1)
-            return patchSessionScopedSlot(state, ctx, { permissionQueue: filtered }, queuedSid)
-          }
-        }
-        // 2) Search sessionSlots
-        for (const [sid, slot] of Object.entries(state.sessionSlots)) {
-          if (slot.permissionRequest?.id === requestId) {
-            const next = slot.permissionQueue[0] ?? null
-            const rest = slot.permissionQueue.slice(1)
-            return patchSessionScopedSlot(state, slot.permissionRequest.context || 'editor', { permissionRequest: next, permissionQueue: rest }, sid)
-          }
-          const qIdx = slot.permissionQueue.findIndex((r) => r.id === requestId)
-          if (qIdx !== -1) {
-            const filtered = [...slot.permissionQueue]
-            const queuedSid = filtered[qIdx].sessionId || sid
-            const queuedContext = filtered[qIdx].context || 'editor'
-            filtered.splice(qIdx, 1)
-            return patchSessionScopedSlot(state, queuedContext, { permissionQueue: filtered }, queuedSid)
-          }
-        }
-        return {}
-      })
+      set((state) => resolvePermissionInteraction(state, requestId, state.context).patch)
     },
 
     handleGenerationActivity(activity: SessionRoutedGenerationActivity) {

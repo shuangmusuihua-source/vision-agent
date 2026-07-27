@@ -42,6 +42,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
 - `pending-interactions.ts` — permission and AskUser registration, timeout, SDK cancellation, notification cleanup, resolution, and session-scoped rejection
 - `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
+- `src/shared/telemetry-sanitizer.ts` — shared Sentry privacy boundary for recursive secret, session ID, URL credential, and private-path redaction
 - `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
 - `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
 - `officecli-runtime.ts` — opt-in, pinned OfficeCLI download, SHA-256 verification, atomic install, and runtime discovery for editable DOCX/XLSX/PPTX work
@@ -66,7 +67,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `App.tsx` — application root, settings cache, theme, global providers
 - `components/layout/AppShell.tsx` — main layout and feature orchestration
 - `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state
-- `store/session-slot-state.ts` — app/SDK session ID resolution, live/cache slot routing, mirroring, and LRU ownership
+- `store/session-slot-state.ts` — app/SDK session ID resolution, live/cache slot routing, pending-interaction queue transitions, mirroring, and LRU ownership
 - `store/ui-slice.ts` — application UI state
 - `hooks/useAgent.ts` — singleton agent IPC subscriptions and actions
 - `notifications/notification-inbox.ts` — in-app notification retention, persistence, toast timing, read state, and detail selection

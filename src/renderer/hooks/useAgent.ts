@@ -3,7 +3,6 @@ import { useAgentStore } from '../store/agent-store-impl'
 import { stripInternalAttachmentContext } from '../../shared/file-attachments'
 import { getSkillInvocationDisplayText } from '../../shared/skill-invocation'
 import {
-  findAskUserTarget,
   resolveSessionSlot,
   selectAskUserRequest,
   selectIsResumingSession,
@@ -276,8 +275,7 @@ export function useAgent(context: AgentContext = 'editor') {
   }, [store])
 
   const respondAskUser = useCallback((requestId: string, answers: Record<string, string>) => {
-    const target = findAskUserTarget(store.getState(), requestId, context)
-    store.getState().handleAskUserResponse(requestId, answers)
+    const target = store.getState().handleAskUserResponse(requestId, answers)
     if (target) {
       store.getState().dispatchAgentEvent({ type: 'ASK_USER_RESPONDED' }, target.context, target.sessionId)
       refreshWatchdogAfterState(target.context, target.sessionId)

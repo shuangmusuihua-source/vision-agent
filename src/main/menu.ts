@@ -1,5 +1,6 @@
 import { app, Menu, shell } from 'electron'
 import { GITHUB_REPOSITORY_URL } from '../shared/branding'
+import type { MenuAction } from '../shared/ipc-types'
 
 export function setupMenu(): void {
   const isMac = process.platform === 'darwin'
@@ -82,7 +83,7 @@ export function setupMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-function sendMenuAction(action: string): () => void {
+function sendMenuAction(action: MenuAction): () => void {
   return () => {
     const { BrowserWindow } = require('electron')
     const win = BrowserWindow.getFocusedWindow()

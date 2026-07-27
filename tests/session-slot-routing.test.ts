@@ -144,6 +144,35 @@ describe('session-scoped store routing', () => {
     expect(state.sessionSlots['background-session'].agentState).toBe('error')
   })
 
+  it('removes a queued background AskUser request when that request times out', () => {
+    const currentRequest = askUser('ask-current', 'background-session')
+    const queuedRequest = askUser('ask-queued', 'background-session')
+    const background = {
+      ...emptySlot(),
+      currentSessionId: 'background-session',
+      agentState: 'waitingForUserInput' as const,
+      askUserRequest: currentRequest,
+      askUserQueue: [queuedRequest],
+    }
+
+    useAgentStore.setState({
+      activeSessionId: { editor: 'active-session', ask: null },
+      slots: {
+        editor: { ...emptySlot(), currentSessionId: 'active-session' },
+        ask: emptySlot(),
+      },
+      sessionSlots: { 'background-session': background },
+      sessionAccessOrder: ['background-session'],
+    })
+
+    useAgentStore.getState().handleAskUserTimeout('ask-queued')
+
+    const state = useAgentStore.getState()
+    expect(state.sessionSlots['background-session'].askUserRequest?.id).toBe('ask-current')
+    expect(state.sessionSlots['background-session'].askUserQueue).toEqual([])
+    expect(state.sessionSlots['background-session'].messages.at(-1)?.kind).toBe('status')
+  })
+
   it('routes generation activity by session id instead of always writing to the visible context slot', () => {
     const active = { ...emptySlot(), currentSessionId: 'active-session' }
     const background = { ...emptySlot(), currentSessionId: 'background-session' }

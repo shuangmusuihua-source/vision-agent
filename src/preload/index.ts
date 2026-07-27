@@ -33,6 +33,7 @@ type UpdateAvailablePayload = IPCEventPayload<'update:available'>
 type UpdateDownloadProgressPayload = IPCEventPayload<'update:download-progress'>
 type UpdateErrorEventPayload = IPCEventPayload<'update:error'>
 type MainErrorPayload = IPCEventPayload<'main:error'>
+type MenuActionPayload = IPCEventPayload<'menu-action'>
 type CronRegisterRequest = IPCRequest<'cron:register'>
 type CronResolveScheduleRequest = IPCRequest<'cron:resolveSchedule'>
 type CronSetStatusRequest = IPCRequest<'cron:setStatus'>
@@ -307,8 +308,8 @@ const api = {
   },
 
   menu: {
-    onAction: (callback: (action: string) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, action: string) => callback(action)
+    onAction: (callback: (action: MenuActionPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, action: MenuActionPayload) => callback(action)
       ipcRenderer.on('menu-action', handler)
       return () => { ipcRenderer.removeListener('menu-action', handler) }
     }
