@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
+import { app, BrowserWindow, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
 import { pathToFileURL } from 'url'
@@ -6,7 +6,6 @@ import { configureAppIdentity } from './app-identity'
 configureAppIdentity()
 import { is } from '@electron-toolkit/utils'
 import * as Sentry from '@sentry/electron/main'
-import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { setupMenu } from './menu'
 import { getApiKey, getSettings } from './persistence/profile-store'
@@ -19,10 +18,10 @@ import { inlineRewriteRunner } from './inline-rewrite-runner'
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
 import { flushAuditLog } from './agent-audit'
-import { APP_NAME, GITHUB_LATEST_RELEASE_URL } from '../shared/branding'
-import { toUpdateErrorPayload, type UpdateDownloadProgress } from '../shared/update-types'
+import { APP_NAME } from '../shared/branding'
 import { isAllowedExternalUrl, isAllowedRendererNavigation } from './navigation-policy'
 import { sanitizeTelemetryEvent } from '../shared/telemetry-sanitizer'
+import { appUpdateLifecycle } from './app-update-lifecycle'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -67,73 +66,6 @@ process.on('uncaughtException', (error) => {
 })
 
 let mainWindow: BrowserWindow | null = null
-let silentUpdateChecks = 0
-let lastSilentUpdateCheckAt = 0
-
-const FOREGROUND_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
-
-type UpdateCheckResponse =
-  | { status: 'available'; version?: string }
-  | { status: 'not-available'; version?: string }
-  | { status: 'skipped'; message: string }
-  | { status: 'error'; message: string }
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-function isMissingUpdateFeedError(error: unknown): boolean {
-  const message = getErrorMessage(error)
-  return message.includes('404') && message.includes('releases.atom')
-}
-
-function sendUpdateError(error: unknown): void {
-  const win = getMainWindow()
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('update:error', toUpdateErrorPayload(error))
-  }
-}
-
-async function checkForUpdates(options: { silentMissingFeed?: boolean } = {}): Promise<UpdateCheckResponse> {
-  if (!app.isPackaged) return { status: 'skipped', message: '开发模式不检查更新' }
-
-  if (options.silentMissingFeed) silentUpdateChecks += 1
-  try {
-    const result = await autoUpdater.checkForUpdates()
-    if (!result) {
-      return { status: 'skipped', message: '检查已在进行中' }
-    }
-    const version = result.updateInfo?.version
-    return result.isUpdateAvailable
-      ? { status: 'available', version }
-      : { status: 'not-available', version }
-  } catch (error) {
-    if (options.silentMissingFeed && isMissingUpdateFeedError(error)) {
-      console.warn('[AutoUpdater] update feed unavailable; skipping launch check')
-      return { status: 'skipped', message: '更新源暂不可用' }
-    }
-    throw error
-  } finally {
-    if (options.silentMissingFeed) {
-      setTimeout(() => {
-        silentUpdateChecks = Math.max(0, silentUpdateChecks - 1)
-      }, 1000)
-    }
-  }
-}
-
-function checkForUpdatesSilently(reason: 'launch' | 'foreground'): void {
-  if (!app.isPackaged) return
-
-  const now = Date.now()
-  if (reason === 'foreground' && now - lastSilentUpdateCheckAt < FOREGROUND_UPDATE_CHECK_INTERVAL_MS) return
-  lastSilentUpdateCheckAt = now
-
-  checkForUpdates({ silentMissingFeed: true }).catch((err) => {
-    console.error(`[AutoUpdater] ${reason} check failed:`, err)
-    Sentry.captureException(err)
-  })
-}
 
 function createWindow(): void {
   const rendererEntry = is.dev && process.env['ELECTRON_RENDERER_URL']
@@ -245,76 +177,16 @@ app.whenReady().then(async () => {
 
   createWindow()
 
-  // Auto-updater: check for updates after launch (production only)
-  if (app.isPackaged) {
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = true
-
-    autoUpdater.on('update-available', (info) => {
-      const win = getMainWindow()
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('update:available', { version: info.version })
-      }
-    })
-
-    autoUpdater.on('update-downloaded', () => {
-      const win = getMainWindow()
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('update:downloaded')
-      }
-    })
-
-    autoUpdater.on('download-progress', (progress) => {
-      const win = getMainWindow()
-      if (win && !win.isDestroyed()) {
-        const payload: UpdateDownloadProgress = {
-          percent: Math.max(0, Math.min(100, progress.percent)),
-          transferred: progress.transferred,
-          total: progress.total,
-          bytesPerSecond: progress.bytesPerSecond,
-        }
-        win.webContents.send('update:download-progress', payload)
-      }
-    })
-
-    autoUpdater.on('error', (err) => {
-      if (silentUpdateChecks > 0 && isMissingUpdateFeedError(err)) {
-        console.warn('[AutoUpdater] update feed unavailable; skipping launch check')
-        return
-      }
-      console.error('[AutoUpdater] error:', err)
-      Sentry.captureException(err)
-      sendUpdateError(err)
-    })
-
-    checkForUpdatesSilently('launch')
-  }
+  appUpdateLifecycle.start()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
-    checkForUpdatesSilently('foreground')
+    appUpdateLifecycle.checkOnForeground()
   })
 
   app.on('browser-window-focus', () => {
-    checkForUpdatesSilently('foreground')
+    appUpdateLifecycle.checkOnForeground()
   })
-})
-
-// IPC: update actions from renderer
-ipcMain.handle('update:download', async () => {
-  await autoUpdater.downloadUpdate()
-})
-ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
-ipcMain.handle('update:openLatestRelease', () => shell.openExternal(GITHUB_LATEST_RELEASE_URL))
-ipcMain.handle('update:checkForUpdates', async () => {
-  try {
-    return await checkForUpdates()
-  } catch (error) {
-    const message = getErrorMessage(error)
-    sendUpdateError(error)
-    console.error('[AutoUpdater] manual check failed:', error)
-    return { status: 'error', message }
-  }
 })
 
 app.on('window-all-closed', () => {

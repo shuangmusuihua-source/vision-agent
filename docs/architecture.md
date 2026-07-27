@@ -28,7 +28,12 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 - 初始化知识库和文件索引
 - 同步内置 Skills
 - 恢复持久化 Cron 任务
-- 创建窗口并配置外链、更新和退出清理
+- 创建窗口并配置外链和退出清理
+
+`app-update-lifecycle.ts` 是自动更新的深 Module：其 interface 只有启动和前台检查，
+implementation 隐藏 electron-updater 配置、24 小时节流、缺失 feed 降噪、更新事件投影
+以及下载、安装、手动检查和打开发布页的 IPC。生产 updater 与测试 fake 通过同一 adapter
+seam 验证生命周期行为。
 
 ### IPC 层
 
