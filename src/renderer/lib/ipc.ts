@@ -43,7 +43,7 @@ import type {
   CronTaskRegistration,
   CronTaskTarget,
 } from '../../shared/cron-types'
-import type { IPCRequest, IPCResponse } from '../../shared/ipc-types'
+import type { IPCEventPayload, IPCRequest, IPCResponse } from '../../shared/ipc-types'
 
 // ─── API Interfaces ──────────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ interface SearchApi {
 }
 
 interface MenuApi {
-  onAction: (callback: (action: string) => void) => () => void
+  onAction: (callback: (action: IPCEventPayload<'menu-action'>) => void) => () => void
 }
 
 interface UpdateApi {

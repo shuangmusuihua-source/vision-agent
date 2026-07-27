@@ -145,8 +145,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const inlineRequestSequenceRef = useRef(0)
   const beginInlineRewriteRef = useRef<(() => void) | null>(null)
   const inlineDocumentIdentityRef = useRef(currentDocumentIdentity)
-  const shortcutSaveRef = useRef({ filePath, documentOwnerKey, onSave })
-  shortcutSaveRef.current = { filePath, documentOwnerKey, onSave }
   if (!sourceSaveControllerRef.current) {
     sourceSaveControllerRef.current = new SourceSaveController(onSave)
   }
@@ -156,14 +154,16 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const sourceSaveController = sourceSaveControllerRef.current
   const editorSaveController = editorSaveControllerRef.current
 
-  useImperativeHandle(ref, () => ({
-    flushPendingSave: async () => {
-      editorProjectionSchedulerRef.current?.flush()
-      const editorFlushed = await editorSaveController.flushAsync()
-      const sourceFlushed = await sourceSaveController.flushAsync()
-      return sourceFlushed || editorFlushed
-    },
-  }), [editorSaveController, sourceSaveController])
+  const flushPendingSave = useCallback(async () => {
+    editorProjectionSchedulerRef.current?.flush()
+    const editorFlushed = await editorSaveController.flushAsync()
+    const sourceFlushed = await sourceSaveController.flushAsync()
+    return sourceFlushed || editorFlushed
+  }, [editorSaveController, sourceSaveController])
+  const flushPendingSaveRef = useRef(flushPendingSave)
+  flushPendingSaveRef.current = flushPendingSave
+
+  useImperativeHandle(ref, () => ({ flushPendingSave }), [flushPendingSave])
 
   useEffect(() => {
     sourceSaveController.setSaveHandler(onSave)
@@ -265,9 +265,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
         addKeyboardShortcuts() {
           return {
             'Mod-s': () => {
-              const md = getFullMarkdown(this.editor)
-              const target = shortcutSaveRef.current
-              target.onSave(target.filePath, md)
+              void flushPendingSaveRef.current().catch(() => {})
               return true
             },
             'Mod-k': () => {

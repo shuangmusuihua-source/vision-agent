@@ -148,7 +148,10 @@ export type AgentStore = {
   handlePermissionRequest: (req: PermissionRequestIPC) => void
   handlePermissionResponse: (requestId: string, behavior: 'allow' | 'deny') => void
   handleAskUserRequest: (req: AskUserRequestIPC) => void
-  handleAskUserResponse: (requestId: string, answers: Record<string, string>) => void
+  handleAskUserResponse: (
+    requestId: string,
+    answers: Record<string, string>,
+  ) => { context: AgentContext; sessionId: string | null } | null
   handleAskUserTimeout: (requestId: string) => void
   handlePermissionTimeout: (requestId: string) => void
   handleGenerationActivity: (state: SessionRoutedGenerationActivity) => void

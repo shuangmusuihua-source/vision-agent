@@ -36,6 +36,8 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 
 `src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/preload/index.ts` 将其适配成 `window.api`。新增 IPC 时必须同时维护这两个边界和 renderer 类型。
 
+菜单事件也使用该共享协议。显式保存由菜单或编辑器快捷键触发后，统一 flush 编辑器投影调度器、source-mode save controller 与富文本 save controller，不能只依赖延迟自动保存。
+
 ### Agent 层
 
 - `query-runner.ts`：准备会话目录、构建 prompt/options、执行 `query()`、消费 SDK 流
@@ -48,6 +50,7 @@ BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isola
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
 - `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
 - `officecli-runtime.ts`：固定版本 OfficeCLI 的按需下载、SHA-256 校验、原子安装和能力探测；Agent 环境只获得受管二进制路径，并禁用 OfficeCLI 自更新
+- `src/shared/telemetry-sanitizer.ts`：Sentry `beforeSend` 的统一隐私边界，递归处理结构化字段与字符串中的 API Key、认证信息、session ID、URL 凭据和私有路径；清洗失败时事件不得发送
 
 ### 文件与授权
 
@@ -80,7 +83,7 @@ Renderer 是单页 React 应用：
 - `App.tsx`：主题、设置缓存、更新订阅和全局 provider
 - `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱编排
 - `agent-store*`：按 context 与 session 隔离的流式状态
-- `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、镜像写入与 LRU 淘汰
+- `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、权限/AskUser 队列推进、镜像写入与 LRU 淘汰
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions
 - `notification-inbox.ts`：应用内通知的保留、持久化、toast 计时、已读状态和详情选择
@@ -99,4 +102,4 @@ React 组件错误由 ErrorBoundary 隔离；全局同步错误和未处理 Prom
 
 Renderer 依赖由 Vite 打入静态资源；只有 main/preload 运行时依赖保留在生产 `node_modules`。Claude 原生二进制及 CLI 相关文件通过 `asarUnpack` 放入 `app.asar.unpacked`。Skills 作为 `extraResources` 打包；pack/dist 后同时校验 Skill 完整性和 `app.asar` 顶层运行时 allowlist。
 
-当前 macOS 构建目标为 arm64 DMG/ZIP。Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程执行 hardened runtime、签名和 notarization；本地没有发布凭据时生成未签名验证包。
+当前 macOS 构建目标为 arm64 DMG/ZIP。Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程执行 hardened runtime、签名和 notarization；本地没有发布凭据时生成未签名验证包。Renderer CSP 只为 Shiki 的 WebAssembly 开放 `wasm-unsafe-eval`；macOS entitlement 只保留 Electron hardened runtime 所需的 JIT、unsigned executable memory、library validation 例外及用户选择文件读写，不声明未使用的 network server/client 或 DYLD 环境权限。

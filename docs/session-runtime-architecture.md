@@ -145,6 +145,8 @@ Claude SDK JSONL 保存 transcript。electron-store `SessionRecord` 保存：
 
 Renderer 的双表示规则由 `store/session-slot-state.ts` 独占：caller 不应自行在
 `slots[context]` 与 `sessionSlots[sessionId]` 之间回退，也不应自行维护 LRU 顺序。
+权限与 AskUser 的入队、当前项推进、排队项移除和 request target 定位同样经过该
+module；超时与用户响应不能在 store action 中再次实现一套 live/cache 搜索。
 
 ## 修改检查表
 

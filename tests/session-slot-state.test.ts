@@ -5,8 +5,8 @@ import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import {
   buildSessionSwitchPatch,
   cacheSessionSlot,
-  findAskUserTarget,
   patchSessionSlot,
+  resolveAskUserInteraction,
   resolveClientSessionId,
   selectAskUserRequest,
   selectIsResumingSession,
@@ -106,7 +106,7 @@ describe('session-slot state module', () => {
     expect(patch.slots?.editor._needsSdkLoad).toBe(true)
   })
 
-  it('selects and locates AskUser requests without exposing cache fallback to callers', () => {
+  it('selects and resolves AskUser requests without exposing cache fallback to callers', () => {
     const request = {
       id: 'ask-1',
       questions: [{ question: 'Continue?', options: [], multiSelect: false }],
@@ -121,10 +121,12 @@ describe('session-slot state module', () => {
     })
 
     expect(selectAskUserRequest(current, 'editor')).toBe(request)
-    expect(findAskUserTarget(current, 'ask-1', 'ask')).toEqual({
+    const mutation = resolveAskUserInteraction(current, 'ask-1', 'ask')
+    expect(mutation.target).toEqual({
       context: 'editor',
       sessionId: 'session-a',
     })
+    expect(mutation.patch.sessionSlots?.['session-a'].askUserRequest).toBeNull()
   })
 
   it('derives resume state from the owning context slot only', () => {
