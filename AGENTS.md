@@ -68,6 +68,8 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - React 19, TypeScript, Zustand, no router
 - `App.tsx` — application root, settings cache, theme, global providers
 - `components/layout/AppShell.tsx` — main layout and feature orchestration
+- `workflows/editor-session-workflow.ts` — editor-session persistence ordering, app/SDK ID deletion routing, workspace/session switching, overview activation, and new-session draft lifecycle
+- `workflows/session-output-workflow.ts` — latest-only session-output loading, file-change/agent-completion refresh coalescing, and output actions
 - `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state
 - `store/session-slot-state.ts` — app/SDK session ID resolution, live/cache slot routing, pending-interaction queue transitions, mirroring, and LRU ownership
 - `store/ui-slice.ts` — application UI state

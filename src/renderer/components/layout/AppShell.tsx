@@ -19,9 +19,11 @@ import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { useTabs, type SaveFileResult } from '../../hooks/useTabs'
+import { useEditorSessionWorkflow } from '../../workflows/editor-session-workflow'
+import { useSessionOutputWorkflow } from '../../workflows/session-output-workflow'
 import { useAgentStore } from '../../store/agent-store-impl'
-import type { AgentContext, SessionOutputEntry, TabDescriptor } from '../../../shared/types'
-import { isFileTab, OVERVIEW_TAB_ID } from '../../../shared/types'
+import type { AgentContext, TabDescriptor } from '../../../shared/types'
+import { isFileTab } from '../../../shared/types'
 import { filterUserWorkspacePaths, findContainingWorkspacePath } from '../../../shared/workspace-paths'
 import { useChangedFileCount, useGraphStore } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
@@ -68,8 +70,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const modal = useModal()
   const setAgentContext = useAgentStore((state) => state.setContext)
   const setAgentLinkedFile = useAgentStore((state) => state.setLinkedFile)
-  const setSessionOutputsLoading = useAgentStore((state) => state.setSessionOutputsLoading)
-  const removeSessionState = useAgentStore((state) => state.removeSessionState)
   const clearContextSession = useAgentStore((state) => state.clearContextSession)
   const setAgentPrefill = useAgentStore((state) => state.setPrefill)
 
@@ -197,6 +197,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
   const editorWorkspacePath = useAgentStore((s) => s.slots.editor.workspacePath || s.activeWorkspacePath)
   const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
+  const isStreaming = useIsStreaming('editor')
   const sessionLoadError = useAgentStore((s) => s.sessionLoadError)
   const retrySessionLoad = useAgentStore((s) => s.retrySessionLoad)
   const clearSessionLoadError = useAgentStore((s) => s.clearSessionLoadError)
@@ -204,202 +205,6 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     activeFilePath,
     [...workspace.workspacePaths, ...workspace.fixedWorkspacePaths],
   )
-  const sessionOutputRequestVersions = useRef(new Map<string, number>())
-  const sessionOutputRefreshTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
-
-  const refreshSessionOutputs = useCallback((sessionId: string, showLoading = false) => {
-    const requestVersion = (sessionOutputRequestVersions.current.get(sessionId) || 0) + 1
-    sessionOutputRequestVersions.current.set(sessionId, requestVersion)
-    if (showLoading) setSessionOutputsLoading(true)
-
-    return window.api.agent.getSessionOutputs(sessionId).then((outputs) => {
-      const isLatestRequest = sessionOutputRequestVersions.current.get(sessionId) === requestVersion
-      const isActiveSession = useAgentStore.getState().activeSessionId.editor === sessionId
-      if (isLatestRequest && isActiveSession) {
-        useAgentStore.getState().setSessionOutputs(outputs)
-      }
-    }).catch(() => {
-      const isLatestRequest = sessionOutputRequestVersions.current.get(sessionId) === requestVersion
-      const isActiveSession = useAgentStore.getState().activeSessionId.editor === sessionId
-      if (isLatestRequest && isActiveSession) {
-        useAgentStore.getState().setSessionOutputs(null)
-      }
-    })
-  }, [setSessionOutputsLoading])
-
-  const scheduleSessionOutputsRefresh = useCallback((sessionId: string) => {
-    const existing = sessionOutputRefreshTimers.current.get(sessionId)
-    if (existing) clearTimeout(existing)
-    const timer = setTimeout(() => {
-      sessionOutputRefreshTimers.current.delete(sessionId)
-      void refreshSessionOutputs(sessionId)
-    }, 120)
-    sessionOutputRefreshTimers.current.set(sessionId, timer)
-  }, [refreshSessionOutputs])
-
-  useEffect(() => () => {
-    for (const timer of sessionOutputRefreshTimers.current.values()) clearTimeout(timer)
-    sessionOutputRefreshTimers.current.clear()
-  }, [])
-
-  // Load sessions when workspace changes
-  const skipNextSessionLoad = useRef(false)
-  useEffect(() => {
-    if (skipNextSessionLoad.current) {
-      skipNextSessionLoad.current = false
-      return
-    }
-    loadSessions()
-  }, [activeWorkspacePath])
-
-  // Auto-open overview tab when active session changes (per-session tabs)
-  useEffect(() => {
-    if (activeWorkspacePath && activeSessionId && view === 'editor') {
-      openFixedTab(OVERVIEW_TAB_ID)
-    }
-  }, [activeSessionId])
-
-  // Load session outputs when active session changes
-  useEffect(() => {
-    if (activeSessionId) {
-      void refreshSessionOutputs(activeSessionId, true)
-    } else {
-      useAgentStore.getState().setSessionOutputs(null)
-    }
-  }, [activeSessionId, refreshSessionOutputs])
-
-  useEffect(() => {
-    return window.api.agent.onSessionFilesChanged(({ sessionId }) => {
-      if (useAgentStore.getState().activeSessionId.editor !== sessionId) return
-      scheduleSessionOutputsRefresh(sessionId)
-    })
-  }, [scheduleSessionOutputsRefresh])
-
-  // ── Session selection / new conversation handlers ─────────────────────
-
-  const handleSessionSelect = useCallback((sessionId: string, workspacePath: string) => {
-    // Switch to session-isolated slot (also sets activeSessionId, loading flag,
-    // and kicks off SDK message load when the slot has _needsSdkLoad === true).
-    useAgentStore.getState().switchToSession(sessionId, 'editor', workspacePath || null)
-    setLinkedFile(useAgentStore.getState().slots.editor.linkedFile || null)
-    if (workspacePath && workspacePath !== activeWorkspacePath) {
-      useAgentStore.getState().setActiveWorkspace(workspacePath)
-    }
-    // session outputs loaded by useEffect on activeSessionId change
-    if (view !== 'editor') {
-      setAgentContext('editor')
-      setView('editor')
-    }
-    const overviewTab = openTabs.find(t => t.type === 'fixed')
-    if (overviewTab) switchTab(overviewTab)
-  }, [activeWorkspacePath, view, openTabs, switchTab, setAgentContext, setLinkedFile])
-
-  const handleNotificationOpen = useCallback((notification: AppNotification) => {
-    const target = notification.target
-    if (target?.view === 'automation') {
-      setAutomationFocusTaskId(target.taskId || null)
-      clearTab()
-      setView('automation')
-      return
-    }
-    if (target?.view === 'skills') {
-      clearTab()
-      setView('skills')
-      return
-    }
-    if (target?.view === 'knowledge') {
-      clearTab()
-      setView('knowledge')
-      return
-    }
-    if (target?.view === 'ask') {
-      setAgentContext('ask')
-      clearTab()
-      setView('ask')
-      return
-    }
-    if (target?.view === 'editor') {
-      setAgentContext('editor')
-      setView('editor')
-      if (target.sessionId && target.workspacePath) {
-        handleSessionSelect(target.sessionId, target.workspacePath)
-      }
-      return
-    }
-
-    if ('context' in notification && notification.context === 'ask') {
-      setAgentContext('ask')
-      clearTab()
-      setView('ask')
-      return
-    }
-    if ('context' in notification && notification.context === 'editor') {
-      setAgentContext('editor')
-      setView('editor')
-      if (notification.sessionId && notification.workspacePath) {
-        handleSessionSelect(notification.sessionId, notification.workspacePath)
-      }
-    }
-  }, [clearTab, handleSessionSelect, setAgentContext, setView])
-
-  const { creatingSessionIn, setCreatingSessionIn, newSessionName, setNewSessionName } = useUiStore(useShallow((state) => ({
-    creatingSessionIn: state.creatingSessionIn,
-    setCreatingSessionIn: state.setCreatingSessionIn,
-    newSessionName: state.newSessionName,
-    setNewSessionName: state.setNewSessionName,
-  })))
-  const newSessionInputRef = useRef<HTMLInputElement>(null)
-  const creatingSessionRequestRef = useRef(false)
-
-  useEffect(() => {
-    if (creatingSessionIn) {
-      setNewSessionName('')
-      setTimeout(() => newSessionInputRef.current?.focus(), 50)
-    }
-  }, [creatingSessionIn])
-
-  const handleCreateSession = useCallback(async (wsPath: string) => {
-    const name = newSessionName.trim()
-    if (!name || creatingSessionRequestRef.current) return
-    creatingSessionRequestRef.current = true
-    const tempSessionId = `new-${Date.now()}`
-    try {
-      const result = await window.api.agent.updateSessionRecord(tempSessionId, {
-        title: name,
-        workspacePath: wsPath,
-        context: 'editor',
-      })
-      if (!result.success) throw new Error('会话记录未保存')
-    } catch (error) {
-      console.error('[AppShell] create session persistence failed:', error)
-      await modal.alert({ title: '创建失败', message: '无法保存新会话，请稍后重试' })
-      return
-    } finally {
-      creatingSessionRequestRef.current = false
-    }
-
-    if (wsPath !== activeWorkspacePath) {
-      skipNextSessionLoad.current = true
-    }
-    // Only expose the session after its app-owned record is durable.
-    useAgentStore.getState().switchToSession(tempSessionId, 'editor', wsPath)
-    setEditorLinkedFile(null)
-    if (wsPath !== activeWorkspacePath) {
-      useAgentStore.getState().setActiveWorkspace(wsPath)
-    }
-    // Add to sessionList via the protocol — single write path
-    useAgentStore.getState().dispatchSessionList({
-      type: 'CREATE_TEMP',
-      sessionId: tempSessionId,
-      title: name,
-      workspacePath: wsPath,
-    })
-    setCreatingSessionIn(null)
-    if (view !== 'editor') {
-      setAgentContext('editor')
-      setView('editor')
-    }
-  }, [newSessionName, activeWorkspacePath, view, setAgentContext, setEditorLinkedFile, modal])
 
   useEffect(() => {
     return window.api.onMainError((error) => {
@@ -452,54 +257,70 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     setPermissionMode: setEditorApprovalMode,
   } = useAgent('editor')
 
-  const handleDeleteSession = useCallback(async (sessionId: string) => {
-    const ok = await modal.confirm({
-      title: '删除会话',
-      message: '确定删除此会话？会话中的对话记录和会话文件将被永久删除，此操作不可撤销。',
-      variant: 'danger',
-    })
-    if (!ok) return
-    const wasActive = useAgentStore.getState().activeSessionId.editor === sessionId
+  const editorSessionWorkflow = useEditorSessionWorkflow({
+    activeWorkspacePath,
+    activeSessionId,
+    view,
+    openTabs,
+    loadSessions,
+    switchTab,
+    openFixedTab,
+    setView,
+    setAgentContext: () => setAgentContext('editor'),
+    setUiLinkedFile: setLinkedFile,
+    clearEditorLinkedFile: () => setEditorLinkedFile(null),
+    alert: modal.alert,
+    confirm: modal.confirm,
+  })
 
-    const slot = useAgentStore.getState().sessionSlots[sessionId]
-    const sdkSessionId = slot?.sdkSessionId
-      || useAgentStore.getState().sessionList.find(s => s.id === sessionId)?.sdkSessionId
-      || (sessionId.startsWith('new-') ? null : sessionId)
-
-    try {
-      if (sdkSessionId) {
-        await window.api.agent.deleteSession(sdkSessionId)
-      } else {
-        await window.api.agent.removeSessionRecord(sessionId)
-      }
-    } catch (err) {
-      console.error('[AppShell] deleteSession error:', err)
-      await modal.alert({ title: '删除失败', message: '无法删除会话，请稍后重试' })
+  const handleNotificationOpen = useCallback((notification: AppNotification) => {
+    const target = notification.target
+    if (target?.view === 'automation') {
+      setAutomationFocusTaskId(target.taskId || null)
+      clearTab()
+      setView('automation')
       return
     }
-    removeSessionState(sessionId)
-    if (wasActive) {
-      useAgentStore.getState().switchToSession('')
-      useAgentStore.getState().setSessionOutputs(null)
-      setEditorLinkedFile(null)
-      if (view !== 'editor') {
-        setView('editor')
+    if (target?.view === 'skills') {
+      clearTab()
+      setView('skills')
+      return
+    }
+    if (target?.view === 'knowledge') {
+      clearTab()
+      setView('knowledge')
+      return
+    }
+    if (target?.view === 'ask') {
+      setAgentContext('ask')
+      clearTab()
+      setView('ask')
+      return
+    }
+    if (target?.view === 'editor') {
+      setAgentContext('editor')
+      setView('editor')
+      if (target.sessionId && target.workspacePath) {
+        editorSessionWorkflow.select(target.sessionId, target.workspacePath)
+      }
+      return
+    }
+
+    if ('context' in notification && notification.context === 'ask') {
+      setAgentContext('ask')
+      clearTab()
+      setView('ask')
+      return
+    }
+    if ('context' in notification && notification.context === 'editor') {
+      setAgentContext('editor')
+      setView('editor')
+      if (notification.sessionId && notification.workspacePath) {
+        editorSessionWorkflow.select(notification.sessionId, notification.workspacePath)
       }
     }
-  }, [modal, view, loadSessions, removeSessionState, setEditorLinkedFile])
+  }, [clearTab, editorSessionWorkflow.select, setAgentContext, setView])
 
-  const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
-    try {
-      const result = await window.api.agent.renameSession(sessionId, title)
-      if (!result.success) throw new Error('会话名称未保存')
-      useAgentStore.getState().dispatchSessionList({ type: 'RENAME', sessionId, title })
-    } catch (error) {
-      console.error('[AppShell] rename session failed:', error)
-      await modal.alert({ title: '重命名失败', message: '无法保存会话名称，请稍后重试' })
-    }
-  }, [modal])
-
-  const isStreaming = useIsStreaming('editor')
   const prevIsStreamingRef = useRef(isStreaming)
   const editorPermission = usePermissionRequest('editor')
   const editorPermissionQueueLen = usePermissionQueueLength('editor')
@@ -565,53 +386,16 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     await openFile(path)
   }, [openFile, setAgentContext, view, workspace.fixedWorkspacePaths, workspace.workspacePaths])
 
-  const handleAddToKnowledge = useCallback(async (filePath: string) => {
-    const result = await window.api.workspace.addToKnowledge(filePath, activeSessionId || undefined)
-    if (!result.success) {
-      await modal.alert({ title: '无法放入知识库', message: result.error || '请稍后重试' })
-    } else if (activeSessionId) {
-      await refreshSessionOutputs(activeSessionId)
-    }
-    return result
-  }, [activeSessionId, modal, refreshSessionOutputs])
-
-  const handleRevealSessionOutput = useCallback(async (filePath: string) => {
-    if (!activeSessionId) return
-    const result = await window.api.agent.revealSessionOutput(activeSessionId, filePath)
-    if (!result.success) {
-      await modal.alert({ title: '无法打开所在目录', message: result.error || '产物可能已被移动或删除' })
-    }
-  }, [activeSessionId, modal])
-
-  const handleOpenSessionOutput = useCallback(async (filePath: string) => {
-    if (!activeSessionId) return
-    const result = await window.api.agent.openSessionOutput(activeSessionId, filePath)
-    if (!result.success) {
-      await modal.alert({ title: '无法打开产物', message: result.error || '没有可用于打开该文件的应用' })
-    }
-  }, [activeSessionId, modal])
-
-  const handleDeleteSessionOutput = useCallback(async (file: SessionOutputEntry) => {
-    if (!activeSessionId) return false
-    const confirmed = await modal.confirm({
-      title: '删除产物',
-      message: `确定删除“${file.fileName}”吗？文件会被移到废纸篓。`,
-      variant: 'danger',
-      confirmLabel: '删除',
-    })
-    if (!confirmed) return false
-    const result = await window.api.agent.deleteSessionOutput(activeSessionId, file.filePath)
-    if (!result.success) {
-      await modal.alert({ title: '删除失败', message: result.error || '请稍后重试' })
-      return false
-    }
-    await refreshSessionOutputs(activeSessionId)
-    return true
-  }, [activeSessionId, modal, refreshSessionOutputs])
+  const sessionOutputWorkflow = useSessionOutputWorkflow({
+    activeSessionId,
+    isStreaming,
+    alert: modal.alert,
+    confirm: modal.confirm,
+  })
 
   // ── File operations (bridging workspace + tabs) ─────────────────────
 
-  // ── Auto-refresh after agent finishes ───────────────────────────────
+  // ── Refresh the active editor after the agent finishes ─────────────
 
   useEffect(() => {
     const wasStreaming = prevIsStreamingRef.current
@@ -621,18 +405,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     const hasMessages = useAgentStore.getState().slots.editor.messages.length > 0
     if (!hasMessages) return
 
-    // Refresh session outputs so OverviewPanel shows newly produced files
-    const sid = useAgentStore.getState().activeSessionId.editor
-    if (sid) {
-      scheduleSessionOutputsRefresh(sid)
-    }
-
     const tab = activeTabRef.current
     if (tab && isFileTab(tab)) {
       const timer = setTimeout(() => { refreshActiveContentRef.current().catch(() => {}) }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isStreaming, scheduleSessionOutputsRefresh])
+  }, [isStreaming])
 
   // ── Text selection, ask-agent, stats, skill ─────────────────────────
 
@@ -716,18 +494,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           items: editorSessionList,
           activeId: view === 'editor' ? activeSessionId : null,
           activeRunning: isStreaming,
-          select: handleSessionSelect,
-          remove: handleDeleteSession,
-          rename: handleRenameSession,
-          draft: {
-            workspacePath: creatingSessionIn,
-            title: newSessionName,
-            inputRef: newSessionInputRef,
-            begin: setCreatingSessionIn,
-            cancel: () => setCreatingSessionIn(null),
-            change: setNewSessionName,
-            submit: handleCreateSession,
-          },
+          select: editorSessionWorkflow.select,
+          remove: editorSessionWorkflow.remove,
+          rename: editorSessionWorkflow.rename,
+          draft: editorSessionWorkflow.draft,
         }}
         tools={{
           openSettings: onOpenSettings,
@@ -811,10 +581,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             sessionId={activeSessionId}
             activeFilePath={linkedFile || activeFilePath}
             onOpenFile={handleFileSelect}
-            onOpenOutput={handleOpenSessionOutput}
-            onAddToKnowledge={handleAddToKnowledge}
-            onRevealOutput={handleRevealSessionOutput}
-            onDeleteOutput={handleDeleteSessionOutput}
+            onOpenOutput={sessionOutputWorkflow.open}
+            onAddToKnowledge={sessionOutputWorkflow.addToKnowledge}
+            onRevealOutput={sessionOutputWorkflow.reveal}
+            onDeleteOutput={sessionOutputWorkflow.delete}
           />
           </ErrorBoundary>
         ) : (
