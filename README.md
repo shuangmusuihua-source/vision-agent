@@ -1,12 +1,12 @@
 # sumi
 
-`sumi` 是一款面向 macOS 的 AI 工作台，把 Markdown 编辑、Claude Agent 会话、项目文件、知识库、图谱和 Skills 放在同一个桌面应用中。
+`sumi` 是一款面向 macOS 的 AI 工作台，把 Markdown 编辑、AI 助手会话、项目文件、知识库、图谱和 Skills 放在同一个桌面应用中。
 
 ## 当前能力
 
 - 多工作区与独立会话
 - Tiptap Markdown 编辑器、选区 AI 改写审阅、源码模式、自动保存、表格、任务列表、Mermaid 和 KaTeX
-- Claude Agent SDK 流式对话、工具审批、AskUser、会话恢复和分页历史
+- 流式 AI 对话、操作审批、交互式提问、会话恢复和分页历史
 - 每个会话独立的生成文件目录与产物预览
 - 全局搜索、知识库与双向链接图谱
 - 内置 Skills、社区 Skill 安装/更新/卸载
