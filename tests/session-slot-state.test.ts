@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { SessionRoutedAskUserRequest } from '../src/shared/types'
 import type { AgentStore, ContextSlot } from '../src/renderer/store/agent-store'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
@@ -107,11 +108,13 @@ describe('session-slot state module', () => {
   })
 
   it('selects and resolves AskUser requests without exposing cache fallback to callers', () => {
-    const request = {
+    const request: SessionRoutedAskUserRequest = {
       id: 'ask-1',
       questions: [{ question: 'Continue?', options: [], multiSelect: false }],
-      context: 'editor' as const,
+      context: 'editor',
       sessionId: 'session-a',
+      clientSessionKey: 'session-a',
+      workspacePath: '/workspace/a',
     }
     const current = state({
       slots: { editor: slot('session-a'), ask: emptySlot() },
@@ -121,7 +124,7 @@ describe('session-slot state module', () => {
     })
 
     expect(selectAskUserRequest(current, 'editor')).toBe(request)
-    const mutation = resolveAskUserInteraction(current, 'ask-1', 'ask')
+    const mutation = resolveAskUserInteraction(current, 'ask-1')
     expect(mutation.target).toEqual({
       context: 'editor',
       sessionId: 'session-a',

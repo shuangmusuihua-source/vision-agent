@@ -3,7 +3,18 @@ import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
 import { isAgentQueryActive } from '../src/renderer/store/agent-state-machine'
 import { sessionListReducer } from '../src/renderer/store/session-protocol'
-import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SessionRoutedGenerationActivity } from '../src/shared/types'
+import type {
+  AgentContext,
+  AgentIPCMessage,
+  AgentIPCMessageWithContext,
+  AgentSessionEnvelope,
+  ConversationMessage,
+  SdkSessionInfo,
+  SessionRoutedAskUserRequest,
+  SessionRoutedGenerationActivity,
+  SessionRoutedPermissionRequest,
+  SessionRoutedRequestTimeout,
+} from '../src/shared/types'
 
 function resetStore() {
   useAgentStore.setState({
@@ -42,22 +53,43 @@ function userMessage(id: string, text: string): ConversationMessage {
   }
 }
 
-function permission(id: string, sessionId: string): PermissionRequestIPC {
+function interactionEnvelope(
+  sessionId: string,
+  context: AgentContext = 'editor',
+): AgentSessionEnvelope {
+  return {
+    context,
+    sessionId,
+    clientSessionKey: sessionId,
+    workspacePath: context === 'ask' ? '/app/ask' : `/workspace/${sessionId}`,
+  }
+}
+
+function permission(id: string, sessionId: string): SessionRoutedPermissionRequest {
   return {
     id,
     toolName: 'Write',
     input: { file_path: `/tmp/${id}.md` },
-    context: 'editor',
-    sessionId,
+    ...interactionEnvelope(sessionId),
   }
 }
 
-function askUser(id: string, sessionId: string): AskUserRequestIPC {
+function askUser(
+  id: string,
+  sessionId: string,
+  context: AgentContext = 'editor',
+): SessionRoutedAskUserRequest {
   return {
     id,
     questions: [{ question: 'Pick one', options: [], multiSelect: false }],
-    context: 'editor',
-    sessionId,
+    ...interactionEnvelope(sessionId, context),
+  }
+}
+
+function interactionTimeout(requestId: string, sessionId: string): SessionRoutedRequestTimeout {
+  return {
+    requestId,
+    ...interactionEnvelope(sessionId),
   }
 }
 
@@ -136,7 +168,9 @@ describe('session-scoped store routing', () => {
       sessionAccessOrder: ['background-session'],
     })
 
-    useAgentStore.getState().handleAskUserTimeout('ask-bg')
+    useAgentStore.getState().handleAskUserTimeout(
+      interactionTimeout('ask-bg', 'background-session'),
+    )
 
     const state = useAgentStore.getState()
     expect(state.slots.editor.messages).toHaveLength(1)
@@ -166,7 +200,9 @@ describe('session-scoped store routing', () => {
       sessionAccessOrder: ['background-session'],
     })
 
-    useAgentStore.getState().handleAskUserTimeout('ask-queued')
+    useAgentStore.getState().handleAskUserTimeout(
+      interactionTimeout('ask-queued', 'background-session'),
+    )
 
     const state = useAgentStore.getState()
     expect(state.sessionSlots['background-session'].askUserRequest?.id).toBe('ask-current')
@@ -303,6 +339,31 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.askUserRequest).toBeNull()
     expect(state.sessionSlots['background-session'].askUserRequest?.id).toBe('ask-bg')
     expect(state.sessionSlots['background-session'].agentState).toBe('waitingForUserInput')
+  })
+
+  it('routes AskUser requests from their envelope instead of the visible store context', () => {
+    const ask = {
+      ...emptySlot(),
+      currentSessionId: 'ask-session',
+      agentState: 'running' as const,
+    }
+
+    useAgentStore.setState({
+      context: 'editor',
+      activeSessionId: { editor: null, ask: 'ask-session' },
+      slots: { editor: emptySlot(), ask },
+      sessionSlots: { 'ask-session': ask },
+      sessionAccessOrder: ['ask-session'],
+    })
+
+    useAgentStore.getState().handleAskUserRequest(
+      askUser('ask-home', 'ask-session', 'ask'),
+    )
+
+    const state = useAgentStore.getState()
+    expect(state.slots.editor.askUserRequest).toBeNull()
+    expect(state.slots.ask.askUserRequest?.id).toBe('ask-home')
+    expect(state.slots.ask.agentState).toBe('waitingForUserInput')
   })
 
   it('keeps switched editor sessions isolated while background output and prompts arrive', async () => {

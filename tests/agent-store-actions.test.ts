@@ -259,6 +259,10 @@ describe('agent store intent actions', () => {
         id: 'permission-a',
         toolName: 'Write',
         input: {},
+        context: 'editor' as const,
+        sessionId: 'session-a',
+        clientSessionKey: 'session-a',
+        workspacePath: '/workspace/a',
       },
     }
     useAgentStore.setState({

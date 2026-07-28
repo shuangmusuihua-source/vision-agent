@@ -8,8 +8,9 @@ import type {
   AgentEvent,
   ConversationMessage,
   UsageInfo,
-  PermissionRequestIPC,
-  AskUserRequestIPC,
+  SessionRoutedPermissionRequest,
+  SessionRoutedAskUserRequest,
+  SessionRoutedRequestTimeout,
   SdkSessionInfo,
   StreamingAccumulator,
   GenerationActivity,
@@ -46,10 +47,10 @@ export type ContextSlot = {
   sdkSessionId: string | null
   agentState: AgentState
   usageInfo: UsageInfo | null
-  permissionRequest: PermissionRequestIPC | null
-  permissionQueue: PermissionRequestIPC[]
-  askUserRequest: AskUserRequestIPC | null
-  askUserQueue: AskUserRequestIPC[]
+  permissionRequest: SessionRoutedPermissionRequest | null
+  permissionQueue: SessionRoutedPermissionRequest[]
+  askUserRequest: SessionRoutedAskUserRequest | null
+  askUserQueue: SessionRoutedAskUserRequest[]
   generationActivity: GenerationActivity | null
   activeSkillId: string | null
   lastEditedFile: string | null
@@ -143,15 +144,15 @@ export type AgentStore = {
   // Actions
   dispatchAgentEvent: (event: AgentEvent, context?: AgentContext, eventSid?: string | null) => void
   processIPCMessage: (msg: AgentIPCMessageWithContext | AgentIPCMessage, options?: { isReplay?: boolean }) => void
-  handlePermissionRequest: (req: PermissionRequestIPC) => void
+  handlePermissionRequest: (req: SessionRoutedPermissionRequest) => void
   handlePermissionResponse: (requestId: string, behavior: 'allow' | 'deny') => void
-  handleAskUserRequest: (req: AskUserRequestIPC) => void
+  handleAskUserRequest: (req: SessionRoutedAskUserRequest) => void
   handleAskUserResponse: (
     requestId: string,
     answers: Record<string, string>,
   ) => { context: AgentContext; sessionId: string | null } | null
-  handleAskUserTimeout: (requestId: string) => void
-  handlePermissionTimeout: (requestId: string) => void
+  handleAskUserTimeout: (timeout: SessionRoutedRequestTimeout) => void
+  handlePermissionTimeout: (timeout: SessionRoutedRequestTimeout) => void
   handleGenerationActivity: (state: SessionRoutedGenerationActivity) => void
   setContext: (context: AgentContext) => void
   setPrefill: (context: AgentContext, text: string) => void

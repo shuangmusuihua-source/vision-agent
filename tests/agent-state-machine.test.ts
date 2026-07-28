@@ -51,8 +51,23 @@ describe('reduceAgentEvent', () => {
       agentState: 'running' as const,
       activeSkillId: 'skill-1',
       messages: [activeTextMessage()],
-      permissionRequest: { id: 'permission-1', toolName: 'Write', input: {} },
-      askUserRequest: { id: 'ask-1', questions: [] },
+      permissionRequest: {
+        id: 'permission-1',
+        toolName: 'Write',
+        input: {},
+        context: 'editor' as const,
+        sessionId: 'session-1',
+        clientSessionKey: 'session-1',
+        workspacePath: '/workspace',
+      },
+      askUserRequest: {
+        id: 'ask-1',
+        questions: [],
+        context: 'editor' as const,
+        sessionId: 'session-1',
+        clientSessionKey: 'session-1',
+        workspacePath: '/workspace',
+      },
     }
 
     const patch = reduceAgentEvent(slot, { type: 'RESULT_ERROR' })

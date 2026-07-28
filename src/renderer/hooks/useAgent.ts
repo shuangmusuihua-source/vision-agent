@@ -14,10 +14,6 @@ import type {
   AgentApprovalMode,
   AgentContext,
   AgentSessionEnvelope,
-  AskUserRequestIPC,
-  PermissionRequestIPC,
-  SessionRoutedRequestTimeout,
-  SessionRoutedGenerationActivity,
 } from '../../shared/types'
 
 // This is an inactivity notice, not an execution deadline. A healthy tool can
@@ -45,28 +41,25 @@ export function useIPCSubscriptions() {
     const unsubEvent = window.api.agent.onEvent((msg) => {
       store.getState().processIPCMessage(msg, undefined)
       // Refresh watchdog for the concrete session that received this event.
-      const ctx = msg.context as AgentContext | undefined
-      if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(msg as Record<string, unknown>))
+      refreshWatchdogAfterState(msg.context, msg.clientSessionKey)
     })
 
     const unsubPerm = window.api.agent.onPermissionRequest((req) => {
-      store.getState().handlePermissionRequest(req as PermissionRequestIPC)
-      const ctx = (req as PermissionRequestIPC).context as AgentContext | undefined
-      if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(req as unknown as Record<string, unknown>))
+      store.getState().handlePermissionRequest(req)
+      refreshWatchdogAfterState(req.context, req.clientSessionKey)
     })
 
     const unsubAsk = window.api.agent.onAskUser((req) => {
-      store.getState().handleAskUserRequest(req as AskUserRequestIPC)
-      const ctx = (req as AskUserRequestIPC).context as AgentContext | undefined
-      if (ctx) refreshWatchdogAfterState(ctx, getEventSessionId(req as unknown as Record<string, unknown>))
+      store.getState().handleAskUserRequest(req)
+      refreshWatchdogAfterState(req.context, req.clientSessionKey)
     })
 
-    const unsubAskTimeout = window.api.agent.onAskUserTimeout((data: SessionRoutedRequestTimeout) => {
-      store.getState().handleAskUserTimeout(data.requestId)
+    const unsubAskTimeout = window.api.agent.onAskUserTimeout((data) => {
+      store.getState().handleAskUserTimeout(data)
     })
 
-    const unsubPermTimeout = window.api.agent.onPermissionTimeout((data: SessionRoutedRequestTimeout) => {
-      store.getState().handlePermissionTimeout(data.requestId)
+    const unsubPermTimeout = window.api.agent.onPermissionTimeout((data) => {
+      store.getState().handlePermissionTimeout(data)
     })
 
     const unsubSession = window.api.agent.onSessionCreated((data: AgentSessionEnvelope) => {
@@ -86,10 +79,9 @@ export function useIPCSubscriptions() {
       refreshWatchdogAfterState(data.context, clientSessionKey)
     })
 
-    const unsubGenerationActivity = window.api.agent.onGenerationActivity((state: SessionRoutedGenerationActivity) => {
+    const unsubGenerationActivity = window.api.agent.onGenerationActivity((state) => {
       store.getState().handleGenerationActivity(state)
-      const ctx = state.context as AgentContext | undefined
-      if (ctx) refreshWatchdogAfterState(ctx, state.sessionId)
+      refreshWatchdogAfterState(state.context, state.clientSessionKey)
     })
 
     return () => {
@@ -118,14 +110,6 @@ const watchdogTimers = new Map<string, WatchdogEntry>()
 function normalizeWatchdogSessionId(sessionId?: string | null): string | null {
   if (!sessionId || sessionId === 'editor' || sessionId === 'ask') return null
   return sessionId
-}
-
-function getEventSessionId(data: Record<string, unknown>): string | null {
-  return normalizeWatchdogSessionId(
-    (data.clientSessionKey as string | undefined)
-    || (data.sessionId as string | undefined)
-    || (data.session_id as string | undefined)
-  )
 }
 
 function getWatchdogKey(ctx: AgentContext, sessionId?: string | null): string {

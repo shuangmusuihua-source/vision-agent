@@ -1,8 +1,8 @@
 import type {
   AgentContext,
-  AskUserRequestIPC,
   ConversationMessage,
-  PermissionRequestIPC,
+  SessionRoutedAskUserRequest,
+  SessionRoutedPermissionRequest,
 } from '../../shared/types'
 import type { AgentStore, ContextSlot } from './agent-store'
 import { emptySlot } from './agent-store'
@@ -25,7 +25,12 @@ export type SessionInteractionMutation = {
 }
 
 type PendingInteractionKind = 'permission' | 'askUser'
-type PendingInteractionRequest = PermissionRequestIPC | AskUserRequestIPC
+type PendingInteraction =
+  | { kind: 'permission'; request: SessionRoutedPermissionRequest }
+  | { kind: 'askUser'; request: SessionRoutedAskUserRequest }
+type PendingInteractionRequest =
+  | SessionRoutedPermissionRequest
+  | SessionRoutedAskUserRequest
 
 type PendingInteractionLocation = {
   context: AgentContext
@@ -323,7 +328,7 @@ function cachedContextSlot(state: AgentStore, context: AgentContext): ContextSlo
 export function selectPermissionRequest(
   state: AgentStore,
   context: AgentContext,
-): PermissionRequestIPC | null {
+): SessionRoutedPermissionRequest | null {
   return state.slots[context].permissionRequest || cachedContextSlot(state, context)?.permissionRequest || null
 }
 
@@ -335,7 +340,7 @@ export function selectPermissionQueueLength(state: AgentStore, context: AgentCon
 export function selectAskUserRequest(
   state: AgentStore,
   context: AgentContext,
-): AskUserRequestIPC | null {
+): SessionRoutedAskUserRequest | null {
   return state.slots[context].askUserRequest || cachedContextSlot(state, context)?.askUserRequest || null
 }
 
@@ -390,25 +395,16 @@ function findInteractionLocation(
   state: AgentStore,
   kind: PendingInteractionKind,
   requestId: string,
-  fallbackContext: AgentContext,
 ): PendingInteractionLocation | null {
-  const contexts: AgentContext[] = fallbackContext === 'editor'
-    ? ['editor', 'ask']
-    : ['ask', 'editor']
+  const contexts: AgentContext[] = ['editor', 'ask']
 
   for (const context of contexts) {
     const slot = state.slots[context]
     const current = currentInteraction(slot, kind)
     if (current?.id === requestId) {
       return {
-        context,
-        sessionId: resolveClientSessionId(
-          state,
-          current.clientSessionKey
-            || current.sessionId
-            || slot.currentSessionId
-            || state.activeSessionId[context],
-        ),
+        context: current.context,
+        sessionId: resolveClientSessionId(state, current.clientSessionKey),
         slot,
         queueIndex: null,
       }
@@ -419,29 +415,20 @@ function findInteractionLocation(
     if (queueIndex !== -1) {
       const request = queue[queueIndex]
       return {
-        context,
-        sessionId: resolveClientSessionId(
-          state,
-          request.clientSessionKey
-            || request.sessionId
-            || slot.currentSessionId
-            || state.activeSessionId[context],
-        ),
+        context: request.context,
+        sessionId: resolveClientSessionId(state, request.clientSessionKey),
         slot,
         queueIndex,
       }
     }
   }
 
-  for (const [sessionId, slot] of Object.entries(state.sessionSlots)) {
+  for (const slot of Object.values(state.sessionSlots)) {
     const current = currentInteraction(slot, kind)
     if (current?.id === requestId) {
       return {
-        context: current.context || fallbackContext,
-        sessionId: resolveClientSessionId(
-          state,
-          current.clientSessionKey || current.sessionId || sessionId,
-        ),
+        context: current.context,
+        sessionId: resolveClientSessionId(state, current.clientSessionKey),
         slot,
         queueIndex: null,
       }
@@ -452,11 +439,8 @@ function findInteractionLocation(
     if (queueIndex !== -1) {
       const request = queue[queueIndex]
       return {
-        context: request.context || fallbackContext,
-        sessionId: resolveClientSessionId(
-          state,
-          request.clientSessionKey || request.sessionId || sessionId,
-        ),
+        context: request.context,
+        sessionId: resolveClientSessionId(state, request.clientSessionKey),
         slot,
         queueIndex,
       }
@@ -467,15 +451,11 @@ function findInteractionLocation(
 
 function enqueueInteraction(
   state: AgentStore,
-  kind: PendingInteractionKind,
-  request: PendingInteractionRequest,
-  fallbackContext: AgentContext,
+  interaction: PendingInteraction,
 ): SessionInteractionMutation {
-  const context = request.context || fallbackContext
-  const sessionId = resolveClientSessionId(
-    state,
-    request.clientSessionKey || request.sessionId,
-  )
+  const { request } = interaction
+  const context = request.context
+  const sessionId = resolveClientSessionId(state, request.clientSessionKey)
   const liveSlot = state.slots[context]
   const liveSessionId = liveSlot.currentSessionId
   const activeSessionId = state.activeSessionId[context]
@@ -483,32 +463,29 @@ function enqueueInteraction(
     sessionId && (sessionId === liveSessionId || sessionId === activeSessionId),
   )
   const belongsToBackgroundSession = Boolean(sessionId && !belongsToLiveSession)
-  const cannotRouteLegacyRequest = Boolean(
-    !request.sessionId && liveSessionId && !liveSessionId.startsWith('new-'),
-  )
 
-  if (belongsToBackgroundSession || cannotRouteLegacyRequest) {
+  if (belongsToBackgroundSession) {
     if (!sessionId) return { patch: {}, target: null }
     const backgroundSlot = state.sessionSlots[sessionId]
       || { ...emptySlot(), currentSessionId: sessionId }
-    const patch = kind === 'permission'
+    const patch = interaction.kind === 'permission'
       ? backgroundSlot.permissionRequest
         ? {
             currentSessionId: backgroundSlot.currentSessionId || sessionId,
-            permissionQueue: [...backgroundSlot.permissionQueue, request as PermissionRequestIPC],
+            permissionQueue: [...backgroundSlot.permissionQueue, interaction.request],
           }
         : {
             currentSessionId: backgroundSlot.currentSessionId || sessionId,
-            permissionRequest: request as PermissionRequestIPC,
+            permissionRequest: interaction.request,
           }
       : backgroundSlot.askUserRequest
         ? {
             currentSessionId: backgroundSlot.currentSessionId || sessionId,
-            askUserQueue: [...backgroundSlot.askUserQueue, request as AskUserRequestIPC],
+            askUserQueue: [...backgroundSlot.askUserQueue, interaction.request],
           }
         : {
             currentSessionId: backgroundSlot.currentSessionId || sessionId,
-            askUserRequest: request as AskUserRequestIPC,
+            askUserRequest: interaction.request,
           }
     return {
       patch: patchSessionSlot(state, context, patch, sessionId),
@@ -516,13 +493,13 @@ function enqueueInteraction(
     }
   }
 
-  const patch = kind === 'permission'
+  const patch = interaction.kind === 'permission'
     ? liveSlot.permissionRequest
-      ? { permissionQueue: [...liveSlot.permissionQueue, request as PermissionRequestIPC] }
-      : { permissionRequest: request as PermissionRequestIPC }
+      ? { permissionQueue: [...liveSlot.permissionQueue, interaction.request] }
+      : { permissionRequest: interaction.request }
     : liveSlot.askUserRequest
-      ? { askUserQueue: [...liveSlot.askUserQueue, request as AskUserRequestIPC] }
-      : { askUserRequest: request as AskUserRequestIPC }
+      ? { askUserQueue: [...liveSlot.askUserQueue, interaction.request] }
+      : { askUserRequest: interaction.request }
   return {
     patch: patchSessionSlot(state, context, patch),
     target: { context, sessionId },
@@ -533,10 +510,9 @@ function resolveInteraction(
   state: AgentStore,
   kind: PendingInteractionKind,
   requestId: string,
-  fallbackContext: AgentContext,
   message?: ConversationMessage,
 ): SessionInteractionMutation {
-  const location = findInteractionLocation(state, kind, requestId, fallbackContext)
+  const location = findInteractionLocation(state, kind, requestId)
   if (!location) return { patch: {}, target: null }
 
   const slotPatch = interactionPatch(
@@ -562,33 +538,29 @@ function resolveInteraction(
 
 export function enqueuePermissionInteraction(
   state: AgentStore,
-  request: PermissionRequestIPC,
-  fallbackContext: AgentContext,
+  request: SessionRoutedPermissionRequest,
 ): SessionInteractionMutation {
-  return enqueueInteraction(state, 'permission', request, fallbackContext)
+  return enqueueInteraction(state, { kind: 'permission', request })
 }
 
 export function enqueueAskUserInteraction(
   state: AgentStore,
-  request: AskUserRequestIPC,
-  fallbackContext: AgentContext,
+  request: SessionRoutedAskUserRequest,
 ): SessionInteractionMutation {
-  return enqueueInteraction(state, 'askUser', request, fallbackContext)
+  return enqueueInteraction(state, { kind: 'askUser', request })
 }
 
 export function resolvePermissionInteraction(
   state: AgentStore,
   requestId: string,
-  fallbackContext: AgentContext,
 ): SessionInteractionMutation {
-  return resolveInteraction(state, 'permission', requestId, fallbackContext)
+  return resolveInteraction(state, 'permission', requestId)
 }
 
 export function resolveAskUserInteraction(
   state: AgentStore,
   requestId: string,
-  fallbackContext: AgentContext,
   message?: ConversationMessage,
 ): SessionInteractionMutation {
-  return resolveInteraction(state, 'askUser', requestId, fallbackContext, message)
+  return resolveInteraction(state, 'askUser', requestId, message)
 }

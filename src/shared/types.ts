@@ -551,13 +551,6 @@ export type PermissionRequestIPC = {
   toolName: string
   input: Record<string, unknown>
   description?: string
-  context?: AgentContext
-  /** App-owned stable session key used for renderer routing. */
-  sessionId?: string
-  /** Claude SDK session_id, when already materialized. */
-  sdkSessionId?: string
-  clientSessionKey?: string
-  workspacePath?: string
   /** SDK-provided display title (e.g. "Claude wants to read foo.txt") */
   title?: string
   /** Short noun phrase for the tool action (e.g. "Read file") */
@@ -583,13 +576,6 @@ export type AskUserRequestIPC = {
   id: string
   /** Questions from SDK (1-4). */
   questions: AskUserQuestionItem[]
-  context?: AgentContext
-  /** App-owned stable session key used for renderer routing. */
-  sessionId?: string
-  /** Claude SDK session_id, when already materialized. */
-  sdkSessionId?: string
-  clientSessionKey?: string
-  workspacePath?: string
 }
 
 // ─── Session Info ────────────────────────────────────────────────────

@@ -9,8 +9,9 @@ import type {
   AgentSessionEnvelope,
   AgentEvent,
   ConversationMessage,
-  PermissionRequestIPC,
-  AskUserRequestIPC,
+  SessionRoutedPermissionRequest,
+  SessionRoutedAskUserRequest,
+  SessionRoutedRequestTimeout,
   SessionRoutedGenerationActivity,
 } from '../../shared/types'
 import {
@@ -163,19 +164,19 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     // ─── Interaction Handlers ─────────────────────────────────────────────
 
-    handlePermissionRequest(req: PermissionRequestIPC) {
-      set((state) => enqueuePermissionInteraction(state, req, state.context).patch)
+    handlePermissionRequest(req: SessionRoutedPermissionRequest) {
+      set((state) => enqueuePermissionInteraction(state, req).patch)
     },
 
     // ─── Permission / AskUser response & timeout handlers ──────────────────
     // session-slot-state owns the live/cache representation and routing seam.
 
     handlePermissionResponse(requestId: string, _behavior: 'allow' | 'deny') {
-      set((state) => resolvePermissionInteraction(state, requestId, state.context).patch)
+      set((state) => resolvePermissionInteraction(state, requestId).patch)
     },
 
-    handleAskUserRequest(req: AskUserRequestIPC) {
-      const mutation = enqueueAskUserInteraction(get(), req, get().context)
+    handleAskUserRequest(req: SessionRoutedAskUserRequest) {
+      const mutation = enqueueAskUserInteraction(get(), req)
       set(mutation.patch)
       if (mutation.target) {
         get().dispatchAgentEvent(
@@ -190,7 +191,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const displayAnswer = Object.values(answers).filter(Boolean).join('；') || Object.keys(answers).join(', ')
       const createdAt = Date.now()
       const state = get()
-      const mutation = resolveAskUserInteraction(state, requestId, state.context, {
+      const mutation = resolveAskUserInteraction(state, requestId, {
         kind: 'user',
         id: `user-answer-${createdAt}`,
         role: 'user',
@@ -201,10 +202,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       return mutation.target
     },
 
-    handleAskUserTimeout(requestId: string) {
+    handleAskUserTimeout(timeout: SessionRoutedRequestTimeout) {
       const createdAt = Date.now()
       const state = get()
-      const mutation = resolveAskUserInteraction(state, requestId, state.context, {
+      const mutation = resolveAskUserInteraction(state, timeout.requestId, {
         kind: 'status',
         id: `timeout-${createdAt}`,
         role: 'system',
@@ -222,8 +223,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
     },
 
-    handlePermissionTimeout(requestId: string) {
-      set((state) => resolvePermissionInteraction(state, requestId, state.context).patch)
+    handlePermissionTimeout(timeout: SessionRoutedRequestTimeout) {
+      set((state) => resolvePermissionInteraction(state, timeout.requestId).patch)
     },
 
     handleGenerationActivity(activity: SessionRoutedGenerationActivity) {
@@ -327,13 +328,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         const sourceSlot = clientSlot || (activeSlotIsClient ? state.slots[envelope.context] : undefined)
         const realSlot = sdkSlot
         const baseSlot = sourceSlot || realSlot || emptySlot()
-        const permissionItems = mergeById<PermissionRequestIPC>([
+        const permissionItems = mergeById<SessionRoutedPermissionRequest>([
           sourceSlot?.permissionRequest,
           ...(sourceSlot?.permissionQueue || []),
           realSlot?.permissionRequest,
           ...(realSlot?.permissionQueue || []),
         ])
-        const askUserItems = mergeById<AskUserRequestIPC>([
+        const askUserItems = mergeById<SessionRoutedAskUserRequest>([
           sourceSlot?.askUserRequest,
           ...(sourceSlot?.askUserQueue || []),
           realSlot?.askUserRequest,
