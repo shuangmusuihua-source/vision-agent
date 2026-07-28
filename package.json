@@ -35,7 +35,6 @@
   "devDependencies": {
     "@electron-toolkit/utils": "^4.0.0",
     "@electron/asar": "^3.4.1",
-    "@json-render/react": "^0.19.0",
     "@streamdown/code": "^1.1.1",
     "@streamdown/math": "^1.0.2",
     "@tiptap/core": "^3.27.3",

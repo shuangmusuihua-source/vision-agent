@@ -4,7 +4,6 @@ import type { ConversationMessage, TextMessage, ArtifactData, UserMessage } from
 import { useAgentStore } from '../../store/agent-store-impl'
 import { isAgentQueryActive } from '../../store/agent-state-machine'
 import ToolCallDisplay from './ToolCallDisplay'
-import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
 import {
   fileExtension,
   isConvertibleAttachmentPath,
@@ -339,11 +338,6 @@ function AssistantBubble({ message, onSelectText, context }: {
 }) {
   const isStreaming = message.phase === 'streaming' || message.phase === 'tool_calling'
 
-  // Extract json-render blocks from the message text
-  const { blocks: jsonRenderBlocks, cleanText } = !isStreaming
-    ? extractJsonRenderBlocks(message.textContent)
-    : { blocks: [], cleanText: message.textContent }
-
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -382,18 +376,11 @@ function AssistantBubble({ message, onSelectText, context }: {
             ))}
           </div>
         )}
-        {jsonRenderBlocks.length > 0 && (
-          <div className="message-json-render-blocks">
-            {jsonRenderBlocks.map((block, i) => (
-              <ComponentRenderer key={i} spec={block} />
-            ))}
-          </div>
-        )}
-        {cleanText && (
+        {message.textContent && (
           <div className="message-assistant-text">
             <div className="message-markdown">
-              <Suspense fallback={<span>{stripSkillOutputBlock(cleanText)}</span>}>
-                <AssistantMarkdown text={cleanText} isStreaming={isStreaming} />
+              <Suspense fallback={<span>{stripSkillOutputBlock(message.textContent)}</span>}>
+                <AssistantMarkdown text={message.textContent} isStreaming={isStreaming} />
               </Suspense>
             </div>
           </div>
