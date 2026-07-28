@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowUp, Square, Paperclip, X, Loader2, ShieldQuestionMark, ShieldCheck, ChevronDown, Check } from 'lucide-react'
+import { Paperclip, X, Loader2, ShieldQuestionMark, ShieldCheck, ChevronDown, Check } from 'lucide-react'
 import type { SkillDefinition } from '../../../shared/ipc-types'
 import type { AgentApprovalMode, AgentContext } from '../../../shared/types'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
@@ -26,6 +26,23 @@ interface ChatInputProps {
   placeholder?: string
   variant?: 'default' | 'capsule'
   onApprovalModeChange?: (mode: AgentApprovalMode) => Promise<{ success: boolean; error?: string }>
+}
+
+function ComposerSendIcon(): React.ReactElement {
+  return (
+    <svg
+      className="composer-send-icon"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8 1.8c.38 0 .72.21.9.54l5.28 9.74c.47.87-.4 1.85-1.33 1.5l-4.1-1.53a2.14 2.14 0 0 0-1.5 0l-4.1 1.53c-.93.35-1.8-.63-1.33-1.5L7.1 2.34c.18-.33.52-.54.9-.54Z" />
+    </svg>
+  )
+}
+
+function ComposerStopIcon(): React.ReactElement {
+  return <span className="composer-stop-icon" aria-hidden="true" />
 }
 
 function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isRunning, placeholder, variant = 'default', onApprovalModeChange }: ChatInputProps): React.ReactElement {
@@ -341,8 +358,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isRunning
               onClick={onStop}
               type="button"
               title="停止生成"
+              aria-label="停止生成"
             >
-              <Square size={14} />
+              <ComposerStopIcon />
             </button>
           ) : (
             <button
@@ -351,8 +369,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isRunning
               disabled={(!text.trim() && attachedFiles.length === 0) || disabled || isPreparingAttachments}
               type="button"
               title={isPreparingAttachments ? '正在准备附件解析组件' : '发送'}
+              aria-label={isPreparingAttachments ? '正在准备附件解析组件' : '发送'}
             >
-              {isPreparingAttachments ? <Loader2 size={16} className="spin" /> : <ArrowUp size={16} />}
+              {isPreparingAttachments ? <Loader2 size={16} className="spin" /> : <ComposerSendIcon />}
             </button>
           )}
         </div>
@@ -485,8 +504,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isRunning
             onClick={onStop}
             type="button"
             title="停止生成"
+            aria-label="停止生成"
           >
-            <Square size={14} />
+            <ComposerStopIcon />
           </button>
         ) : (
           <button
@@ -495,8 +515,9 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isRunning
             disabled={(!text.trim() && attachedFiles.length === 0) || disabled || isPreparingAttachments}
             type="button"
             title={isPreparingAttachments ? '正在准备附件解析组件' : '发送'}
+            aria-label={isPreparingAttachments ? '正在准备附件解析组件' : '发送'}
           >
-            {isPreparingAttachments ? <Loader2 size={16} className="spin" /> : <ArrowUp size={16} />}
+            {isPreparingAttachments ? <Loader2 size={16} className="spin" /> : <ComposerSendIcon />}
           </button>
         )}
       </div>

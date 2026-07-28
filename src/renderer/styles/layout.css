@@ -1777,7 +1777,7 @@
 .sidebar-ask-zuovis {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
   margin: 0;
   padding: 8px 12px;
@@ -1787,10 +1787,6 @@
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default);
   -webkit-app-region: no-drag;
-}
-
-.sidebar-skills-icon {
-  border-radius: var(--radius-sm);
 }
 
 .sidebar-ask-zuovis:hover {
@@ -1810,15 +1806,26 @@
 }
 
 .sidebar-ask-zuovis-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-action-bg);
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-action);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.sidebar-primary-icon-svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  shape-rendering: geometricPrecision;
+}
+
+.sidebar-ask-zuovis:hover .sidebar-ask-zuovis-icon,
+.sidebar-ask-zuovis-active .sidebar-ask-zuovis-icon {
+  color: var(--color-text-primary);
 }
 
 .sidebar-primary-badge {

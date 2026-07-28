@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { ChevronsUp, X, Plus, Pin, Ellipsis, ArrowLeft, FolderClosed, FolderOpen, Loader2, Trash2, ShieldAlert, MessageCircleQuestion, Blocks, Workflow, BookOpenText } from 'lucide-react'
+import { ChevronsUp, X, Plus, Pin, ArrowLeft, FolderClosed, FolderOpen, Loader2, Trash2, ShieldAlert, MessageCircleQuestion } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
@@ -9,6 +9,7 @@ import type { ContextSlot } from '../../store/agent-store'
 import { isAgentQueryActive } from '../../store/agent-state-machine'
 import type { PrimaryView } from '../../store/ui-slice'
 import SidebarToolDock from './SidebarToolDock'
+import { AskSumiIcon, AutomationIcon, KnowledgeIcon, SkillsIcon } from './SidebarPrimaryIcons'
 
 interface SidebarProps {
   collapsed: boolean
@@ -233,7 +234,7 @@ function Sidebar({
             aria-current={isAskZuovisActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAskZuovis() } }}
           >
-            <div className="sidebar-ask-zuovis-icon"><Ellipsis size={12} /></div>
+            <div className="sidebar-ask-zuovis-icon"><AskSumiIcon /></div>
             <span className="sidebar-ask-zuovis-label">Ask {ASK_ASSISTANT_NAME}</span>
             {isAskZuovisActive && isAskZuovisInChat && (
               <SidebarBackButton running={isAskZuovisRunning} onBack={onAskZuovisBack} />
@@ -247,7 +248,7 @@ function Sidebar({
             aria-current={isSkillsActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSkills() } }}
           >
-            <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Blocks size={13} /></div>
+            <div className="sidebar-ask-zuovis-icon"><SkillsIcon /></div>
             <span className="sidebar-ask-zuovis-label">技能</span>
           </div>
 
@@ -258,7 +259,7 @@ function Sidebar({
             aria-current={isAutomationActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenAutomation() } }}
           >
-            <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><Workflow size={13} /></div>
+            <div className="sidebar-ask-zuovis-icon"><AutomationIcon /></div>
             <span className="sidebar-ask-zuovis-label">自动化</span>
           </div>
 
@@ -269,7 +270,7 @@ function Sidebar({
             aria-current={isKnowledgeActive ? 'page' : undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenKnowledge() } }}
           >
-            <div className="sidebar-ask-zuovis-icon sidebar-skills-icon"><BookOpenText size={13} /></div>
+            <div className="sidebar-ask-zuovis-icon"><KnowledgeIcon /></div>
             <span className="sidebar-ask-zuovis-label">知识库</span>
             {changedFileCount > 0 && (
               <span className="sidebar-primary-badge" aria-label={`${changedFileCount} 项知识库变化`}>
