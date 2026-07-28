@@ -58,6 +58,34 @@ export type MenuAction =
   | 'toggle-focus-mode'
   | 'save-file'
 
+export type AppSettingsSnapshot = {
+  profiles: ModelProfile[]
+  activeProfileId: string | null
+  authorizedDirectories: string[]
+  fixedDirectories: string[]
+  theme: 'light' | 'dark' | 'system'
+}
+
+export type SkillDefinition = {
+  id: string
+  name: string
+  description: string
+  icon: string
+  promptTemplate: string
+  argumentHint?: string
+  outputMode?: 'skill-output' | 'write'
+  hideInSlashMenu?: boolean
+  enabled?: boolean
+}
+
+export type SearchResult = {
+  filePath: string
+  fileName: string
+  workspaceName: string
+  line: number
+  content: string
+}
+
 // ─── Request/Response Channels ───────────────────────────────────────
 
 export type IPCChannelMap = {
@@ -207,10 +235,6 @@ export type IPCChannelMap = {
     request: string
     response: WorkspaceDeleteResult
   }
-  'workspace:knowledgeDir': {
-    request: void
-    response: string
-  }
   'workspace:selectFiles': {
     request: void
     response: { canceled: boolean; filePaths: string[]; attachmentGrantId?: string }
@@ -235,7 +259,7 @@ export type IPCChannelMap = {
   // Settings
   'settings:get': {
     request: void
-    response: Record<string, unknown>
+    response: AppSettingsSnapshot
   }
   'settings:addProfile': {
     request: ModelProfile
@@ -331,7 +355,7 @@ export type IPCChannelMap = {
   // Skills
   'skills:list': {
     request: void
-    response: unknown[]
+    response: SkillDefinition[]
   }
   'skills:toggle': {
     request: [string, boolean]
@@ -381,7 +405,7 @@ export type IPCChannelMap = {
   // Search
   'search:query': {
     request: string
-    response: unknown[]
+    response: SearchResult[]
   }
 
   // Update
@@ -416,7 +440,7 @@ export type IPCEventMap = {
   'agent:notification': AgentNotificationEvent
   'agent:generationActivity': SessionRoutedGenerationActivity
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
-  'settings:changed': Record<string, unknown>
+  'settings:changed': AppSettingsSnapshot
   'graph:filesChanged': { count: number; files: string[]; version: number }
   'cron:taskCompleted': CronTaskCompletedEvent
   'menu-action': MenuAction

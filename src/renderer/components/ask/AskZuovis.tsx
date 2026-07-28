@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Monitor, FolderOpen, Trash2, Gauge } from 'lucide-react'
-import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsQueryActive, useIsResumingSession, useAgentStatus, usePermissionRequest, usePermissionQueueLength, useAskUserRequest } from '../../hooks/useAgent'
 import ChatInput from '../chat/ChatInput'
 import PermissionDialog from '../chat/PermissionDialog'
 import AskUserDrawer, { type AskUserTextSubmitHandler } from '../chat/AskUserDrawer'
@@ -43,7 +43,7 @@ interface AskZuovisProps {
 function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactElement {
   const { sendMessage, respondPermission, respondAskUser } = useAgent('ask')
   const messages = useMessages('ask')
-  const isStreaming = useIsStreaming('ask')
+  const isQueryActive = useIsQueryActive('ask')
   const agentStatus = useAgentStatus('ask')
   const isResuming = useIsResumingSession('ask')
   const permissionRequest = usePermissionRequest('ask')
@@ -106,7 +106,7 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
   }, [askUserRequest])
 
   const handleCardClick = async (card: FeatureCard) => {
-    if (isStreaming && agentStatus !== 'waitingForUserInput') return
+    if (isQueryActive && agentStatus !== 'waitingForUserInput') return
     const skill = card.skillId ? availableFeatureSkills.get(card.skillId) : undefined
     if (!skill) return
     if (card.id === 'organize-files') {
@@ -213,8 +213,8 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
             useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'ask', sid)
             window.api.agent.abort(sid || 'ask')
           }}
-          disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !askUserRequest}
-          isStreaming={isStreaming}
+          disabled={(isQueryActive && agentStatus !== 'waitingForUserInput') && !askUserRequest}
+          isRunning={isQueryActive}
           placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined}
           variant="capsule"
         />

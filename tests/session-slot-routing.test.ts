@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
+import { isAgentQueryActive } from '../src/renderer/store/agent-state-machine'
 import { sessionListReducer } from '../src/renderer/store/session-protocol'
 import type { AgentIPCMessage, AgentIPCMessageWithContext, AskUserRequestIPC, ConversationMessage, PermissionRequestIPC, SdkSessionInfo, SessionRoutedGenerationActivity } from '../src/shared/types'
 
@@ -213,7 +214,6 @@ describe('session-scoped store routing', () => {
       ...emptySlot(),
       currentSessionId: 'background-session',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [textMessage('bg-existing', 'background existing')],
     }
     const assistantMsg: AgentIPCMessage & { context: 'editor'; sessionId: string } = {
@@ -247,7 +247,6 @@ describe('session-scoped store routing', () => {
       ...emptySlot(),
       currentSessionId: 'background-session',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [textMessage('bg-existing', 'background existing')],
     }
 
@@ -263,7 +262,7 @@ describe('session-scoped store routing', () => {
     const state = useAgentStore.getState()
     expect(state.slots.editor.messages).toHaveLength(0)
     expect(state.sessionSlots['background-session'].agentState).toBe('idle')
-    expect(state.sessionSlots['background-session'].isStreaming).toBe(false)
+    expect(isAgentQueryActive(state.sessionSlots['background-session'].agentState)).toBe(false)
     expect(state.sessionSlots['background-session'].messages.map((m) => m.id)).toEqual(['bg-existing'])
   })
 
@@ -289,7 +288,6 @@ describe('session-scoped store routing', () => {
       ...emptySlot(),
       currentSessionId: 'background-session',
       agentState: 'running' as const,
-      isStreaming: true,
     }
 
     useAgentStore.setState({
@@ -314,7 +312,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [{
         kind: 'user' as const,
         id: 'user-a',
@@ -329,7 +326,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-b',
       workspacePath: '/workspace/b',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [{
         kind: 'user' as const,
         id: 'user-b',
@@ -397,7 +393,7 @@ describe('session-scoped store routing', () => {
     expect(sessionA.workspacePath).toBe('/workspace/a')
     expect(sessionA.messages[0].id).toBe('user-a')
     expect(sessionA.messages.some((m) => m.kind === 'text' && m.textContent === 'answer A')).toBe(true)
-    expect(sessionA.isStreaming).toBe(false)
+    expect(isAgentQueryActive(sessionA.agentState)).toBe(false)
     expect(sessionA.agentState).toBe('idle')
   })
 
@@ -436,7 +432,6 @@ describe('session-scoped store routing', () => {
           ...emptySlot(),
           currentSessionId: 'atomic-session',
           agentState: 'thinking',
-          isStreaming: true,
         },
         ask: emptySlot(),
       },
@@ -463,7 +458,7 @@ describe('session-scoped store routing', () => {
 
     const slot = useAgentStore.getState().slots.editor
     expect(slot.agentState).toBe('idle')
-    expect(slot.isStreaming).toBe(false)
+    expect(isAgentQueryActive(slot.agentState)).toBe(false)
     expect(slot.messages).toHaveLength(1)
     expect(slot.messages[0]).toMatchObject({ id: 'atomic-answer', phase: 'complete' })
   })
@@ -473,14 +468,12 @@ describe('session-scoped store routing', () => {
       ...emptySlot(),
       currentSessionId: 'ask-session',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [textMessage('ask-msg', 'ask')],
     }
     const editorA = {
       ...emptySlot(),
       currentSessionId: 'editor-a',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [textMessage('editor-a-msg', 'editor A')],
     }
     const editorB = {
@@ -524,7 +517,7 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.currentSessionId).toBe('editor-b')
     expect(state.slots.editor.messages.at(-1)?.id).toBe('editor-b-new-msg')
     expect(state.sessionSlots['editor-a'].agentState).toBe('running')
-    expect(state.sessionSlots['editor-a'].isStreaming).toBe(true)
+    expect(isAgentQueryActive(state.sessionSlots['editor-a'].agentState)).toBe(true)
   })
 
   it('keeps Ask and multi-workspace editor sessions isolated while concurrent background events arrive', async () => {
@@ -534,7 +527,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-ask',
       workspacePath: '/app/ask',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [userMessage('ask-user', 'Ask sumi question')],
     }
     const editorA = {
@@ -543,7 +535,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [userMessage('user-a', 'question A')],
     }
     const editorB = {
@@ -552,7 +543,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-b',
       workspacePath: '/workspace/b',
       agentState: 'running' as const,
-      isStreaming: true,
       messages: [userMessage('user-b', 'question B')],
     }
 
@@ -664,7 +654,7 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.askUserRequest).toBeNull()
     expect(state.slots.editor.generationActivity).toBeNull()
     expect(state.slots.editor.agentState).toBe('idle')
-    expect(state.slots.editor.isStreaming).toBe(false)
+    expect(isAgentQueryActive(state.slots.editor.agentState)).toBe(false)
 
     const sessionA = state.sessionSlots['editor-a']
     expect(sessionA.workspacePath).toBe('/workspace/a')
@@ -673,7 +663,7 @@ describe('session-scoped store routing', () => {
     expect(sessionA.askUserRequest?.id).toBe('ask-user-a')
     expect(sessionA.generationActivity?.content).toBe('<html>workspace A slides</html>')
     expect(sessionA.agentState).toBe('waitingForUserInput')
-    expect(sessionA.isStreaming).toBe(true)
+    expect(isAgentQueryActive(sessionA.agentState)).toBe(true)
 
     expect(state.activeSessionId.ask).toBe('ask-session')
     expect(state.slots.ask.workspacePath).toBe('/app/ask')
@@ -906,7 +896,6 @@ describe('session-scoped store routing', () => {
           ...emptySlot(),
           currentSessionId: clientId,
           agentState: 'thinking',
-          isStreaming: true,
           messages: [userMsg],
         },
         ask: emptySlot(),
@@ -916,7 +905,6 @@ describe('session-scoped store routing', () => {
           ...emptySlot(),
           currentSessionId: clientId,
           agentState: 'thinking',
-          isStreaming: true,
           messages: [userMsg],
         },
       },
@@ -1031,7 +1019,6 @@ describe('session-scoped store routing', () => {
           ...state.slots.editor,
           messages: [optimisticUser],
           agentState: 'thinking',
-          isStreaming: true,
         },
       },
       sessionSlots: {
@@ -1040,7 +1027,6 @@ describe('session-scoped store routing', () => {
           ...state.sessionSlots[clientId],
           messages: [optimisticUser],
           agentState: 'thinking',
-          isStreaming: true,
         },
       },
     }))
@@ -1061,7 +1047,7 @@ describe('session-scoped store routing', () => {
     expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['assistant-history', 'user-live'])
     expect(state.sessionSlots[clientId].messages.map((m) => m.id)).toEqual(['assistant-history', 'user-live'])
     expect(state.slots.editor.agentState).toBe('thinking')
-    expect(state.slots.editor.isStreaming).toBe(true)
+    expect(isAgentQueryActive(state.slots.editor.agentState)).toBe(true)
   })
 
   it('keeps loaded older messages in a session cache when load-more resolves after switching away', async () => {

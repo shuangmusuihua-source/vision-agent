@@ -37,14 +37,17 @@ seam 验证生命周期行为。
 
 `workspace-lifecycle.ts` 是工作区变更的深 Module。它用一个串行 interface 处理创建、排序
 和删除；implementation 协调交互 Agent 停止、关联自动化暂停、废纸篓、electron-store
-提交、索引刷新和 settings 投影。`workspace-lifecycle-adapter.ts` 连接 Electron、运行时、
-Cron、持久化和索引 Adapter。IPC handler 不得绕过该 Module 直接修改授权工作区。
+提交和索引刷新，并在每个操作结果中返回规范工作区列表。Renderer 只将该结果投影一次，
+不再同时依赖 settings push 与本地补丁。`workspace-lifecycle-adapter.ts` 连接 Electron、
+运行时、Cron、持久化和索引 Adapter。IPC handler 不得绕过该 Module 直接修改授权工作区。
 
 ### IPC 层
 
 `src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、office、search 和 connection。
 
-`src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/preload/index.ts` 将其适配成 `window.api`。新增 IPC 时必须同时维护这两个边界和 renderer 类型。
+`src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/shared/preload-api.ts` 是
+`window.api` 的唯一 Interface，`src/preload/index.ts` 的实现必须通过 `satisfies` 完整匹配。
+Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 
 菜单事件也使用该共享协议。显式保存由菜单或编辑器快捷键触发后，统一 flush 编辑器投影调度器、source-mode save controller 与富文本 save controller，不能只依赖延迟自动保存。
 
@@ -76,7 +79,7 @@ Cron、持久化和索引 Adapter。IPC handler 不得绕过该 Module 直接修
 共享的 electron-store 实例位于 `persistence/store-core.ts`：
 
 - `profile-store.ts`：Profile、API Key、模型和服务地址
-- `workspace-store.ts`：授权目录、兼容 workspace 记录、app session 元数据、知识库；删除工作区时以一次 store 提交同步移除授权、兼容身份和会话元数据
+- `workspace-store.ts`：授权目录、app session 元数据和知识库；删除工作区时以一次 store 提交同步移除授权与会话元数据
 - `settings-store.ts`：主题、Cron、Skill 开关和 compaction IDs
 
 Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级映射和展示元数据。两者职责不同。
@@ -95,7 +98,7 @@ Renderer 是单页 React 应用：
 - `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱的顶层视图编排
 - `workflows/editor-session-workflow.ts`：集中 editor session 的持久化顺序、app/SDK ID 删除路由、workspace/session 切换、Overview 激活和新会话草稿生命周期
 - `workflows/session-output-workflow.ts`：集中 session output 的 latest-only 请求投影、文件事件/Agent 完成刷新合并，以及知识库、打开、访达和删除动作
-- `agent-store*`：按 context 与 session 隔离的流式状态；工作区切换会先保存旧 session slot 再清空 live editor slot，绝不改写已有 session 的 workspace 所有权
+- `agent-store*`：按 context 与 session 隔离的 Agent 状态；查询是否活跃统一从状态机派生，不保存第二个布尔生命周期；工作区切换会先保存旧 session slot 再清空 live editor slot，绝不改写已有 session 的 workspace 所有权
 - `session-slot-state.ts`：集中 app/SDK ID 解析、live/cache slot 路由、权限/AskUser 队列推进、镜像写入与 LRU 淘汰
 - `ui-slice.ts`：非 Agent UI 状态
 - `useAgent.ts`：唯一 IPC 订阅入口和 Agent actions

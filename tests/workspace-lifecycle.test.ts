@@ -42,7 +42,6 @@ function createHarness(initialPaths = ['/work/a']) {
       return taskSuspension
     }),
     refreshIndex: vi.fn(async () => { calls.push('index') }),
-    notifySettingsChanged: vi.fn(() => { calls.push('notify') }),
   }
 
   return {
@@ -74,7 +73,6 @@ describe('WorkspaceLifecycle', () => {
       'persist',
       'commit-automation',
       'index',
-      'notify',
     ])
   })
 
@@ -138,7 +136,6 @@ describe('WorkspaceLifecycle', () => {
     expect(harness.dependencies.ensureDirectory).toHaveBeenCalledWith('/documents/sumi')
     expect(harness.dependencies.createDirectory).toHaveBeenCalledWith('/documents/sumi/Research')
     expect(harness.dependencies.refreshIndex).toHaveBeenCalledWith(['/documents/sumi/Research'])
-    expect(harness.dependencies.notifySettingsChanged).toHaveBeenCalledOnce()
   })
 
   it('rejects stale reorder requests and returns the canonical order', async () => {
@@ -160,6 +157,5 @@ describe('WorkspaceLifecycle', () => {
       workspacePaths: ['/work/b', '/work/a'],
     })
     expect(harness.dependencies.refreshIndex).toHaveBeenCalledWith(['/work/b', '/work/a'])
-    expect(harness.dependencies.notifySettingsChanged).toHaveBeenCalledOnce()
   })
 })

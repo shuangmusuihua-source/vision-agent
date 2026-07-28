@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  appendUserWorkspacePath,
   findContainingWorkspacePath,
   filterUserWorkspacePaths,
   isReservedKnowledgeWorkspacePath,
-  removeUserWorkspacePath,
 } from '../src/shared/workspace-paths'
 
 describe('workspace path filtering', () => {
@@ -35,27 +33,6 @@ describe('workspace path filtering', () => {
       '/Users/me/Documents/sumi/demo/',
     ])).toEqual([
       '/Users/me/Documents/sumi/demo',
-      '/Users/me/Documents/sumi/research',
-    ])
-  })
-
-  it('keeps settings pushes and create responses idempotent regardless of ordering', () => {
-    const workspacePath = '/Users/me/Documents/sumi/demo'
-    const afterSettingsPush = filterUserWorkspacePaths([workspacePath])
-
-    expect(appendUserWorkspacePath(afterSettingsPush, workspacePath)).toEqual([workspacePath])
-    expect(appendUserWorkspacePath([], workspacePath)).toEqual([workspacePath])
-    expect(filterUserWorkspacePaths(
-      appendUserWorkspacePath([], workspacePath),
-    )).toEqual([workspacePath])
-  })
-
-  it('removes every equivalent in-memory copy of a workspace path', () => {
-    expect(removeUserWorkspacePath([
-      '/Users/me/Documents/sumi/demo',
-      '/Users/me/Documents/sumi/demo/',
-      '/Users/me/Documents/sumi/research',
-    ], '/Users/me/Documents/sumi/demo')).toEqual([
       '/Users/me/Documents/sumi/research',
     ])
   })

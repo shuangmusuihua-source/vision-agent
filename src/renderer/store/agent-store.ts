@@ -44,7 +44,6 @@ export type ContextSlot = {
   currentSessionId: string | null
   /** Claude SDK session_id used for resume/history/delete operations. */
   sdkSessionId: string | null
-  isStreaming: boolean
   agentState: AgentState
   usageInfo: UsageInfo | null
   permissionRequest: PermissionRequestIPC | null
@@ -77,7 +76,6 @@ function emptySlot(): ContextSlot {
     messages: [],
     currentSessionId: null,
     sdkSessionId: null,
-    isStreaming: false,
     agentState: 'idle',
     usageInfo: null,
     permissionRequest: null,

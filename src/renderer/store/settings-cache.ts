@@ -1,15 +1,17 @@
 import { create } from 'zustand'
-import type { AppSettings } from '../lib/ipc'
+import type { AppSettingsSnapshot } from '../../shared/ipc-types'
+import { filterUserWorkspacePaths } from '../../shared/workspace-paths'
 
 // ─── Settings Store ──────────────────────────────────────────────────
 
 export type SettingsStore = {
-  settings: AppSettings | null
+  settings: AppSettingsSnapshot | null
   loaded: boolean
 
   // Actions
   init: () => Promise<void>
-  update: (settings: AppSettings) => void
+  update: (settings: AppSettingsSnapshot) => void
+  projectWorkspacePaths: (workspacePaths: string[]) => void
 }
 
 // ─── Store implementation ────────────────────────────────────────────
@@ -25,6 +27,21 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
   update: (settings) => {
     set({ settings, loaded: true })
+  },
+
+  projectWorkspacePaths: (workspacePaths) => {
+    set((state) => {
+      if (!state.settings) return state
+      return {
+        settings: {
+          ...state.settings,
+          authorizedDirectories: filterUserWorkspacePaths(
+            workspacePaths,
+            state.settings.fixedDirectories,
+          ),
+        },
+      }
+    })
   },
 }))
 

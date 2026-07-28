@@ -27,7 +27,6 @@ export interface WorkspaceLifecycleDependencies {
   abortWorkspaceRuns: (workspacePath: string) => Promise<string[]>
   suspendWorkspaceTasks: (workspacePath: string) => Promise<WorkspaceAutomationSuspension>
   refreshIndex: (workspacePaths: string[]) => Promise<void>
-  notifySettingsChanged: () => void
 }
 
 function errorMessage(error: unknown): string {
@@ -44,8 +43,9 @@ function errorCode(error: unknown): string | undefined {
  * Owns all mutations of the registered Workspace collection.
  *
  * Callers cross one serialized Interface. Runtime shutdown, automation
- * suspension, filesystem mutation, persistence, indexing, and Renderer
- * projection remain implementation details behind this seam.
+ * suspension, filesystem mutation, persistence, and indexing remain
+ * implementation details behind this seam. Each result carries the canonical
+ * Workspace projection for the Renderer to apply exactly once.
  */
 export class WorkspaceLifecycle {
   private mutationTail: Promise<void> = Promise.resolve()
@@ -136,7 +136,6 @@ export class WorkspaceLifecycle {
     }
 
     await this.refreshIndex()
-    this.dependencies.notifySettingsChanged()
     return {
       success: true,
       workspacePath,
@@ -209,7 +208,6 @@ export class WorkspaceLifecycle {
       console.error('[WorkspaceLifecycle] automation deletion commit failed:', error)
     }
     await this.refreshIndex()
-    this.dependencies.notifySettingsChanged()
     return {
       success: true,
       workspacePath: registeredRoot,
@@ -239,7 +237,6 @@ export class WorkspaceLifecycle {
     }
 
     await this.refreshIndex()
-    this.dependencies.notifySettingsChanged()
     return {
       success: true,
       workspacePaths: this.dependencies.getWorkspacePaths(),

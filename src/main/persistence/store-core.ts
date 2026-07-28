@@ -2,7 +2,7 @@ import Store from 'electron-store'
 import { safeStorage } from 'electron'
 import path from 'path'
 import { app } from 'electron'
-import type { ModelProfile, WorkspaceRecord, SessionRecord } from '../../shared/types'
+import type { ModelProfile, SessionRecord } from '../../shared/types'
 import type { CronTask } from '../../shared/cron-types'
 import { DOCUMENTS_DIR_NAME } from '../../shared/branding'
 import { KNOWLEDGE_BASE_NAME } from '../../shared/workspace-paths'
@@ -43,7 +43,6 @@ export interface AppSettings {
   activeProfileId: string | null
   authorizedDirectories: string[]
   fixedDirectories: string[]
-  workspaces: WorkspaceRecord[]
   sessions: SessionRecord[]
   compactionSessionIds: string[]
   theme: 'light' | 'dark' | 'system'
@@ -59,7 +58,6 @@ export const store = new Store<AppSettings>({
     activeProfileId: null,
     authorizedDirectories: [],
     fixedDirectories: [],
-    workspaces: [],
     sessions: [],
     compactionSessionIds: [],
     theme: 'system',

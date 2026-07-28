@@ -14,7 +14,7 @@ import { ErrorBoundary } from '../common/ErrorBoundary'
 import DaydreamOverlay from './DaydreamOverlay'
 import OverviewPanel from './OverviewPanel'
 import './OverviewPanel.css'
-import { useAgent, useIPCSubscriptions, useIsStreaming, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useSessionList, useAgentStatus, useActiveSkillId } from '../../hooks/useAgent'
+import { useAgent, useIPCSubscriptions, useIsQueryActive, useMessages, usePermissionRequest, usePermissionQueueLength, useAskUserRequest, useCurrentSessionId, useSessionList, useAgentStatus, useActiveSkillId } from '../../hooks/useAgent'
 import { useAppShortcuts } from '../../hooks/useAppShortcuts'
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout'
 import { useWorkspace } from '../../hooks/useWorkspace'
@@ -25,14 +25,13 @@ import { useAgentStore } from '../../store/agent-store-impl'
 import type { AgentContext, TabDescriptor } from '../../../shared/types'
 import { isFileTab } from '../../../shared/types'
 import {
-  filterUserWorkspacePaths,
   findContainingWorkspacePath,
   isSameWorkspacePath,
 } from '../../../shared/workspace-paths'
 import type { WorkspaceDeleteResult } from '../../../shared/workspace-lifecycle'
 import { useChangedFileCount, useGraphStore } from '../../store/graph-store'
 import { useSettings } from '../../store/settings-cache'
-import type { SkillDefinition } from '../../lib/ipc'
+import type { SkillDefinition } from '../../../shared/ipc-types'
 import { buildSkillInvocationPrompt } from '../../../shared/skill-invocation'
 import { checkForAppUpdates, getUpdateProgressLabel, performPrimaryUpdateAction } from '../../lib/app-update'
 import type { MarkdownEditorHandle } from '../editor/MarkdownEditor'
@@ -80,7 +79,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   // ── Hooks: workspace, tabs ──────────────────────────────────────────
 
-  const workspace = useWorkspace()
+  const settings = useSettings()
+  const workspace = useWorkspace(settings)
   const {
     openTabs, activeTab, activeContent, activeFilePath, documentOwnerKey,
     openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
@@ -197,7 +197,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const activeWorkspacePath = useAgentStore((s) => s.activeWorkspacePath)
   const editorWorkspacePath = useAgentStore((s) => s.slots.editor.workspacePath || s.activeWorkspacePath)
   const activeSessionId = useAgentStore((s) => s.activeSessionId.editor)
-  const isStreaming = useIsStreaming('editor')
+  const isQueryActive = useIsQueryActive('editor')
   const sessionLoadError = useAgentStore((s) => s.sessionLoadError)
   const retrySessionLoad = useAgentStore((s) => s.retrySessionLoad)
   const clearSessionLoadError = useAgentStore((s) => s.clearSessionLoadError)
@@ -321,7 +321,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     }
   }, [clearTab, editorSessionWorkflow.select, setAgentContext, setView])
 
-  const prevIsStreamingRef = useRef(isStreaming)
+  const previousQueryActiveRef = useRef(isQueryActive)
   const editorPermission = usePermissionRequest('editor')
   const editorPermissionQueueLen = usePermissionQueueLength('editor')
   const editorAskUser = useAskUserRequest('editor')
@@ -333,16 +333,14 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const activeSkillId = useActiveSkillId('editor')
   // ── Agent hooks (ask context) ───────────────────────────────────────
 
-  const askIsStreaming = useIsStreaming('ask')
+  const askQueryActive = useIsQueryActive('ask')
   const askMessages = useMessages('ask')
 
   // ── Settings → workspace sync ───────────────────────────────────────
 
-  const settings = useSettings()
   useEffect(() => {
     if (!settings) return
-    const userDirectories = filterUserWorkspacePaths(settings.authorizedDirectories, settings.fixedDirectories)
-    workspace.syncFromSettings(settings.authorizedDirectories, settings.fixedDirectories)
+    const userDirectories = workspace.workspacePaths
     // Set initial active workspace if not yet set
     const currentActiveWorkspace = useAgentStore.getState().activeWorkspacePath
     const activeWorkspaceIsRegistered = Boolean(
@@ -356,18 +354,18 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
     } else if (currentActiveWorkspace && userDirectories.length === 0) {
       useAgentStore.getState().setActiveWorkspace(null)
     }
-  }, [settings])
+  }, [settings, workspace.workspacePaths])
 
   // ── View routing helpers ────────────────────────────────────────────
 
   const handleAskZuovisBack = useCallback(() => {
     const askSid = useAgentStore.getState().slots.ask.currentSessionId
-    if (askIsStreaming) {
+    if (askQueryActive) {
       useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'ask', askSid)
       window.api.agent.abort(askSid || 'ask')
     }
     clearContextSession('ask')
-  }, [askIsStreaming, clearContextSession])
+  }, [askQueryActive, clearContextSession])
 
   // ── File selection (bridges workspace + tabs) ───────────────────────
 
@@ -394,7 +392,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   const sessionOutputWorkflow = useSessionOutputWorkflow({
     activeSessionId,
-    isStreaming,
+    queryActive: isQueryActive,
     alert: modal.alert,
     confirm: modal.confirm,
   })
@@ -404,10 +402,10 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   // ── Refresh the active editor after the agent finishes ─────────────
 
   useEffect(() => {
-    const wasStreaming = prevIsStreamingRef.current
-    prevIsStreamingRef.current = isStreaming
-    // Only trigger on streaming → idle transition (agent just finished)
-    if (!wasStreaming || isStreaming) return
+    const wasQueryActive = previousQueryActiveRef.current
+    previousQueryActiveRef.current = isQueryActive
+    // Only trigger when an active query reaches a terminal state.
+    if (!wasQueryActive || isQueryActive) return
     const hasMessages = useAgentStore.getState().slots.editor.messages.length > 0
     if (!hasMessages) return
 
@@ -416,7 +414,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
       const timer = setTimeout(() => { refreshActiveContentRef.current().catch(() => {}) }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isStreaming])
+  }, [isQueryActive])
 
   // ── Text selection, ask-agent, stats, skill ─────────────────────────
 
@@ -490,7 +488,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           open: handleSidebarNavigate,
           ask: {
             hasConversation: askMessages.length > 0,
-            running: askIsStreaming,
+            running: askQueryActive,
             back: handleAskZuovisBack,
           },
           changedFileCount,
@@ -505,7 +503,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         sessions={{
           items: editorSessionList,
           activeId: view === 'editor' ? activeSessionId : null,
-          activeRunning: isStreaming,
+          activeRunning: isQueryActive,
           select: editorSessionWorkflow.select,
           remove: editorSessionWorkflow.remove,
           rename: editorSessionWorkflow.rename,
@@ -679,7 +677,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             const sid = useAgentStore.getState().slots.editor.currentSessionId
             useAgentStore.getState().dispatchAgentEvent({ type: 'ABORT' }, 'editor', sid)
             window.api.agent.abort(sid || 'editor')
-          }} disabled={(isStreaming && agentStatus !== 'waitingForUserInput') && !editorAskUser} isStreaming={isStreaming} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
+          }} disabled={(isQueryActive && agentStatus !== 'waitingForUserInput') && !editorAskUser} isRunning={isQueryActive} placeholder={agentStatus === 'waitingForUserInput' ? '回答 Agent 的问题...' : undefined} />}
         linkedFile={linkedFile}
         onUnlinkFile={() => setEditorLinkedFile(null)}
       >

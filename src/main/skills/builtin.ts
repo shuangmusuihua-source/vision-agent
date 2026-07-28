@@ -1,16 +1,11 @@
-export interface SkillDefinition {
-  id: string
-  name: string
-  description: string
-  icon: string
-  promptTemplate: string
+import type { SkillDefinition } from '../../shared/ipc-types'
+
+export interface BuiltinSkillDefinition extends SkillDefinition {
   systemPromptAppend?: string
-  outputMode?: 'skill-output' | 'write'
-  hideInSlashMenu?: boolean
   defaultEnabled?: boolean
 }
 
-const builtinSkills: SkillDefinition[] = [
+const builtinSkills: BuiltinSkillDefinition[] = [
   {
     id: 'kami',
     name: 'Kami · 紙',
@@ -70,6 +65,6 @@ const builtinSkills: SkillDefinition[] = [
   },
 ]
 
-export function getBuiltinSkills(): SkillDefinition[] {
+export function getBuiltinSkills(): BuiltinSkillDefinition[] {
   return builtinSkills
 }

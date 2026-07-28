@@ -1,17 +1,20 @@
 import type { ModelProfile } from '../../shared/types'
-import { store, encryptValue, decryptValue, maskApiKey, type AppSettings } from './store-core'
+import type { AppSettingsSnapshot } from '../../shared/ipc-types'
+import { store, encryptValue, decryptValue, maskApiKey } from './store-core'
 import { filterUserWorkspacePaths } from '../../shared/workspace-paths'
 
-export function getSettings(): AppSettings {
+export function getSettings(): AppSettingsSnapshot {
   const settings = store.store
   const authorizedDirectories = filterUserWorkspacePaths(settings.authorizedDirectories, settings.fixedDirectories)
   return {
-    ...settings,
+    activeProfileId: settings.activeProfileId,
     authorizedDirectories,
+    fixedDirectories: settings.fixedDirectories,
     profiles: settings.profiles.map((p) => ({
       ...p,
       apiKey: maskApiKey(decryptValue(p.apiKey)),
     })),
+    theme: settings.theme,
   }
 }
 

@@ -107,6 +107,4 @@ export function registerWorkspaceHandlers(
     return { success: true, filePath }
   })
 
-  ipcMain.handle('workspace:knowledgeDir', () => getKnowledgeBaseDir())
-
 }

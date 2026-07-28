@@ -33,7 +33,7 @@ function App(): React.ReactElement {
   useEffect(() => {
     useSettingsStore.getState().init()
     const unsub = window.api.settings.onChanged((s) => {
-      useSettingsStore.getState().update(s as unknown as import('./lib/ipc').AppSettings)
+      useSettingsStore.getState().update(s)
     })
     return unsub
   }, [])

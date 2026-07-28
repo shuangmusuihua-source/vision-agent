@@ -344,7 +344,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           ...(sourceSlot || {}),
           ...(realSlot || {}),
           messages: mergeMessages(sourceSlot?.messages || [], realSlot?.messages || []),
-          isStreaming: Boolean(sourceSlot?.isStreaming || realSlot?.isStreaming),
           agentState: realSlot?.agentState && realSlot.agentState !== 'idle'
             ? realSlot.agentState
             : (sourceSlot?.agentState || baseSlot.agentState),
@@ -456,14 +455,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             createdAt: Date.now(),
           }],
           ...(skill ? { activeSkillId: skill.id } : {}),
-          isStreaming: true,
         }
         const cachedSlot = state.sessionSlots[clientSessionKey] || baseSlot
         const nextCachedSlot: ContextSlot = {
           ...cachedSlot,
           messages: nextSlot.messages,
           ...(skill ? { activeSkillId: skill.id } : {}),
-          isStreaming: true,
           currentSessionId: clientSessionKey,
         }
         const cachePatch = cacheSessionSlot(state, clientSessionKey, nextCachedSlot)

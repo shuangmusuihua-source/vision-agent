@@ -139,7 +139,7 @@ export class SessionOutputWorkflow {
 
 interface UseSessionOutputWorkflowOptions {
   activeSessionId: string | null
-  isStreaming: boolean
+  queryActive: boolean
   alert: (options: { title: string; message: string }) => Promise<void>
   confirm: (options: {
     title: string
@@ -151,7 +151,7 @@ interface UseSessionOutputWorkflowOptions {
 
 export function useSessionOutputWorkflow({
   activeSessionId,
-  isStreaming,
+  queryActive,
   alert,
   confirm,
 }: UseSessionOutputWorkflowOptions): {
@@ -177,7 +177,7 @@ export function useSessionOutputWorkflow({
     }),
     alert: (title, message) => alert({ title, message }),
   }), [alert, confirm])
-  const previousStreaming = useRef(isStreaming)
+  const previousQueryActive = useRef(queryActive)
 
   useEffect(() => {
     workflow.activateSession(activeSessionId)
@@ -190,16 +190,16 @@ export function useSessionOutputWorkflow({
   }, [workflow])
 
   useEffect(() => {
-    const wasStreaming = previousStreaming.current
-    previousStreaming.current = isStreaming
-    if (!wasStreaming || isStreaming) return
+    const wasQueryActive = previousQueryActive.current
+    previousQueryActive.current = queryActive
+    if (!wasQueryActive || queryActive) return
 
     const state = useAgentStore.getState()
     const sessionId = state.activeSessionId.editor
     if (sessionId && state.slots.editor.messages.length > 0) {
       workflow.agentFinished(sessionId)
     }
-  }, [isStreaming, workflow])
+  }, [queryActive, workflow])
 
   useEffect(() => () => workflow.dispose(), [workflow])
 

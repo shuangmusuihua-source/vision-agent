@@ -652,18 +652,6 @@ export type MemoryDocument = MemoryEntry & {
   content: string
 }
 
-// ─── Workspace Record (P0: workspace-centric architecture) ────────────
-
-export interface WorkspaceRecord {
-  id: string            // UUID, stable identity
-  name: string          // display name (directory basename)
-  path: string          // absolute filesystem path
-  icon?: string         // emoji or icon key
-  isFixed: boolean      // true for Knowledge Base, false for user workspaces
-  createdAt: number
-  lastOpenedAt: number
-}
-
 // ─── Session Record (app-owned metadata, persisted in electron-store) ──
 
 export type SessionStatus = 'active' | 'idle' | 'archived' | 'empty'
@@ -671,7 +659,7 @@ export type SessionStatus = 'active' | 'idle' | 'archived' | 'empty'
 export interface SessionRecord {
   id: string            // App-owned stable session key
   sdkSessionId?: string // Claude SDK session_id once materialized
-  workspacePath: string // FK → WorkspaceRecord.path
+  workspacePath: string // Registered Workspace path
   /** Isolated SDK cwd for sessions created with the session-files model. */
   workingDirectory?: string
   title?: string        // user or auto-generated title

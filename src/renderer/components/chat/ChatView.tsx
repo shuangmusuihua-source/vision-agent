@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
-import { useAgent, useMessages, useIsStreaming, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useGenerationActivity } from '../../hooks/useAgent'
+import { useAgent, useMessages, useIsQueryActive, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useGenerationActivity } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
 import GenerationActivityCard from './GenerationActivityCard'
 import styles from './ChatView.module.css'
@@ -23,7 +23,7 @@ interface ChatViewProps {
 
 function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollContainerRef: externalScrollRef }: ChatViewProps): React.ReactElement {
   const messages = useMessages(context)
-  const isStreaming = useIsStreaming(context)
+  const isQueryActive = useIsQueryActive(context)
   const isResuming = useIsResumingSession(context)
   const agentState = useAgentStatus(context)
   const ttftMs = useTtftMs(context)
@@ -82,11 +82,11 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   // New message arrived (not during streaming) → always scroll to bottom
   const prevMsgCount = useRef(messages.length)
   useEffect(() => {
-    if (messages.length > prevMsgCount.current && !isStreaming) {
+    if (messages.length > prevMsgCount.current && !isQueryActive) {
       forceScrollToBottom()
     }
     prevMsgCount.current = messages.length
-  }, [messages.length, isStreaming, forceScrollToBottom])
+  }, [messages.length, isQueryActive, forceScrollToBottom])
 
   // ── Auto-scroll during streaming ──
   // useLayoutEffect runs synchronously during React commit, BEFORE paint.
@@ -95,7 +95,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const prevScrollHeightRef = useRef(0)
   useLayoutEffect(() => {
     const el = containerRef.current
-    if (!el || !isStreaming || userScrolledUpRef.current) return
+    if (!el || !isQueryActive || userScrolledUpRef.current) return
     const newHeight = el.scrollHeight
     const growth = newHeight - prevScrollHeightRef.current
     if (growth > 0 && prevScrollHeightRef.current > 0) {
@@ -105,7 +105,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
       })
     }
     prevScrollHeightRef.current = newHeight
-  }, [messages, isStreaming, generationContentLength, containerRef])
+  }, [messages, isQueryActive, generationContentLength, containerRef])
 
   // Reset visibleCount and scroll height ref when messages are cleared (new session)
   useEffect(() => {
@@ -180,7 +180,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
           </div>
         </div>
       )}
-      {isStreaming && (() => {
+      {isQueryActive && (() => {
         // "思考中" — thinking phase, before any content arrives
         // "整理思路中" — running/compacting, but no visible text in the last reply yet.
         // Once text appears in the bubble, the indicator is no longer needed.

@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useCallback, useEffect, useRef, memo } from '
 import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon, Check, ChevronDown, CircleAlert } from 'lucide-react'
 import type { ConversationMessage, TextMessage, ArtifactData, UserMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { isAgentQueryActive } from '../../store/agent-state-machine'
 import ToolCallDisplay from './ToolCallDisplay'
 import { ComponentRenderer, extractJsonRenderBlocks } from './ComponentRender'
 import {
@@ -194,7 +195,7 @@ function UserBubble({ text, messageId, attachmentConversions, onSelectText, cont
   const isLatestStreamingUserMessage = useAgentStore((s) => {
     const slot = s.slots[context]
     const latestUser = [...slot.messages].reverse().find((msg) => msg.kind === 'user')
-    return slot.isStreaming && latestUser?.id === messageId
+    return isAgentQueryActive(slot.agentState) && latestUser?.id === messageId
   })
 
   const handleMouseUp = useCallback(() => {

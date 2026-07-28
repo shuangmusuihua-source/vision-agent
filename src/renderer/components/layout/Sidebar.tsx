@@ -6,6 +6,7 @@ import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { ContextSlot } from '../../store/agent-store'
+import { isAgentQueryActive } from '../../store/agent-state-machine'
 import type { PrimaryView } from '../../store/ui-slice'
 import SidebarToolDock from './SidebarToolDock'
 
@@ -364,7 +365,7 @@ function Sidebar({
                             const isRenaming = renamingId === session.id
                             const isRunning = isActive
                               ? activeSessionRunning
-                              : (slot?.isStreaming || (slot?.agentState && slot.agentState !== 'idle' && slot.agentState !== 'error'))
+                              : Boolean(slot && isAgentQueryActive(slot.agentState))
                             return (
                               <div
                                 key={session.id}

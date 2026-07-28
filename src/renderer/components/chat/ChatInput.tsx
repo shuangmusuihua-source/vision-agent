@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ArrowUp, Square, Paperclip, X, Loader2, ShieldQuestionMark, ShieldCheck, ChevronDown, Check } from 'lucide-react'
-import type { SkillDefinition } from '../../lib/ipc'
+import type { SkillDefinition } from '../../../shared/ipc-types'
 import type { AgentApprovalMode, AgentContext } from '../../../shared/types'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { isSkillVisibleInSlashMenu } from '../../../shared/skill-invocation'
@@ -22,13 +22,13 @@ interface ChatInputProps {
   onSkillSelect?: (skill: SkillDefinition) => void
   onStop?: () => void
   disabled: boolean
-  isStreaming?: boolean
+  isRunning?: boolean
   placeholder?: string
   variant?: 'default' | 'capsule'
   onApprovalModeChange?: (mode: AgentApprovalMode) => Promise<{ success: boolean; error?: string }>
 }
 
-function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreaming, placeholder, variant = 'default', onApprovalModeChange }: ChatInputProps): React.ReactElement {
+function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isRunning, placeholder, variant = 'default', onApprovalModeChange }: ChatInputProps): React.ReactElement {
   const [skills, setSkills] = useState<SkillDefinition[]>([])
   const [showSkillPopup, setShowSkillPopup] = useState(false)
   const [skillFilter, setSkillFilter] = useState('')
@@ -335,7 +335,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
             rows={1}
             autoFocus
           />
-          {isStreaming && onStop ? (
+          {isRunning && onStop ? (
             <button
               className="ask-zuovis-stop-btn"
               onClick={onStop}
@@ -479,7 +479,7 @@ function ChatInput({ context, onSend, onSkillSelect, onStop, disabled, isStreami
           rows={1}
           autoFocus
         />
-        {isStreaming && onStop ? (
+        {isRunning && onStop ? (
           <button
             className="chat-stop-btn"
             onClick={onStop}

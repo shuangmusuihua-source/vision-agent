@@ -9,6 +9,7 @@ import {
   selectPermissionQueueLength,
   selectPermissionRequest,
 } from '../store/session-slot-state'
+import { isAgentQueryActive } from '../store/agent-state-machine'
 import type {
   AgentApprovalMode,
   AgentContext,
@@ -320,7 +321,7 @@ export function useAgent(context: AgentContext = 'editor') {
     const queryKey = currentSlot.currentSessionId || context
     store.getState().setApprovalMode(context, mode, currentSlot.currentSessionId)
 
-    if (!currentSlot.isStreaming) return { success: true }
+    if (!isAgentQueryActive(currentSlot.agentState)) return { success: true }
 
     const result = await window.api.agent.setPermissionMode(queryKey, mode)
     if (!result.success) {
@@ -347,7 +348,9 @@ export function useAgent(context: AgentContext = 'editor') {
 // ─── Context-aware Selectors ────────────────────────────────────────────
 
 export const useMessages = (context: AgentContext) => useAgentStore((s) => s.slots[context].messages)
-export const useIsStreaming = (context: AgentContext) => useAgentStore((s) => s.slots[context].isStreaming)
+export const useIsQueryActive = (context: AgentContext) => (
+  useAgentStore((state) => isAgentQueryActive(state.slots[context].agentState))
+)
 export const useCurrentSessionId = (context: AgentContext) => useAgentStore((s) => s.slots[context].currentSessionId)
 export const useAgentStatus = (context: AgentContext) => useAgentStore((s) => s.slots[context].agentState)
 // Permission / AskUser selectors — live-slot priority, per-context session.

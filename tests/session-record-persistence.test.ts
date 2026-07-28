@@ -4,7 +4,6 @@ type MockState = {
   sessions: unknown[]
   authorizedDirectories: string[]
   fixedDirectories: string[]
-  workspaces: unknown[]
   compactionSessionIds: string[]
 }
 
@@ -12,7 +11,6 @@ const mockState: MockState = {
   sessions: [],
   authorizedDirectories: [],
   fixedDirectories: [],
-  workspaces: [],
   compactionSessionIds: [],
 }
 
@@ -50,7 +48,6 @@ describe('session record persistence', () => {
     mockState.sessions = []
     mockState.authorizedDirectories = []
     mockState.fixedDirectories = []
-    mockState.workspaces = []
     mockState.compactionSessionIds = []
   })
 
@@ -87,12 +84,8 @@ describe('session record persistence', () => {
     expect(getSessionRecords()).toEqual([])
   })
 
-  it('removes workspace authorization, legacy identity, and sessions together', () => {
+  it('removes workspace authorization and app-owned sessions together', () => {
     mockState.authorizedDirectories = ['/workspace/a', '/workspace/b']
-    mockState.workspaces = [
-      { id: 'a', path: '/workspace/a' },
-      { id: 'b', path: '/workspace/b' },
-    ]
     mockState.sessions = [
       { id: 'session-a', sdkSessionId: 'sdk-a', workspacePath: '/workspace/a' },
       { id: 'session-b', sdkSessionId: 'sdk-b', workspacePath: '/workspace/b' },
@@ -103,7 +96,6 @@ describe('session record persistence', () => {
       removedSessionIds: ['session-a'],
     })
     expect(mockState.authorizedDirectories).toEqual(['/workspace/b'])
-    expect(mockState.workspaces).toEqual([{ id: 'b', path: '/workspace/b' }])
     expect(mockState.sessions).toEqual([
       { id: 'session-b', sdkSessionId: 'sdk-b', workspacePath: '/workspace/b' },
     ])

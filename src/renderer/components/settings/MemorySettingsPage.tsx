@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Clock3, FileText, Globe2, HardDrive, Pencil, RefreshCw, Save, Trash2, X } from 'lucide-react'
-import type { MemoryDocument, MemoryEntry } from '../../lib/ipc'
+import type { MemoryDocument, MemoryEntry } from '../../../shared/types'
 import { useModal } from '../common/ModalSystem'
 import './MemorySettingsPage.css'
 

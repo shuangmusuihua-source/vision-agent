@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import {
-  appendUserWorkspacePath,
   filterUserWorkspacePaths,
   KNOWLEDGE_BASE_NAME,
-  removeUserWorkspacePath,
 } from '../../shared/workspace-paths'
+import type { AppSettingsSnapshot } from '../../shared/ipc-types'
 import type { WorkspaceDeleteResult } from '../../shared/workspace-lifecycle'
+import { useSettingsStore } from '../store/settings-cache'
 
 export interface WorkspaceDialogsController {
   create: {
@@ -34,43 +34,31 @@ export interface WorkspaceDialogsController {
  * Keeps workspace-level state and modals in one place. File discovery is
  * handled by the search/index modules rather than duplicated in renderer state.
  */
-export function useWorkspace() {
-  const [workspacePaths, setWorkspacePaths] = useState<string[]>([])
-  const [fixedWorkspacePaths, setFixedWorkspacePaths] = useState<string[]>([])
-
-  // Knowledge base dir
-  useEffect(() => {
-    window.api.workspace.knowledgeDir().then(dir => {
-      setFixedWorkspacePaths([dir])
-      setWorkspacePaths((prev) => filterUserWorkspacePaths(prev, [dir]))
-    })
-  }, [])
-
-  // ── Settings sync ──────────────────────────────────────────────────
-
-  const prevAuthDirsRef = useRef<string>('')
-
-  /** Pull workspace directories from cached settings on change. */
-  function syncFromSettings(dirs: string[], fixedDirs: string[] = fixedWorkspacePaths): void {
-    const userDirs = filterUserWorkspacePaths(dirs, fixedDirs)
-    const key = `${userDirs.join(',')}::${fixedDirs.join(',')}`
-    if (key === prevAuthDirsRef.current) return
-    prevAuthDirsRef.current = key
-    setWorkspacePaths(userDirs)
-  }
+export function useWorkspace(settings: AppSettingsSnapshot | null) {
+  const projectWorkspacePaths = useSettingsStore((state) => state.projectWorkspacePaths)
+  const fixedWorkspacePaths = useMemo(
+    () => settings?.fixedDirectories ?? [],
+    [settings?.fixedDirectories],
+  )
+  const workspacePaths = useMemo(
+    () => filterUserWorkspacePaths(
+      settings?.authorizedDirectories ?? [],
+      fixedWorkspacePaths,
+    ),
+    [fixedWorkspacePaths, settings?.authorizedDirectories],
+  )
 
   // ── Workspace-level handlers ──────────────────────────────────────
 
   const handleReorderWorkspaces = useCallback(async (paths: string[]) => {
     const userPaths = filterUserWorkspacePaths(paths, fixedWorkspacePaths)
-    setWorkspacePaths(userPaths)
     try {
       const result = await window.api.settings.reorderDirectories(userPaths)
-      setWorkspacePaths(result.workspacePaths)
-    } catch {
-      setWorkspacePaths(workspacePaths)
+      projectWorkspacePaths(result.workspacePaths)
+    } catch (error) {
+      console.error('[Workspace] reorder failed:', error)
     }
-  }, [fixedWorkspacePaths, workspacePaths])
+  }, [fixedWorkspacePaths, projectWorkspacePaths])
 
   const handleRemoveWorkspace = useCallback((path: string) => {
     setDeleteWsPath(path)
@@ -130,14 +118,8 @@ export function useWorkspace() {
       setNewWorkspaceError('')
       try {
         const result = await window.api.workspace.createWorkspace(name)
-        setWorkspacePaths(result.workspacePaths)
+        projectWorkspacePaths(result.workspacePaths)
         if (result.success) {
-          // Keep this merge idempotent when settings:changed arrives first.
-          setWorkspacePaths((prev) => appendUserWorkspacePath(
-            prev,
-            result.workspacePath,
-            fixedWorkspacePaths,
-          ))
           setModalVisible(false)
           setTimeout(() => {
             setShowNewWorkspaceModal(false)
@@ -159,7 +141,7 @@ export function useWorkspace() {
     }
     void operation.then(clearCreation, clearCreation)
     return operation
-  }, [newWorkspaceName, fixedWorkspacePaths])
+  }, [newWorkspaceName, projectWorkspacePaths])
 
   // ── Delete workspace modal ─────────────────────────────────────────
 
@@ -190,13 +172,8 @@ export function useWorkspace() {
       setIsDeletingWorkspace(true)
       try {
         const result = await window.api.workspace.deleteWorkspace(deletingPath)
-        setWorkspacePaths(result.workspacePaths)
+        projectWorkspacePaths(result.workspacePaths)
         if (result.success) {
-          setWorkspacePaths((prev) => removeUserWorkspacePath(
-            prev,
-            deletingPath,
-            fixedWorkspacePaths,
-          ))
           setDeleteWsPath(null)
           setDeleteWsConfirm('')
         }
@@ -218,15 +195,12 @@ export function useWorkspace() {
     }
     void operation.then(clearDeletion, clearDeletion)
     return operation
-  }, [deleteWsPath, fixedWorkspacePaths, workspacePaths])
+  }, [deleteWsPath, projectWorkspacePaths, workspacePaths])
 
   return {
     // State
     workspacePaths,
-    setWorkspacePaths,
     fixedWorkspacePaths,
-    // Settings
-    syncFromSettings,
     // Workspace handlers
     handleReorderWorkspaces,
     handleRemoveWorkspace,

@@ -30,6 +30,7 @@ import {
 import type { BuiltinSkillCatalogItem, CommunitySkillCatalogItem } from '../../../shared/types'
 import { useModal } from '../common/ModalSystem'
 import { useAgentStore } from '../../store/agent-store-impl'
+import { isAgentQueryActive } from '../../store/agent-state-machine'
 
 type PendingActionName = 'install' | 'update' | 'uninstall'
 type PendingAction = { skillId: string; action: PendingActionName } | null
@@ -145,7 +146,9 @@ function SkillLibrary(): React.ReactElement {
   const selectedSkillRunning = useAgentStore(state => {
     if (!detailSkillId) return false
     const slots = [...Object.values(state.slots), ...Object.values(state.sessionSlots)]
-    return slots.some(slot => slot.isStreaming && slot.activeSkillId === detailSkillId)
+    return slots.some(slot => (
+      isAgentQueryActive(slot.agentState) && slot.activeSkillId === detailSkillId
+    ))
   })
   const SelectedSkillIcon = selectedSkill ? communitySkillIcons[selectedSkill.icon] || Blocks : Blocks
 

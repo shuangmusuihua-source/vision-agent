@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { emptySlot } from '../src/renderer/store/agent-store'
-import { reduceAgentEvent } from '../src/renderer/store/agent-state-machine'
+import {
+  isAgentQueryActive,
+  reduceAgentEvent,
+} from '../src/renderer/store/agent-state-machine'
 
 function activeTextMessage() {
   return {
@@ -22,7 +25,6 @@ describe('reduceAgentEvent', () => {
     const slot = {
       ...emptySlot(),
       agentState: 'running' as const,
-      isStreaming: true,
       activeSkillId: 'skill-1',
       messages: [activeTextMessage()],
       _processedArtifactIds: processedArtifactIds,
@@ -30,8 +32,9 @@ describe('reduceAgentEvent', () => {
 
     const patch = reduceAgentEvent(slot, { type: 'RESULT_SUCCESS' })
 
+    expect(isAgentQueryActive(slot.agentState)).toBe(true)
     expect(patch.agentState).toBe('idle')
-    expect(patch.isStreaming).toBe(false)
+    expect(isAgentQueryActive(patch.agentState!)).toBe(false)
     expect(patch.messages?.[0]).toMatchObject({
       phase: 'complete',
       skillMeta: { status: 'completed' },
@@ -46,7 +49,6 @@ describe('reduceAgentEvent', () => {
     const slot = {
       ...emptySlot(),
       agentState: 'running' as const,
-      isStreaming: true,
       activeSkillId: 'skill-1',
       messages: [activeTextMessage()],
       permissionRequest: { id: 'permission-1', toolName: 'Write', input: {} },
@@ -56,7 +58,7 @@ describe('reduceAgentEvent', () => {
     const patch = reduceAgentEvent(slot, { type: 'RESULT_ERROR' })
 
     expect(patch.agentState).toBe('error')
-    expect(patch.isStreaming).toBe(false)
+    expect(isAgentQueryActive(patch.agentState!)).toBe(false)
     expect(patch.permissionRequest).toBeNull()
     expect(patch.askUserRequest).toBeNull()
     expect(patch.messages?.[0]).toMatchObject({
@@ -69,7 +71,6 @@ describe('reduceAgentEvent', () => {
     const slot = {
       ...emptySlot(),
       agentState: 'thinking' as const,
-      isStreaming: true,
       messages: [activeTextMessage()],
       _queryGeneration: 4,
     }
@@ -78,7 +79,7 @@ describe('reduceAgentEvent', () => {
 
     expect(patch.agentState).toBe('idle')
     expect(patch._resultGuardGen).toBe(4)
-    expect(patch.isStreaming).toBe(false)
+    expect(isAgentQueryActive(patch.agentState!)).toBe(false)
     expect(patch.messages?.[0]).toMatchObject({ phase: 'complete' })
   })
 })

@@ -94,8 +94,6 @@ export function removeWorkspacePersistence(workspacePath: string): {
     ...store.store,
     authorizedDirectories: store.get('authorizedDirectories')
       .filter((candidate) => !isSameWorkspacePath(candidate, workspacePath)),
-    workspaces: store.get('workspaces')
-      .filter((workspace) => !isSameWorkspacePath(workspace.path, workspacePath)),
     sessions: sessions.filter((session) => (
       !isSameWorkspacePath(session.workspacePath, workspacePath)
     )),

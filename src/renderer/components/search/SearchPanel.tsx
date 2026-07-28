@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Search, X, FileText } from 'lucide-react'
-import type { SearchResult } from '../../lib/ipc'
+import type { SearchResult } from '../../../shared/ipc-types'
 
 interface SearchPanelProps {
   onOpenFile: (filePath: string) => void

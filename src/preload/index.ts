@@ -11,6 +11,7 @@ import type {
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
+import type { WindowApi } from '../shared/preload-api'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
@@ -78,7 +79,6 @@ const api = {
     createWorkspace: (name: string) => invoke('workspace:createWorkspace', name),
     deleteWorkspace: (dirPath: string) =>
       invoke('workspace:deleteWorkspace', dirPath),
-    knowledgeDir: () => invoke('workspace:knowledgeDir'),
     selectFiles: () => invoke('workspace:selectFiles'),
   },
 
@@ -98,8 +98,11 @@ const api = {
     setActiveProfile: (id: string) => invoke('settings:setActiveProfile', id),
     reorderDirectories: (paths: string[]) => invoke('settings:reorderDirectories', paths),
     setTheme: (theme: 'light' | 'dark' | 'system') => invoke('settings:setTheme', theme),
-    onChanged: (callback: (settings: Record<string, unknown>) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, settings: Record<string, unknown>) => callback(settings)
+    onChanged: (callback: (settings: IPCEventPayload<'settings:changed'>) => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        settings: IPCEventPayload<'settings:changed'>,
+      ) => callback(settings)
       ipcRenderer.on('settings:changed', handler)
       return () => { ipcRenderer.removeListener('settings:changed', handler) }
     },
@@ -346,6 +349,6 @@ const api = {
     ipcRenderer.on('main:error', handler)
     return () => { ipcRenderer.removeListener('main:error', handler) }
   }
-}
+} satisfies WindowApi
 
 contextBridge.exposeInMainWorld('api', api)

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useAgentStore } from '../src/renderer/store/agent-store-impl'
 import { emptySlot } from '../src/renderer/store/agent-store'
+import { isAgentQueryActive } from '../src/renderer/store/agent-state-machine'
 import type { ConversationMessage } from '../src/shared/types'
 
 function resetStore(): void {
@@ -317,13 +318,14 @@ describe('agent store intent actions', () => {
       name: 'Skill A',
       icon: 'sparkles',
     })
+    useAgentStore.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, 'ask', sessionId)
 
     const state = useAgentStore.getState()
     expect(sessionId).toMatch(/^new-ask-/)
     expect(state.activeSessionId.ask).toBe(sessionId)
     expect(state.activeSessionId.editor).toBeNull()
     expect(state.slots.ask.currentSessionId).toBe(sessionId)
-    expect(state.slots.ask.isStreaming).toBe(true)
+    expect(isAgentQueryActive(state.slots.ask.agentState)).toBe(true)
     expect(state.slots.ask.activeSkillId).toBe('skill-a')
     expect(state.slots.ask.messages[0]).toMatchObject({
       kind: 'user',
@@ -337,7 +339,7 @@ describe('agent store intent actions', () => {
     const tempSlot = {
       ...emptySlot(),
       currentSessionId: 'temp-a',
-      isStreaming: true,
+      agentState: 'running' as const,
       approvalMode: 'auto' as const,
       composerDraft: { text: 'follow up', attachments: [] },
       messages: [{ kind: 'user' as const, id: 'user-a', role: 'user' as const, textContent: 'hello', createdAt: 1 }],

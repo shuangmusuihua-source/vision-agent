@@ -51,23 +51,6 @@ export function filterUserWorkspacePaths(paths: string[], fixedPaths: string[] =
   })
 }
 
-export function appendUserWorkspacePath(
-  paths: string[],
-  path: string,
-  fixedPaths: string[] = [],
-): string[] {
-  return filterUserWorkspacePaths([...paths, path], fixedPaths)
-}
-
-export function removeUserWorkspacePath(
-  paths: string[],
-  path: string,
-  fixedPaths: string[] = [],
-): string[] {
-  return filterUserWorkspacePaths(paths, fixedPaths)
-    .filter((candidate) => !isSameWorkspacePath(candidate, path))
-}
-
 export function findContainingWorkspacePath(
   filePath: string | null | undefined,
   workspacePaths: string[],

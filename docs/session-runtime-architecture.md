@@ -95,8 +95,8 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 2. `SessionRuntimeController` 按稳定 envelope 中的 `workspacePath` 终止并等待所有 run。
 3. `cron-manager.ts` 暂停并等待关联 Workspace、Workspace session 或其子目录的自动化。
 4. 将 Workspace 移入废纸篓；失败时恢复此前活动的自动化计划。
-5. 一次性移除授权目录、兼容 Workspace 记录和 app session metadata。
-6. 刷新索引并把规范工作区列表投影给 Renderer。
+5. 一次性移除授权目录和 app session metadata。
+6. 刷新索引并在操作结果中返回规范工作区列表；Renderer 将该结果投影到设置缓存一次。
 
 Renderer 切换 Workspace 时，如果 live editor slot 属于另一个 Workspace，必须缓存旧 slot
 并清空活动 session；不得通过修改 live slot 的 `workspacePath` 把旧 session 迁移到新
@@ -118,7 +118,9 @@ Workspace。
 
 App-level 通知（例如 Cron 失败）可以使用不带 session ownership 的 general notification。
 
-Agent IPC 请求使用 `src/shared/ipc-types.ts` 中定义的对象 payload；Main、preload 与 Renderer 必须共同维护同一 interface。
+Agent IPC 请求使用 `src/shared/ipc-types.ts` 中定义的对象 payload；
+`src/shared/preload-api.ts` 维护唯一 `window.api` Interface，preload 实现和 Renderer
+共同消费该类型。
 
 ## 权限与用户输入
 

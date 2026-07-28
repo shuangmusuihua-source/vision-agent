@@ -39,7 +39,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `index.ts` — boot, BrowserWindow, Sentry, indexing, Skill initialization, persisted cron restoration
 - `app-update-lifecycle.ts` — electron-updater configuration, launch/foreground checks, throttling, event projection, and update IPC
 - `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
-- `workspace-lifecycle.ts` / `workspace-lifecycle-adapter.ts` — serialized workspace creation, ordering, and deletion; coordinates Agent shutdown, automation suspension, Trash, persistence, indexing, and settings projection
+- `workspace-lifecycle.ts` / `workspace-lifecycle-adapter.ts` — serialized workspace creation, ordering, and deletion; coordinates Agent shutdown, automation suspension, Trash, persistence, and indexing, then returns the canonical workspace projection
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
 - `pending-interactions.ts` — permission and AskUser registration, timeout, SDK cancellation, notification cleanup, resolution, and session-scoped rejection
@@ -60,7 +60,7 @@ Main-process code imports directly from the owning runtime module or persistence
 
 ### IPC
 
-`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. Preload exposes typed methods grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, and `update`.
+`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. `src/shared/preload-api.ts` owns the `window.api` Interface, and the preload implementation must satisfy it. Methods are grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `search`, `menu`, and `update`.
 
 New session-affecting push events must carry an `AgentSessionEnvelope`; never infer ownership from the currently visible workspace or panel.
 
@@ -71,7 +71,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `components/layout/AppShell.tsx` — main layout and feature orchestration
 - `workflows/editor-session-workflow.ts` — editor-session persistence ordering, app/SDK ID deletion routing, workspace/session switching, overview activation, and new-session draft lifecycle
 - `workflows/session-output-workflow.ts` — latest-only session-output loading, file-change/agent-completion refresh coalescing, and output actions
-- `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state
+- `store/agent-store.ts` / `agent-store-impl.ts` — per-context and per-session agent state; query activity is derived from the Agent state machine rather than stored separately
 - `store/session-slot-state.ts` — app/SDK session ID resolution, live/cache slot routing, pending-interaction queue transitions, mirroring, and LRU ownership
 - `store/ui-slice.ts` — application UI state
 - `hooks/useAgent.ts` — singleton agent IPC subscriptions and actions
@@ -113,7 +113,7 @@ Do not introduce a second store for the same authority without documenting the o
 
 - Treat user worktree changes as owned by the user; do not overwrite unrelated edits.
 - Prefer focused owning modules; do not introduce pass-through facades.
-- Update `src/shared/ipc-types.ts`, preload, and renderer types together when changing IPC.
+- Update `src/shared/ipc-types.ts` and `src/shared/preload-api.ts` together when changing IPC; the preload implementation must satisfy the shared Interface.
 - Built-in Skill changes must keep `skills-manifest.json`, `builtin.ts`, resources, and packaged verification aligned. See `src/main/skills/BUILTIN-SKILL-ARCHITECTURE.md`.
 - OfficeCLI remains an app-managed runtime: pin release assets and hashes, disable its self-update, and never invoke its global installer or MCP registration flow.
 - Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.

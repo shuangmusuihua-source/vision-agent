@@ -12,6 +12,10 @@ export function transition(current: AgentState, event: AgentEvent): AgentState {
   return allowed
 }
 
+export function isAgentQueryActive(state: AgentState): boolean {
+  return state !== 'idle' && state !== 'error'
+}
+
 export function reduceAgentEvent(slot: ContextSlot, event: AgentEvent): Partial<ContextSlot> {
   const next = transition(slot.agentState, event)
   const slotUpdates: Partial<ContextSlot> = { agentState: next }
@@ -31,7 +35,6 @@ export function reduceAgentEvent(slot: ContextSlot, event: AgentEvent): Partial<
   }
 
   if (event.type === 'RESULT_SUCCESS') {
-    slotUpdates.isStreaming = false
     slotUpdates._acc = null
     slotUpdates._firstContentSeen = false
     slotUpdates.activeSkillId = null
@@ -80,7 +83,6 @@ export function reduceAgentEvent(slot: ContextSlot, event: AgentEvent): Partial<
   }
 
   if (event.type === 'RESULT_ERROR') {
-    slotUpdates.isStreaming = false
     slotUpdates._acc = null
     slotUpdates._firstContentSeen = false
     slotUpdates.activeSkillId = null
@@ -112,7 +114,6 @@ export function reduceAgentEvent(slot: ContextSlot, event: AgentEvent): Partial<
   }
 
   if (event.type === 'ABORT') {
-    slotUpdates.isStreaming = false
     slotUpdates._acc = null
     slotUpdates._firstContentSeen = false
     slotUpdates.activeSkillId = null

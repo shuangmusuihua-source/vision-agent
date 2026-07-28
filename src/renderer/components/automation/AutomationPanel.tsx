@@ -24,7 +24,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import type { SdkSessionInfo } from '../../../shared/types'
-import type { CronTask } from '../../lib/ipc'
+import type { CronTask } from '../../../shared/cron-types'
 import { MAX_CRON_LINKED_URLS } from '../../../shared/cron-linked-urls'
 import {
   automationTaskDraftReducer,

@@ -16,9 +16,7 @@ import { getKnowledgeBaseDir } from './persistence/store-core'
 import { sessionRuntime } from './session-runtime'
 import { WorkspaceLifecycle } from './workspace-lifecycle'
 
-export function createWorkspaceLifecycle(
-  notifySettingsChanged: () => void,
-): WorkspaceLifecycle {
+export function createWorkspaceLifecycle(): WorkspaceLifecycle {
   return new WorkspaceLifecycle({
     documentsRoot: () => join(app.getPath('documents'), DOCUMENTS_DIR_NAME),
     ensureDirectory: async (directoryPath) => {
@@ -44,6 +42,5 @@ export function createWorkspaceLifecycle(
     abortWorkspaceRuns: (workspacePath) => sessionRuntime.abortWorkspaceAndWait(workspacePath),
     suspendWorkspaceTasks: suspendTasksForWorkspace,
     refreshIndex: (workspacePaths) => fileIndexService.init(workspacePaths),
-    notifySettingsChanged,
   })
 }

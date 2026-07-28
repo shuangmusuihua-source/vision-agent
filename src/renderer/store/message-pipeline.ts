@@ -338,7 +338,7 @@ export function reduceTextDelta(
       }
       const msgs = [...slot.messages.filter((m) => !(m.kind === 'status' && m.phase === 'streaming')), newMsg]
       firstContentSeenDuringThisCall = !slot._firstContentSeen
-      return { patch: { messages: msgs, _acc: newAcc, isStreaming: true, _firstContentSeen: true }, firstContentSeenDuringThisCall }
+      return { patch: { messages: msgs, _acc: newAcc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
     }
     acc = ensureAccumulator(msgId, slot)
   }
@@ -428,7 +428,7 @@ export function reduceContentBlockStart(
       const msgs = [...slot.messages.filter((m) => !(m.kind === 'status' && m.phase === 'streaming')), newMsg]
       const newAcc = ensureAccumulator(msgId, slot)
       firstContentSeenDuringThisCall = !slot._firstContentSeen
-      return { patch: { messages: msgs, _acc: newAcc, isStreaming: true, _firstContentSeen: true }, firstContentSeenDuringThisCall }
+      return { patch: { messages: msgs, _acc: newAcc, _firstContentSeen: true }, firstContentSeenDuringThisCall }
     }
     acc = ensureAccumulator(msgId, slot)
   }
