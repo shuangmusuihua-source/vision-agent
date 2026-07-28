@@ -34,9 +34,10 @@ export function AskSumiIcon(): React.ReactElement {
 export function SkillsIcon(): React.ReactElement {
   return (
     <SidebarPrimaryIcon>
-      <rect x="3.15" y="3.15" width="6.05" height="6.05" rx="1.75" />
-      <rect x="10.8" y="3.15" width="6.05" height="6.05" rx="1.75" />
-      <rect x="6.98" y="10.8" width="6.05" height="6.05" rx="1.75" />
+      <rect x="3.1" y="3.1" width="5.4" height="5.4" rx="1.5" />
+      <rect x="11.5" y="3.1" width="5.4" height="5.4" rx="1.5" />
+      <rect x="3.1" y="11.5" width="5.4" height="5.4" rx="1.5" />
+      <path d="M11.5 14.2h5.4M14.2 11.5v5.4" />
     </SidebarPrimaryIcon>
   )
 }
@@ -54,9 +55,10 @@ export function AutomationIcon(): React.ReactElement {
 export function KnowledgeIcon(): React.ReactElement {
   return (
     <SidebarPrimaryIcon>
-      <path d="M4.05 3.45h10.1a1.8 1.8 0 0 1 1.8 1.8v11.3H6.4a2.35 2.35 0 0 1-2.35-2.35V3.45Z" />
-      <path d="M4.05 13.75c.6-.7 1.38-1.05 2.35-1.05h9.55" />
-      <path d="M7.15 3.45v5.3l1.9-1.2 1.9 1.2v-5.3" />
+      <rect x="3.2" y="4.05" width="3.55" height="11.35" rx="1.1" />
+      <rect x="7.65" y="2.95" width="4.05" height="12.45" rx="1.1" />
+      <path d="m13.05 4.35 3.1-.55 1.65 10.85-3.1.5-1.65-10.8Z" />
+      <path d="M2.7 17.05h14.6" />
     </SidebarPrimaryIcon>
   )
 }
