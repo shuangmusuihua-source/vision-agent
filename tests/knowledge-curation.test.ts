@@ -36,7 +36,7 @@ describe('knowledge curation', () => {
     await expect(readFile(join(knowledgeDir, 'research.md'), 'utf8')).resolves.toBe('# Revised')
 
     const provenance = JSON.parse(
-      await readFile(join(knowledgeDir, '.vision', 'knowledge-provenance.json'), 'utf8')
+      await readFile(join(knowledgeDir, '.sumi', 'knowledge-provenance.json'), 'utf8')
     )
     expect(provenance['research.md']).toMatchObject({ sourcePath: source, sessionId: 'session-b' })
     expect(provenance['research.md'].sourceHash).toEqual(expect.any(String))

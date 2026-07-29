@@ -141,7 +141,7 @@ function convertedMarkdownPath(workspaceCwd: string, sessionKey: string, filePat
   const safeBaseName = safeAttachmentSegment(baseName, 'attachment')
   const outName = `${safeBaseName}-${hashPath(filePath)}.md`
 
-  return join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey), outName)
+  return join(workspaceCwd, '.sumi', 'attachments', safeAttachmentSegment(sessionKey), outName)
 }
 
 async function runMarkitdown(filePath: string): Promise<string> {
@@ -179,7 +179,7 @@ export async function convertAttachmentsToMarkdown(
   requests: AttachmentConversionRequest[]
 ): Promise<AttachmentConversionResult> {
   const result: AttachmentConversionResult = { converted: [], failed: [] }
-  const outDir = join(workspaceCwd, '.vision', 'attachments', safeAttachmentSegment(sessionKey))
+  const outDir = join(workspaceCwd, '.sumi', 'attachments', safeAttachmentSegment(sessionKey))
   await mkdir(outDir, { recursive: true })
 
   for (const request of requests) {

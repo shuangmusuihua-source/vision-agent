@@ -8,7 +8,7 @@ dist/
 design-token-preview.html
 mockups/
 .claude/
-.vision/
+.sumi/
 .coverage
 htmlcov/
 .agents/skills/**/scripts/tests/coverage-*.json

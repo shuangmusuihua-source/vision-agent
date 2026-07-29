@@ -9,7 +9,7 @@ const appAsarPath = process.env.SUMI_PACKAGED_APP_ASAR
 
 const allowedTopLevelPaths = new Set(['/node_modules', '/out', '/package.json'])
 const requiredPaths = ['/node_modules', '/out/main/index.js', '/out/preload/index.js', '/out/renderer/index.html', '/package.json']
-const forbiddenPrefixes = ['/.vision', '/scripts', '/skills-lock.json']
+const forbiddenPrefixes = ['/.sumi', '/scripts', '/skills-lock.json']
 
 try {
   await access(appAsarPath)

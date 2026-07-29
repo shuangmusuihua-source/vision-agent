@@ -29,7 +29,7 @@ export interface KnowledgeSyncState {
   syncedAt?: number
 }
 
-const PROVENANCE_RELATIVE_PATH = join('.vision', 'knowledge-provenance.json')
+const PROVENANCE_RELATIVE_PATH = join('.sumi', 'knowledge-provenance.json')
 
 function contentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex')
@@ -99,7 +99,7 @@ export async function addMarkdownToKnowledge(options: {
     await mkdir(options.knowledgeDir, { recursive: true })
     const sourceName = basename(options.sourcePath)
     const parsed = parse(sourceName)
-    const metadataDir = join(options.knowledgeDir, '.vision')
+    const metadataDir = join(options.knowledgeDir, '.sumi')
     const provenancePath = join(options.knowledgeDir, PROVENANCE_RELATIVE_PATH)
     await mkdir(metadataDir, { recursive: true })
     const provenance = await readProvenance(provenancePath)

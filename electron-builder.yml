@@ -16,7 +16,7 @@ files:
   - '!**/.claude/**'
   - '!**/.codex/**'
   - '!**/.agents/**'
-  - '!**/.vision/**'
+  - '!**/.sumi/**'
   - '!**/.git/**'
   - '!dist/**'
   - '!docs/**'

@@ -22,7 +22,6 @@ interface KnowledgeEntry {
 const IGNORED_INDEX_PATH_SEGMENTS = new Set([
   '.git',
   'node_modules',
-  '.vision',
   '.claude',
   '.sumi',
   'out',

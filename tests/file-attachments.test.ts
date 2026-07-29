@@ -112,14 +112,14 @@ describe('file conversion markers', () => {
     const result = appendAttachmentConversionSummary(prompt, {
       converted: [{
         sourcePath: '/Users/me/Documents/report.pdf',
-        markdownPath: '/Users/me/work/.vision/attachments/session/report-a1b2c3d4e5.md',
+        markdownPath: '/Users/me/work/.sumi/attachments/session/report-a1b2c3d4e5.md',
       }],
       failed: [],
     })
 
     expect(result).toContain(`<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`)
     expect(result).toContain(`</${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`)
-    expect(result).toContain('Markdown路径: /Users/me/work/.vision/attachments/session/report-a1b2c3d4e5.md')
+    expect(result).toContain('Markdown路径: /Users/me/work/.sumi/attachments/session/report-a1b2c3d4e5.md')
     expect(result).toContain('请优先使用 Read 工具读取 Markdown 路径')
   })
 
@@ -131,7 +131,7 @@ describe('file conversion markers', () => {
       `<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
       '附件转换结果：',
       '- 源文件: /tmp/a.pdf',
-      '  Markdown路径: /tmp/work/.vision/attachments/a.md',
+      '  Markdown路径: /tmp/work/.sumi/attachments/a.md',
       `</${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
     ].join('\n')
 
@@ -147,7 +147,7 @@ describe('file conversion markers', () => {
       `<${ATTACHMENT_CONVERSION_CONTEXT_TAG}>`,
       '附件转换结果：',
       '- 源文件: /tmp/a.pdf',
-      '  Markdown路径: /tmp/work/.vision/attachments/a.md',
+      '  Markdown路径: /tmp/work/.sumi/attachments/a.md',
       '',
       '附件转换失败：',
       '- 源文件: /tmp/b.pdf',
@@ -159,7 +159,7 @@ describe('file conversion markers', () => {
       {
         sourcePath: '/tmp/a.pdf',
         status: 'converted',
-        markdownPath: '/tmp/work/.vision/attachments/a.md',
+        markdownPath: '/tmp/work/.sumi/attachments/a.md',
       },
       {
         sourcePath: '/tmp/b.pdf',

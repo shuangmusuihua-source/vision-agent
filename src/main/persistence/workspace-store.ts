@@ -129,7 +129,7 @@ export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): 
 export function ensureKnowledgeBase(): string {
   const kbDir = getKnowledgeBaseDir()
   mkdirSync(kbDir, { recursive: true })
-  mkdirSync(path.join(kbDir, '.vision'), { recursive: true })
+  mkdirSync(path.join(kbDir, '.sumi'), { recursive: true })
 
   const fixed = store.get('fixedDirectories')
   const nextFixed = [kbDir, ...fixed.filter((dir) => !isReservedKnowledgeWorkspacePath(dir, [kbDir]))]
