@@ -22,7 +22,7 @@ export type GraphStore = {
 
 export const useGraphStore = create<GraphStore>((set) => ({
   // Core data
-  graphData: { nodes: [], edges: [] },
+  graphData: { nodes: [], edges: [], changeVersion: 0 },
 
   // File change tracking
   changedFileCount: 0,
@@ -36,7 +36,7 @@ export const useGraphStore = create<GraphStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const data = await window.api.graph.getData()
-      const loadedVersion = data.changeVersion || 0
+      const loadedVersion = data.changeVersion
       await window.api.graph.acknowledgeChanges(loadedVersion)
       set((state) => state.changedFileVersion > loadedVersion
         ? { graphData: data, isLoading: false, error: null }

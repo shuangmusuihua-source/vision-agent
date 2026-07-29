@@ -98,7 +98,7 @@ export function useTabs() {
             tabs: [...current.tabs, { type: 'file', path: filePath }],
             activeTab: { type: 'file', path: filePath },
             tabContents: { ...current.tabContents, [filePath]: result.content! },
-            pendingSaves: current.pendingSaves ?? {},
+            pendingSaves: current.pendingSaves,
           },
         }
       })
@@ -204,7 +204,7 @@ export function useTabs() {
     const result = await window.api.workspace.readFile(path)
     if (result.success && result.content !== undefined) {
       setCurrentWsState(prev => {
-        if (prev.pendingSaves?.[path]) {
+        if (prev.pendingSaves[path]) {
           return prev
         }
         if (prev.tabContents[path] !== result.content) {

@@ -389,7 +389,7 @@ export class FileIndexService {
       }
     }
 
-    return { nodes, edges }
+    return { nodes, edges, changeVersion: this.changeVersion }
   }
 
   /** Search files by query string */

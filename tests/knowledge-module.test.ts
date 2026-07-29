@@ -26,7 +26,7 @@ beforeEach(() => {
   })
   useUiStore.setState({ view: 'ask' })
   useGraphStore.setState({
-    graphData: { nodes: [], edges: [] },
+    graphData: { nodes: [], edges: [], changeVersion: 0 },
     changedFileCount: 0,
     changedFileVersion: 0,
     isLoading: false,

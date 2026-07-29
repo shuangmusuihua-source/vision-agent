@@ -555,7 +555,7 @@ export type GraphData = {
   nodes: GraphNode[]
   edges: GraphEdge[]
   /** File-index version represented by this graph snapshot. */
-  changeVersion?: number
+  changeVersion: number
 }
 
 // ─── Memory Files ──────────────────────────────────────────────────
