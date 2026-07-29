@@ -2,7 +2,7 @@ import { DOCUMENTS_DIR_NAME } from './branding'
 
 export const KNOWLEDGE_BASE_NAME = 'Knowledge'
 
-const LEGACY_KNOWLEDGE_PARENT_NAMES = new Set([DOCUMENTS_DIR_NAME, 'VisionAgent'])
+const RESERVED_KNOWLEDGE_PARENT_NAMES = new Set([DOCUMENTS_DIR_NAME])
 
 function trimTrailingSeparators(value: string): string {
   return value.trim().replace(/[\\/]+$/, '')
@@ -37,7 +37,7 @@ export function isReservedKnowledgeWorkspacePath(path: string, fixedPaths: strin
   }
 
   if (basename(normalized) !== KNOWLEDGE_BASE_NAME) return false
-  return LEGACY_KNOWLEDGE_PARENT_NAMES.has(basename(dirname(normalized)))
+  return RESERVED_KNOWLEDGE_PARENT_NAMES.has(basename(dirname(normalized)))
 }
 
 export function filterUserWorkspacePaths(paths: string[], fixedPaths: string[] = []): string[] {

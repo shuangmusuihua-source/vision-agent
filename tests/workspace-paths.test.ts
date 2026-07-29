@@ -15,11 +15,11 @@ describe('workspace path filtering', () => {
     ])
   })
 
-  it('filters legacy knowledge directories left in authorized settings', () => {
-    expect(filterUserWorkspacePaths([
-      '/Users/me/Documents/VisionAgent/Knowledge',
-      '/Users/me/Documents/sumi/test',
-    ])).toEqual(['/Users/me/Documents/sumi/test'])
+  it('does not reserve knowledge directories under the retired app name', () => {
+    const legacyPath = '/Users/me/Documents/VisionAgent/Knowledge'
+
+    expect(isReservedKnowledgeWorkspacePath(legacyPath)).toBe(false)
+    expect(filterUserWorkspacePaths([legacyPath])).toEqual([legacyPath])
   })
 
   it('does not hide unrelated workspaces named Knowledge', () => {

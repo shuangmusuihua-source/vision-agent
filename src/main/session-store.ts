@@ -139,7 +139,7 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
           title: r.title || r.firstPrompt,
           createdAt: r.createdAt,
           lastModified: r.lastModified,
-          messageCount: r.messageCount || 0,
+          messageCount: 0,
           cwd: r.workingDirectory,
           workspacePath: r.workspacePath,
           context: r.context,

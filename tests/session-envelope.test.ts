@@ -524,7 +524,6 @@ describe('session runtime event routing', () => {
       clientSessionKey: 'app-session-notification',
       sdkSessionId: 'sdk-session-notification',
       workspacePath: '/workspace/notification',
-      workspaceCwd: '/workspace/notification',
     })
   })
 

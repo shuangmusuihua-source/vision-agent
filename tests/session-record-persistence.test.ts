@@ -60,7 +60,6 @@ describe('session record persistence', () => {
       status: 'empty',
       createdAt: 10,
       lastModified: 10,
-      messageCount: 0,
     })
 
     expect(getSessionRecords()).toEqual([
@@ -73,7 +72,6 @@ describe('session record persistence', () => {
         status: 'empty',
         createdAt: 10,
         lastModified: 10,
-        messageCount: 0,
       },
     ])
   })

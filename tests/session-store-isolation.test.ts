@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
     title: 'Session A',
     createdAt: 1,
     lastModified: 2,
-    messageCount: 1,
   }],
   listSessions: vi.fn(),
   renameSession: vi.fn(),
@@ -73,7 +72,6 @@ beforeEach(() => {
     title: 'Session A',
     createdAt: 1,
     lastModified: 2,
-    messageCount: 1,
   }]
   mocks.listSessions.mockReset()
   mocks.renameSession.mockReset()

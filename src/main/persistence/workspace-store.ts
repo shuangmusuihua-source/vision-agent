@@ -113,7 +113,6 @@ export function updateSessionRecord(id: string, patch: Partial<SessionRecord>): 
     status: isSessionStatus(patch.status) ? patch.status : 'empty',
     createdAt: numberOrDefault(patch.createdAt, now),
     lastModified: numberOrDefault(patch.lastModified, now),
-    messageCount: numberOrDefault(patch.messageCount, 0),
   }
 
   if (typeof patch.sdkSessionId === 'string') record.sdkSessionId = patch.sdkSessionId

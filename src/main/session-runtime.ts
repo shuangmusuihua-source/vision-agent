@@ -308,17 +308,14 @@ export class SessionRuntimeController {
     notification: AgentNotificationPayload
   ): void {
     if (win.isDestroyed()) return
-    const payload: SessionRoutedNotification & { workspaceCwd: string } = {
-      ...withSessionEnvelope(envelope, {
-        ...notification,
-        target: notification.target ?? {
-          view: envelope.context === 'ask' ? 'ask' : 'editor',
-          sessionId: envelope.sessionId,
-          workspacePath: envelope.workspacePath,
-        },
-      }),
-      workspaceCwd: envelope.workspacePath,
-    }
+    const payload: SessionRoutedNotification = withSessionEnvelope(envelope, {
+      ...notification,
+      target: notification.target ?? {
+        view: envelope.context === 'ask' ? 'ask' : 'editor',
+        sessionId: envelope.sessionId,
+        workspacePath: envelope.workspacePath,
+      },
+    })
     win.webContents.send('agent:notification', payload)
   }
 

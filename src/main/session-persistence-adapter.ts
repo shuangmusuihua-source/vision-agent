@@ -26,7 +26,6 @@ export function persistMaterializedSession(input: MaterializedSessionInput): voi
     title: input.title ?? existing?.title,
     createdAt: existing?.createdAt ?? now,
     lastModified: now,
-    messageCount: existing?.messageCount ?? 0,
   })
 }
 

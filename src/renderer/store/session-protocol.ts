@@ -10,10 +10,9 @@
  * 3. Invariants are enforced by a pure reducer — no ad-hoc list manipulation.
  * 4. `id` is app-owned and stable. `sdkSessionId` is the Claude SDK handle.
  *    Materialization attaches `sdkSessionId`; it must not rename `id`.
- * 5. `messageCount` carries real SDK data (populated by `listSdkSessions` in
- *    session-store.ts). It flows through CREATE_TEMP (set to 0), MATERIALIZE
- *    (spread-preserved), and REPLACE_SDK (passed through from SDK sessions)
- *    unchanged — the reducer never mutates it.
+ * 5. `messageCount` is a transient SDK projection populated by
+ *    `listSdkSessions`. Empty app-owned sessions use 0 until materialization;
+ *    the value is not persisted in SessionRecord.
  */
 
 import type { SdkSessionInfo } from '../../shared/types'

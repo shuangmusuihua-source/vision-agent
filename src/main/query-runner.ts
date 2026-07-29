@@ -418,7 +418,6 @@ export async function sendMessage(
       status: latestRecord?.status || 'empty',
       createdAt: latestRecord?.createdAt || Date.now(),
       lastModified: Date.now(),
-      messageCount: latestRecord?.messageCount || 0,
     })
   } catch (error) {
     startLease.release()

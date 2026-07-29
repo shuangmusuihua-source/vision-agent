@@ -87,7 +87,6 @@ export function registerAgentHandlers(): void {
       status: 'empty',
       createdAt: now,
       lastModified: now,
-      messageCount: 0,
     })
     return { success: true }
   })

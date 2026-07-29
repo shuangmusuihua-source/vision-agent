@@ -260,12 +260,10 @@ export type AgentNotificationPayload = {
   target?: AgentNotificationTarget
 }
 export type SessionRoutedNotification = AgentNotificationPayload & AgentSessionEnvelope
-export type GeneralAgentNotification = AgentNotificationPayload & {
-  workspaceCwd?: string
-}
+export type GeneralAgentNotification = AgentNotificationPayload
 export type AgentNotificationEvent =
   | GeneralAgentNotification
-  | (SessionRoutedNotification & { workspaceCwd?: string })
+  | SessionRoutedNotification
 
 export type AgentIPCMessageWithContext = SessionRoutedAgentIPCMessage
 
@@ -594,7 +592,6 @@ export interface SessionRecord {
   tags?: string[]
   createdAt: number
   lastModified: number
-  messageCount: number
 }
 // ─── Tab Descriptor (supports fixed tabs + file tabs) ──────────────────
 
