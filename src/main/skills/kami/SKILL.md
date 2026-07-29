@@ -472,6 +472,10 @@ PDF always ships for document templates. Landing pages ship as a ready-to-serve 
 
 ## Step 5 · Build & verify
 
+Build artifacts are written to `kami-output/` under the session working
+directory. Set `KAMI_OUTPUT_DIR` only when the user explicitly needs a different
+destination outside the installed Skill directory.
+
 ```bash
 python3 scripts/build.py --verify           # build all templates + page count + font check + slides
 python3 scripts/build.py --verify resume-en # single target full verification

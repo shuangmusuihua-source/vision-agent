@@ -67,6 +67,11 @@ UI 定义示例：
 
 Workspace 不复制完整资源；`workspace-skill-links.ts` 在会话工作目录中创建指向全局安装的轻量链接。`query-runner.ts` 将用户启用的 Skill IDs 传给 SDK，并使用 project setting source 发现它们。
 
+这些链接只用于读取共享 Skill 资源。Skill 运行时脚本必须把生成文件写入会话
+working directory，不能写到链接目标；Agent 子进程统一禁用 Python bytecode，
+避免在共享脚本旁生成 `__pycache__`。Kami 的构建脚本默认写入会话内的
+`kami-output/`，并拒绝解析到已安装 Skill 目录中的输出路径。
+
 ## 社区 Skills
 
 社区 Skill 不进入内置 manifest。`community-catalog.ts` 提供受控目录，`community-skill-installer.ts` 负责 staging、校验、安装、更新和卸载；`handlers/skill-handlers.ts` 暴露 renderer API。

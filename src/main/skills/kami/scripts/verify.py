@@ -18,7 +18,13 @@ from optional_deps import (
     require_pypdf_reader,
     require_weasyprint_html,
 )
-from shared import DIAGRAMS, EXAMPLES, TEMPLATES, default_example_pdfs, load_checks_thresholds
+from shared import (
+    DIAGRAMS,
+    TEMPLATES,
+    default_example_pdfs,
+    example_output_dir,
+    load_checks_thresholds,
+)
 
 # Primary fonts expected in embedded PDF font names
 CN_PRIMARY_FONTS = {"TsangerJinKai02"}
@@ -126,8 +132,9 @@ def verify_target(
         issues.append(str(exc))
         return issues
 
-    EXAMPLES.mkdir(parents=True, exist_ok=True)
-    out = EXAMPLES / f"{name}.pdf"
+    output_dir = example_output_dir()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out = output_dir / f"{name}.pdf"
 
     # Warn about missing local font files before rendering
     missing_fonts = _check_font_sources(src)

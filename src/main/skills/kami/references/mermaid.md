@@ -58,7 +58,7 @@ To make a new diagram from Mermaid text:
 python3 scripts/mermaid_normalize.py raw.svg -o clean.svg
 # 3. Paste <svg>...</svg> into a diagram shell (copy assets/diagrams/sequence.html),
 #    register it in DIAGRAM_TARGETS (scripts/build.py), then verify:
-python3 scripts/build.py diagram-<name>     # renders to assets/examples/*.pdf
+python3 scripts/build.py diagram-<name>     # renders to <working-directory>/kami-output/*.pdf
 ```
 
 The `.mmd` files in `assets/diagrams/src/` record the Mermaid source of the shipped

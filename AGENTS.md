@@ -45,7 +45,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `pending-interactions.ts` — permission and AskUser registration, timeout, SDK cancellation, notification cleanup, resolution, and session-scoped rejection
 - `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
 - `src/shared/telemetry-sanitizer.ts` — shared Sentry privacy boundary for recursive secret, session ID, URL credential, and private-path redaction
-- `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution
+- `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution, and read-only Skill runtime environment guards
 - `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
 - `officecli-runtime.ts` — opt-in, pinned OfficeCLI download, SHA-256 verification, atomic install, and runtime discovery for editable DOCX/XLSX/PPTX work
 - `managed-runtime-install.ts` — shared single-flight staging, backup, activation validation, rollback, and cleanup transaction for app-managed runtimes
@@ -116,6 +116,7 @@ Do not introduce a second store for the same authority without documenting the o
 - Prefer focused owning modules; do not introduce pass-through facades.
 - Update `src/shared/ipc-types.ts` and `src/shared/preload-api.ts` together when changing IPC; the preload implementation must satisfy the shared Interface.
 - Built-in Skill changes must keep `skills-manifest.json`, `builtin.ts`, resources, and packaged verification aligned. See `src/main/skills/BUILTIN-SKILL-ARCHITECTURE.md`.
+- Skill resources linked into a session are shared read-only inputs. Runtime scripts must write generated files under the session working directory, never beside their installed resources.
 - OfficeCLI remains an app-managed runtime: pin release assets and hashes, disable its self-update, and never invoke its global installer or MCP registration flow.
 - Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.
 

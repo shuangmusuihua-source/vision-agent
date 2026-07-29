@@ -129,6 +129,9 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
   if (profile.extraEnv) {
     Object.assign(env, profile.extraEnv)
   }
+  // Installed Skills are shared read-only resources. Python must not place
+  // __pycache__ files beside their scripts, including through session links.
+  env.PYTHONDONTWRITEBYTECODE = '1'
 
   const effectiveCwd = profile.workspaceCwd ?? profile.cwd ?? getAppSkillsCwd()
 

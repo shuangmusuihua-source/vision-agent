@@ -2,7 +2,7 @@
   {
     "id": "kami",
     "hasResources": true,
-    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "references/diagrams.md", "assets/diagrams/architecture-board.html", "assets/templates"],
+    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "scripts/shared.py", "scripts/verify.py", "references/diagrams.md", "assets/diagrams/architecture-board.html", "assets/templates"],
     "version": "1.9.4",
     "source": {
       "repositoryUrl": "https://github.com/tw93/kami",

@@ -44,10 +44,11 @@ from optional_deps import (
 )
 from shared import (
     DIAGRAMS,
-    EXAMPLES,
     TEMPLATES,
+    UnsafeOutputDirectoryError,
     build_targets,
     diagram_targets,
+    example_output_dir,
     screen_targets,
 )
 
@@ -191,8 +192,9 @@ def build_html(name: str, source: str, max_pages: int,
         print(f"ERROR: {name}: source not found ({src})")
         return False
 
-    EXAMPLES.mkdir(parents=True, exist_ok=True)
-    out = EXAMPLES / f"{name}.pdf"
+    output_dir = example_output_dir()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out = output_dir / f"{name}.pdf"
 
     html_text = src.read_text(encoding="utf-8")
     html_text = highlight_code_blocks(html_text)
@@ -220,8 +222,9 @@ def build_slides(name: str = "slides") -> bool:
         print(f"ERROR: {name}: source not found ({src})")
         return False
 
-    EXAMPLES.mkdir(parents=True, exist_ok=True)
-    out = EXAMPLES / f"{name}.pptx"
+    output_dir = example_output_dir()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out = output_dir / f"{name}.pptx"
     # Pass --out so the slides script writes directly to the target path. Older
     # slides.py defaults to 'output.pptx' in cwd; new copies accept --out.
     result = subprocess.run(
@@ -277,7 +280,7 @@ def build_single(name: str) -> int:
         source, max_pages = HTML_TARGETS[name]
         ok = build_html(name, source, max_pages)
         if ok:
-            show_fonts(EXAMPLES / f"{name}.pdf")
+            show_fonts(example_output_dir() / f"{name}.pdf")
         return 0 if ok else 1
     if name in SCREEN_TARGETS:
         ok = build_screen_template(name, SCREEN_TARGETS[name])
@@ -391,4 +394,9 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    try:
+        exit_code = main(sys.argv)
+    except UnsafeOutputDirectoryError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        exit_code = 1
+    sys.exit(exit_code)

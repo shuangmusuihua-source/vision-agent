@@ -34,6 +34,7 @@ describe('agent options', () => {
     expect(options.env).toEqual(expect.objectContaining({
       ANTHROPIC_API_KEY: 'sk-app-profile',
       ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic',
+      PYTHONDONTWRITEBYTECODE: '1',
     }))
     expect(options.settingSources).toEqual([])
     expect(options.settings).toEqual({ autoMemoryEnabled: false })

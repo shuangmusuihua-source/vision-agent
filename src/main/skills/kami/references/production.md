@@ -201,7 +201,7 @@ WeasyPrint reads standard meta tags in `<head>` and writes them into the PDF (Ti
 **Verify**:
 
 ```bash
-pdfinfo assets/examples/one-pager-en.pdf   # shows Title / Author / Subject
+pdfinfo kami-output/one-pager-en.pdf   # shows Title / Author / Subject
 ```
 
 ---

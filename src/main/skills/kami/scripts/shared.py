@@ -20,7 +20,6 @@ class TemplateSpec(NamedTuple):
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = ROOT / "assets" / "templates"
 DIAGRAMS = ROOT / "assets" / "diagrams"
-EXAMPLES = ROOT / "assets" / "examples"
 TOKENS_FILE = ROOT / "references" / "tokens.json"
 CHECKS_THRESHOLDS_FILE = ROOT / "references" / "checks_thresholds.json"
 
@@ -42,6 +41,67 @@ CLAUDE_DESKTOP_PACKAGE_URL = "https://github.com/tw93/kami/releases/latest/downl
 PARCHMENT_RGB = (0xF5, 0xF4, 0xED)
 
 _HOMEBREW_PREFIXES = (Path("/opt/homebrew"), Path("/usr/local"))
+_SESSION_DIRECTORY_KINDS = {"sessions", "ask-sessions"}
+
+
+class UnsafeOutputDirectoryError(RuntimeError):
+    """Raised when a build would write into installed Skill resources."""
+
+
+def _is_within(candidate: Path, parent: Path) -> bool:
+    try:
+        candidate.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def _session_root_from_logical_pwd() -> Path | None:
+    """Recover the session root when cwd entered the Skill through its symlink."""
+    raw_pwd = os.environ.get("PWD")
+    if not raw_pwd:
+        return None
+
+    logical_pwd = Path(raw_pwd).expanduser()
+    if not logical_pwd.is_absolute():
+        return None
+    try:
+        if not logical_pwd.samefile(Path.cwd()):
+            return None
+    except OSError:
+        return None
+
+    parts = logical_pwd.parts
+    try:
+        claude_index = parts.index(".claude")
+    except ValueError:
+        return None
+
+    candidate = Path(*parts[:claude_index])
+    candidate_parts = candidate.parts
+    return candidate if any(
+        candidate_parts[index] == ".sumi"
+        and candidate_parts[index + 1] in _SESSION_DIRECTORY_KINDS
+        and bool(candidate_parts[index + 2])
+        for index in range(len(candidate_parts) - 2)
+    ) else None
+
+
+def example_output_dir() -> Path:
+    """Return a writable output directory that can never be inside this Skill."""
+    base = _session_root_from_logical_pwd() or Path.cwd()
+    configured = os.environ.get("KAMI_OUTPUT_DIR")
+    candidate = Path(configured).expanduser() if configured else base / "kami-output"
+    if not candidate.is_absolute():
+        candidate = base / candidate
+
+    resolved = candidate.resolve()
+    if _is_within(resolved, ROOT.resolve()):
+        raise UnsafeOutputDirectoryError(
+            "Kami output directory must be outside installed Skill resources; "
+            "run from the session working directory or set KAMI_OUTPUT_DIR"
+        )
+    return resolved
 
 
 def _default_cache_dir() -> Path:
@@ -209,7 +269,7 @@ def rel_to_root(path: Path) -> Path:
 
 def default_example_pdfs() -> list[str]:
     """Return every rendered example PDF, the default scan set for PDF checks."""
-    return [str(p) for p in sorted(EXAMPLES.glob("*.pdf"))]
+    return [str(p) for p in sorted(example_output_dir().glob("*.pdf"))]
 
 
 def iter_template_files(
