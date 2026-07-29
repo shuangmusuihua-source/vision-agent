@@ -9,8 +9,16 @@ describe('session request policy', () => {
     expect(isSafeSdkSessionId('nested/session')).toBe(false)
   })
 
-  it('clamps pagination to finite non-negative values', () => {
-    expect(normalizeSessionPage(10_000, -20)).toEqual({ limit: 200, offset: 0 })
-    expect(normalizeSessionPage(Number.POSITIVE_INFINITY, Number.NaN)).toEqual({ limit: 1, offset: 0 })
+  it('clamps page size and accepts only Main-issued cursors', () => {
+    expect(normalizeSessionPage(10_000, null)).toEqual({ limit: 200, cursor: null })
+    expect(normalizeSessionPage(Number.POSITIVE_INFINITY, undefined)).toEqual({
+      limit: 1,
+      cursor: null,
+    })
+    expect(normalizeSessionPage(10, 'jsonl:42')).toEqual({ limit: 10, cursor: 'jsonl:42' })
+    expect(normalizeSessionPage(10, 'sdk:8')).toEqual({ limit: 10, cursor: 'sdk:8' })
+    expect(normalizeSessionPage(10, 'sdk:0')).toBeNull()
+    expect(normalizeSessionPage(10, 'unknown:8')).toBeNull()
+    expect(normalizeSessionPage(10, -20)).toBeNull()
   })
 })

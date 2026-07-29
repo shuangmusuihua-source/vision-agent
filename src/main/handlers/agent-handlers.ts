@@ -2,7 +2,8 @@ import { ipcMain, dialog, shell } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, abortActiveQuery, abortActiveQueryAndWait, setPermissionMode } from '../query-runner'
 import { resolvePermission, resolveAskUser } from '../session-runtime'
-import { listSdkSessions, loadSdkSessionMessagesPaginated, renameSdkSession, deleteSdkSession } from '../session-store'
+import { listSdkSessions, renameSdkSession, deleteSdkSession } from '../session-store'
+import { loadSessionTranscriptPage } from '../session-transcript'
 import { getSessionRecords, getSessionRecordById, updateSessionRecord, removeSessionRecord } from '../persistence/workspace-store'
 import { getSessionFileOutputs } from '../session-file-catalog'
 import type { IPCRequest } from '../../shared/ipc-types'
@@ -11,7 +12,7 @@ import { removeSessionWorkingDirectory } from '../session-files'
 import { createAttachmentPathGrant } from '../attachment-path-authorization'
 import { removeSessionOutputMetadataEntry } from '../session-output-metadata'
 import { isAuthorizedSessionWorkspace } from '../path-validator'
-import { isSafeSdkSessionId, normalizeSessionPage } from '../session-request-policy'
+import { normalizeSessionPage } from '../session-request-policy'
 import { extname } from 'path'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
@@ -56,12 +57,9 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:loadSessionMessagesPaginated', async (_event, request: AgentLoadSessionMessagesPaginatedRequest) => {
-    const record = getSessionRecordById(request.sessionId)
-    if (!record?.sdkSessionId || !isSafeSdkSessionId(record.sdkSessionId)) {
-      return { messages: [], offset: 0, limit: 0, hasMore: false }
-    }
-    const page = normalizeSessionPage(request.limit, request.offset)
-    return await loadSdkSessionMessagesPaginated(record.sdkSessionId, page.limit, page.offset)
+    const page = normalizeSessionPage(request.limit, request.cursor)
+    if (!page) return { messages: [], cursor: null, limit: 0, hasMore: false }
+    return await loadSessionTranscriptPage(request.sessionId, page.limit, page.cursor)
   })
 
   ipcMain.handle('agent:renameSession', async (_event, request: AgentRenameSessionRequest) => {

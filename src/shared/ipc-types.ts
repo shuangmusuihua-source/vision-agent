@@ -2,7 +2,6 @@
 // request/response shapes and event payloads across Main/Preload/Renderer.
 
 import type {
-  AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentSessionEnvelope,
   AgentNotificationEvent,
@@ -21,6 +20,8 @@ import type {
   InlineRewriteResponse,
   MemoryDocument,
   MemoryEntry,
+  SessionMessagePage,
+  SessionPageCursor,
 } from './types'
 import type {
   WorkspaceCreateResult,
@@ -142,8 +143,8 @@ export type IPCChannelMap = {
     response: SdkSessionInfo[]
   }
   'agent:loadSessionMessagesPaginated': {
-    request: { sessionId: string; limit: number; offset: number }
-    response: { messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }
+    request: { sessionId: string; limit: number; cursor: SessionPageCursor }
+    response: SessionMessagePage
   }
   'agent:renameSession': {
     request: { sessionId: string; title: string }

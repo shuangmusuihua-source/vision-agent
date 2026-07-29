@@ -59,7 +59,8 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 - `pending-interactions.ts`：权限与 AskUser 的注册、超时、SDK 取消、通知清理、响应和按 session 拒绝
 - `generation-activity-projector.ts`：将 SDK 内容块和工具输入流投影为会话级生成活动；Renderer 不接触 SDK 原始事件
 - `message-converter.ts`：SDK 消息转换为 renderer 使用的消息协议
-- `session-store.ts`：SDK 会话列表、历史分页、重命名、删除及 compaction 过滤
+- `session-transcript.ts`：通过 JSONL/SDK Adapter 分页读取 app-owned transcript；游标由 Main 签发并固定后续数据来源
+- `session-store.ts`：SDK 会话列表、重命名、删除及 compaction 过滤
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
 - `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
 - `officecli-runtime.ts`：固定版本 OfficeCLI 的按需下载、SHA-256 校验、原子安装和能力探测；Agent 环境只获得受管二进制路径，并禁用 OfficeCLI 自更新

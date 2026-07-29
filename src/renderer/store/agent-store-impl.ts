@@ -651,8 +651,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       try {
         const INITIAL_LIMIT = 10
-        const { messages, offset: paginationOffset, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
-          sessionId, INITIAL_LIMIT, 0
+        const { messages, cursor, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
+          sessionId, INITIAL_LIMIT, null
         )
         const loadedMessages = buildReplayedMessages(messages)
 
@@ -668,8 +668,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             currentSessionId: sessionId,
             sdkSessionId,
             _needsSdkLoad: hasMore,
-            _sdkLoadedCount: paginationOffset,
-            _sdkLoadOffset: paginationOffset,
+            _sessionPageCursor: cursor,
             _isLoadingMoreMessages: false,
           }
           return {
@@ -707,7 +706,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const sdkSessionId = getSdkSessionIdForClient(get(), sessionId)
       if (!sdkSessionId) return
 
-      const nextOffset = slot._sdkLoadOffset
+      const nextCursor = slot._sessionPageCursor
+      if (!nextCursor) return
 
       // Resolve which UI context owns this session (instead of hardcoding editor).
       const stateBefore = get()
@@ -729,8 +729,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       try {
         const LOAD_MORE_LIMIT = 100
-        const { messages: olderRawMessages, offset: olderRawOffset, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
-          sessionId, LOAD_MORE_LIMIT, nextOffset
+        const { messages: olderRawMessages, cursor, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
+          sessionId, LOAD_MORE_LIMIT, nextCursor
         )
 
         // Guard: if the session is no longer active in any context, write only
@@ -750,8 +750,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             const updatedSlot: ContextSlot = {
               ...cached,
               messages: mergeLoadedMessages(olderBuiltMessages, cached.messages),
-              _sdkLoadOffset: olderRawOffset,
-              _sdkLoadedCount: olderRawOffset,
+              _sessionPageCursor: cursor,
               _needsSdkLoad: hasMore,
               _isLoadingMoreMessages: false,
             }
@@ -770,8 +769,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           const updatedSlot: ContextSlot = {
             ...targetSlot,
             messages: mergeLoadedMessages(olderBuiltMessages, currentMessages),
-            _sdkLoadOffset: olderRawOffset,
-            _sdkLoadedCount: olderRawOffset,
+            _sessionPageCursor: cursor,
             _needsSdkLoad: hasMore,
             _isLoadingMoreMessages: false,
           }

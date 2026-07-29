@@ -14,6 +14,7 @@ import type {
   StreamingAccumulator,
   GenerationActivity,
   SessionRoutedGenerationActivity,
+  SessionPageCursor,
   TodoTaskList,
   SessionOutputs,
 } from '../../shared/types'
@@ -59,8 +60,7 @@ export type ContextSlot = {
   todoList: TodoTaskList | null
   workspacePath: string | null
   _needsSdkLoad: boolean
-  _sdkLoadedCount: number
-  _sdkLoadOffset: number
+  _sessionPageCursor: SessionPageCursor
   _isLoadingMoreMessages: boolean
   _acc: StreamingAccumulator | null
   _firstContentSeen: boolean
@@ -89,8 +89,7 @@ function emptySlot(): ContextSlot {
     todoList: null,
     workspacePath: null,
     _needsSdkLoad: false,
-    _sdkLoadedCount: 0,
-    _sdkLoadOffset: 0,
+    _sessionPageCursor: null,
     _isLoadingMoreMessages: false,
     _acc: null,
     _firstContentSeen: false,

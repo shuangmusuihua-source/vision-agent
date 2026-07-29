@@ -79,7 +79,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 
 - SDK options 和 system prompt：`agent-options.ts` / `query-runner.ts`
 - 持久化 session metadata：`persistence/workspace-store.ts`
-- SDK transcript 查询：`session-store.ts`
+- Workspace session transcript 分页：`session-transcript.ts`
 - Renderer 状态：`agent-store*`
 - 产物数据库：当前不存在，文件目录就是事实来源
 
@@ -149,7 +149,11 @@ Claude SDK JSONL 保存 transcript。electron-store `SessionRecord` 保存：
 - workspace/context/working directory
 - 标题、摘要、标签、时间和消息计数
 
-`session-store.ts` 按 working directory 调用 SDK API；历史分页优先直接读取 JSONL 尾部，以保留 compaction 前消息。SDK compaction 产生的内部 session ID 会持久化过滤，不作为独立用户会话展示。
+`session-transcript.ts` 通过 app session ID 解析 SDK session ID 和 working
+directory。首屏优先从 JSONL 尾部读取；仅当首屏读取失败时降级到 SDK
+Adapter。分页按最新页优先、页内时间正序返回，Main 签发的不透明游标会固定
+后续请求的数据来源。`session-store.ts` 负责会话列表和变更；SDK compaction
+产生的内部 session ID 会持久化过滤，不作为独立用户会话展示。
 
 ## Renderer invariants
 

@@ -4,6 +4,7 @@ import type {
   AgentIPCMessageWithContext,
   AgentNotificationEvent,
   AgentSessionEnvelope,
+  SessionPageCursor,
   BuiltinSkillCatalogItem,
   CommunitySkillCatalogItem,
   CommunitySkillMutationResult,
@@ -125,7 +126,7 @@ export interface AgentApi {
   loadSessionMessagesPaginated: (
     sessionId: string,
     limit: number,
-    offset: number,
+    cursor: SessionPageCursor,
   ) => Promise<IPCResponse<'agent:loadSessionMessagesPaginated'>>
   renameSession: (
     sessionId: string,

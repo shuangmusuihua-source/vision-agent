@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   listSessions: mocks.listSessions,
-  getSessionMessages: vi.fn(),
   renameSession: mocks.renameSession,
   deleteSession: mocks.deleteSession,
 }))
@@ -37,22 +36,6 @@ vi.mock('../src/main/persistence/workspace-store', () => ({
 vi.mock('../src/main/persistence/settings-store', () => ({
   getCompactionSessionIds: () => [],
   deleteCompactionSessionId: mocks.deleteCompactionSessionId,
-}))
-
-vi.mock('../src/main/skill-init', () => ({
-  getAppSkillsCwd: () => '/app/skills',
-}))
-
-vi.mock('../src/main/message-converter', () => ({
-  toAgentIPCMessage: vi.fn(() => null),
-}))
-
-vi.mock('../src/main/claude-session-path', () => ({
-  resolveClaudeSessionJsonlPath: vi.fn(() => null),
-}))
-
-vi.mock('../src/main/jsonl-tail-reader', () => ({
-  readJsonlTailPage: vi.fn(),
 }))
 
 vi.mock('../src/main/session-files', () => ({

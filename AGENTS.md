@@ -50,7 +50,8 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `officecli-runtime.ts` — opt-in, pinned OfficeCLI download, SHA-256 verification, atomic install, and runtime discovery for editable DOCX/XLSX/PPTX work
 - `managed-runtime-install.ts` — shared single-flight staging, backup, activation validation, rollback, and cleanup transaction for app-managed runtimes
 - `memory-policy.ts`, `memory-files.ts` — application-global auto-memory policy and managed Markdown storage; interactive sessions share it, while automation and ephemeral model runs disable auto-memory
-- `session-store.ts` — SDK transcript listing, paging, rename, delete, and compaction filtering
+- `session-transcript.ts` — app-owned transcript paging through JSONL and SDK adapters with Main-issued opaque cursors
+- `session-store.ts` — SDK transcript listing, rename, delete, and compaction filtering
 - `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata
 - `file-index-service.ts` — workspace search and knowledge graph index
 - `skill-init.ts`, `builtin-skill-installer.ts`, `community-skill-installer.ts` — Skill installation and discovery

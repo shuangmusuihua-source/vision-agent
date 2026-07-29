@@ -8,6 +8,7 @@ import type {
   SessionRoutedPermissionRequest,
   InlineRewriteRequest,
   SessionRoutedGenerationActivity,
+  SessionPageCursor,
 } from '../shared/types'
 import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '../shared/ipc-types'
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
@@ -139,8 +140,8 @@ const api = {
       const request: AgentListSdkSessionsRequest = { workspaceCwd }
       return invoke('agent:listSdkSessions', request)
     },
-    loadSessionMessagesPaginated: (sessionId: string, limit: number, offset: number) => {
-      const request: AgentLoadSessionMessagesPaginatedRequest = { sessionId, limit, offset }
+    loadSessionMessagesPaginated: (sessionId: string, limit: number, cursor: SessionPageCursor) => {
+      const request: AgentLoadSessionMessagesPaginatedRequest = { sessionId, limit, cursor }
       return invoke('agent:loadSessionMessagesPaginated', request)
     },
     renameSession: (sessionId: string, title: string) => {

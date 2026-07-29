@@ -1016,13 +1016,13 @@ describe('session-scoped store routing', () => {
   it('does not wipe optimistic messages when initial SDK history load resolves after a send', async () => {
     let resolveLoad!: (value: {
       messages: AgentIPCMessage[]
-      offset: number
+      cursor: string | null
       limit: number
       hasMore: boolean
     }) => void
     const loadPromise = new Promise<{
       messages: AgentIPCMessage[]
-      offset: number
+      cursor: string | null
       limit: number
       hasMore: boolean
     }>((resolve) => { resolveLoad = resolve })
@@ -1086,7 +1086,7 @@ describe('session-scoped store routing', () => {
         uuid: 'assistant-history',
         message: { content: [{ type: 'text', text: 'historical answer' }] },
       }],
-      offset: 1,
+      cursor: null,
       limit: 10,
       hasMore: false,
     })
@@ -1102,13 +1102,13 @@ describe('session-scoped store routing', () => {
   it('keeps loaded older messages in a session cache when load-more resolves after switching away', async () => {
     let resolveLoad!: (value: {
       messages: AgentIPCMessage[]
-      offset: number
+      cursor: string | null
       limit: number
       hasMore: boolean
     }) => void
     const loadPromise = new Promise<{
       messages: AgentIPCMessage[]
-      offset: number
+      cursor: string | null
       limit: number
       hasMore: boolean
     }>((resolve) => { resolveLoad = resolve })
@@ -1130,8 +1130,7 @@ describe('session-scoped store routing', () => {
       sdkSessionId: sdkId,
       messages: [activeMessage],
       _needsSdkLoad: true,
-      _sdkLoadOffset: 10,
-      _sdkLoadedCount: 10,
+      _sessionPageCursor: 'sdk:10',
     }
     const sessionB = {
       ...emptySlot(),
@@ -1157,7 +1156,7 @@ describe('session-scoped store routing', () => {
         uuid: 'older-history',
         message: { content: [{ type: 'text', text: 'older answer' }] },
       }],
-      offset: 11,
+      cursor: null,
       limit: 100,
       hasMore: false,
     })
@@ -1167,7 +1166,7 @@ describe('session-scoped store routing', () => {
     expect(state.activeSessionId.editor).toBe(otherId)
     expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['other-existing'])
     expect(state.sessionSlots[clientId].messages.map((m) => m.id)).toEqual(['older-history', 'active-existing'])
-    expect(state.sessionSlots[clientId]._sdkLoadOffset).toBe(11)
+    expect(state.sessionSlots[clientId]._sessionPageCursor).toBeNull()
     expect(state.sessionSlots[clientId]._needsSdkLoad).toBe(false)
     expect(state.sessionSlots[clientId]._isLoadingMoreMessages).toBe(false)
   })

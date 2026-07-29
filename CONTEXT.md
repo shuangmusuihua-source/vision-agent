@@ -19,6 +19,13 @@ those results into visible state.
 An app-owned session whose stable app session ID is associated with exactly one
 Workspace path. Its workspace ownership never changes after creation.
 
+## Workspace session transcript
+
+The chronological conversation history attached to a materialized Workspace
+session through its SDK session ID. History pages are requested newest-first,
+while messages inside each page remain in chronological order. Page cursors are
+opaque Main-issued values and must never be interpreted by the Renderer.
+
 ## Workspace automation
 
 A scheduled task targeting a Workspace, one of its Workspace sessions, or a

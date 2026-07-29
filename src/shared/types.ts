@@ -530,6 +530,15 @@ export type SdkSessionInfo = {
   context?: string       // AgentContext ('editor' | 'ask')
 }
 
+export type SessionPageCursor = string | null
+
+export type SessionMessagePage = {
+  messages: AgentIPCMessage[]
+  cursor: SessionPageCursor
+  limit: number
+  hasMore: boolean
+}
+
 // ─── Graph / Knowledge Graph ────────────────────────────────────────
 
 export type GraphNodeType = 'file' | 'entity'

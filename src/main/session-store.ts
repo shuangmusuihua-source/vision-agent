@@ -1,11 +1,8 @@
-import { listSessions, getSessionMessages, renameSession, deleteSession } from '@anthropic-ai/claude-agent-sdk'
+import { listSessions, renameSession, deleteSession } from '@anthropic-ai/claude-agent-sdk'
 import type { SessionMutationOptions } from '@anthropic-ai/claude-agent-sdk'
-import { toAgentIPCMessage } from './message-converter'
-import type { AgentIPCMessage, SdkSessionInfo } from '../shared/types'
+import type { SdkSessionInfo } from '../shared/types'
 import { getSessionRecords, removeSessionRecord, updateSessionRecord } from './persistence/workspace-store'
 import { getCompactionSessionIds, deleteCompactionSessionId } from './persistence/settings-store'
-import { resolveClaudeSessionJsonlPath } from './claude-session-path'
-import { readJsonlTailPage } from './jsonl-tail-reader'
 import { removeSessionWorkingDirectory } from './session-files'
 import { isSameWorkspacePath } from '../shared/workspace-paths'
 
@@ -158,61 +155,6 @@ export async function listSdkSessions(workspaceCwd?: string): Promise<SdkSession
     console.error('[SessionStore] listSessions error:', err)
     return []
   }
-}
-
-/**
- * Read session JSONL directly from disk, bypassing the SDK API which
- * truncates pre-compaction messages. SDK project directory encoding is an
- * implementation detail, so resolution scans the current projects root by ID.
- */
-function getSessionJsonlPath(sessionId: string): string | null {
-  return resolveClaudeSessionJsonlPath(getSdkSessionId(sessionId))
-}
-
-export async function loadSdkSessionMessagesPaginated(
-  sessionId: string,
-  limit: number,
-  offset: number
-): Promise<{ messages: AgentIPCMessage[]; offset: number; limit: number; hasMore: boolean }> {
-  // Direct JSONL read — SDK API truncates pre-compaction messages.
-  // JSONL is append-only (oldest → newest). We read backward:
-  //   offset=0 → newest messages (from end of file)
-  //   offset>0 → older messages before the current window (backward)
-  const jsonlPath = getSessionJsonlPath(sessionId)
-  if (jsonlPath) {
-    try {
-      const page = await readJsonlTailPage(jsonlPath, limit, offset)
-      const messages: AgentIPCMessage[] = []
-      for (const m of page.records) {
-        const converted = toAgentIPCMessage(m as any)
-        if (converted) messages.push(converted)
-      }
-      return { messages, offset: page.offset, limit, hasMore: page.hasMore }
-    } catch (err) {
-      console.warn('[SessionStore] Tail JSONL read failed, falling back to SDK:', (err as Error).message)
-    }
-  }
-
-  // Fallback to SDK API — used only when direct JSONL read fails
-  // (no workspacePath in session record). SDK API uses forward pagination
-  // (oldest→newest, offset increases); the direct path uses backward
-  // (newest→oldest, offset decreases).  This fallback does NOT match the
-  // direct path's "newest first" behavior for initial load — it returns
-  // the oldest messages instead.  Acceptable because this path is rarely hit.
-  const dir = getSessionDir(sessionId)
-  if (!dir) return { messages: [], offset, limit, hasMore: false }
-  const sdkMessages = await getSessionMessages(getSdkSessionId(sessionId), {
-    limit,
-    offset,
-    includeSystemMessages: true,
-    dir,
-  })
-  const messages: AgentIPCMessage[] = []
-  for (const m of sdkMessages) {
-    const converted = toAgentIPCMessage(m as any)
-    if (converted) messages.push(converted)
-  }
-  return { messages, offset: offset + sdkMessages.length, limit, hasMore: sdkMessages.length >= limit }
 }
 
 export async function renameSdkSession(sessionId: string, title: string): Promise<void> {
