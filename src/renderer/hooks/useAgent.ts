@@ -41,17 +41,17 @@ export function useIPCSubscriptions() {
     const unsubEvent = window.api.agent.onEvent((msg) => {
       store.getState().processIPCMessage(msg, undefined)
       // Refresh watchdog for the concrete session that received this event.
-      refreshWatchdogAfterState(msg.context, msg.clientSessionKey)
+      refreshWatchdogAfterState(msg.context, msg.sessionId)
     })
 
     const unsubPerm = window.api.agent.onPermissionRequest((req) => {
       store.getState().handlePermissionRequest(req)
-      refreshWatchdogAfterState(req.context, req.clientSessionKey)
+      refreshWatchdogAfterState(req.context, req.sessionId)
     })
 
     const unsubAsk = window.api.agent.onAskUser((req) => {
       store.getState().handleAskUserRequest(req)
-      refreshWatchdogAfterState(req.context, req.clientSessionKey)
+      refreshWatchdogAfterState(req.context, req.sessionId)
     })
 
     const unsubAskTimeout = window.api.agent.onAskUserTimeout((data) => {
@@ -63,10 +63,10 @@ export function useIPCSubscriptions() {
     })
 
     const unsubSession = window.api.agent.onSessionCreated((data: AgentSessionEnvelope) => {
-      // The creating query carries its app-owned session key. Do not infer it
+      // The creating query carries its app-owned session ID. Do not infer it
       // from the currently active session; the user may have switched away
       // while the SDK was still creating the real session.
-      const { clientSessionKey, sdkSessionId, sessionTitle } = store.getState().materializeSession(data)
+      const { sessionId, sdkSessionId, sessionTitle } = store.getState().materializeSession(data)
       if (data.context === 'editor') {
         // Rename the newly materialized SDK session with the user-chosen title.
         // Persist to BOTH the SDK (customTitle) and electron-store (survives restarts).
@@ -76,12 +76,12 @@ export function useIPCSubscriptions() {
           )
         }
       }
-      refreshWatchdogAfterState(data.context, clientSessionKey)
+      refreshWatchdogAfterState(data.context, sessionId)
     })
 
     const unsubGenerationActivity = window.api.agent.onGenerationActivity((state) => {
       store.getState().handleGenerationActivity(state)
-      refreshWatchdogAfterState(state.context, state.clientSessionKey)
+      refreshWatchdogAfterState(state.context, state.sessionId)
     })
 
     return () => {
@@ -221,37 +221,33 @@ export function useAgent(context: AgentContext = 'editor') {
       ? `执行 Skill: ${options.skill.name}`
       : (getSkillInvocationDisplayText(prompt) || stripInternalAttachmentContext(prompt))
     slotSid = store.getState().beginMessage(context, visibleText, options?.skill)
-    const clientSessionKey = slotSid
+    const appSessionId = slotSid
 
     // A new query starts a new inactivity window, even when it reuses the
     // same session after replacing an active run.
-    clearWatchdog(context, clientSessionKey)
+    clearWatchdog(context, appSessionId)
 
     // The store owns the optimistic message and live/cache mirroring.
     store.getState().dispatchAgentEvent({ type: 'SEND_MESSAGE' }, context, slotSid)
     refreshWatchdog(context, slotSid)
     const skillId = store.getState().slots[context].activeSkillId
-    // Don't pass frontend-only temp IDs as SDK sessionId — the SDK doesn't
-    // recognize them, would create an untracked duplicate session.
     const currentSlot = resolveSessionSlot(store.getState(), context, slotSid)
     const workspacePath = context === 'ask'
       ? undefined
       : (currentSlot.workspacePath || store.getState().activeWorkspacePath || undefined)
-    const effectiveSid = currentSlot.sdkSessionId || (slotSid?.startsWith('new-') ? undefined : (slotSid || undefined))
     const sessionTitle = slotSid
       ? store.getState().sessionList.find((session) => session.id === slotSid)?.title
       : undefined
-    window.api.agent.sendMessage(
+    window.api.agent.sendMessage({
       prompt,
-      effectiveSid,
+      appSessionId,
       activeFilePath,
-      skillId || undefined,
       context,
       workspacePath,
-      sessionTitle,
-      clientSessionKey,
-      currentSlot.approvalMode,
-    )
+      ...(skillId ? { skillId } : {}),
+      ...(sessionTitle ? { title: sessionTitle } : {}),
+      approvalMode: currentSlot.approvalMode,
+    })
   }, [context, store])
 
   const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
@@ -293,12 +289,12 @@ export function useAgent(context: AgentContext = 'editor') {
   const setPermissionMode = useCallback(async (mode: AgentApprovalMode) => {
     const currentSlot = store.getState().slots[context]
     const previousMode = currentSlot.approvalMode
-    const queryKey = currentSlot.currentSessionId || context
+    const sessionId = currentSlot.currentSessionId || context
     store.getState().setApprovalMode(context, mode, currentSlot.currentSessionId)
 
     if (!isAgentQueryActive(currentSlot.agentState)) return { success: true }
 
-    const result = await window.api.agent.setPermissionMode(queryKey, mode)
+    const result = await window.api.agent.setPermissionMode(sessionId, mode)
     if (!result.success) {
       console.warn('[useAgent] Failed to set permission mode:', result.error)
       store.getState().setApprovalMode(context, previousMode, currentSlot.currentSessionId)

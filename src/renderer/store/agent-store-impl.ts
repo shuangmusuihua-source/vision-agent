@@ -24,14 +24,14 @@ import {
   cacheSessionSlot,
   enqueueAskUserInteraction,
   enqueuePermissionInteraction,
-  getSdkSessionIdForClient,
+  getSdkSessionIdForAppSession,
   normalizeSessionId,
   patchActiveContextSlot,
   patchSessionScopedSlot,
   patchSessionSlot,
   removeSessionSlotPatch,
   resolveAskUserInteraction,
-  resolveClientSessionId,
+  resolveAppSessionId,
   resolvePermissionInteraction,
   resolveSessionSlot,
 } from './session-slot-state'
@@ -113,11 +113,10 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const isReplay = options?.isReplay ?? false
       const routed = msg as AgentIPCMessage & Partial<AgentSessionEnvelope> & { session_id?: string }
       const ctx = routed.context || get().context
-      const rawEventSessionId = routed.clientSessionKey
-        || routed.sessionId
+      const rawEventSessionId = routed.sessionId
         || routed.session_id
         || undefined
-      const eventSessionId = resolveClientSessionId(get(), rawEventSessionId) || undefined
+      const eventSessionId = resolveAppSessionId(get(), rawEventSessionId) || undefined
 
       // Replay restores message content, but must not drive the live FSM.
       if (isReplay) {
@@ -315,16 +314,16 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     materializeSession(envelope: AgentSessionEnvelope) {
-      const clientSessionKey = envelope.clientSessionKey || envelope.sessionId
+      const appSessionId = envelope.sessionId
       const sdkSessionId = envelope.sdkSessionId || envelope.sessionId
-      const sessionTitle = get().sessionList.find((session) => session.id === clientSessionKey)?.title
+      const sessionTitle = get().sessionList.find((session) => session.id === appSessionId)?.title
 
       set((state) => {
         const currentActiveId = state.activeSessionId[envelope.context]
-        const clientSlot = state.sessionSlots[clientSessionKey]
-        const sdkSlot = clientSessionKey !== sdkSessionId ? state.sessionSlots[sdkSessionId] : undefined
-        const activeSlotIsClient = currentActiveId === clientSessionKey || currentActiveId === sdkSessionId
-        const sourceSlot = clientSlot || (activeSlotIsClient ? state.slots[envelope.context] : undefined)
+        const appSlot = state.sessionSlots[appSessionId]
+        const sdkSlot = appSessionId !== sdkSessionId ? state.sessionSlots[sdkSessionId] : undefined
+        const activeSlotMatches = currentActiveId === appSessionId || currentActiveId === sdkSessionId
+        const sourceSlot = appSlot || (activeSlotMatches ? state.slots[envelope.context] : undefined)
         const realSlot = sdkSlot
         const baseSlot = sourceSlot || realSlot || emptySlot()
         const permissionItems = mergeById<SessionRoutedPermissionRequest>([
@@ -364,17 +363,17 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           todoList: realSlot?.todoList || sourceSlot?.todoList || null,
           composerDraft: sourceSlot?.composerDraft || realSlot?.composerDraft || baseSlot.composerDraft,
           approvalMode: sourceSlot?.approvalMode || realSlot?.approvalMode || baseSlot.approvalMode,
-          currentSessionId: clientSessionKey,
+          currentSessionId: appSessionId,
           sdkSessionId,
           workspacePath: envelope.workspacePath || sourceSlot?.workspacePath || realSlot?.workspacePath || null,
         }
 
-        const cachePatch = cacheSessionSlot(state, clientSessionKey, materializedSlot, {
-          removeIds: sdkSessionId !== clientSessionKey ? [sdkSessionId] : [],
+        const cachePatch = cacheSessionSlot(state, appSessionId, materializedSlot, {
+          removeIds: sdkSessionId !== appSessionId ? [sdkSessionId] : [],
         })
 
         const isStillActiveSession =
-          currentActiveId === clientSessionKey ||
+          currentActiveId === appSessionId ||
           currentActiveId === sdkSessionId ||
           currentActiveId === null
 
@@ -382,13 +381,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           ...cachePatch,
         }
         if (isStillActiveSession) {
-          next.activeSessionId = { ...state.activeSessionId, [envelope.context]: clientSessionKey }
+          next.activeSessionId = { ...state.activeSessionId, [envelope.context]: appSessionId }
           next.slots = { ...state.slots, [envelope.context]: materializedSlot }
         }
         if (envelope.context === 'editor') {
           next.sessionList = sessionListReducer(state.sessionList, {
             type: 'MATERIALIZE',
-            tempId: clientSessionKey,
+            tempId: appSessionId,
             realId: sdkSessionId,
             context: envelope.context,
             workspacePath: envelope.workspacePath,
@@ -401,7 +400,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         return next
       })
 
-      return { clientSessionKey, sdkSessionId, sessionTitle }
+      return { sessionId: appSessionId, sdkSessionId, sessionTitle }
     },
 
     appendInactivityNotice(context: AgentContext, sessionId?: string | null) {
@@ -428,12 +427,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     ) {
       let sessionId = get().slots[context].currentSessionId
       if (!sessionId) sessionId = `new-${context}-${Date.now()}`
-      const clientSessionKey = sessionId
+      const appSessionId = sessionId
 
       set((state) => {
         const isNewSession = !state.slots[context].currentSessionId
         const baseSlot = isNewSession
-          ? { ...state.slots[context], currentSessionId: clientSessionKey, sdkSessionId: null }
+          ? { ...state.slots[context], currentSessionId: appSessionId, sdkSessionId: null }
           : state.slots[context]
         const nextSlot: ContextSlot = {
           ...baseSlot,
@@ -454,24 +453,24 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           }],
           ...(skill ? { activeSkillId: skill.id } : {}),
         }
-        const cachedSlot = state.sessionSlots[clientSessionKey] || baseSlot
+        const cachedSlot = state.sessionSlots[appSessionId] || baseSlot
         const nextCachedSlot: ContextSlot = {
           ...cachedSlot,
           messages: nextSlot.messages,
           ...(skill ? { activeSkillId: skill.id } : {}),
-          currentSessionId: clientSessionKey,
+          currentSessionId: appSessionId,
         }
-        const cachePatch = cacheSessionSlot(state, clientSessionKey, nextCachedSlot)
+        const cachePatch = cacheSessionSlot(state, appSessionId, nextCachedSlot)
         return {
           ...(isNewSession
-            ? { activeSessionId: { ...state.activeSessionId, [context]: clientSessionKey } }
+            ? { activeSessionId: { ...state.activeSessionId, [context]: appSessionId } }
             : {}),
           slots: { ...state.slots, [context]: nextSlot },
           ...cachePatch,
         }
       })
 
-      return clientSessionKey
+      return appSessionId
     },
 
     // ─── Workspace Actions ────────────────────────────────────────────────
@@ -632,7 +631,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     async loadInitialSessionMessages(sessionId: string, context: AgentContext = 'editor') {
       const slot = get().sessionSlots[sessionId]
       if (!slot || slot._isLoadingMoreMessages) return
-      const sdkSessionId = getSdkSessionIdForClient(get(), sessionId)
+      const sdkSessionId = getSdkSessionIdForAppSession(get(), sessionId)
       if (!sdkSessionId) return
 
       set((state) => ({
@@ -703,7 +702,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     async loadMoreSessionMessages(sessionId: string) {
       const slot = get().sessionSlots[sessionId]
       if (!slot || slot._isLoadingMoreMessages) return
-      const sdkSessionId = getSdkSessionIdForClient(get(), sessionId)
+      const sdkSessionId = getSdkSessionIdForAppSession(get(), sessionId)
       if (!sdkSessionId) return
 
       const nextCursor = slot._sessionPageCursor

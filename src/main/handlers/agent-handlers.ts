@@ -12,7 +12,10 @@ import { removeSessionWorkingDirectory } from '../session-files'
 import { createAttachmentPathGrant } from '../attachment-path-authorization'
 import { removeSessionOutputMetadataEntry } from '../session-output-metadata'
 import { isAuthorizedSessionWorkspace } from '../path-validator'
-import { normalizeSessionPage } from '../session-request-policy'
+import {
+  isSafeAppSessionId,
+  normalizeSessionPage,
+} from '../session-request-policy'
 import { extname } from 'path'
 
 type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
@@ -35,10 +38,13 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agent:sendMessage', async (_event, request: AgentSendMessageRequest) => {
     const window = getMainWindow()
     if (!window) throw new Error('No main window')
-    if (request.context !== undefined && request.context !== 'editor' && request.context !== 'ask') {
+    if (request.context !== 'editor' && request.context !== 'ask') {
       throw new Error('Invalid agent context')
     }
-    sendMessage(window, request.prompt, request.sessionId, request.activeFilePath, request.context || 'editor', request.skillId || null, request.workspacePath, request.clientSessionKey, request.title, request.approvalMode)
+    if (!isSafeAppSessionId(request.appSessionId)) {
+      throw new Error('Invalid app session ID')
+    }
+    sendMessage(window, request)
     return { started: true }
   })
 
@@ -180,9 +186,9 @@ export function registerAgentHandlers(): void {
     }
 
     try {
-      const applied = await setPermissionMode(request.queryKey, request.mode === 'auto' ? 'auto' : 'default')
+      const applied = await setPermissionMode(request.sessionId, request.mode === 'auto' ? 'auto' : 'default')
       if (!applied) {
-        return { success: false, error: `No active agent run for session: ${request.queryKey}` }
+        return { success: false, error: `No active agent run for session: ${request.sessionId}` }
       }
       return { success: true }
     } catch (err) {

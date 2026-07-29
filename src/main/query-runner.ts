@@ -3,7 +3,15 @@ import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { ensureWorkspaceSkills, getAppSkillsCwd, getAppSkillsDir } from './skill-init'
 import { DEFAULT_AGENT_APPROVAL_MODE } from '../shared/types'
-import type { AgentApprovalMode, AgentContext, AgentSessionEnvelope, AskUserQuestionOption, AskUserQuestionItem, PermissionUpdate } from '../shared/types'
+import type {
+  AgentApprovalMode,
+  AgentContext,
+  AgentQueryRequest,
+  AgentSessionEnvelope,
+  AskUserQuestionOption,
+  AskUserQuestionItem,
+  PermissionUpdate,
+} from '../shared/types'
 import {
   getApiKey,
 } from './persistence/profile-store'
@@ -148,9 +156,9 @@ function buildOptions(
   context: AgentContext = 'editor',
   workspacePathOverride?: string,
   workingDirectoryOverride?: string,
-  sessionId?: string,
+  sdkSessionId?: string,
   envelope?: AgentSessionEnvelope,
-  getSessionId?: () => string | undefined,
+  getSdkSessionId?: () => string | undefined,
   authorizedAttachmentPaths: string[] = [],
   explicitExternalPaths: string[] = [],
   approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
@@ -161,13 +169,13 @@ function buildOptions(
   const skillsDirectory = getAppSkillsDir()
   const sessionEnvelope = envelope || createSessionEnvelope({
     context,
-    sessionId: sessionId || context,
+    sessionId: context,
     workspacePath,
-    sdkSessionId: sessionId,
+    sdkSessionId,
   })
   const currentEnvelope = (): AgentSessionEnvelope => ({
     ...sessionEnvelope,
-    sdkSessionId: getSessionId?.() || sessionEnvelope.sdkSessionId,
+    sdkSessionId: getSdkSessionId?.() || sessionEnvelope.sdkSessionId,
   })
   const memoryMode = 'global' as const
   const decideFileAccess = (toolName: string, input: Record<string, unknown>) => decideSessionFileAccess({
@@ -210,10 +218,10 @@ function buildOptions(
     systemPromptAppend,
     hooks: buildHooks(mainWindow, {
       envelope: sessionEnvelope,
-      getSdkSessionId: getSessionId,
+      getSdkSessionId,
       decideFileAccess,
     }),
-    resume: sessionId || undefined,
+    resume: sdkSessionId || undefined,
     canUseTool: async (
       toolName: string,
       input: Record<string, unknown>,
@@ -290,8 +298,8 @@ export async function abortActiveQueryAndWait(queryKey: string): Promise<void> {
   await sessionRuntime.abortAndWait(queryKey)
 }
 
-export async function setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {
-  return sessionRuntime.setPermissionMode(queryKey, mode)
+export async function setPermissionMode(sessionId: string | undefined, mode: PermissionMode): Promise<boolean> {
+  return sessionRuntime.setPermissionMode(sessionId, mode)
 }
 
 /** Clean up all pending promises when the renderer window is destroyed */
@@ -327,24 +335,25 @@ function toUserFacingQueryError(error: unknown): string {
 
 export async function sendMessage(
   mainWindow: BrowserWindow,
-  prompt: string,
-  sessionId?: string,
-  activeFilePath?: string,
-  context: AgentContext = 'editor',
-  skillId?: string | null,
-  workspacePath?: string,
-  clientSessionKey?: string,
-  title?: string,
-  approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
+  request: AgentQueryRequest,
 ): Promise<void> {
-  const queryKey = clientSessionKey || sessionId || context
+  const {
+    prompt,
+    appSessionId,
+    activeFilePath,
+    context,
+    skillId,
+    workspacePath,
+    title,
+    approvalMode = DEFAULT_AGENT_APPROVAL_MODE,
+  } = request
   // Same-session starts are ordered from identity validation through
   // registration. Starts for different sessions use independent leases.
-  const startLease = await sessionRuntime.acquireSessionStart(queryKey)
-  const existingRecord = getSessionRecordById(queryKey)
+  const startLease = await sessionRuntime.acquireSessionStart(appSessionId)
+  const existingRecord = getSessionRecordById(appSessionId)
   let effectiveContext = context
   let effectiveWorkspacePath: string
-  let effectiveSdkSessionId = sessionId
+  let effectiveSdkSessionId = existingRecord?.sdkSessionId
 
   if (existingRecord) {
     const storedWorkspaceValid = existingRecord.context === 'ask'
@@ -352,13 +361,10 @@ export async function sendMessage(
       : isAuthorizedSessionWorkspace(existingRecord.workspacePath)
     const workspaceMatches = !workspacePath
       || isExactAuthorizedRoot(workspacePath, [existingRecord.workspacePath])
-    const sdkSessionMatches = existingRecord.sdkSessionId
-      ? !sessionId || sessionId === existingRecord.sdkSessionId
-      : !sessionId
-    if (!storedWorkspaceValid || context !== existingRecord.context || !workspaceMatches || !sdkSessionMatches) {
+    if (!storedWorkspaceValid || context !== existingRecord.context || !workspaceMatches) {
       sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
         context: existingRecord.context,
-        sessionId: queryKey,
+        sessionId: appSessionId,
         workspacePath: existingRecord.workspacePath,
         sdkSessionId: existingRecord.sdkSessionId,
       }), '会话归属信息不匹配，请重新选择会话。')
@@ -367,7 +373,7 @@ export async function sendMessage(
     }
     effectiveContext = existingRecord.context
     effectiveWorkspacePath = existingRecord.workspacePath
-    effectiveSdkSessionId = existingRecord.sdkSessionId || sessionId
+    effectiveSdkSessionId = existingRecord.sdkSessionId
   } else if (context === 'ask') {
     effectiveWorkspacePath = getAppSkillsCwd()
   } else {
@@ -375,9 +381,8 @@ export async function sendMessage(
     if (!effectiveWorkspacePath || !isAuthorizedSessionWorkspace(effectiveWorkspacePath)) {
       sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
         context,
-        sessionId: queryKey,
+        sessionId: appSessionId,
         workspacePath: effectiveWorkspacePath,
-        sdkSessionId: sessionId,
       }), '工作区未授权，请重新选择工作区。')
       startLease.release()
       return
@@ -385,12 +390,12 @@ export async function sendMessage(
   }
 
   try {
-    await abortActiveQueryAndWait(queryKey)
+    await abortActiveQueryAndWait(appSessionId)
   } catch (error) {
     startLease.release()
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
       context: effectiveContext,
-      sessionId: queryKey,
+      sessionId: appSessionId,
       workspacePath: effectiveWorkspacePath,
       sdkSessionId: effectiveSdkSessionId,
     }), toUserFacingQueryError(error))
@@ -399,19 +404,19 @@ export async function sendMessage(
 
   // The previous run may materialize its SDK transcript while responding to
   // abort. Resume that transcript instead of using the pre-abort snapshot.
-  const latestRecord = getSessionRecordById(queryKey) || existingRecord
+  const latestRecord = getSessionRecordById(appSessionId) || existingRecord
   effectiveSdkSessionId = latestRecord?.sdkSessionId || effectiveSdkSessionId
 
   let effectiveWorkingDirectory = effectiveWorkspacePath
 
   try {
     if (effectiveContext === 'editor') {
-      effectiveWorkingDirectory = await ensureSessionWorkingDirectory(effectiveWorkspacePath, queryKey)
+      effectiveWorkingDirectory = await ensureSessionWorkingDirectory(effectiveWorkspacePath, appSessionId)
     } else {
-      effectiveWorkingDirectory = await ensureAskSessionWorkingDirectory(effectiveWorkspacePath, queryKey)
+      effectiveWorkingDirectory = await ensureAskSessionWorkingDirectory(effectiveWorkspacePath, appSessionId)
     }
 
-    updateSessionRecord(queryKey, {
+    updateSessionRecord(appSessionId, {
       workspacePath: effectiveWorkspacePath,
       workingDirectory: effectiveWorkingDirectory,
       context: effectiveContext,
@@ -423,7 +428,7 @@ export async function sendMessage(
     startLease.release()
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
       context: effectiveContext,
-      sessionId: queryKey,
+      sessionId: appSessionId,
       workspacePath: effectiveWorkspacePath,
       sdkSessionId: effectiveSdkSessionId,
     }), toUserFacingQueryError(error))
@@ -432,11 +437,11 @@ export async function sendMessage(
 
   let runtimeEnvelope = createSessionEnvelope({
     context: effectiveContext,
-    sessionId: queryKey,
+    sessionId: appSessionId,
     workspacePath: effectiveWorkspacePath,
     sdkSessionId: effectiveSdkSessionId,
   })
-  let currentSessionId = effectiveSdkSessionId
+  let currentSdkSessionId = effectiveSdkSessionId
   let queryInstanceId = 0
   let outputSnapshot: SessionOutputSnapshot = {}
 
@@ -451,7 +456,11 @@ export async function sendMessage(
       ...extractExplicitAbsolutePaths(prompt),
     ])]
     if (convertPaths.length > 0) {
-      const conversion = await convertAttachmentsToMarkdown(effectiveWorkingDirectory, queryKey, convertRequests)
+      const conversion = await convertAttachmentsToMarkdown(
+        effectiveWorkingDirectory,
+        appSessionId,
+        convertRequests,
+      )
       processedPrompt = appendAttachmentConversionSummary(processedPrompt, conversion)
     }
 
@@ -468,7 +477,7 @@ export async function sendMessage(
       outputSnapshot = await captureSessionOutputSnapshot(effectiveWorkingDirectory)
     }
 
-    const getSessionId = () => currentSessionId
+    const getSdkSessionId = () => currentSdkSessionId
     const options = buildOptions(
       mainWindow,
       activeFilePath,
@@ -477,12 +486,11 @@ export async function sendMessage(
       effectiveWorkingDirectory,
       effectiveSdkSessionId,
       runtimeEnvelope,
-      getSessionId,
+      getSdkSessionId,
       attachmentPaths,
       explicitExternalPaths,
       approvalMode,
     )
-    const appSessionKey = queryKey
     const abortController = new AbortController()
     const messageStream = query({
       prompt: processedPrompt,
@@ -509,27 +517,27 @@ export async function sendMessage(
         }
       }
 
-      const sdkSessionId = message.session_id || currentSessionId || runtimeEnvelope.sdkSessionId || undefined
-      const eventEnvelope = sessionRuntime.resolveEventEnvelope(queryKey, runtimeEnvelope, sdkSessionId)
-      sessionRuntime.emitSdkMessage(mainWindow, queryKey, eventEnvelope, message)
+      const sdkSessionId = message.session_id || currentSdkSessionId || runtimeEnvelope.sdkSessionId || undefined
+      const eventEnvelope = sessionRuntime.resolveEventEnvelope(appSessionId, runtimeEnvelope, sdkSessionId)
+      sessionRuntime.emitSdkMessage(mainWindow, appSessionId, eventEnvelope, message)
 
       // Session creation still gets its own lifecycle channel — tagged with context
-      if (!currentSessionId && message.session_id) {
-        currentSessionId = message.session_id
-        runtimeEnvelope = sessionRuntime.materializeSdkSession(queryKey, currentSessionId) || {
+      if (!currentSdkSessionId && message.session_id) {
+        currentSdkSessionId = message.session_id
+        runtimeEnvelope = sessionRuntime.materializeSdkSession(appSessionId, currentSdkSessionId) || {
           ...runtimeEnvelope,
-          sdkSessionId: currentSessionId,
+          sdkSessionId: currentSdkSessionId,
         }
         persistMaterializedSession({
-          appSessionId: appSessionKey,
-          sdkSessionId: currentSessionId,
+          appSessionId,
+          sdkSessionId: currentSdkSessionId,
           workspacePath: effectiveWorkspacePath,
           workingDirectory: effectiveWorkingDirectory,
           context: effectiveContext,
           title,
         })
         sessionRuntime.emitSessionCreated(mainWindow, runtimeEnvelope)
-      } else if (currentSessionId && message.session_id && message.session_id !== currentSessionId) {
+      } else if (currentSdkSessionId && message.session_id && message.session_id !== currentSdkSessionId) {
         // SDK compacted the session — a new session file was created on disk
         // with a different session_id. Track it so session-store filters it
         // out (it should not appear as a separate user-facing session).
@@ -538,7 +546,7 @@ export async function sendMessage(
     }
 
     // Flush any remaining batched text deltas after the stream ends
-    sessionRuntime.flushText(queryKey, mainWindow)
+    sessionRuntime.flushText(appSessionId, mainWindow)
 
     // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
@@ -548,7 +556,7 @@ export async function sendMessage(
     if (!mainWindow.isDestroyed()) {
       sessionRuntime.emitExecutionError(mainWindow, {
         ...runtimeEnvelope,
-        sdkSessionId: currentSessionId || runtimeEnvelope.sdkSessionId,
+        sdkSessionId: currentSdkSessionId || runtimeEnvelope.sdkSessionId,
       }, toUserFacingQueryError(error))
     }
   } finally {
@@ -564,13 +572,13 @@ export async function sendMessage(
         if (changed && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('agent:sessionFilesChanged', {
             ...runtimeEnvelope,
-            sdkSessionId: currentSessionId || runtimeEnvelope.sdkSessionId,
+            sdkSessionId: currentSdkSessionId || runtimeEnvelope.sdkSessionId,
           })
         }
       } catch (error) {
         console.error('[SessionOutputMetadata] failed to record Skill provenance:', error)
       }
     }
-    sessionRuntime.finalizeRun(mainWindow, queryKey, queryInstanceId)
+    sessionRuntime.finalizeRun(mainWindow, appSessionId, queryInstanceId)
   }
 }

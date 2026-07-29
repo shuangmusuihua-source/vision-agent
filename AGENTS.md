@@ -86,6 +86,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 
 - Claude Agent SDK is the execution runtime; do not reimplement the agent loop.
 - App session IDs are stable UI/product identifiers. SDK session IDs are transcript handles attached after materialization.
+- Interactive query requests carry the app session ID; Main resolves the SDK transcript handle from persisted session metadata.
 - Workspace sessions write generated files under `<workspace>/.sumi/sessions/<hash>/`; Ask sessions use the app-data `.sumi/ask-sessions/` area.
 - File access must pass the session-scoped authorization checks in `session-file-access.ts`.
 - Tool approval and AskUser requests are session-routed and time out after five minutes.

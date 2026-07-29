@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AgentIPCMessageWithContext,
   AgentNotificationEvent,
+  AgentQueryRequest,
   AgentSessionEnvelope,
   ModelProfile,
   SessionRoutedAskUserRequest,
@@ -14,7 +15,6 @@ import type { IPCChannelMap, IPCEventPayload, IPCRequest, IPCResponse } from '..
 import type { MarkitdownFormat } from '../shared/markitdown-runtime'
 import type { WindowApi } from '../shared/preload-api'
 
-type AgentSendMessageRequest = IPCRequest<'agent:sendMessage'>
 type AgentPermissionResponseRequest = IPCRequest<'agent:permissionResponse'>
 type AgentRespondAskUserRequest = IPCRequest<'agent:respondAskUser'>
 type AgentListSdkSessionsRequest = IPCRequest<'agent:listSdkSessions'>
@@ -114,18 +114,7 @@ const api = {
   // ─── Agent API (typed, unified event channel) ────────────────────────
   agent: {
     // Request/response channels
-    sendMessage: (prompt: string, sessionId?: string, activeFilePath?: string, skillId?: string, context?: 'editor' | 'ask', workspacePath?: string, title?: string, clientSessionKey?: string, approvalMode?: import('../shared/types').AgentApprovalMode) => {
-      const request: AgentSendMessageRequest = {
-        prompt,
-        sessionId,
-        activeFilePath,
-        skillId,
-        context,
-        workspacePath,
-        title,
-        clientSessionKey,
-        approvalMode,
-      }
+    sendMessage: (request: AgentQueryRequest) => {
       return invoke('agent:sendMessage', request)
     },
     respondPermission: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
@@ -160,8 +149,8 @@ const api = {
       const request: AgentAbortRequest = { contextOrSessionId }
       return invoke('agent:abort', request)
     },
-    setPermissionMode: (queryKey: string, mode: import('../shared/types').AgentApprovalMode) => {
-      const request: AgentSetPermissionModeRequest = { queryKey, mode }
+    setPermissionMode: (sessionId: string, mode: import('../shared/types').AgentApprovalMode) => {
+      const request: AgentSetPermissionModeRequest = { sessionId, mode }
       return invoke('agent:setPermissionMode', request)
     },
     selectFolder: () => invoke('agent:selectFolder'),

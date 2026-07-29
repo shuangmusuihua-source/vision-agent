@@ -34,7 +34,6 @@ describe('session event envelope', () => {
     expect(envelope).toEqual({
       context: 'editor',
       sessionId: 'app-session-a',
-      clientSessionKey: 'app-session-a',
       sdkSessionId: 'sdk-session-a',
       workspacePath: '/workspace/a',
     })
@@ -54,7 +53,6 @@ describe('session event envelope', () => {
     })
 
     expect(payload.sessionId).toBe('ask-session')
-    expect(payload.clientSessionKey).toBe('ask-session')
     expect(payload.context).toBe('ask')
     expect(payload.workspacePath).toBe('/app/ask')
   })
@@ -77,7 +75,6 @@ describe('session event envelope', () => {
     expect(sent[0].payload).toMatchObject({
       context: 'editor',
       sessionId: 'session-a',
-      clientSessionKey: 'session-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       type: 'stream_event',
@@ -113,7 +110,6 @@ describe('session runtime event routing', () => {
     expect(sent[0].payload).toMatchObject({
       context: 'editor',
       sessionId: 'app-session-a',
-      clientSessionKey: 'app-session-a',
       sdkSessionId: 'sdk-session-a',
       workspacePath: '/workspace/a',
       type: 'assistant',
@@ -159,7 +155,6 @@ describe('session runtime event routing', () => {
     expect(sent[0].payload).toMatchObject({
       context: 'editor',
       sessionId: 'app-session-text',
-      clientSessionKey: 'app-session-text',
       sdkSessionId: 'sdk-session-text',
       workspacePath: '/workspace/text',
       type: 'stream_event',
@@ -211,7 +206,6 @@ describe('session runtime event routing', () => {
       language: 'html',
       context: 'editor',
       sessionId: 'app-session-skill-output',
-      clientSessionKey: 'app-session-skill-output',
       sdkSessionId: 'sdk-session-skill-output',
       workspacePath: '/workspace/skill-output',
     })
@@ -285,7 +279,6 @@ describe('session runtime event routing', () => {
       language: 'html',
       context: 'editor',
       sessionId: 'app-session-late-sdk',
-      clientSessionKey: 'app-session-late-sdk',
       sdkSessionId: 'sdk-session-late',
       workspacePath: '/workspace/late-sdk',
     })
@@ -350,7 +343,6 @@ describe('session runtime event routing', () => {
       language: 'html',
       context: 'editor',
       sessionId: 'app-session-edit-output',
-      clientSessionKey: 'app-session-edit-output',
       sdkSessionId: 'sdk-session-edit-output',
       workspacePath: '/workspace/edit-output',
     })
@@ -412,7 +404,6 @@ describe('session runtime event routing', () => {
       language: 'text',
       context: 'editor',
       sessionId: 'app-session-bash-output',
-      clientSessionKey: 'app-session-bash-output',
       sdkSessionId: 'sdk-session-bash-output',
       workspacePath: '/workspace/bash-output',
     })
@@ -489,7 +480,6 @@ describe('session runtime event routing', () => {
     expect(sent[0].payload).toMatchObject({
       context: 'ask',
       sessionId: 'ask-session',
-      clientSessionKey: 'ask-session',
       workspacePath: '/app/ask',
       type: 'result',
       subtype: 'error_during_execution',
@@ -521,7 +511,6 @@ describe('session runtime event routing', () => {
       message: 'Agent needs attention',
       context: 'editor',
       sessionId: 'app-session-notification',
-      clientSessionKey: 'app-session-notification',
       sdkSessionId: 'sdk-session-notification',
       workspacePath: '/workspace/notification',
     })
@@ -546,12 +535,10 @@ describe('session runtime event routing', () => {
     expect(runtime.resolveEventEnvelope('app-session-materialized', {
       context: 'ask',
       sessionId: 'fallback',
-      clientSessionKey: 'fallback',
       workspacePath: '/fallback',
     })).toEqual({
       context: 'editor',
       sessionId: 'app-session-materialized',
-      clientSessionKey: 'app-session-materialized',
       sdkSessionId: 'sdk-real',
       workspacePath: '/workspace/materialized',
     })
@@ -669,7 +656,6 @@ describe('session runtime event routing', () => {
       requestId,
       context: 'editor',
       sessionId: 'app-session-ask-timeout',
-      clientSessionKey: 'app-session-ask-timeout',
       sdkSessionId: 'sdk-ask-timeout',
       workspacePath: '/workspace/ask-timeout',
     })
@@ -739,7 +725,6 @@ describe('session runtime event routing', () => {
     expect(sent[0].payload).toMatchObject({
       context: 'editor',
       sessionId: 'app-session-permission-abort',
-      clientSessionKey: 'app-session-permission-abort',
       sdkSessionId: 'sdk-permission-abort',
       workspacePath: '/workspace/permission-abort',
     })

@@ -2,9 +2,14 @@ import type { SessionPageCursor } from '../shared/types'
 
 const MAX_SESSION_PAGE_SIZE = 200
 const SESSION_PAGE_CURSOR_PATTERN = /^(jsonl|sdk):([1-9]\d*)$/
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/
+
+export function isSafeAppSessionId(sessionId: string): boolean {
+  return SESSION_ID_PATTERN.test(sessionId)
+}
 
 export function isSafeSdkSessionId(sessionId: string): boolean {
-  return /^[A-Za-z0-9_-]{1,200}$/.test(sessionId)
+  return SESSION_ID_PATTERN.test(sessionId)
 }
 
 export function normalizeSessionPage(

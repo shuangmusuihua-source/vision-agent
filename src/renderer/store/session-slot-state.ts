@@ -146,7 +146,7 @@ export function normalizeSessionId(sessionId?: string | null): string | null {
   return sessionId
 }
 
-export function resolveClientSessionId(
+export function resolveAppSessionId(
   state: AgentStore,
   sessionId?: string | null,
 ): string | null {
@@ -162,13 +162,13 @@ export function resolveClientSessionId(
     return normalized
   }
 
-  for (const [clientId, slot] of Object.entries(state.sessionSlots)) {
-    if (slot.sdkSessionId === normalized) return clientId
+  for (const [appSessionId, slot] of Object.entries(state.sessionSlots)) {
+    if (slot.sdkSessionId === normalized) return appSessionId
   }
   return state.sessionList.find((session) => session.sdkSessionId === normalized)?.id || normalized
 }
 
-export function getSdkSessionIdForClient(
+export function getSdkSessionIdForAppSession(
   state: AgentStore,
   sessionId: string | null,
 ): string | null {
@@ -212,12 +212,12 @@ export function patchSessionScopedSlot(
   patch: Partial<ContextSlot>,
   sessionId?: string | null,
 ): Partial<AgentStore> {
-  const clientSessionId = resolveClientSessionId(state, sessionId)
+  const appSessionId = resolveAppSessionId(state, sessionId)
   return patchSessionSlot(
     state,
-    contextForSession(state, clientSessionId, fallbackContext),
+    contextForSession(state, appSessionId, fallbackContext),
     patch,
-    clientSessionId,
+    appSessionId,
   )
 }
 
@@ -294,7 +294,7 @@ export function buildSessionSwitchPatch(
     state.sessionList.find((session) => session.sdkSessionId === sessionId)?.workspacePath ||
     state.slots[context].workspacePath ||
     (context === 'editor' ? state.activeWorkspacePath : null)
-  const sdkSessionId = getSdkSessionIdForClient(state, sessionId)
+  const sdkSessionId = getSdkSessionIdForAppSession(state, sessionId)
   const targetSlot: ContextSlot = existingSlot
     ? {
         ...existingSlot,
@@ -404,7 +404,7 @@ function findInteractionLocation(
     if (current?.id === requestId) {
       return {
         context: current.context,
-        sessionId: resolveClientSessionId(state, current.clientSessionKey),
+        sessionId: resolveAppSessionId(state, current.sessionId),
         slot,
         queueIndex: null,
       }
@@ -416,7 +416,7 @@ function findInteractionLocation(
       const request = queue[queueIndex]
       return {
         context: request.context,
-        sessionId: resolveClientSessionId(state, request.clientSessionKey),
+        sessionId: resolveAppSessionId(state, request.sessionId),
         slot,
         queueIndex,
       }
@@ -428,7 +428,7 @@ function findInteractionLocation(
     if (current?.id === requestId) {
       return {
         context: current.context,
-        sessionId: resolveClientSessionId(state, current.clientSessionKey),
+        sessionId: resolveAppSessionId(state, current.sessionId),
         slot,
         queueIndex: null,
       }
@@ -440,7 +440,7 @@ function findInteractionLocation(
       const request = queue[queueIndex]
       return {
         context: request.context,
-        sessionId: resolveClientSessionId(state, request.clientSessionKey),
+        sessionId: resolveAppSessionId(state, request.sessionId),
         slot,
         queueIndex,
       }
@@ -455,7 +455,7 @@ function enqueueInteraction(
 ): SessionInteractionMutation {
   const { request } = interaction
   const context = request.context
-  const sessionId = resolveClientSessionId(state, request.clientSessionKey)
+  const sessionId = resolveAppSessionId(state, request.sessionId)
   const liveSlot = state.slots[context]
   const liveSessionId = liveSlot.currentSessionId
   const activeSessionId = state.activeSessionId[context]

@@ -166,7 +166,7 @@ export type AgentStore = {
   markArtifactSaved: (context: AgentContext, messageId: string, filePath: string) => void
   clearContextSession: (context: AgentContext) => void
   materializeSession: (envelope: AgentSessionEnvelope) => {
-    clientSessionKey: string
+    sessionId: string
     sdkSessionId: string
     sessionTitle?: string
   }

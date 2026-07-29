@@ -1,8 +1,8 @@
 import type {
   AgentApprovalMode,
-  AgentContext,
   AgentIPCMessageWithContext,
   AgentNotificationEvent,
+  AgentQueryRequest,
   AgentSessionEnvelope,
   SessionPageCursor,
   BuiltinSkillCatalogItem,
@@ -98,15 +98,7 @@ export interface SettingsApi {
 
 export interface AgentApi {
   sendMessage: (
-    prompt: string,
-    sessionId?: string,
-    activeFilePath?: string,
-    skillId?: string,
-    context?: AgentContext,
-    workspacePath?: string,
-    title?: string,
-    clientSessionKey?: string,
-    approvalMode?: AgentApprovalMode,
+    request: AgentQueryRequest,
   ) => Promise<IPCResponse<'agent:sendMessage'>>
   respondPermission: (
     requestId: string,
@@ -138,7 +130,7 @@ export interface AgentApi {
   ) => Promise<IPCResponse<'agent:updateSessionRecord'>>
   abort: (contextOrSessionId?: string) => Promise<IPCResponse<'agent:abort'>>
   setPermissionMode: (
-    queryKey: string,
+    sessionId: string,
     mode: AgentApprovalMode,
   ) => Promise<IPCResponse<'agent:setPermissionMode'>>
   selectFolder: () => Promise<IPCResponse<'agent:selectFolder'>>

@@ -9,7 +9,6 @@ export function createSessionEnvelope(input: {
   return {
     context: input.context,
     sessionId: input.sessionId,
-    clientSessionKey: input.sessionId,
     sdkSessionId: input.sdkSessionId || undefined,
     workspacePath: input.workspacePath,
   }

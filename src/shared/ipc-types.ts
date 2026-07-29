@@ -4,6 +4,7 @@
 import type {
   AgentIPCMessageWithContext,
   AgentSessionEnvelope,
+  AgentQueryRequest,
   AgentNotificationEvent,
   ModelProfile,
   SdkSessionInfo,
@@ -98,17 +99,7 @@ export type IPCChannelMap = {
 
   // Agent
   'agent:sendMessage': {
-    request: {
-      prompt: string
-      sessionId?: string
-      activeFilePath?: string
-      skillId?: string
-      context?: 'editor' | 'ask'
-      workspacePath?: string
-      title?: string
-      clientSessionKey?: string
-      approvalMode?: import('./types').AgentApprovalMode
-    }
+    request: AgentQueryRequest
     response: { started: boolean }
   }
   'agent:abort': {
@@ -128,7 +119,7 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'agent:setPermissionMode': {
-    request: { queryKey: string; mode: import('./types').AgentApprovalMode }
+    request: { sessionId: string; mode: import('./types').AgentApprovalMode }
     response: { success: boolean; error?: string }
   }
   'agent:respondAskUser': {

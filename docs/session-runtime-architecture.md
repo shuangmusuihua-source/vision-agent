@@ -17,13 +17,12 @@
 type AgentSessionEnvelope = {
   context: 'editor' | 'ask'
   sessionId: string
-  clientSessionKey: string
   sdkSessionId?: string
   workspacePath: string
 }
 ```
 
-- `sessionId` / `clientSessionKey`：应用拥有的稳定路由 ID
+- `sessionId`：应用拥有的稳定路由 ID
 - `sdkSessionId`：Claude SDK 在首次 materialization 后产生的 transcript ID
 - `workspacePath`：会话所属 workspace；会话生命周期内不得漂移
 - `context`：UI 入口类型，不足以单独标识会话
@@ -32,8 +31,8 @@ type AgentSessionEnvelope = {
 
 ## 执行流程
 
-1. Renderer 为新对话创建临时 app session key，并乐观写入用户消息。
-2. Main 为 app session ID 获取启动所有权；同一会话的启动串行，不同会话仍可并行。
+1. Renderer 为新对话创建临时 app session ID，并乐观写入用户消息；发送请求只携带该 ID，不携带 SDK transcript ID。
+2. Main 根据 app session ID 从 `SessionRecord` 解析 SDK transcript ID，再获取启动所有权；同一会话的启动串行，不同会话仍可并行。
 3. `query-runner.ts` 在启动所有权内校验身份、终止并等待旧 run、准备受管 working directory。
 4. App session 元数据先写入 electron-store。
 5. `query()` 启动后，`SessionRuntimeController.registerRun()` 以 app session ID 注册 Query、AbortController 和 envelope；注册完成才释放启动所有权。
@@ -159,7 +158,7 @@ Adapter。分页按最新页优先、页内时间正序返回，Main 签发的�
 
 1. `slots.editor` 和 `slots.ask` 只表示当前可见 context。
 2. `sessionSlots` 保存每个会话的隔离状态；后台事件只更新对应 entry。
-3. Session materialization 只合并临时 app slot 和 SDK 信息，不重命名 app session key。
+3. Session materialization 只合并临时 app slot 和 SDK 信息，不重命名 app session ID。
 4. 权限、AskUser 和 Skill 输出按 request/session ID 路由。
 5. IPC 静默只能触发非阻断提示，不能作为自动 abort 的依据。
 6. 新查询替换旧查询时，同一 app session 的启动必须串行覆盖 identity validation、abort、prepare 和 register，并等待旧 runtime 的 finally 完成；不同 session 不得共享这把锁。

@@ -57,7 +57,6 @@ describe('reduceAgentEvent', () => {
         input: {},
         context: 'editor' as const,
         sessionId: 'session-1',
-        clientSessionKey: 'session-1',
         workspacePath: '/workspace',
       },
       askUserRequest: {
@@ -65,7 +64,6 @@ describe('reduceAgentEvent', () => {
         questions: [],
         context: 'editor' as const,
         sessionId: 'session-1',
-        clientSessionKey: 'session-1',
         workspacePath: '/workspace',
       },
     }

@@ -8,7 +8,7 @@ import {
   cacheSessionSlot,
   patchSessionSlot,
   resolveAskUserInteraction,
-  resolveClientSessionId,
+  resolveAppSessionId,
   selectAskUserRequest,
   selectIsResumingSession,
 } from '../src/renderer/store/session-slot-state'
@@ -38,7 +38,7 @@ describe('session-slot state module', () => {
       },
     })
 
-    expect(resolveClientSessionId(current, 'sdk-session')).toBe('app-session')
+    expect(resolveAppSessionId(current, 'sdk-session')).toBe('app-session')
   })
 
   it('mirrors active patches while keeping background patches isolated', () => {
@@ -113,7 +113,6 @@ describe('session-slot state module', () => {
       questions: [{ question: 'Continue?', options: [], multiSelect: false }],
       context: 'editor',
       sessionId: 'session-a',
-      clientSessionKey: 'session-a',
       workspacePath: '/workspace/a',
     }
     const current = state({

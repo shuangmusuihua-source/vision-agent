@@ -60,7 +60,6 @@ function interactionEnvelope(
   return {
     context,
     sessionId,
-    clientSessionKey: sessionId,
     workspacePath: context === 'ask' ? '/app/ask' : `/workspace/${sessionId}`,
   }
 }
@@ -224,7 +223,6 @@ describe('session-scoped store routing', () => {
       language: 'html',
       context: 'editor',
       sessionId: 'background-session',
-      clientSessionKey: 'background-session',
       workspacePath: '/workspace/background',
     }
 
@@ -406,7 +404,6 @@ describe('session-scoped store routing', () => {
     useAgentStore.getState().switchToSession('editor-b', 'editor')
     useAgentStore.getState().handlePermissionRequest({
       ...permission('perm-b', 'editor-b'),
-      clientSessionKey: 'editor-b',
       sdkSessionId: 'sdk-b',
       workspacePath: '/workspace/b',
     })
@@ -415,7 +412,6 @@ describe('session-scoped store routing', () => {
       type: 'stream_event',
       context: 'editor',
       sessionId: 'editor-a',
-      clientSessionKey: 'editor-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       uuid: 'a-stream',
@@ -430,7 +426,6 @@ describe('session-scoped store routing', () => {
       subtype: 'success',
       context: 'editor',
       sessionId: 'editor-a',
-      clientSessionKey: 'editor-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       session_id: 'sdk-a',
@@ -620,13 +615,11 @@ describe('session-scoped store routing', () => {
 
     useAgentStore.getState().handlePermissionRequest({
       ...permission('perm-a', 'editor-a'),
-      clientSessionKey: 'editor-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
     })
     useAgentStore.getState().handleAskUserRequest({
       ...askUser('ask-user-a', 'editor-a'),
-      clientSessionKey: 'editor-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
     })
@@ -641,7 +634,6 @@ describe('session-scoped store routing', () => {
       language: 'html',
       context: 'editor',
       sessionId: 'editor-a',
-      clientSessionKey: 'editor-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
     })
@@ -650,7 +642,6 @@ describe('session-scoped store routing', () => {
       type: 'assistant',
       context: 'editor',
       sessionId: 'editor-a',
-      clientSessionKey: 'editor-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       uuid: 'assistant-a',
@@ -660,7 +651,6 @@ describe('session-scoped store routing', () => {
       type: 'assistant',
       context: 'editor',
       sessionId: 'editor-b',
-      clientSessionKey: 'editor-b',
       sdkSessionId: 'sdk-b',
       workspacePath: '/workspace/b',
       uuid: 'assistant-b',
@@ -670,7 +660,6 @@ describe('session-scoped store routing', () => {
       type: 'assistant',
       context: 'ask',
       sessionId: 'ask-session',
-      clientSessionKey: 'ask-session',
       sdkSessionId: 'sdk-ask',
       workspacePath: '/app/ask',
       uuid: 'assistant-ask',
@@ -681,7 +670,6 @@ describe('session-scoped store routing', () => {
       subtype: 'success',
       context: 'editor',
       sessionId: 'editor-b',
-      clientSessionKey: 'editor-b',
       sdkSessionId: 'sdk-b',
       workspacePath: '/workspace/b',
       session_id: 'sdk-b',
@@ -804,14 +792,14 @@ describe('session-scoped store routing', () => {
     expect(state.sessionSlots['session-b'].linkedFile).toBe('/workspace-b/b-updated.md')
   })
 
-  it('routes pre-materialized Ask events by client session key', () => {
+  it('routes pre-materialized Ask events by app session ID', () => {
     const tempId = 'new-ask-1'
     const editor = { ...emptySlot(), currentSessionId: 'editor-session', messages: [textMessage('editor-msg', 'editor')] }
     const ask = { ...emptySlot(), currentSessionId: tempId }
-    const assistantMsg: AgentIPCMessage & { context: 'ask'; clientSessionKey: string } = {
+    const assistantMsg: AgentIPCMessage & { context: 'ask'; sessionId: string } = {
       type: 'assistant',
       context: 'ask',
-      clientSessionKey: tempId,
+      sessionId: tempId,
       uuid: 'assistant-temp',
       message: { content: [{ type: 'text', text: 'temp answer' }] },
     }
@@ -927,8 +915,8 @@ describe('session-scoped store routing', () => {
     expect(next.find(s => s.id === 'nextai-1')?.lastModified).toBe(1)
   })
 
-  it('keeps an editor session keyed by client id after SDK materialization', async () => {
-    const clientId = 'new-editor-a'
+  it('keeps an editor session keyed by app session ID after SDK materialization', async () => {
+    const appSessionId = 'new-editor-a'
     const sdkId = 'sdk-editor-a'
     const userMsg: ConversationMessage = {
       kind: 'user',
@@ -939,27 +927,27 @@ describe('session-scoped store routing', () => {
     }
 
     useAgentStore.setState({
-      activeSessionId: { editor: clientId, ask: null },
+      activeSessionId: { editor: appSessionId, ask: null },
       slots: {
         editor: {
           ...emptySlot(),
-          currentSessionId: clientId,
+          currentSessionId: appSessionId,
           agentState: 'thinking',
           messages: [userMsg],
         },
         ask: emptySlot(),
       },
       sessionSlots: {
-        [clientId]: {
+        [appSessionId]: {
           ...emptySlot(),
-          currentSessionId: clientId,
+          currentSessionId: appSessionId,
           agentState: 'thinking',
           messages: [userMsg],
         },
       },
-      sessionAccessOrder: [clientId],
+      sessionAccessOrder: [appSessionId],
       sessionList: [{
-        id: clientId,
+        id: appSessionId,
         title: 'A',
         workspacePath: '/workspace',
         context: 'editor',
@@ -971,7 +959,7 @@ describe('session-scoped store routing', () => {
 
     useAgentStore.getState().dispatchSessionList({
       type: 'MATERIALIZE',
-      tempId: clientId,
+      tempId: appSessionId,
       realId: sdkId,
       context: 'editor',
       workspacePath: '/workspace',
@@ -980,8 +968,8 @@ describe('session-scoped store routing', () => {
     useAgentStore.setState((state) => ({
       sessionSlots: {
         ...state.sessionSlots,
-        [clientId]: {
-          ...state.sessionSlots[clientId],
+        [appSessionId]: {
+          ...state.sessionSlots[appSessionId],
           sdkSessionId: sdkId,
         },
       },
@@ -998,8 +986,7 @@ describe('session-scoped store routing', () => {
     useAgentStore.getState().processIPCMessage({
       type: 'assistant',
       context: 'editor',
-      sessionId: clientId,
-      clientSessionKey: clientId,
+      sessionId: appSessionId,
       sdkSessionId: sdkId,
       uuid: 'assistant-a',
       message: { content: [{ type: 'text', text: 'answer A' }] },
@@ -1007,10 +994,10 @@ describe('session-scoped store routing', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     const state = useAgentStore.getState()
-    expect(state.sessionList.find(s => s.id === clientId)?.sdkSessionId).toBe(sdkId)
-    expect(state.sessionSlots[clientId].messages.map((m) => m.id)).toEqual(['user-a', 'assistant-a'])
-    expect(state.sessionSlots[clientId].currentSessionId).toBe(clientId)
-    expect(state.sessionSlots[clientId].sdkSessionId).toBe(sdkId)
+    expect(state.sessionList.find(s => s.id === appSessionId)?.sdkSessionId).toBe(sdkId)
+    expect(state.sessionSlots[appSessionId].messages.map((m) => m.id)).toEqual(['user-a', 'assistant-a'])
+    expect(state.sessionSlots[appSessionId].currentSessionId).toBe(appSessionId)
+    expect(state.sessionSlots[appSessionId].sdkSessionId).toBe(sdkId)
   })
 
   it('does not wipe optimistic messages when initial SDK history load resolves after a send', async () => {
@@ -1034,24 +1021,24 @@ describe('session-scoped store routing', () => {
       },
     })
 
-    const clientId = 'new-editor-race'
+    const appSessionId = 'new-editor-race'
     const sdkId = 'sdk-editor-race'
     const initialSlot = {
       ...emptySlot(),
-      currentSessionId: clientId,
+      currentSessionId: appSessionId,
       sdkSessionId: sdkId,
       _needsSdkLoad: true,
     }
 
     useAgentStore.setState({
-      activeSessionId: { editor: clientId, ask: null },
+      activeSessionId: { editor: appSessionId, ask: null },
       slots: { editor: initialSlot, ask: emptySlot() },
-      sessionSlots: { [clientId]: initialSlot },
-      sessionAccessOrder: [clientId],
-      sessionList: [{ id: clientId, sdkSessionId: sdkId, context: 'editor', workspacePath: '/workspace' }],
+      sessionSlots: { [appSessionId]: initialSlot },
+      sessionAccessOrder: [appSessionId],
+      sessionList: [{ id: appSessionId, sdkSessionId: sdkId, context: 'editor', workspacePath: '/workspace' }],
     })
 
-    const loading = useAgentStore.getState().loadInitialSessionMessages(clientId, 'editor')
+    const loading = useAgentStore.getState().loadInitialSessionMessages(appSessionId, 'editor')
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     const optimisticUser: ConversationMessage = {
@@ -1072,8 +1059,8 @@ describe('session-scoped store routing', () => {
       },
       sessionSlots: {
         ...state.sessionSlots,
-        [clientId]: {
-          ...state.sessionSlots[clientId],
+        [appSessionId]: {
+          ...state.sessionSlots[appSessionId],
           messages: [optimisticUser],
           agentState: 'thinking',
         },
@@ -1094,7 +1081,7 @@ describe('session-scoped store routing', () => {
 
     const state = useAgentStore.getState()
     expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['assistant-history', 'user-live'])
-    expect(state.sessionSlots[clientId].messages.map((m) => m.id)).toEqual(['assistant-history', 'user-live'])
+    expect(state.sessionSlots[appSessionId].messages.map((m) => m.id)).toEqual(['assistant-history', 'user-live'])
     expect(state.slots.editor.agentState).toBe('thinking')
     expect(isAgentQueryActive(state.slots.editor.agentState)).toBe(true)
   })
@@ -1120,13 +1107,13 @@ describe('session-scoped store routing', () => {
       },
     })
 
-    const clientId = 'editor-history-a'
+    const appSessionId = 'editor-history-a'
     const sdkId = 'sdk-history-a'
     const otherId = 'editor-history-b'
     const activeMessage = textMessage('active-existing', 'existing answer')
     const sessionA = {
       ...emptySlot(),
-      currentSessionId: clientId,
+      currentSessionId: appSessionId,
       sdkSessionId: sdkId,
       messages: [activeMessage],
       _needsSdkLoad: true,
@@ -1139,14 +1126,14 @@ describe('session-scoped store routing', () => {
     }
 
     useAgentStore.setState({
-      activeSessionId: { editor: clientId, ask: null },
+      activeSessionId: { editor: appSessionId, ask: null },
       slots: { editor: sessionA, ask: emptySlot() },
-      sessionSlots: { [clientId]: sessionA, [otherId]: sessionB },
-      sessionAccessOrder: [clientId, otherId],
-      sessionList: [{ id: clientId, sdkSessionId: sdkId, context: 'editor', workspacePath: '/workspace' }],
+      sessionSlots: { [appSessionId]: sessionA, [otherId]: sessionB },
+      sessionAccessOrder: [appSessionId, otherId],
+      sessionList: [{ id: appSessionId, sdkSessionId: sdkId, context: 'editor', workspacePath: '/workspace' }],
     })
 
-    const loading = useAgentStore.getState().loadMoreSessionMessages(clientId)
+    const loading = useAgentStore.getState().loadMoreSessionMessages(appSessionId)
     await new Promise((resolve) => setTimeout(resolve, 0))
     useAgentStore.getState().switchToSession(otherId, 'editor')
 
@@ -1165,9 +1152,9 @@ describe('session-scoped store routing', () => {
     const state = useAgentStore.getState()
     expect(state.activeSessionId.editor).toBe(otherId)
     expect(state.slots.editor.messages.map((m) => m.id)).toEqual(['other-existing'])
-    expect(state.sessionSlots[clientId].messages.map((m) => m.id)).toEqual(['older-history', 'active-existing'])
-    expect(state.sessionSlots[clientId]._sessionPageCursor).toBeNull()
-    expect(state.sessionSlots[clientId]._needsSdkLoad).toBe(false)
-    expect(state.sessionSlots[clientId]._isLoadingMoreMessages).toBe(false)
+    expect(state.sessionSlots[appSessionId].messages.map((m) => m.id)).toEqual(['older-history', 'active-existing'])
+    expect(state.sessionSlots[appSessionId]._sessionPageCursor).toBeNull()
+    expect(state.sessionSlots[appSessionId]._needsSdkLoad).toBe(false)
+    expect(state.sessionSlots[appSessionId]._isLoadingMoreMessages).toBe(false)
   })
 })

@@ -258,7 +258,6 @@ describe('agent store intent actions', () => {
         input: {},
         context: 'editor' as const,
         sessionId: 'session-a',
-        clientSessionKey: 'session-a',
         workspacePath: '/workspace/a',
       },
     }
@@ -363,13 +362,12 @@ describe('agent store intent actions', () => {
     const result = useAgentStore.getState().materializeSession({
       context: 'editor',
       sessionId: 'temp-a',
-      clientSessionKey: 'temp-a',
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace',
     })
 
     const state = useAgentStore.getState()
-    expect(result).toEqual({ clientSessionKey: 'temp-a', sdkSessionId: 'sdk-a', sessionTitle: 'Research' })
+    expect(result).toEqual({ sessionId: 'temp-a', sdkSessionId: 'sdk-a', sessionTitle: 'Research' })
     expect(state.activeSessionId.editor).toBe('temp-a')
     expect(state.slots.editor.currentSessionId).toBe('temp-a')
     expect(state.slots.editor.sdkSessionId).toBe('sdk-a')

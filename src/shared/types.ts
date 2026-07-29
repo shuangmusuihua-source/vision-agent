@@ -232,14 +232,24 @@ export type AgentIPCMessage =
 
 export type AgentSessionEnvelope = {
   context: AgentContext
-  /** App-owned stable session key used for renderer routing. */
+  /** App-owned stable session ID used for renderer routing. */
   sessionId: string
-  /** Explicit alias for the app-owned stable session key. */
-  clientSessionKey: string
   /** Claude SDK session_id used for resume/history/delete operations. */
   sdkSessionId?: string
   /** Workspace/app directory that owns this session. */
   workspacePath: string
+}
+
+export type AgentQueryRequest = {
+  prompt: string
+  /** App-owned stable session ID used for persistence and routing. */
+  appSessionId: string
+  activeFilePath?: string
+  skillId?: string
+  context: AgentContext
+  workspacePath?: string
+  title?: string
+  approvalMode?: AgentApprovalMode
 }
 
 export type SessionRoutedAgentIPCMessage = AgentIPCMessage & AgentSessionEnvelope

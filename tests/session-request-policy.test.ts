@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isSafeSdkSessionId, normalizeSessionPage } from '../src/main/session-request-policy'
+import {
+  isSafeAppSessionId,
+  isSafeSdkSessionId,
+  normalizeSessionPage,
+} from '../src/main/session-request-policy'
 
 describe('session request policy', () => {
   it('accepts opaque SDK IDs without path syntax', () => {
@@ -7,6 +11,13 @@ describe('session request policy', () => {
     expect(isSafeSdkSessionId('../../settings')).toBe(false)
     expect(isSafeSdkSessionId('/absolute/path')).toBe(false)
     expect(isSafeSdkSessionId('nested/session')).toBe(false)
+  })
+
+  it('accepts generated app session IDs without path syntax', () => {
+    expect(isSafeAppSessionId('new-editor-1720000000000')).toBe(true)
+    expect(isSafeAppSessionId('new-ask-1720000000000')).toBe(true)
+    expect(isSafeAppSessionId('')).toBe(false)
+    expect(isSafeAppSessionId('../session')).toBe(false)
   })
 
   it('clamps page size and accepts only Main-issued cursors', () => {
