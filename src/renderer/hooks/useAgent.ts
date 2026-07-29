@@ -268,10 +268,6 @@ export function useAgent(context: AgentContext = 'editor') {
     window.api.agent.respondAskUser(requestId, answers)
   }, [context, store])
 
-  const newSession = useCallback(() => {
-    store.getState().startNewSession(context)
-  }, [context, store])
-
   const loadSessions = useCallback(async () => {
     try {
       const workspacePath = store.getState().activeWorkspacePath || undefined
@@ -285,11 +281,6 @@ export function useAgent(context: AgentContext = 'editor') {
       console.error('[useAgent] Failed to load sessions:', err)
     }
   }, [store])
-
-  const resumeSession = useCallback((sessionId: string) => {
-    // switchToSession starts the slot-scoped SDK history load when needed.
-    store.getState().switchToSession(sessionId, context)
-  }, [context, store])
 
   const loadMoreMessages = useCallback(async (sessionId: string) => {
     await store.getState().loadMoreSessionMessages(sessionId)
@@ -319,9 +310,7 @@ export function useAgent(context: AgentContext = 'editor') {
     sendMessage,
     respondPermission,
     respondAskUser,
-    newSession,
     loadSessions,
-    resumeSession,
     loadMoreMessages,
     hasMoreSdkMessages,
     isLoadingMoreMessages,

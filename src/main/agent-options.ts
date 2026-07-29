@@ -25,16 +25,6 @@ export function resolveClaudeCodeExecutable(): string | undefined {
     }
   } catch { /* fall through */ }
 
-  // Fall back to cli.js
-  try {
-    const cliJs = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js')
-    const resolved = resolveAsarPath(cliJs)
-    if (existsSync(resolved)) {
-      _cachedCliPath = resolved
-      return resolved
-    }
-  } catch { /* fall through */ }
-
   _cachedCliPath = undefined
   return undefined
 }

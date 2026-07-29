@@ -52,7 +52,7 @@ export async function ensureWorkspaceSkills(workspaceCwd: string): Promise<Works
   return result
 }
 
-export async function getInstalledSkillNames(): Promise<string[]> {
+async function getInstalledSkillNames(): Promise<string[]> {
   let entries
   try {
     entries = await readdir(appSkillsDir, { withFileTypes: true })

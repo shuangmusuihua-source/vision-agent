@@ -11,10 +11,6 @@ export function isPathAuthorized(filePath: string): boolean {
   return isPathInsideAuthorizedRoots(filePath, allowedRoots)
 }
 
-export function isAuthorizedWorkspaceRoot(dirPath: string): boolean {
-  return findAuthorizedWorkspaceRoot(dirPath) !== null
-}
-
 export function findAuthorizedWorkspaceRoot(dirPath: string): string | null {
   return getAuthorizedDirectories().find((root) => isExactAuthorizedRoot(dirPath, [root])) || null
 }

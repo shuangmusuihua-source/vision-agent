@@ -434,9 +434,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-a',
       workspacePath: '/workspace/a',
       session_id: 'sdk-a',
-      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
-      total_cost_usd: 0,
-      duration_ms: 0,
     }
 
     useAgentStore.getState().processIPCMessage(streamA)
@@ -473,9 +470,6 @@ describe('session-scoped store routing', () => {
       context: 'editor',
       sessionId: 'replay-session',
       session_id: 'replay-session',
-      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
-      total_cost_usd: 0,
-      duration_ms: 0,
     }
 
     useAgentStore.getState().processIPCMessage(assistantMsg, { isReplay: true })
@@ -512,9 +506,6 @@ describe('session-scoped store routing', () => {
       context: 'editor',
       sessionId: 'atomic-session',
       session_id: 'sdk-atomic',
-      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
-      total_cost_usd: 0,
-      duration_ms: 0,
     })
 
     const slot = useAgentStore.getState().slots.editor
@@ -694,9 +685,6 @@ describe('session-scoped store routing', () => {
       sdkSessionId: 'sdk-b',
       workspacePath: '/workspace/b',
       session_id: 'sdk-b',
-      usage: { input_tokens: 1, output_tokens: 1, cache_read_tokens: 0, cache_creation_tokens: 0 },
-      total_cost_usd: 0,
-      duration_ms: 1,
     }
 
     useAgentStore.getState().processIPCMessage(editorAAnswer)

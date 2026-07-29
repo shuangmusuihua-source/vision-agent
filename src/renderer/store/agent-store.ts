@@ -7,7 +7,6 @@ import type {
   AgentState,
   AgentEvent,
   ConversationMessage,
-  UsageInfo,
   SessionRoutedPermissionRequest,
   SessionRoutedAskUserRequest,
   SessionRoutedRequestTimeout,
@@ -46,14 +45,12 @@ export type ContextSlot = {
   /** Claude SDK session_id used for resume/history/delete operations. */
   sdkSessionId: string | null
   agentState: AgentState
-  usageInfo: UsageInfo | null
   permissionRequest: SessionRoutedPermissionRequest | null
   permissionQueue: SessionRoutedPermissionRequest[]
   askUserRequest: SessionRoutedAskUserRequest | null
   askUserQueue: SessionRoutedAskUserRequest[]
   generationActivity: GenerationActivity | null
   activeSkillId: string | null
-  lastEditedFile: string | null
   linkedFile: string | null
   prefillText: string | null
   composerDraft: AgentComposerDraft
@@ -78,14 +75,12 @@ function emptySlot(): ContextSlot {
     currentSessionId: null,
     sdkSessionId: null,
     agentState: 'idle',
-    usageInfo: null,
     permissionRequest: null,
     permissionQueue: [],
     askUserRequest: null,
     askUserQueue: [],
     generationActivity: null,
     activeSkillId: null,
-    lastEditedFile: null,
     linkedFile: null,
     prefillText: null,
     composerDraft: { text: '', attachments: [] },
@@ -182,20 +177,17 @@ export type AgentStore = {
     visibleText: string,
     skill?: { id: string; name: string; icon: string },
   ) => string
-  startNewSession: (context: AgentContext) => void
   setActiveWorkspace: (path: string | null) => void
   removeWorkspaceState: (
     workspacePath: string,
     fallbackWorkspacePath: string | null,
     removedSessionIds?: string[],
   ) => void
-  setActiveSession: (sessionId: string | null, context?: AgentContext) => void
   setSessionOutputs: (outputs: SessionOutputs | null) => void
   setSessionOutputsLoading: (loading: boolean) => void
   dispatchSessionList: (action: SessionListAction) => void
   removeSessionState: (sessionId: string) => void
   switchToSession: (sessionId: string, context?: AgentContext, workspacePath?: string | null) => void
-  ensureSessionSlot: (sessionId: string) => void
   loadInitialSessionMessages: (sessionId: string, context?: AgentContext) => Promise<void>
   loadMoreSessionMessages: (sessionId: string) => Promise<void>
   clearSessionLoadError: () => void

@@ -7,10 +7,8 @@ import type {
   SDKResultSuccess,
   SDKResultError,
   SDKPartialAssistantMessage,
-  SDKRateLimitEvent,
-  SDKPromptSuggestionMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentIPCMessage, StreamEventPayload, UsageInfo } from '../shared/types'
+import type { AgentIPCMessage, StreamEventPayload } from '../shared/types'
 
 // ─── All system-subtype messages the SDK can emit ───────────────────────
 
@@ -54,17 +52,9 @@ export function toAgentIPCMessage(message: SDKMessage): AgentIPCMessage | null {
     case 'system':
       return convertSystem(message)
 
-    // All other top-level types (auth_status, tool_progress, tool_use_summary,
-    // prompt_suggestion, rate_limit_event, etc.) — handle those with SDK types.
-    default: {
-      if (message.type === 'rate_limit_event') {
-        return convertRateLimitEvent(message as SDKRateLimitEvent)
-      }
-      if (message.type === 'prompt_suggestion') {
-        return convertPromptSuggestion(message as SDKPromptSuggestionMessage)
-      }
+    // All other top-level types are not projected to the renderer.
+    default:
       return null
-    }
   }
 }
 
@@ -78,10 +68,6 @@ function convertSystem(message: SDKSystemMessageAny): AgentIPCMessage | null {
         type: 'system',
         subtype: 'init',
         session_id: m.session_id,
-        model: m.model,
-        tools: m.tools,
-        skills: m.skills,
-        slash_commands: m.slash_commands,
       }
     }
 
@@ -122,17 +108,6 @@ function convertSystem(message: SDKSystemMessageAny): AgentIPCMessage | null {
       }
     }
 
-    case 'task_notification': {
-      const m = narrowSystem(message, 'task_notification')
-      return {
-        type: 'system',
-        subtype: 'task_notification',
-        task_id: m.task_id,
-        status: m.status,
-        summary: m.summary,
-      }
-    }
-
     // Drop other system subtypes (notification, tool_use_summary, hook_*, etc.)
     default:
       return null
@@ -170,37 +145,26 @@ function convertUser(message: SDKUserMessage | SDKUserMessageReplay): AgentIPCMe
 // ─── Result ─────────────────────────────────────────────────────────────
 
 function convertResult(message: SDKResultMessage): AgentIPCMessage {
-  const usage = extractUsage(message.usage)
   return message.subtype === 'success'
-    ? convertResultSuccess(message, usage)
-    : convertResultError(message, usage)
+    ? convertResultSuccess(message)
+    : convertResultError(message)
 }
 
-function convertResultSuccess(message: SDKResultSuccess, usage: UsageInfo): AgentIPCMessage {
+function convertResultSuccess(message: SDKResultSuccess): AgentIPCMessage {
   return {
     type: 'result',
     subtype: 'success',
     session_id: message.session_id,
-    usage,
-    total_cost_usd: message.total_cost_usd,
-    duration_ms: message.duration_ms,
     stop_reason: message.stop_reason ?? undefined,
-    num_turns: message.num_turns,
-    result: message.result,
   }
 }
 
-function convertResultError(message: SDKResultError, usage: UsageInfo): AgentIPCMessage {
+function convertResultError(message: SDKResultError): AgentIPCMessage {
   return {
     type: 'result',
     subtype: message.subtype,
     session_id: message.session_id,
     errors: message.errors,
-    usage,
-    total_cost_usd: message.total_cost_usd,
-    duration_ms: message.duration_ms,
-    stop_reason: message.stop_reason ?? undefined,
-    num_turns: message.num_turns,
   }
 }
 
@@ -228,8 +192,6 @@ function convertStreamEvent(message: SDKPartialAssistantMessage): AgentIPCMessag
  * itself — it's passed down from convertStreamEvent so message_start can carry it.
  *
  * message_start is forwarded when ttft_ms is present (latency display).
- * message_delta / message_stop are still filtered — the renderer has no use
- * for them yet and forwarding them is pure overhead.
  */
 function adaptStreamEvent(event: { type: string }, ttftMs?: number): StreamEventPayload | null {
   switch (event.type) {
@@ -247,7 +209,6 @@ function adaptStreamEvent(event: { type: string }, ttftMs?: number): StreamEvent
       return null
     }
 
-    // Filtered: message_delta and message_stop are unused by the renderer
     default:
       return null
   }
@@ -264,37 +225,4 @@ function adaptStreamEvent(event: { type: string }, ttftMs?: number): StreamEvent
  */
 function adaptContentBlocks(content: unknown): any {
   return content
-}
-
-// ─── Usage extraction ───────────────────────────────────────────────────
-
-function extractUsage(usage: NonNullable<SDKResultMessage['usage']>): UsageInfo {
-  return {
-    input_tokens: usage.input_tokens ?? 0,
-    output_tokens: usage.output_tokens ?? 0,
-    cache_read_tokens: usage.cache_read_input_tokens ?? 0,
-    cache_creation_tokens: usage.cache_creation_input_tokens ?? 0,
-  }
-}
-
-// ─── Rate limit & prompt suggestion (typed via SDK) ─────────────────────
-
-function convertRateLimitEvent(message: SDKRateLimitEvent): AgentIPCMessage {
-  const info = message.rate_limit_info
-  return {
-    type: 'rate_limit_event',
-    rate_limit_info: {
-      status: info.status,
-      resets_at: info.resetsAt ? new Date(info.resetsAt).toISOString() : undefined,
-      limit: undefined, // SDK uses utilization instead of limit/remaining
-      remaining: undefined,
-    },
-  }
-}
-
-function convertPromptSuggestion(message: SDKPromptSuggestionMessage): AgentIPCMessage {
-  return {
-    type: 'prompt_suggestion',
-    suggestions: [message.suggestion].filter(Boolean),
-  }
 }

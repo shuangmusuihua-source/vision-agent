@@ -129,9 +129,6 @@ function createWindow(): void {
   }
 }
 
-// getMainWindow is now provided by ipc-sender module (re-exported below)
-export { getMainWindow }
-
 app.whenReady().then(async () => {
   setupMenu()
 

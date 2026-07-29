@@ -128,7 +128,7 @@ function getTaskCwd(task: CronTask): string {
   return join(tmpdir(), 'sumi-automation', task.id)
 }
 
-function getTaskAuthorizedRoots(_task: CronTask, cwd: string): string[] {
+function getTaskAuthorizedRoots(cwd: string): string[] {
   return [cwd]
 }
 
@@ -278,7 +278,7 @@ export async function executeTask(task: CronTask): Promise<void> {
     task.target = normalizeTaskTarget(task.target, false)
     const cwd = getTaskCwd(task)
     if (!task.target) await mkdir(cwd, { recursive: true })
-    const authorizedRoots = getTaskAuthorizedRoots(task, cwd)
+    const authorizedRoots = getTaskAuthorizedRoots(cwd)
     const allowedTools = task.allowNetwork
       ? ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'WebSearch', 'WebFetch']
       : ['Read', 'Glob', 'Grep', 'Write', 'Edit']

@@ -544,7 +544,7 @@ export async function sendMessage(
     // The SDK stream has completed — the result message was already
     // emitted inside the for-await loop via agent:event channel.
     // Send a session-level completion notification only.
-    notifyAgentComplete(currentSessionId || '')
+    notifyAgentComplete()
   } catch (error) {
     if (!mainWindow.isDestroyed()) {
       sessionRuntime.emitExecutionError(mainWindow, {

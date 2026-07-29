@@ -29,14 +29,14 @@ describe('ensureAccumulator', () => {
 
   it('reuses existing accumulator for the same messageId', () => {
     const slot = emptySlot()
-    slot._acc = { messageId: 'msg-1', text: 'partial', toolUseBlocks: new Map(), thinkingText: '' }
+    slot._acc = { messageId: 'msg-1', text: 'partial', toolUseBlocks: new Map() }
     const acc = ensureAccumulator('msg-1', slot)
     expect(acc.text).toBe('partial')
   })
 
   it('creates new accumulator for different messageId', () => {
     const slot = emptySlot()
-    slot._acc = { messageId: 'old', text: 'old', toolUseBlocks: new Map(), thinkingText: '' }
+    slot._acc = { messageId: 'old', text: 'old', toolUseBlocks: new Map() }
     const acc = ensureAccumulator('new', slot)
     expect(acc.messageId).toBe('new')
     expect(acc.text).toBe('')

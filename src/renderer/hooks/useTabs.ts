@@ -39,8 +39,6 @@ export function useTabs() {
   const currentState = currentKey ? workspaceStates[currentKey] : undefined
   const openTabs = currentState?.tabs ?? []
   const activeTab = currentState?.activeTab ?? null
-  const tabContents = currentState?.tabContents ?? {}
-  const pendingSaves = currentState?.pendingSaves ?? {}
   const activeFilePath = activeTab && isFileTab(activeTab) ? activeTab.path : ''
   const activePendingSave = activeFilePath ? pendingSaveFor(currentState, activeFilePath) : null
 
@@ -221,15 +219,9 @@ export function useTabs() {
     ? visibleFileContent(currentState, activeFilePath)
     : ''
 
-  const hasFileTab = useCallback((path: string) =>
-    openTabs.some(t => isFileTab(t) && t.path === path),
-    [openTabs])
-
   return {
     openTabs,
     activeTab,
-    tabContents,
-    pendingSaves,
     activeContent,
     activeFilePath,
     documentOwnerKey: currentKey,
@@ -244,6 +236,5 @@ export function useTabs() {
     saveFile,
     retryPendingSave,
     refreshActiveContent,
-    hasFileTab,
   }
 }

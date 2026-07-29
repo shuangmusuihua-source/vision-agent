@@ -62,7 +62,6 @@ describe('reduceAgentMessage', () => {
       type: 'result',
       subtype: 'error_during_execution',
       errors: ['aborted'],
-      usage: { input_tokens: 0, output_tokens: 0 },
     } as AgentIPCMessage
 
     expect(reduceAgentMessage(slot, message, 'live')).toEqual({
@@ -109,9 +108,6 @@ describe('reduceAgentMessage', () => {
       subtype: 'success',
       stop_reason: 'max_tokens',
       session_id: 'sdk-session',
-      usage: { input_tokens: 1, output_tokens: 2 },
-      total_cost_usd: 0,
-      duration_ms: 1,
     } as AgentIPCMessage])
 
     expect(messages).toHaveLength(1)

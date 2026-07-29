@@ -28,7 +28,7 @@ function showNotification(title: string, body: string, onClick?: () => void, gro
   notification.show()
 }
 
-export function notifyAgentComplete(_sessionId: string): void {
+export function notifyAgentComplete(): void {
   showNotification('Agent 任务完成', '点击返回查看结果', undefined, 'app.sumi.agent')
 }
 

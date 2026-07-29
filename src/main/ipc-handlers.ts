@@ -26,8 +26,6 @@ function pushSettingsToRenderer(): void {
 
 // ─── Registration ────────────────────────────────────────────────
 
-export { pushSettingsToRenderer }
-
 export function registerIpcHandlers(): void {
   ipcMain.handle('app:getVersion', () => app.getVersion())
 

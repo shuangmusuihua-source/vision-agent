@@ -39,7 +39,7 @@ function getVisibleUserText(rawText: string): string {
 
 export function ensureAccumulator(messageId: string, slot: ContextSlot): StreamingAccumulator {
   if (slot._acc && slot._acc.messageId === messageId) return slot._acc
-  return { messageId, text: '', toolUseBlocks: new Map(), thinkingText: '' }
+  return { messageId, text: '', toolUseBlocks: new Map() }
 }
 
 export function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, content: ContentBlock[], phase: TextMessage['phase']): Partial<ContextSlot> {
@@ -224,9 +224,6 @@ export function reduceSystemMessage(
       }
       return { patch: { messages: msgs }, events: [] }
     }
-    return { patch: {}, events: [] }
-  }
-  if (msg.subtype === 'task_notification') {
     return { patch: {}, events: [] }
   }
   return { patch: {}, events: [] }
@@ -488,15 +485,6 @@ export function reduceContentBlockStop(slot: ContextSlot): Partial<ContextSlot> 
     const updatedLast = { ...last, toolCalls: updatedToolCalls }
     const msgs = slot.messages.slice(0, -1).concat([updatedLast])
 
-    const writeOrEdit = updatedToolCalls.find(
-      (tc) => (tc.toolName === 'Write' || tc.toolName === 'Edit') && tc.status === 'running'
-    )
-    if (writeOrEdit) {
-      const filePath = (writeOrEdit.input as Record<string, unknown>)?.file_path as string
-      if (filePath) {
-        return { messages: msgs, lastEditedFile: filePath, _acc: acc }
-      }
-    }
     return { messages: msgs, _acc: acc }
   }
 
@@ -513,15 +501,6 @@ export function reduceContentBlockStop(slot: ContextSlot): Partial<ContextSlot> 
   })
   msgs[idx] = { ...msgs[idx], toolCalls: updatedToolCalls } as TextMessage
 
-  const writeOrEdit = updatedToolCalls.find(
-    (tc) => (tc.toolName === 'Write' || tc.toolName === 'Edit') && tc.status === 'running'
-  )
-  if (writeOrEdit) {
-    const filePath = (writeOrEdit.input as Record<string, unknown>)?.file_path as string
-    if (filePath) {
-      return { messages: msgs, lastEditedFile: filePath, _acc: acc }
-    }
-  }
   return { messages: msgs, _acc: acc }
 }
 
@@ -564,9 +543,6 @@ export function reduceStreamEvent(
       }
       return { patch: null, firstContentSeenDuringThisCall: false }
     }
-    case 'message_delta':
-    case 'message_stop':
-      return { patch: null, firstContentSeenDuringThisCall: false }
     default:
       return { patch: null, firstContentSeenDuringThisCall: false }
   }
@@ -701,7 +677,7 @@ export function reduceResultMessage(
   if (msg.subtype === 'success') {
     const resultMsg = msg as ResultSuccessPayload
     // Detect output truncation or model refusal
-    let patch: Partial<ContextSlot> = { usageInfo: resultMsg.usage, ttftMs: null }
+    let patch: Partial<ContextSlot> = { ttftMs: null }
     if (resultMsg.stop_reason === 'max_tokens') {
       const truncationNote: StoppedMessage = {
         kind: 'stopped', id: `truncate-${Date.now()}`, role: 'assistant', phase: 'stopped',
@@ -743,7 +719,7 @@ export function reduceResultMessage(
     const msgs = lastMsg?.kind === 'text' && lastMsg.phase === 'streaming'
       ? [...slot.messages.slice(0, -1), { ...lastMsg, phase: 'complete' as const }, stopNote]
       : [...slot.messages, stopNote]
-    return { patch: { messages: msgs, usageInfo: errorMsg.usage }, events: [{ type: 'RESULT_ERROR' }] }
+    return { patch: { messages: msgs }, events: [{ type: 'RESULT_ERROR' }] }
   }
 
   return {
@@ -752,7 +728,6 @@ export function reduceResultMessage(
         kind: 'text' as const, id: `error-${Date.now()}`, role: 'assistant', phase: 'error',
         textContent: friendlyError || errorText, content: [], toolCalls: [], createdAt: Date.now(),
       }],
-      usageInfo: errorMsg.usage,
     },
     events: [{ type: 'RESULT_ERROR' }],
   }
@@ -827,9 +802,6 @@ export function reduceAgentMessage(
         firstContentSeenDuringThisCall: false,
       }
     }
-    case 'rate_limit_event':
-    case 'prompt_suggestion':
-      return { patch: null, events: [], firstContentSeenDuringThisCall: false }
   }
 }
 

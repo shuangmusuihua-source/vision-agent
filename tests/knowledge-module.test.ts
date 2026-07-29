@@ -28,7 +28,6 @@ beforeEach(() => {
   useGraphStore.setState({
     graphData: { nodes: [], edges: [] },
     changedFileCount: 0,
-    changedFiles: [],
     changedFileVersion: 0,
     isLoading: false,
     error: null,
@@ -44,7 +43,7 @@ describe('knowledge module', () => {
   it('loads graph data and acknowledges the loaded version', async () => {
     getData.mockResolvedValue(graphData)
     acknowledgeChanges.mockResolvedValue({ count: 0, files: [], version: 4 })
-    useGraphStore.setState({ changedFileCount: 2, changedFiles: ['/knowledge/note.md'] })
+    useGraphStore.setState({ changedFileCount: 2 })
 
     await useGraphStore.getState().loadGraphData()
 
@@ -53,7 +52,6 @@ describe('knowledge module', () => {
     expect(useGraphStore.getState()).toMatchObject({
       graphData,
       changedFileCount: 0,
-      changedFiles: [],
       changedFileVersion: 4,
       isLoading: false,
       error: null,

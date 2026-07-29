@@ -134,22 +134,11 @@ export type StreamMessageStart = {
   ttft_ms?: number
 }
 
-export type StreamMessageDelta = {
-  type: 'message_delta'
-  stop_reason?: string
-}
-
-export type StreamMessageStop = {
-  type: 'message_stop'
-}
-
 export type StreamEventPayload =
   | StreamContentBlockStart
   | StreamContentBlockDelta
   | StreamContentBlockStop
   | StreamMessageStart
-  | StreamMessageDelta
-  | StreamMessageStop
 
 // ─── SDK Message → IPC Message (discriminated union) ────────────────
 // This is the single message type that crosses the IPC boundary.
@@ -160,10 +149,6 @@ export type SystemInitPayload = {
   type: 'system'
   subtype: 'init'
   session_id: string
-  model: string
-  tools: string[]
-  skills: string[]
-  slash_commands: string[]
 }
 
 export type SystemStatusPayload = {
@@ -218,12 +203,7 @@ export type ResultSuccessPayload = {
   type: 'result'
   subtype: 'success'
   session_id?: string
-  usage: UsageInfo
-  total_cost_usd: number
-  duration_ms: number
   stop_reason?: string
-  num_turns?: number
-  result?: string
 }
 
 export type ResultErrorPayload = {
@@ -231,11 +211,6 @@ export type ResultErrorPayload = {
   subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd' | 'error_max_structured_output_retries'
   session_id?: string
   errors: string[]
-  usage: UsageInfo
-  total_cost_usd: number
-  duration_ms: number
-  stop_reason?: string
-  num_turns?: number
 }
 
 export type StreamEventPayloadIPC = {
@@ -244,37 +219,11 @@ export type StreamEventPayloadIPC = {
   event: StreamEventPayload
 }
 
-export type SystemTaskNotificationPayload = {
-  type: 'system'
-  subtype: 'task_notification'
-  task_id: string
-  status: 'completed' | 'failed' | 'stopped'
-  summary: string
-}
-
-export type RateLimitPayload = {
-  type: 'rate_limit_event'
-  rate_limit_info?: {
-    status?: 'allowed' | 'allowed_warning' | 'rejected'
-    resets_at?: string
-    limit?: number
-    remaining?: number
-  }
-}
-
-export type PromptSuggestionPayload = {
-  type: 'prompt_suggestion'
-  suggestions: string[]
-}
-
 export type AgentIPCMessage =
   | SystemInitPayload
   | SystemStatusPayload
   | SystemCompactBoundaryPayload
   | SystemPermissionDeniedPayload
-  | SystemTaskNotificationPayload
-  | RateLimitPayload
-  | PromptSuggestionPayload
   | AssistantPayload
   | UserPayload
   | ResultSuccessPayload
@@ -334,16 +283,6 @@ export type InlineRewriteRequest = {
 export type InlineRewriteResponse = {
   requestId: string
   replacementMarkdown: string
-}
-
-// ─── Usage Info ──────────────────────────────────────────────────────
-
-export type UsageInfo = {
-  input_tokens: number
-  output_tokens: number
-  cache_read_tokens: number
-  cache_creation_tokens: number
-  server_tool_use?: Record<string, unknown>
 }
 
 // ─── Agent State Machine ─────────────────────────────────────────────
@@ -501,7 +440,6 @@ export type StreamingAccumulator = {
     name: string
     inputJson: string
   }>
-  thinkingText: string
 }
 
 // ─── Live Generation Activity ───────────────────────────────────────

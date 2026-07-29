@@ -279,11 +279,6 @@
   pointer-events: auto;
 }
 
-.ask-zuovis-footer .permission-dialog,
-.ask-zuovis-footer .ask-user-drawer {
-  margin: 0;
-}
-
 /* Permission/AskUser drawer — absolute overlay, never expands footer */
 .ask-zuovis-footer .input-drawer {
   position: absolute;

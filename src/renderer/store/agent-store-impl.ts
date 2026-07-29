@@ -24,7 +24,6 @@ import {
   cacheSessionSlot,
   enqueueAskUserInteraction,
   enqueuePermissionInteraction,
-  ensureSessionSlotPatch,
   getSdkSessionIdForClient,
   normalizeSessionId,
   patchActiveContextSlot,
@@ -362,8 +361,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           askUserQueue: askUserItems.slice(1),
           generationActivity: realSlot?.generationActivity || sourceSlot?.generationActivity || null,
           activeSkillId: realSlot?.activeSkillId || sourceSlot?.activeSkillId || null,
-          lastEditedFile: realSlot?.lastEditedFile || sourceSlot?.lastEditedFile || null,
-          usageInfo: realSlot?.usageInfo || sourceSlot?.usageInfo || null,
           todoList: realSlot?.todoList || sourceSlot?.todoList || null,
           composerDraft: sourceSlot?.composerDraft || realSlot?.composerDraft || baseSlot.composerDraft,
           approvalMode: sourceSlot?.approvalMode || realSlot?.approvalMode || baseSlot.approvalMode,
@@ -475,25 +472,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       })
 
       return clientSessionKey
-    },
-
-    startNewSession(context: AgentContext) {
-      set((state) => {
-        const currentSlot = state.slots[context]
-        const currentSessionId = currentSlot.currentSessionId || state.activeSessionId[context]
-        const cachePatch = currentSessionId
-          ? cacheSessionSlot(state, currentSessionId, { ...currentSlot })
-          : {}
-        return {
-          activeSessionId: { ...state.activeSessionId, [context]: null },
-          ...(context === 'editor' ? { sessionOutputs: null, sessionOutputsLoading: false } : {}),
-          ...cachePatch,
-          slots: {
-            ...state.slots,
-            [context]: { ...emptySlot(), workspacePath: currentSlot.workspacePath },
-          },
-        }
-      })
     },
 
     // ─── Workspace Actions ────────────────────────────────────────────────
@@ -614,13 +592,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     // ─── Session Actions ──────────────────────────────────────────────────
 
-    setActiveSession(sessionId: string | null, context: AgentContext = 'editor') {
-      set((state) => ({
-        activeSessionId: { ...state.activeSessionId, [context]: sessionId },
-        ...(context === 'editor' ? { sessionOutputs: null, sessionOutputsLoading: !!sessionId } : {}),
-      }))
-    },
-
     setSessionOutputs(outputs) {
       set({ sessionOutputs: outputs, sessionOutputsLoading: false })
     },
@@ -640,10 +611,6 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           ...removeSessionSlotPatch(state, sessionId),
         }
       })
-    },
-
-    ensureSessionSlot(sessionId: string) {
-      set((state) => ensureSessionSlotPatch(state, sessionId))
     },
 
     switchToSession(sessionId: string, context: AgentContext = 'editor', workspacePath?: string | null) {

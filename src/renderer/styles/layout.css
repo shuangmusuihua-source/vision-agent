@@ -580,24 +580,6 @@
   pointer-events: none;
 }
 
-.sidebar-footer {
-  padding: 8px;
-}
-
-.sidebar-settings-btn {
-  width: 100%;
-  padding: 6px 8px;
-  text-align: left;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
-}
-
-.sidebar-settings-btn:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-}
-
 .sidebar-workspace-section {
   margin-bottom: 4px;
 }
@@ -752,14 +734,6 @@
   flex-direction: column;
 }
 
-.sidebar-workspace-drop-line {
-  height: 2px;
-  margin: 0 12px;
-  background: var(--color-action);
-  border-radius: 1px;
-  opacity: 0.7;
-}
-
 .sidebar-workspace-name {
   flex: 1;
   overflow: hidden;
@@ -785,13 +759,6 @@
 
 .sidebar-new-file-field:focus {
   border-color: var(--color-action);
-}
-
-.sidebar-new-file-error {
-  display: block;
-  font-size: var(--font-size-xs);
-  color: var(--color-error);
-  margin-top: 2px;
 }
 
 /* --- Unified Modal System --- */
@@ -991,22 +958,6 @@
   background: var(--color-bg-tertiary);
 }
 
-.sidebar-open-dir-btn {
-  width: calc(100% - 16px);
-  margin: 8px;
-  padding: 8px 12px;
-  background: var(--color-action);
-  color: var(--color-action-text);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-}
-
-.sidebar-open-dir-btn:hover {
-  opacity: 0.9;
-  color: #fff;
-}
-
 /* --- Sidebar file tree entries --- */
 
 .sidebar-entry {
@@ -1066,22 +1017,6 @@
 
 [data-theme="dark"] .sidebar-entry-active:hover {
   background: var(--sidebar-entry-selected-hover) !important;
-}
-
-.sidebar-folder {
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.sidebar-file {
-  color: var(--color-text-primary);
-}
-
-.sidebar-file-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Session entries (replaces file tree in workspace) */
@@ -1314,81 +1249,6 @@
   text-align: center;
 }
 
-.sidebar-file-action {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-tertiary);
-  flex-shrink: 0;
-}
-
-.sidebar-file:hover .sidebar-file-action {
-  display: flex;
-}
-
-.sidebar-file-action:hover {
-  color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
-}
-
-.sidebar-rename-input {
-  flex: 1;
-  min-width: 0;
-  padding: 1px 4px;
-  border: 1px solid var(--color-action);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-md);
-  outline: none;
-}
-
-/* --- Move file dropdown --- */
-
-.move-dropdown {
-  position: fixed;
-  z-index: var(--z-dropdown);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-xs) 0;
-  box-shadow: var(--shadow-md);
-  min-width: 180px;
-  animation: move-dropdown-in 0.15s ease-out;
-}
-
-@keyframes move-dropdown-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.move-dropdown-title {
-  padding: var(--space-xs) var(--space-md);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.move-dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-md);
-  width: 100%;
-  text-align: left;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
-}
-
-.move-dropdown-item:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-}
-
 /* --- Main content area --- */
 
 .main-content {
@@ -1467,27 +1327,6 @@
   padding-left: 78px;
   left: 0;
   right: 0;
-}
-
-.editor-placeholder {
-  padding: 48px 64px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.editor-placeholder-title {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  margin-bottom: 16px;
-  color: var(--color-text-primary);
-}
-
-.editor-placeholder-content {
-  font-size: var(--font-size-lg);
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  color: var(--color-text-primary);
 }
 
 .editor-empty {
@@ -1652,24 +1491,12 @@
   transition: opacity 0.2s ease 0.1s;
 }
 
-.agent-panel-primary .agent-panel-header {
-  padding-left: 12px;
-}
-
 .agent-panel-header {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   padding: 8px 12px 4px 32px;
   -webkit-app-region: drag;
-}
-
-.agent-panel-header-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  -webkit-app-region: no-drag;
 }
 
 .agent-panel-body {
@@ -1718,8 +1545,6 @@
 .update-action-btn:focus-visible,
 .sidebar-app-btn:focus-visible,
 .sidebar-icon-btn:focus-visible,
-.sidebar-settings-btn:focus-visible,
-.sidebar-open-dir-btn:focus-visible,
 .sidebar-new-dir-btn:focus-visible,
 .sidebar-entry:focus-visible,
 .sidebar-workspace-module-btn:focus-visible,
@@ -1742,8 +1567,6 @@
 .update-action-btn:active,
 .sidebar-app-btn:active,
 .sidebar-icon-btn:active,
-.sidebar-settings-btn:active,
-.sidebar-open-dir-btn:active,
 .sidebar-new-dir-btn:active,
 .sidebar-quick-theme-btn:active,
 .sidebar-quick-model-row:active,
@@ -1756,12 +1579,6 @@
 @keyframes update-action-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-.sidebar-section-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 12px 8px 16px;
 }
 
 /* --- Ask sumi Sidebar Entry --- */
@@ -1842,22 +1659,6 @@
   font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
-}
-
-.sidebar-history-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-action-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-action);
-  flex-shrink: 0;
-}
-
-.sidebar-artifacts-icon {
-  /* inherits .sidebar-history-icon, overrides nothing */
 }
 
 .sidebar-ask-zuovis-label {
@@ -1975,44 +1776,6 @@
 [data-theme="dark"] .agent-panel {
   background: var(--color-bg-primary);
 }
-
-/* --- Ask sumi Modal Overlay (permission & askUser) --- */
-
-.ask-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: ask-modal-fadein 0.15s ease;
-}
-
-@keyframes ask-modal-fadein {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.ask-modal-card {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 16px 20px;
-  min-width: 320px;
-  max-width: 420px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  animation: ask-modal-slidein 0.2s ease;
-}
-
-@keyframes ask-modal-slidein {
-  from { opacity: 0; transform: translateY(8px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-[data-theme="dark"] .ask-modal-card {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
 
 /* --- Daydream Mode --- */
 

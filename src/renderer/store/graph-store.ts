@@ -9,7 +9,6 @@ export type GraphStore = {
 
   // File change tracking
   changedFileCount: number
-  changedFiles: string[]
   changedFileVersion: number
   isLoading: boolean
   error: string | null
@@ -17,7 +16,6 @@ export type GraphStore = {
   // Actions
   loadGraphData: () => Promise<void>
   handleFilesChanged: (data: { count: number; files: string[]; version: number }) => void
-  clearChangedFiles: () => void
 }
 
 // ─── Store implementation ───────────────────────────────────────────
@@ -28,7 +26,6 @@ export const useGraphStore = create<GraphStore>((set) => ({
 
   // File change tracking
   changedFileCount: 0,
-  changedFiles: [],
   changedFileVersion: 0,
   isLoading: false,
   error: null,
@@ -46,7 +43,6 @@ export const useGraphStore = create<GraphStore>((set) => ({
         : {
             graphData: data,
             changedFileCount: 0,
-            changedFiles: [],
             changedFileVersion: loadedVersion,
             isLoading: false,
             error: null,
@@ -61,11 +57,7 @@ export const useGraphStore = create<GraphStore>((set) => ({
   },
 
   handleFilesChanged: (data) => {
-    set({ changedFileCount: data.count, changedFiles: data.files, changedFileVersion: data.version })
-  },
-
-  clearChangedFiles: () => {
-    set({ changedFileCount: 0, changedFiles: [] })
+    set({ changedFileCount: data.count, changedFileVersion: data.version })
   },
 }))
 

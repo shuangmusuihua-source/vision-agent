@@ -97,7 +97,7 @@ describe('agent store intent actions', () => {
     })
   })
 
-  it('keeps approval mode isolated per session and defaults new sessions to requests', () => {
+  it('keeps approval mode isolated per session', () => {
     const sessionA = { ...emptySlot(), currentSessionId: 'session-a' }
     const sessionB = { ...emptySlot(), currentSessionId: 'session-b' }
     useAgentStore.setState({
@@ -113,9 +113,6 @@ describe('agent store intent actions', () => {
 
     useAgentStore.getState().switchToSession('session-a', 'editor')
     expect(useAgentStore.getState().slots.editor.approvalMode).toBe('auto')
-
-    useAgentStore.getState().startNewSession('editor')
-    expect(useAgentStore.getState().slots.editor.approvalMode).toBe('request')
   })
 
   it('records a saved artifact in both representations of the active session', () => {
@@ -383,24 +380,4 @@ describe('agent store intent actions', () => {
     expect(state.sessionList[0]).toMatchObject({ id: 'temp-a', sdkSessionId: 'sdk-a', title: 'Research' })
   })
 
-  it('preserves the previous slot when starting a fresh session', () => {
-    const current = {
-      ...emptySlot(),
-      currentSessionId: 'session-a',
-      workspacePath: '/workspace',
-      messages: [{ kind: 'user' as const, id: 'user-a', role: 'user' as const, textContent: 'hello', createdAt: 1 }],
-    }
-    useAgentStore.setState({
-      activeSessionId: { editor: 'session-a', ask: null },
-      slots: { editor: current, ask: emptySlot() },
-    })
-
-    useAgentStore.getState().startNewSession('editor')
-
-    const state = useAgentStore.getState()
-    expect(state.activeSessionId.editor).toBeNull()
-    expect(state.sessionSlots['session-a'].messages).toEqual(current.messages)
-    expect(state.slots.editor.messages).toEqual([])
-    expect(state.slots.editor.workspacePath).toBe('/workspace')
-  })
 })

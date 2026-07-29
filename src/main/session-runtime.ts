@@ -213,14 +213,6 @@ export class SessionRuntimeController {
       type: 'result',
       subtype: 'error_during_execution',
       errors: [message],
-      usage: {
-        input_tokens: 0,
-        output_tokens: 0,
-        cache_read_tokens: 0,
-        cache_creation_tokens: 0,
-      },
-      total_cost_usd: 0,
-      duration_ms: 0,
     } as AgentIPCMessage)
   }
 

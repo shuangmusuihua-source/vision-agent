@@ -34,16 +34,6 @@ export function addAuthorizedDirectory(dir: string): void {
   }
 }
 
-export function removeAuthorizedDirectory(dir: string): void {
-  const fixed = store.get('fixedDirectories')
-  const dirs = store.get('authorizedDirectories')
-  if (fixed.includes(dir) || isReservedKnowledgeWorkspacePath(dir, fixed)) {
-    store.set('authorizedDirectories', dirs.filter((candidate) => !isSameWorkspacePath(candidate, dir)))
-    return
-  }
-  store.set('authorizedDirectories', dirs.filter((candidate) => !isSameWorkspacePath(candidate, dir)))
-}
-
 export function reorderAuthorizedDirectories(paths: string[]): boolean {
   const fixed = store.get('fixedDirectories')
   const current = getAuthorizedDirectories()

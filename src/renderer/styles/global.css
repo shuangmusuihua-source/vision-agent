@@ -290,7 +290,7 @@
 }
 
 /* Unified backdrop for app window modals. Tune modal dim/blur here only. */
-:is(.modal-overlay.modal-overlay-visible, .settings-overlay, .ask-modal-overlay, .search-overlay) {
+:is(.modal-overlay.modal-overlay-visible, .settings-overlay, .search-overlay) {
   background: var(--modal-backdrop-bg);
   backdrop-filter: var(--modal-backdrop-filter);
   -webkit-backdrop-filter: var(--modal-backdrop-filter);
