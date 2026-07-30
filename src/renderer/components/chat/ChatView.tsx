@@ -28,7 +28,6 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   const agentState = useAgentStatus(context)
   const ttftMs = useTtftMs(context)
   const generationActivity = useGenerationActivity(context)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const internalContainerRef = useRef<HTMLDivElement>(null)
   const containerRef = externalScrollRef || internalContainerRef
   const userScrolledUpRef = useRef(false)
@@ -37,6 +36,9 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   // ── SDK load-more wiring (self-contained, per context) ────────────────
   const { loadMoreMessages, hasMoreSdkMessages, isLoadingMoreMessages } = useAgent(context)
   const currentSessionId = useCurrentSessionId(context)
+  const viewportSessionIdRef = useRef(currentSessionId)
+  const prevMsgCount = useRef(messages.length)
+  const prevScrollHeightRef = useRef(0)
 
   const visibleMessages = useMemo(() => {
     const start = Math.max(0, messages.length - visibleCount)
@@ -79,8 +81,19 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
     if (el) el.scrollTop = el.scrollHeight
   }, [containerRef])
 
+  // A ChatView instance survives session switches. Reset all session-scoped
+  // viewport state even when both the previous and next sessions are non-empty.
+  useLayoutEffect(() => {
+    if (viewportSessionIdRef.current === currentSessionId) return
+    viewportSessionIdRef.current = currentSessionId
+    userScrolledUpRef.current = false
+    prevScrollHeightRef.current = 0
+    prevMsgCount.current = messages.length
+    setVisibleCount(RENDER_BATCH)
+    forceScrollToBottom()
+  }, [currentSessionId, messages.length, forceScrollToBottom])
+
   // New message arrived (not during streaming) → always scroll to bottom
-  const prevMsgCount = useRef(messages.length)
   useEffect(() => {
     if (messages.length > prevMsgCount.current && !isQueryActive) {
       forceScrollToBottom()
@@ -92,7 +105,6 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   // useLayoutEffect runs synchronously during React commit, BEFORE paint.
   // With plain-text streaming (no Streamdown overhead), layout cost is minimal
   // and the scroll adjustment happens in the same frame as the content update.
-  const prevScrollHeightRef = useRef(0)
   useLayoutEffect(() => {
     const el = containerRef.current
     if (!el || !isQueryActive || userScrolledUpRef.current) return
@@ -111,6 +123,7 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
   useEffect(() => {
     if (messages.length === 0) {
       setVisibleCount(RENDER_BATCH)
+      userScrolledUpRef.current = false
       prevScrollHeightRef.current = 0
       prevMsgCount.current = 0
     }
@@ -202,7 +215,6 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
         }
         return null
       })()}
-      <div ref={bottomRef} />
     </div>
   )
 }
