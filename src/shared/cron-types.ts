@@ -20,6 +20,16 @@ export interface CronTaskRun {
   error?: string | null
 }
 
+export type CronTaskExecutionOutcome =
+  | { status: 'success'; run: CronTaskRun }
+  | { status: 'error'; run: CronTaskRun; error: string }
+  | { status: 'cancelled'; run: CronTaskRun }
+  | { status: 'already_running' }
+
+export type CronExecuteResponse =
+  | CronTaskExecutionOutcome
+  | { status: 'rejected'; error: string }
+
 export interface CronTaskRegistration {
   name?: string
   cronExpression: string

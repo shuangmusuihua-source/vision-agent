@@ -231,9 +231,14 @@ function AutomationPanel({
   const handleRun = useCallback(async (taskId: string) => {
     setRunningTaskId(taskId)
     try {
-      const result = await window.api.cron.execute(taskId)
-      if (!result.success) throw new Error(result.error || '执行自动化失败')
+      const outcome = await window.api.cron.execute(taskId)
       await refreshTasks()
+      if (outcome.status === 'error' || outcome.status === 'rejected') {
+        throw new Error(outcome.error || '执行自动化失败')
+      }
+      if (outcome.status === 'already_running') {
+        throw new Error('任务已在运行中')
+      }
     } catch (err) {
       setError((err as Error).message || '执行自动化失败')
     } finally {

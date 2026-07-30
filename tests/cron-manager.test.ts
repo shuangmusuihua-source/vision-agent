@@ -123,7 +123,7 @@ describe('cron manager automation tasks', () => {
       },
     })
 
-    await manager.executeTaskById(task.id)
+    const outcome = await manager.executeTaskById(task.id)
 
     expect(buildAgentOptions).toHaveBeenCalledWith(expect.objectContaining({
       cwd: '/tmp/automation-target',
@@ -155,6 +155,10 @@ describe('cron manager automation tasks', () => {
       status: 'success',
       result: 'done',
     }))
+    expect(outcome).toEqual({
+      status: 'success',
+      run: task.resultHistory?.[0],
+    })
     expect(sentEvents.some((event) => event[0] === 'cron:taskCompleted')).toBe(true)
     expect(notifyCronTaskComplete).toHaveBeenCalledWith(task.name, 'done')
   })
@@ -173,7 +177,7 @@ describe('cron manager automation tasks', () => {
       prompt: 'summarize updates',
     })
 
-    await manager.executeTaskById(task.id)
+    const outcome = await manager.executeTaskById(task.id)
 
     expect(task.lastStatus).toBe('error')
     expect(task.lastError).toBe('Model request failed')
@@ -182,6 +186,11 @@ describe('cron manager automation tasks', () => {
       result: 'Error: Model request failed',
       error: 'Model request failed',
     }))
+    expect(outcome).toEqual({
+      status: 'error',
+      run: task.resultHistory?.[0],
+      error: 'Model request failed',
+    })
     expect(notifyCronTaskComplete).not.toHaveBeenCalled()
     expect(sentEvents).toContainEqual([
       'agent:notification',
@@ -214,7 +223,7 @@ describe('cron manager automation tasks', () => {
 
     expect(manager.listTasks()[0].isRunning).toBe(true)
     expect(manager.stopTaskById(task.id)).toBe(true)
-    await pending
+    const outcome = await pending
 
     const [stoppedTask] = manager.listTasks()
     expect(stoppedTask.isRunning).toBe(false)
@@ -223,6 +232,37 @@ describe('cron manager automation tasks', () => {
       status: 'cancelled',
       result: '任务已停止。',
     }))
+    expect(outcome).toEqual({
+      status: 'cancelled',
+      run: stoppedTask.resultHistory?.[0],
+    })
+  })
+
+  it('reports already_running instead of returning a previous result', async () => {
+    let releaseReady!: () => void
+    const ready = new Promise<void>((resolve) => { releaseReady = resolve })
+    const queryImpl = async function* queryMock(args: { options: { abortController: AbortController } }) {
+      releaseReady()
+      await new Promise<void>((_resolve, reject) => {
+        args.options.abortController.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+      })
+    }
+
+    const { manager, query } = await loadCronManager({ queryImpl })
+    const task = manager.registerTask({
+      cronExpression: '*/5 * * * *',
+      prompt: 'watch files',
+    })
+    const firstRun = manager.executeTaskById(task.id)
+    await ready
+
+    await expect(manager.executeTaskById(task.id)).resolves.toEqual({
+      status: 'already_running',
+    })
+    expect(query).toHaveBeenCalledTimes(1)
+
+    expect(manager.stopTaskById(task.id)).toBe(true)
+    await expect(firstRun).resolves.toMatchObject({ status: 'cancelled' })
   })
 
   it('aborts a running task when it is removed', async () => {

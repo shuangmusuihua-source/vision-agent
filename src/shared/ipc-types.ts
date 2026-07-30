@@ -46,6 +46,7 @@ import type {
 import type {
   CronScheduleParseRequest,
   CronScheduleParseResponse,
+  CronExecuteResponse,
   CronTask,
   CronTaskCompletedEvent,
   CronTaskRegistration,
@@ -333,7 +334,7 @@ export type IPCChannelMap = {
   }
   'cron:execute': {
     request: string
-    response: { success: boolean; result?: string; error?: string }
+    response: CronExecuteResponse
   }
   'cron:stop': {
     request: string

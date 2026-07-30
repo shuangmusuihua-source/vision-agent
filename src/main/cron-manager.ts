@@ -4,7 +4,13 @@ import * as Sentry from '@sentry/electron/main'
 import { getMainWindow } from './ipc-sender'
 import { getAuthorizedDirectories, getSessionRecordById } from './persistence/workspace-store'
 import { getCronTasks, saveCronTasks } from './persistence/settings-store'
-import type { CronTask, CronTaskRegistration, CronTaskRun, CronTaskTarget } from '../shared/cron-types'
+import type {
+  CronTask,
+  CronTaskExecutionOutcome,
+  CronTaskRegistration,
+  CronTaskRun,
+  CronTaskTarget,
+} from '../shared/cron-types'
 import { buildAgentOptions } from './agent-options'
 import { notifyCronTaskComplete } from './notification-manager'
 import {
@@ -255,8 +261,8 @@ export function listTasks(): CronTask[] {
   return Array.from(tasks.values()).map((e) => withRuntimeState(e.task))
 }
 
-export async function executeTask(task: CronTask): Promise<void> {
-  if (runningTasks.has(task.id)) return
+export async function executeTask(task: CronTask): Promise<CronTaskExecutionOutcome> {
+  if (runningTasks.has(task.id)) return { status: 'already_running' }
   const abortController = new AbortController()
   let resolveCompletion!: () => void
   const completion = new Promise<void>((resolve) => {
@@ -342,8 +348,8 @@ export async function executeTask(task: CronTask): Promise<void> {
       notifyCronTaskComplete(task.name, task.lastResult || '')
       notifyInApp(task, `自动化完成: ${task.name}`, task.lastResult || '任务已完成')
     }
+    return { status: 'success', run }
   } catch (err) {
-    if (!tasks.has(task.id)) return
     const errorMessage = (err as Error).message || '未知错误'
     const wasCancelled = abortController.signal.aborted
     const run: CronTaskRun = {
@@ -354,6 +360,7 @@ export async function executeTask(task: CronTask): Promise<void> {
       result: wasCancelled ? '任务已停止。' : `Error: ${errorMessage}`,
       error: wasCancelled ? '任务已停止' : errorMessage,
     }
+    if (!tasks.has(task.id)) return { status: 'cancelled', run }
     recordRun(task, run)
     persistTasks()
     if (!wasCancelled) {
@@ -367,6 +374,9 @@ export async function executeTask(task: CronTask): Promise<void> {
       wasCancelled ? '任务已停止' : errorMessage,
       wasCancelled ? 'info' : 'error'
     )
+    return wasCancelled
+      ? { status: 'cancelled', run }
+      : { status: 'error', run, error: errorMessage }
   } finally {
     const runningTask = runningTasks.get(task.id)
     if (runningTask?.abortController === abortController) {
@@ -377,11 +387,10 @@ export async function executeTask(task: CronTask): Promise<void> {
   }
 }
 
-export async function executeTaskById(taskId: string): Promise<string> {
+export async function executeTaskById(taskId: string): Promise<CronTaskExecutionOutcome> {
   const entry = tasks.get(taskId)
   if (!entry) throw new Error('Task not found')
-  await executeTask(entry.task)
-  return entry.task.lastResult || ''
+  return executeTask(entry.task)
 }
 
 export function stopTaskById(taskId: string): boolean {

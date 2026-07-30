@@ -1,7 +1,11 @@
 import { dialog, ipcMain } from 'electron'
 import { registerTask, removeTask, listTasks, executeTaskById, stopTaskById, setTaskStatus } from '../cron-manager'
 import { resolveCronSchedule } from '../cron-schedule-parser'
-import type { CronScheduleParseRequest, CronTaskRegistration } from '../../shared/cron-types'
+import type {
+  CronExecuteResponse,
+  CronScheduleParseRequest,
+  CronTaskRegistration,
+} from '../../shared/cron-types'
 import { getMainWindow } from '../ipc-sender'
 import { rememberSelectedDirectoryGrant } from '../directory-grants'
 
@@ -25,9 +29,12 @@ export function registerCronHandlers(): void {
   ipcMain.handle('cron:list', () => listTasks())
   ipcMain.handle('cron:resolveSchedule', async (_event, request: CronScheduleParseRequest) => resolveCronSchedule(request))
   ipcMain.handle('cron:remove', (_event, taskId: string) => removeTask(taskId))
-  ipcMain.handle('cron:execute', async (_event, taskId: string) => {
-    try { const result = await executeTaskById(taskId); return { success: true, result } }
-    catch (err) { return { success: false, error: (err as Error).message } }
+  ipcMain.handle('cron:execute', async (_event, taskId: string): Promise<CronExecuteResponse> => {
+    try {
+      return await executeTaskById(taskId)
+    } catch (err) {
+      return { status: 'rejected', error: (err as Error).message }
+    }
   })
   ipcMain.handle('cron:stop', (_event, taskId: string) => {
     try {
