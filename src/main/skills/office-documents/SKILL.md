@@ -24,9 +24,9 @@ Use `officecli` as the document engine. Keep every delivered file in the current
 2. Plan stable paths and mutations. Query or inspect elements instead of guessing indexes or property names.
 3. Create or edit the document.
    - Create: `officecli create <output.docx|output.xlsx|output.pptx>`.
-   - Prefer `officecli batch <file> --input <commands.json> --stop-on-error --json` for multiple related edits.
-   - Prefer `officecli merge <template> <output> <data.json>` for repeatable template population.
-   - For an unsupported property, inspect built-in help such as `officecli pptx set shape` before retrying.
+   - Prefer `officecli batch <file> --input <commands.json> --json` for multiple related edits. Batches are atomic by default: any failed item rolls back the whole batch. Do not use `--best-effort` unless the user explicitly accepts partial edits.
+   - Prefer `officecli merge <template> <output> --data <data.json>` for repeatable template population.
+   - For an unsupported property, inspect built-in help such as `officecli help pptx set shape` before retrying.
 4. Flush resident changes with `officecli save <file>` before another program reads the file. Use `officecli close <file>` when the task is complete.
 5. Verify before delivery.
    - Run `officecli validate <file>`.

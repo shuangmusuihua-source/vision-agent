@@ -11,7 +11,10 @@ import { CURATED_COMMUNITY_SKILLS, getCuratedCommunitySkill } from '../skills/co
 import { sessionRuntime } from '../session-runtime'
 import { runSkillMutation } from '../skill-mutation-coordinator'
 import type { CommunitySkillCatalogItem, CommunitySkillMutationResult } from '../../shared/types'
-import { getOfficeCliRuntimeManager } from '../officecli-runtime'
+import {
+  filterOfficeSkillByRuntimeReadiness,
+  getOfficeCliRuntimeManager,
+} from '../officecli-runtime'
 
 function emitSkillsChanged(skillId: string, reason: 'installed' | 'updated' | 'uninstalled' | 'toggled'): void {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -46,7 +49,10 @@ async function getCommunityCatalog(): Promise<CommunitySkillCatalogItem[]> {
 
 export function registerSkillHandlers(): void {
   ipcMain.handle('skills:list', async () => {
-    const communityCatalog = await getCommunityCatalog()
+    const [communityCatalog, enabled] = await Promise.all([
+      getCommunityCatalog(),
+      filterOfficeSkillByRuntimeReadiness(getEnabledSkills()),
+    ])
     const installedCommunity = CURATED_COMMUNITY_SKILLS
       .filter(skill => communityCatalog.some(item => item.id === skill.id && item.installed))
       .map(skill => ({
@@ -56,9 +62,8 @@ export function registerSkillHandlers(): void {
         icon: skill.icon,
         promptTemplate: skill.promptTemplate,
         outputMode: 'write' as const,
-      }))
+    }))
     const skills = [...getBuiltinSkills(), ...installedCommunity]
-    const enabled = getEnabledSkills()
     return skills.map((s) => ({ ...s, enabled: enabled.includes(s.id) }))
   })
 
@@ -75,7 +80,7 @@ export function registerSkillHandlers(): void {
   })
 
   ipcMain.handle('skills:builtins', async () => {
-    const enabled = getEnabledSkills()
+    const enabled = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
     return getBuiltinSkills().map(skill => ({
       id: skill.id,
       name: skill.name,

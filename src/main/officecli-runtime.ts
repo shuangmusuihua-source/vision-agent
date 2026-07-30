@@ -22,13 +22,13 @@ export interface OfficeCliReleaseAsset {
 const RELEASE_ASSETS: Record<string, OfficeCliReleaseAsset> = {
   'darwin-arm64': {
     fileName: 'officecli-mac-arm64',
-    size: 33_539_136,
-    sha256: 'b8582853cc464fa0bdb2fabc2803821472c9449c38b365a7be79fcb53d6356e7',
+    size: 33_740_304,
+    sha256: '2f158d46f9b6c5eb0dfe4eb02038114001e17acc47b67347417c56dcf9659096',
   },
   'darwin-x64': {
     fileName: 'officecli-mac-x64',
-    size: 34_477_296,
-    sha256: 'f0073b16a5181837d0b0df3e264a338066b02f4ac16f4758538873fbc32bf9b2',
+    size: 34_680_704,
+    sha256: '693d243db616c74705fec9d92fdfc8a3db36acfcea378edb7264c2a30d339d9c',
   },
 }
 
@@ -255,4 +255,15 @@ export function getOfficeCliRuntimeManager(): OfficeCliRuntimeManager {
     defaultManager = new OfficeCliRuntimeManager({ runtimeRoot: getOfficeCliRuntimeRoot() })
   }
   return defaultManager
+}
+
+export async function filterOfficeSkillByRuntimeReadiness(
+  skillIds: string[],
+  statusReader: Pick<OfficeCliRuntimeManager, 'getStatus'> = getOfficeCliRuntimeManager(),
+): Promise<string[]> {
+  if (!skillIds.includes('office-documents')) return skillIds
+  const status = await statusReader.getStatus()
+  return status.state === 'ready'
+    ? skillIds
+    : skillIds.filter(skillId => skillId !== 'office-documents')
 }

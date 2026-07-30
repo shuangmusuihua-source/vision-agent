@@ -39,9 +39,12 @@ SITE_LOCALE_PAGES = (
 
 # Every surface that must carry the full public fact set. Derived from the
 # locale-page tuple so adding a locale automatically joins both checks.
+# index.md is the Markdown twin agents read instead of the homepage, so it
+# carries the same install and product facts.
 FULL_PUBLIC_FACT_FILES = (
     "README.md",
     "llms.txt",
+    "index.md",
     SITE_BASE_PAGE,
     *SITE_LOCALE_PAGES,
 )

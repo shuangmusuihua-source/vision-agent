@@ -41,7 +41,7 @@ labels render and embed correctly. Keep these hex values in sync with `tokens.js
 ## Most cases: edit a ready template
 
 Kami ships `sequence`, `class`, and `er` as static Kami-styled diagrams (joining the
-14 hand-drawn ones). The common case needs **no tooling at all**: copy the nearest
+15 hand-drawn ones). The common case needs **no tooling at all**: copy the nearest
 `assets/diagrams/*.html`, edit the text labels, embed the `<svg>` into your document.
 beautiful-mermaid is the *source* of these diagrams; you do not need it to use them.
 
@@ -58,7 +58,7 @@ To make a new diagram from Mermaid text:
 python3 scripts/mermaid_normalize.py raw.svg -o clean.svg
 # 3. Paste <svg>...</svg> into a diagram shell (copy assets/diagrams/sequence.html),
 #    register it in DIAGRAM_TARGETS (scripts/build.py), then verify:
-python3 scripts/build.py diagram-<name>     # renders to <working-directory>/kami-output/*.pdf
+python3 scripts/build.py diagram-<name>     # renders to kami-output/*.pdf
 ```
 
 The `.mmd` files in `assets/diagrams/src/` record the Mermaid source of the shipped

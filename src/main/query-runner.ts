@@ -53,6 +53,7 @@ import {
   type SessionOutputSnapshot,
 } from './session-output-metadata'
 import { getGlobalMemoryDirectory } from './memory-policy'
+import { filterOfficeSkillByRuntimeReadiness } from './officecli-runtime'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ function buildOptions(
   authorizedAttachmentPaths: string[] = [],
   explicitExternalPaths: string[] = [],
   approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
+  enabledSkills: string[] = getEnabledSkills(),
 ) {
   const dirs = getAuthorizedDirectories()
   const workspacePath = workspacePathOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
@@ -196,7 +198,7 @@ function buildOptions(
       allowManagedPermissionRulesOnly: true,
     },
     workspaceCwd: workingDirectory,
-    skills: getEnabledSkills(),
+    skills: enabledSkills,
     systemPromptAppend,
     hooks: buildHooks(mainWindow, {
       envelope: sessionEnvelope,
@@ -459,6 +461,11 @@ export async function sendMessage(
       outputSnapshot = await captureSessionOutputSnapshot(effectiveWorkingDirectory)
     }
 
+    const enabledSkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
+    if (skillId === 'office-documents' && !enabledSkills.includes(skillId)) {
+      throw new Error('Office 文档运行组件需要安装或更新，请在 Skills 中重新启用“Office 文档”。')
+    }
+
     const getSdkSessionId = () => currentSdkSessionId
     const options = buildOptions(
       mainWindow,
@@ -472,6 +479,7 @@ export async function sendMessage(
       attachmentPaths,
       explicitExternalPaths,
       approvalMode,
+      enabledSkills,
     )
     const abortController = new AbortController()
     const messageStream = query({

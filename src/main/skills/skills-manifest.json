@@ -2,11 +2,11 @@
   {
     "id": "kami",
     "hasResources": true,
-    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "scripts/shared.py", "scripts/verify.py", "references/diagrams.md", "assets/diagrams/architecture-board.html", "assets/templates"],
-    "version": "1.9.4",
+    "requiredPaths": ["SKILL.md", "VERSION", "LICENSE", "scripts/build.py", "scripts/content.py", "scripts/render.py", "scripts/shared.py", "scripts/verify.py", "scripts/visual.py", "references/diagrams.md", "references/schemas", "assets/diagrams/architecture-board.html", "assets/templates"],
+    "version": "1.11.0",
     "source": {
       "repositoryUrl": "https://github.com/tw93/kami",
-      "ref": "1a2d2e4a8cbaa700437064e6004ab66e719b0825",
+      "ref": "cd519f0b8ff75220f03baf78b5ea923b42db2019",
       "license": "MIT"
     }
   },
@@ -24,10 +24,10 @@
     "id": "office-documents",
     "hasResources": true,
     "requiredPaths": ["SKILL.md", "agents/openai.yaml"],
-    "version": "1.0.136",
+    "version": "1.0.143",
     "source": {
       "repositoryUrl": "https://github.com/iOfficeAI/OfficeCLI",
-      "ref": "4ba79f0b984e141f57f58d4398ba2df29e8187e8",
+      "ref": "fd4adab4dbe3283b62e3edcfad124dd648fa74bc",
       "license": "Apache-2.0"
     }
   },

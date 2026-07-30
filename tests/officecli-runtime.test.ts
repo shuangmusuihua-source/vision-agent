@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  filterOfficeSkillByRuntimeReadiness,
   OfficeCliRuntimeManager,
   getOfficeCliExecutablePath,
   type OfficeCliReleaseAsset,
@@ -31,6 +32,27 @@ afterEach(async () => {
 })
 
 describe('OfficeCLI managed runtime', () => {
+  it('exposes the Office Skill only while its pinned runtime is ready', async () => {
+    const skillIds = ['kami', 'office-documents']
+
+    await expect(filterOfficeSkillByRuntimeReadiness(skillIds, {
+      getStatus: async () => ({
+        state: 'not-installed',
+        version: OFFICECLI_VERSION,
+        downloadSizeBytes: 1,
+        reason: 'missing',
+      }),
+    })).resolves.toEqual(['kami'])
+
+    await expect(filterOfficeSkillByRuntimeReadiness(skillIds, {
+      getStatus: async () => ({
+        state: 'ready',
+        version: OFFICECLI_VERSION,
+        executablePath: '/runtime/officecli',
+      }),
+    })).resolves.toEqual(skillIds)
+  })
+
   it('reports unsupported platforms without attempting a download', async () => {
     const runtimeRoot = await temporaryRuntimeRoot()
     const manager = new OfficeCliRuntimeManager({

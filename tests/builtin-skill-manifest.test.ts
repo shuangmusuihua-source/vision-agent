@@ -35,7 +35,7 @@ describe('built-in skill manifest', () => {
     const kami = BUILTIN_SKILLS.find(item => item.id === 'kami')
     const version = (await readFile(join(skillsRoot, 'kami', 'VERSION'), 'utf8')).trim()
 
-    expect(kami?.version).toBe('1.9.4')
+    expect(kami?.version).toBe('1.11.0')
     expect(version).toBe(kami?.version)
   })
 
@@ -55,6 +55,7 @@ describe('built-in skill manifest', () => {
       'assets/showcase',
       '.github',
       'scripts/build_metadata.py',
+      'scripts/check-update.sh',
       'scripts/draft-release-notes.py',
       'scripts/package-skill.sh',
       'scripts/tests',

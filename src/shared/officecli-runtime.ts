@@ -1,4 +1,4 @@
-export const OFFICECLI_VERSION = '1.0.136'
+export const OFFICECLI_VERSION = '1.0.143'
 
 export type OfficeCliRuntimeStatus =
   | {
