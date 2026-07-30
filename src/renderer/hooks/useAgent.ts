@@ -39,7 +39,7 @@ export function useIPCSubscriptions() {
     const store = useAgentStore
 
     const unsubEvent = window.api.agent.onEvent((msg) => {
-      store.getState().processIPCMessage(msg, undefined)
+      store.getState().processIPCMessage(msg)
       // Refresh watchdog for the concrete session that received this event.
       refreshWatchdogAfterState(msg.context, msg.sessionId)
     })

@@ -250,10 +250,11 @@ describe('session-scoped store routing', () => {
       agentState: 'running' as const,
       messages: [textMessage('bg-existing', 'background existing')],
     }
-    const assistantMsg: AgentIPCMessage & { context: 'editor'; sessionId: string } = {
+    const assistantMsg: AgentIPCMessageWithContext = {
       type: 'assistant',
       context: 'editor',
       sessionId: 'background-session',
+      workspacePath: '/workspace/background',
       uuid: 'bg-new',
       message: { content: [{ type: 'text', text: 'background new' }] },
     }
@@ -450,31 +451,6 @@ describe('session-scoped store routing', () => {
     expect(sessionA.agentState).toBe('idle')
   })
 
-  it('does not drive the live FSM when replaying historical SDK messages', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const assistantMsg: AgentIPCMessage & { context: 'editor'; sessionId: string } = {
-      type: 'assistant',
-      context: 'editor',
-      sessionId: 'replay-session',
-      uuid: 'assistant-1',
-      message: { content: [{ type: 'text', text: 'historical answer' }] },
-    }
-    const resultMsg: AgentIPCMessage & { context: 'editor'; sessionId: string } = {
-      type: 'result',
-      subtype: 'success',
-      context: 'editor',
-      sessionId: 'replay-session',
-      session_id: 'replay-session',
-    }
-
-    useAgentStore.getState().processIPCMessage(assistantMsg, { isReplay: true })
-    useAgentStore.getState().processIPCMessage(resultMsg, { isReplay: true })
-
-    expect(useAgentStore.getState().slots.editor.agentState).toBe('idle')
-    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('[AgentFSM] Invalid transition'))
-    warnSpy.mockRestore()
-  })
-
   it('applies message projection and result FSM cleanup atomically', () => {
     useAgentStore.setState({
       slots: {
@@ -492,6 +468,7 @@ describe('session-scoped store routing', () => {
       type: 'assistant',
       context: 'editor',
       sessionId: 'atomic-session',
+      workspacePath: '/workspace/atomic',
       uuid: 'atomic-answer',
       message: { content: [{ type: 'text', text: 'done' }] },
     })
@@ -500,6 +477,7 @@ describe('session-scoped store routing', () => {
       subtype: 'success',
       context: 'editor',
       sessionId: 'atomic-session',
+      workspacePath: '/workspace/atomic',
       session_id: 'sdk-atomic',
     })
 
@@ -538,17 +516,19 @@ describe('session-scoped store routing', () => {
 
     useAgentStore.getState().switchToSession('editor-b', 'editor')
 
-    const askMsg: AgentIPCMessage & { context: 'ask'; sessionId: string } = {
+    const askMsg: AgentIPCMessageWithContext = {
       type: 'assistant',
       context: 'ask',
       sessionId: 'ask-session',
+      workspacePath: '/app/ask',
       uuid: 'ask-new-msg',
       message: { content: [{ type: 'text', text: 'ask still running' }] },
     }
-    const editorBMsg: AgentIPCMessage & { context: 'editor'; sessionId: string } = {
+    const editorBMsg: AgentIPCMessageWithContext = {
       type: 'assistant',
       context: 'editor',
       sessionId: 'editor-b',
+      workspacePath: '/workspace/b',
       uuid: 'editor-b-new-msg',
       message: { content: [{ type: 'text', text: 'editor B answer' }] },
     }
@@ -796,10 +776,11 @@ describe('session-scoped store routing', () => {
     const tempId = 'new-ask-1'
     const editor = { ...emptySlot(), currentSessionId: 'editor-session', messages: [textMessage('editor-msg', 'editor')] }
     const ask = { ...emptySlot(), currentSessionId: tempId }
-    const assistantMsg: AgentIPCMessage & { context: 'ask'; sessionId: string } = {
+    const assistantMsg: AgentIPCMessageWithContext = {
       type: 'assistant',
       context: 'ask',
       sessionId: tempId,
+      workspacePath: '/app/ask',
       uuid: 'assistant-temp',
       message: { content: [{ type: 'text', text: 'temp answer' }] },
     }
@@ -988,6 +969,7 @@ describe('session-scoped store routing', () => {
       context: 'editor',
       sessionId: appSessionId,
       sdkSessionId: sdkId,
+      workspacePath: '/workspace/a',
       uuid: 'assistant-a',
       message: { content: [{ type: 'text', text: 'answer A' }] },
     })

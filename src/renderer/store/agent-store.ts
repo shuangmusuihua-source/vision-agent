@@ -1,7 +1,6 @@
 import type {
   AgentApprovalMode,
   AgentContext,
-  AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentSessionEnvelope,
   AgentState,
@@ -137,7 +136,7 @@ export type AgentStore = {
 
   // Actions
   dispatchAgentEvent: (event: AgentEvent, context?: AgentContext, eventSid?: string | null) => void
-  processIPCMessage: (msg: AgentIPCMessageWithContext | AgentIPCMessage, options?: { isReplay?: boolean }) => void
+  processIPCMessage: (msg: AgentIPCMessageWithContext) => void
   handlePermissionRequest: (req: SessionRoutedPermissionRequest) => void
   handlePermissionResponse: (requestId: string, behavior: 'allow' | 'deny') => void
   handleAskUserRequest: (req: SessionRoutedAskUserRequest) => void

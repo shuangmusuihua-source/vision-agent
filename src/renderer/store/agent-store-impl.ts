@@ -4,7 +4,6 @@ import { emptySlot } from './agent-store'
 import { sessionListReducer, type SessionListAction } from './session-protocol'
 import type {
   AgentContext,
-  AgentIPCMessage,
   AgentIPCMessageWithContext,
   AgentSessionEnvelope,
   AgentEvent,
@@ -31,7 +30,6 @@ import {
   patchSessionSlot,
   removeSessionSlotPatch,
   resolveAskUserInteraction,
-  resolveAppSessionId,
   resolvePermissionInteraction,
   resolveSessionSlot,
 } from './session-slot-state'
@@ -109,24 +107,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     // ─── Core Reducer ───────────────────────────────────────────────────
 
-    processIPCMessage(msg: AgentIPCMessageWithContext | AgentIPCMessage, options?: { isReplay?: boolean }) {
-      const isReplay = options?.isReplay ?? false
-      const routed = msg as AgentIPCMessage & Partial<AgentSessionEnvelope> & { session_id?: string }
-      const ctx = routed.context || get().context
-      const rawEventSessionId = routed.sessionId
-        || routed.session_id
-        || undefined
-      const eventSessionId = resolveAppSessionId(get(), rawEventSessionId) || undefined
-
-      // Replay restores message content, but must not drive the live FSM.
-      if (isReplay) {
-        const sourceSlot = resolveSessionSlot(get(), ctx, eventSessionId)
-        const { patch } = reduceAgentMessage(sourceSlot, msg, 'replay')
-        if (patch && Object.keys(patch).length > 0) {
-          set((state) => patchSessionSlot(state, ctx, patch, eventSessionId))
-        }
-        return
-      }
+    processIPCMessage(msg: AgentIPCMessageWithContext) {
+      const ctx = msg.context
+      const eventSessionId = msg.sessionId
 
       // Live dispatch reads the routed slot inside set() for freshness. Message
       // projection and its FSM effects are applied to the same slot atomically.
