@@ -1,15 +1,18 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { ChevronsUp, X, Plus, Pin, ArrowLeft, FolderClosed, FolderOpen, Loader2, Trash2, ShieldAlert, MessageCircleQuestion } from 'lucide-react'
 import { Flipper, Flipped } from 'react-flip-toolkit'
+import { useShallow } from 'zustand/react/shallow'
 import { useAgentStore } from '../../store/agent-store-impl'
 import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
-import type { ContextSlot } from '../../store/agent-store'
-import { isAgentQueryActive } from '../../store/agent-state-machine'
 import type { PrimaryView } from '../../store/ui-slice'
 import SidebarToolDock from './SidebarToolDock'
 import { AskSumiIcon, AutomationIcon, KnowledgeIcon, SkillsIcon } from './SidebarPrimaryIcons'
+import {
+  buildSidebarSessionIndicators,
+  getSidebarSessionAttention,
+} from './sidebar-session-state'
 
 interface SidebarProps {
   collapsed: boolean
@@ -101,25 +104,6 @@ function formatSessionTime(ts?: number): string {
   return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-function getSessionAttention(slot?: ContextSlot | null): {
-  type: 'permission' | 'askUser'
-  count: number
-  label: string
-} | null {
-  if (!slot) return null
-  const permissionCount = (slot.permissionRequest ? 1 : 0) + slot.permissionQueue.length
-  if (permissionCount > 0) {
-    return { type: 'permission', count: permissionCount, label: '等待权限确认' }
-  }
-
-  const askUserCount = (slot.askUserRequest ? 1 : 0) + slot.askUserQueue.length
-  if (askUserCount > 0) {
-    return { type: 'askUser', count: askUserCount, label: '等待你回答' }
-  }
-
-  return null
-}
-
 function Sidebar({
   collapsed,
   navigation,
@@ -166,9 +150,13 @@ function Sidebar({
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const imeCompositionRef = useRef({ active: false, endedAt: 0 })
   const userWorkspacePaths = filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)
-  // Subscribe reactively to sessionSlots so non-active session state (running indicator, title)
-  // triggers re-renders when slots are saved/restored on session switch.
-  const sessionSlots = useAgentStore((s) => s.sessionSlots)
+  const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions])
+  // Streaming mutates full cached slots frequently. Subscribe only to primitive
+  // values that the Sidebar actually renders so unchanged background text/tool
+  // batches do not re-render the workspace and session tree.
+  const sessionIndicators = useAgentStore(useShallow((state) => (
+    buildSidebarSessionIndicators(sessionIds, state.sessionSlots)
+  )))
 
   const handleCompositionStart = useCallback(() => {
     imeCompositionRef.current.active = true
@@ -359,14 +347,14 @@ function Sidebar({
                         ) : (
                           wsSessions.map((session) => {
                             // Running: prefer activeSessionRunning for the active session (reactive via prop),
-                            // fall back to sessionSlots for non-active sessions (saved on switch-away)
+                            // fall back to the narrow cached projection for non-active sessions.
                             const isActive = activeSessionId === session.id
-                            const slot = isActive ? null : sessionSlots[session.id]
-                            const attention = getSessionAttention(slot)
+                            const indicator = isActive ? '' : sessionIndicators[session.id]
+                            const attention = getSidebarSessionAttention(indicator)
                             const isRenaming = renamingId === session.id
                             const isRunning = isActive
                               ? activeSessionRunning
-                              : Boolean(slot && isAgentQueryActive(slot.agentState))
+                              : indicator === 'running'
                             return (
                               <div
                                 key={session.id}
