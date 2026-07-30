@@ -237,14 +237,6 @@ export function patchActiveContextSlot(
   }
 }
 
-export function ensureSessionSlotPatch(
-  state: AgentStore,
-  sessionId: string,
-): Pick<AgentStore, 'sessionSlots' | 'sessionAccessOrder'> {
-  const slot = state.sessionSlots[sessionId] || { ...emptySlot(), currentSessionId: sessionId }
-  return cacheSessionSlot(state, sessionId, slot)
-}
-
 export function removeSessionSlotPatch(
   state: AgentStore,
   sessionId: string,

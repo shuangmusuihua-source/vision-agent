@@ -62,8 +62,6 @@ export interface AgentOptionsProfile {
   extraEnv?: Record<string, string | undefined>
   /** Prepend homebrew + /usr/local/bin paths to PATH. Default true. */
   prependUserBinPaths?: boolean
-  /** When true, do not fall back to external provider routing; app settings remain authoritative. */
-  restrictiveBaseUrl?: boolean
   /** Session ID to resume. SDK loads conversation history from this session. */
   resume?: string
   /** Reasoning effort level. Lower = faster/cheaper, higher = deeper analysis. */

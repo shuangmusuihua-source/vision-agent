@@ -1,7 +1,6 @@
 import type { SkillDefinition } from '../../shared/ipc-types'
 
 export interface BuiltinSkillDefinition extends SkillDefinition {
-  systemPromptAppend?: string
   defaultEnabled?: boolean
 }
 

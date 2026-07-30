@@ -80,9 +80,7 @@ function withRuntimeState(task: CronTask): CronTask {
 }
 
 function scheduleTask(task: CronTask): ScheduledTask {
-  const job = cron.schedule(task.cronExpression, () => executeTask(task), {
-    scheduled: task.status !== 'paused'
-  } as any)
+  const job = cron.schedule(task.cronExpression, () => executeTask(task))
   if (task.status === 'paused') job.stop()
   return job
 }
@@ -185,7 +183,6 @@ function notifyInApp(task: CronTask, title: string, message: string, type: 'succ
     type,
     title,
     message,
-    workspaceCwd: task.target?.workspacePath || task.target?.directoryPath || undefined,
     target: {
       view: 'automation',
       taskId: task.id,
@@ -292,7 +289,6 @@ export async function executeTask(task: CronTask): Promise<void> {
       // Keep this empty so every automation tool call reaches our whitelist
       // and session-scoped path authorization below.
       allowedTools: [],
-      restrictiveBaseUrl: true,
       settingSources: [],
       skills: [],
       prependUserBinPaths: false,

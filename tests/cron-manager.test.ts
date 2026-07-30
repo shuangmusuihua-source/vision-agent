@@ -107,7 +107,7 @@ describe('cron manager automation tasks', () => {
     expect(task.target?.type).toBe('workspace')
     expect(savedTasks()).toHaveLength(1)
     expect(savedTasks()[0].target?.workspacePath).toBe('/tmp/workspace')
-    expect(schedule).toHaveBeenCalledWith('0 9 * * 1', expect.any(Function), { scheduled: true })
+    expect(schedule).toHaveBeenCalledWith('0 9 * * 1', expect.any(Function))
   })
 
   it('executes with target cwd, network tools, and run history', async () => {

@@ -6,10 +6,8 @@ import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
 
 interface IndexedFile {
   filePath: string
-  content: string
   lines: string[]
   normalizedLines: string[]
-  wikilinks: string[]
   mtimeMs: number
 }
 
@@ -40,7 +38,6 @@ export class FileIndexService {
   private workspaceDirs: string[] = []
   private knowledgeBaseDir: string | null = null
   private ready = false
-  private readyCallbacks: Array<() => void> = []
   private knowledgeReady = false
   private knowledgeReadyCallbacks: Array<() => void> = []
   private changedFiles = new Map<string, number>()
@@ -73,8 +70,6 @@ export class FileIndexService {
     this.startWatching()
 
     this.ready = true
-    this.readyCallbacks.forEach((cb) => cb())
-    this.readyCallbacks = []
   }
 
   /** Wait until index is ready */
@@ -140,14 +135,11 @@ export class FileIndexService {
 
       const content = await fs.promises.readFile(filePath, 'utf-8')
       const lines = content.split('\n')
-      const wikilinks = this.extractWikilinks(content)
 
       this.index.set(filePath, {
         filePath,
-        content,
         lines,
         normalizedLines: lines.map((line) => line.toLowerCase()),
-        wikilinks,
         mtimeMs: stat.mtimeMs
       })
     } catch (err: unknown) {
@@ -437,11 +429,6 @@ export class FileIndexService {
       .map((filePath) => ({ label: path.basename(filePath, '.md'), path: filePath }))
   }
 
-  /** Get content of a specific file from index */
-  getFileContent(filePath: string): string | undefined {
-    return this.index.get(filePath)?.content
-  }
-
   /** Clean up */
   async destroyWorkspaceIndex(): Promise<void> {
     if (this.watcher) {
@@ -450,9 +437,7 @@ export class FileIndexService {
     }
     this.index.clear()
     this.workspaceDirs = []
-    this.readyCallbacks.forEach((cb) => cb())
     this.ready = false
-    this.readyCallbacks = []
   }
 
   async destroyKnowledgeIndex(): Promise<void> {

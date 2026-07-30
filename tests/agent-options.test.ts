@@ -19,14 +19,13 @@ async function loadAgentOptions() {
 }
 
 describe('agent options', () => {
-  it('always routes through the app profile baseUrl, including restrictive background runs', async () => {
+  it('always routes through the app profile baseUrl for background runs', async () => {
     const { buildAgentOptions } = await loadAgentOptions()
 
     const options = buildAgentOptions({
       memoryMode: 'disabled',
       permissionMode: 'acceptEdits',
       allowedTools: [],
-      restrictiveBaseUrl: true,
       settingSources: [],
     })
 
