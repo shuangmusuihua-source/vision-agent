@@ -173,4 +173,34 @@ describe('FileIndexService workspace search', () => {
       await index.destroy()
     }
   })
+
+  it('updates workspace order without rebuilding the index or watcher', async () => {
+    const firstWorkspace = await createWorkspace('first.md', 'first workspace')
+    const secondWorkspace = await createWorkspace('second.md', 'second workspace')
+    const index = new FileIndexService()
+
+    try {
+      await index.init([firstWorkspace, secondWorkspace])
+      const before = index as unknown as {
+        watcher: unknown
+        workspaceDirs: string[]
+      }
+      const watcher = before.watcher
+
+      await index.init([secondWorkspace, firstWorkspace])
+
+      const after = index as unknown as {
+        watcher: unknown
+        workspaceDirs: string[]
+      }
+      expect(after.watcher).toBe(watcher)
+      expect(after.workspaceDirs).toEqual([secondWorkspace, firstWorkspace])
+      expect(index.listFiles().sort()).toEqual([
+        join(firstWorkspace, 'first.md'),
+        join(secondWorkspace, 'second.md'),
+      ].sort())
+    } finally {
+      await index.destroy()
+    }
+  })
 })

@@ -55,9 +55,15 @@ export class FileIndexService {
 
   private async performWorkspaceInit(workspaceDirs: string[]): Promise<void> {
     const nextWorkspaceDirs = [...new Set(workspaceDirs.filter(Boolean).map((dir) => path.resolve(dir)))]
-    const unchanged = nextWorkspaceDirs.length === this.workspaceDirs.length
-      && nextWorkspaceDirs.every((dir, index) => dir === this.workspaceDirs[index])
-    if (unchanged && this.ready) return
+    const existingWorkspaceDirs = new Set(this.workspaceDirs)
+    const hasSameWorkspaceRoots = nextWorkspaceDirs.length === existingWorkspaceDirs.size
+      && nextWorkspaceDirs.every((dir) => existingWorkspaceDirs.has(dir))
+    if (hasSameWorkspaceRoots && this.ready) {
+      // Sidebar order is presentation metadata. Existing index entries and the
+      // watcher remain valid when the configured root set itself is unchanged.
+      this.workspaceDirs = nextWorkspaceDirs
+      return
+    }
 
     await this.destroyWorkspaceIndex()
     this.workspaceDirs = nextWorkspaceDirs
