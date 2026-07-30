@@ -26,7 +26,6 @@ export async function initAppSkills(): Promise<InstallBuiltinSkillsResult> {
     sourceRoot: getBuiltInSkillsRoot(),
     targetRoot: appSkillsDir,
     skills: BUILTIN_SKILLS.filter(skill => skill.hasResources),
-    force: !app.isPackaged,
   })
 }
 

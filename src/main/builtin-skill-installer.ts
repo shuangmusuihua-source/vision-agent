@@ -27,7 +27,6 @@ export interface InstallBuiltinSkillsOptions {
   sourceRoot: string
   targetRoot: string
   skills: BuiltinSkillSource[]
-  force?: boolean
 }
 
 export interface InstallBuiltinSkillsResult {
@@ -183,8 +182,7 @@ export async function installBuiltinSkills(options: InstallBuiltinSkillsOptions)
     const sourceHash = hashFiles(sourceFiles)
     const targetDir = join(options.targetRoot, skill.id)
     const previousSkill = previousState?.skills[skill.id]
-    const canReuse = !options.force
-      && previousSkill?.contentHash === sourceHash
+    const canReuse = previousSkill?.contentHash === sourceHash
       && await isInstalledSkillValid(targetDir, previousSkill)
 
     if (canReuse) {
