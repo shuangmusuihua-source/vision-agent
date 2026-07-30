@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MessageSquare, X } from 'lucide-react'
+import { MessagesSquare, X } from 'lucide-react'
 import type { PermissionRequestIPC as PermissionRequest, AskUserRequestIPC as AskUserRequest, SdkSessionInfo } from '../../../shared/types'
 import type { AgentContext } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
@@ -78,7 +78,7 @@ function AgentPanel({ context = 'editor', width, workspacePath, permissionReques
       <div className="agent-panel-inner">
         <div className="agent-panel-header">
           <div className="agent-header-context" title={sessionContextTitle} aria-label={`当前会话：${sessionContextTitle}`}>
-            <MessageSquare size={14} aria-hidden="true" />
+            <MessagesSquare size={14} aria-hidden="true" />
             <span>{currentSessionTitle}</span>
           </div>
         </div>

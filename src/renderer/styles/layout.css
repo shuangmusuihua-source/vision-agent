@@ -1592,6 +1592,7 @@
 }
 
 .sidebar-ask-zuovis {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1668,13 +1669,12 @@
 }
 
 .sidebar-ask-zuovis-back-wrap {
-  margin-left: auto;
-}
-
-.sidebar-ask-zuovis-back-wrap {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  right: 12px;
   display: flex;
   align-items: center;
+  transform: translateY(-50%);
 }
 
 .sidebar-ask-zuovis-back {

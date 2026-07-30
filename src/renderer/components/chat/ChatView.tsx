@@ -3,6 +3,7 @@ import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
 import { useAgent, useMessages, useIsQueryActive, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useGenerationActivity } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
 import GenerationActivityCard from './GenerationActivityCard'
+import ThinkingTypewriter from './ThinkingTypewriter'
 import { buildMessageRenderIndex } from './message-render-index'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
@@ -207,16 +208,16 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
         // Once text appears in the bubble, the indicator is no longer needed.
         const lastMsg = messages[messages.length - 1]
         const hasVisibleText = lastMsg?.kind === 'text' && (lastMsg.textContent?.length ?? 0) > 0
-        if (agentState === 'thinking' || ((agentState === 'running' || agentState === 'compacting') && !hasVisibleText)) {
+        if (!generationActivity && (agentState === 'thinking' || ((agentState === 'running' || agentState === 'compacting') && !hasVisibleText))) {
           // Show ttft_ms when available (after first message_start from SDK)
           const latencyHint = ttftMs != null ? ` · 首字节 ${ttftMs < 1000 ? `${Math.round(ttftMs)}ms` : `${(ttftMs / 1000).toFixed(1)}s`}` : ''
           return (
             <div className="message-bubble message-assistant message-thinking-indicator">
-              <div className="message-status-indicator">
-                {agentState === 'thinking' ? '思考中' : '整理思路中'}{latencyHint}
-                <span className="status-dot" />
-                <span className="status-dot" />
-                <span className="status-dot" />
+              <div className="message-status-indicator message-thinking-status" role="status">
+                <ThinkingTypewriter />
+                <span className="message-thinking-copy">
+                  {agentState === 'thinking' ? '思考中' : '整理思路中'}{latencyHint}
+                </span>
               </div>
             </div>
           )
