@@ -17,7 +17,6 @@ import { setGenerationWindow, handleWindowDestroy, abortActiveQuery } from './qu
 import { inlineRewriteRunner } from './inline-rewrite-runner'
 import { stopAllCronJobs } from './cron-manager'
 import { setMainWindow, getMainWindow } from './ipc-sender'
-import { flushAuditLog } from './agent-audit'
 import { APP_NAME } from '../shared/branding'
 import { isAllowedExternalUrl, isAllowedRendererNavigation } from './navigation-policy'
 import { sanitizeTelemetryEvent } from '../shared/telemetry-sanitizer'
@@ -192,10 +191,9 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', async () => {
+app.on('before-quit', () => {
   abortActiveQuery()
   inlineRewriteRunner.cancelAll()
   handleWindowDestroy()
   stopAllCronJobs()
-  await flushAuditLog()
 })

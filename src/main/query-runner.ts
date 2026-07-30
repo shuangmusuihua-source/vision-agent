@@ -24,11 +24,9 @@ import { getEnabledSkills } from './persistence/settings-store'
 import { notifyAgentComplete } from './notification-manager'
 import { buildAgentOptions } from './agent-options'
 import { buildSumiContextPrompt, buildSumiIdentityPrompt } from './agent-identity'
-import { writeAuditLog } from './agent-audit'
 import type {
   PreToolUseHookInput,
   PostToolUseHookInput,
-  PostToolUseFailureHookInput,
   NotificationHookInput,
 } from '@anthropic-ai/claude-agent-sdk'
 import { sessionRuntime } from './session-runtime'
@@ -68,13 +66,8 @@ type HookSessionContext = {
 }
 
 function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext): Partial<Record<string, HookCallbackMatcher[]>> {
-  const auditPreToolUse: HookCallback = async (input, _toolUseID, _options) => {
+  const preToolUse: HookCallback = async (input, _toolUseID, _options) => {
     const { tool_name, tool_input } = input as PreToolUseHookInput
-    writeAuditLog({
-      event: 'PreToolUse',
-      tool: tool_name,
-      input: JSON.stringify(tool_input).substring(0, 500)
-    })
     const fileAccess = hookContext.decideFileAccess?.(
       tool_name,
       (tool_input || {}) as Record<string, unknown>,
@@ -91,13 +84,8 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
     return {}
   }
 
-  const auditPostToolUse: HookCallback = async (input, toolUseID, _options) => {
-    const { tool_name, tool_response } = input as PostToolUseHookInput
-    writeAuditLog({
-      event: 'PostToolUse',
-      tool: tool_name,
-      result: JSON.stringify(tool_response).substring(0, 500)
-    })
+  const postToolUse: HookCallback = async (input, toolUseID, _options) => {
+    const { tool_name } = input as PostToolUseHookInput
     if (toolUseID) {
       sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'completed')
     }
@@ -114,13 +102,7 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
     return {}
   }
 
-  const auditPostToolUseFailure: HookCallback = async (input, toolUseID, _options) => {
-    const { tool_name, error } = input as PostToolUseFailureHookInput
-    writeAuditLog({
-      event: 'PostToolUseFailure',
-      tool: tool_name,
-      result: error.substring(0, 500),
-    })
+  const postToolUseFailure: HookCallback = async (_input, toolUseID, _options) => {
     if (toolUseID) {
       sessionRuntime.finishGenerationTool(hookContext.envelope.sessionId, toolUseID, 'failed')
     }
@@ -141,9 +123,9 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
   }
 
   return {
-    PreToolUse: [{ hooks: [auditPreToolUse] }],
-    PostToolUse: [{ hooks: [auditPostToolUse] }],
-    PostToolUseFailure: [{ hooks: [auditPostToolUseFailure] }],
+    PreToolUse: [{ hooks: [preToolUse] }],
+    PostToolUse: [{ hooks: [postToolUse] }],
+    PostToolUseFailure: [{ hooks: [postToolUseFailure] }],
     Notification: [{ hooks: [notificationHook] }]
   }
 }
