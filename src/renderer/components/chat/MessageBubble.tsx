@@ -2,7 +2,6 @@ import { lazy, Suspense, useState, useCallback, useEffect, useRef, memo } from '
 import { FileText, FileCode, ExternalLink, MessageSquareText, Download, CircleStop, Image as ImageIcon, Check, ChevronDown, CircleAlert } from 'lucide-react'
 import type { ConversationMessage, TextMessage, ArtifactData, UserMessage } from '../../../shared/types'
 import { useAgentStore } from '../../store/agent-store-impl'
-import { isAgentQueryActive } from '../../store/agent-state-machine'
 import ToolCallDisplay from './ToolCallDisplay'
 import {
   fileExtension,
@@ -21,6 +20,7 @@ interface MessageBubbleProps {
   onSelectText?: (text: string, context?: string) => void
   workspacePath?: string
   context: 'editor' | 'ask'
+  isLatestStreamingUserMessage?: boolean
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────
@@ -179,23 +179,18 @@ function attachmentStatusSubtitle(mode: AttachmentReadMode): string {
   return '提取文本成功'
 }
 
-function UserBubble({ text, messageId, attachmentConversions, onSelectText, context }: {
+function UserBubble({ text, attachmentConversions, onSelectText, context, isLatestStreamingUserMessage }: {
   text: string
-  messageId: string
   attachmentConversions?: UserMessage['attachmentConversions']
   onSelectText?: (text: string, context?: string) => void
   context: 'editor' | 'ask'
+  isLatestStreamingUserMessage: boolean
 }) {
   const [selectionBtn, setSelectionBtn] = useState<{ text: string; x: number; y: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
   const visibleText = getSkillInvocationDisplayText(text) || stripInternalAttachmentContext(text)
   const { attachments, body } = parseAttachments(visibleText)
-  const isLatestStreamingUserMessage = useAgentStore((s) => {
-    const slot = s.slots[context]
-    const latestUser = [...slot.messages].reverse().find((msg) => msg.kind === 'user')
-    return isAgentQueryActive(slot.agentState) && latestUser?.id === messageId
-  })
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()
@@ -398,7 +393,14 @@ function AssistantBubble({ message, onSelectText, context }: {
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelectText, workspacePath, context }: MessageBubbleProps): React.ReactElement {
+const MessageBubble = memo(function MessageBubble({
+  message,
+  onOpenFile,
+  onSelectText,
+  workspacePath,
+  context,
+  isLatestStreamingUserMessage = false,
+}: MessageBubbleProps): React.ReactElement {
   switch (message.kind) {
     case 'stopped':
       return (
@@ -436,10 +438,10 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
       return (
         <UserBubble
           text={message.textContent}
-          messageId={message.id}
           attachmentConversions={message.attachmentConversions}
           onSelectText={onSelectText}
           context={context}
+          isLatestStreamingUserMessage={isLatestStreamingUserMessage}
         />
       )
 
@@ -459,6 +461,10 @@ const MessageBubble = memo(function MessageBubble({ message, onOpenFile, onSelec
       && a.phase === b.phase
       && a.toolCalls === b.toolCalls
       && a.skillMeta === b.skillMeta
+  }
+  if (a.kind === 'user' && b.kind === 'user') {
+    return a === b
+      && prev.isLatestStreamingUserMessage === next.isLatestStreamingUserMessage
   }
   // For other types, use shallow reference comparison of key fields
   return a === b

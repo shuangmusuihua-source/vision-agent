@@ -3,6 +3,7 @@ import { MessageCircleMore, ChevronUp, Loader2 } from 'lucide-react'
 import { useAgent, useMessages, useIsQueryActive, useIsResumingSession, useAgentStatus, useTtftMs, useCurrentSessionId, useGenerationActivity } from '../../hooks/useAgent'
 import { useAgentStore } from '../../store/agent-store-impl'
 import GenerationActivityCard from './GenerationActivityCard'
+import { buildMessageRenderIndex } from './message-render-index'
 import styles from './ChatView.module.css'
 import type { AgentContext } from '../../../shared/types'
 
@@ -44,6 +45,10 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
     const start = Math.max(0, messages.length - visibleCount)
     return { items: messages.slice(start), start }
   }, [messages, visibleCount])
+  const messageRenderIndex = useMemo(
+    () => buildMessageRenderIndex(messages, isQueryActive),
+    [messages, isQueryActive],
+  )
 
   const hasMore = messages.length > visibleCount
   const generationContentLength = generationActivity?.content.length ?? 0
@@ -182,6 +187,9 @@ function ChatView({ context, onOpenFile, onSelectText, workspacePath, scrollCont
               onOpenFile={onOpenFile}
               onSelectText={onSelectText}
               workspacePath={workspacePath}
+              isLatestStreamingUserMessage={
+                msg.id === messageRenderIndex.latestStreamingUserMessageId
+              }
             />
           ))}
         </Suspense>
