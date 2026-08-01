@@ -450,18 +450,18 @@
  */
 .message-thinking-status .typewriter-viewport {
   position: relative;
-  width: 41px;
-  height: 33px;
+  width: 33px;
+  height: 26px;
   flex: 0 0 auto;
 }
 
 .message-thinking-status .typewriter-scale {
   position: absolute;
-  top: 10px;
+  top: 8px;
   left: 0;
   width: 120px;
   height: 66px;
-  transform: scale(0.34);
+  transform: scale(0.272);
   transform-origin: 0 0;
 }
 
