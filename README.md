@@ -17,7 +17,7 @@
 
 ## 开发
 
-要求：Node.js、npm、macOS。当前发布配置仅构建 Apple Silicon。
+要求：Node.js 24 LTS、npm、macOS。当前发布配置仅构建 Apple Silicon。
 
 ```bash
 npm install
