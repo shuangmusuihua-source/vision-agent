@@ -16,6 +16,10 @@ export type PermissionNotificationAdapter = {
   cancel: (requestId: string) => void
 }
 
+export type PermissionBeforeAllowResult =
+  | { success: true }
+  | { success: false; message: string }
+
 type PendingEntry = {
   sessionId: string
   finish: (result: PermissionResult) => void
@@ -23,6 +27,9 @@ type PendingEntry = {
 
 type PendingPermission = PendingEntry & {
   input: Record<string, unknown>
+  beforeAllow?: (signal: AbortSignal) => Promise<PermissionBeforeAllowResult>
+  beforeAllowAbortController: AbortController
+  resolving: boolean
 }
 
 type PendingAskUser = PendingEntry & {
@@ -38,6 +45,7 @@ type PermissionRequest = {
   onRequest: (requestId: string) => void
   onTimeout: (requestId: string) => void
   onCancelled: (requestId: string) => void
+  beforeAllow?: (signal: AbortSignal) => Promise<PermissionBeforeAllowResult>
 }
 
 type AskUserRequest = {
@@ -70,6 +78,8 @@ export class PendingInteractionController {
         if (settled) return
         settled = true
         clearTimeout(timeout)
+        const pending = this.permissions.get(requestId)
+        pending?.beforeAllowAbortController.abort()
         this.permissions.delete(requestId)
         this.notifications.cancel(requestId)
         if (request.signal && abortHandler) {
@@ -87,6 +97,9 @@ export class PendingInteractionController {
       this.permissions.set(requestId, {
         sessionId: request.sessionId,
         input: request.input,
+        beforeAllow: request.beforeAllow,
+        beforeAllowAbortController: new AbortController(),
+        resolving: false,
         finish,
       })
 
@@ -140,14 +153,44 @@ export class PendingInteractionController {
     })
   }
 
-  resolvePermission(
+  async resolvePermission(
     requestId: string,
     behavior: 'allow' | 'deny',
     options?: PermissionResponseOptions,
-  ): void {
+  ): Promise<void> {
     const pending = this.permissions.get(requestId)
     if (!pending) return
     if (behavior === 'allow') {
+      if (pending.beforeAllow) {
+        if (pending.resolving) return
+        pending.resolving = true
+        try {
+          const result = await pending.beforeAllow(pending.beforeAllowAbortController.signal)
+          if (this.permissions.get(requestId) !== pending) return
+          if (!result.success) {
+            pending.finish({
+              behavior: 'deny',
+              message: result.message,
+              decisionClassification: 'user_reject',
+            })
+            return
+          }
+          pending.finish({
+            behavior: 'allow',
+            updatedInput: pending.input,
+            updatedPermissions: options?.updatedPermissions,
+            decisionClassification: options?.decisionClassification ?? 'user_temporary',
+          })
+        } catch (error) {
+          if (this.permissions.get(requestId) !== pending) return
+          pending.finish({
+            behavior: 'deny',
+            message: error instanceof Error ? error.message : '授权未完成',
+            decisionClassification: 'user_reject',
+          })
+        }
+        return
+      }
       pending.finish({
         behavior: 'allow',
         updatedInput: pending.input,

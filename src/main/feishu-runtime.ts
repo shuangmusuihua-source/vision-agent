@@ -22,7 +22,7 @@ if [ "$command_name" = "auth" ]; then
   case "$subcommand_name" in
     status|check|scopes|list) ;;
     *)
-      echo '{"ok":false,"error":{"type":"sumi_connector","message":"飞书登录与授权必须在 sumi 的连接器页面完成"}}' >&2
+      echo '{"ok":false,"error":{"type":"sumi_connector","message":"飞书登录与授权由 sumi 管理；请先执行精确的 auth check 触发对话授权"}}' >&2
       exit 2
       ;;
   esac
@@ -30,7 +30,7 @@ fi
 
 case "$command_name" in
   config|profile|api)
-    echo '{"ok":false,"error":{"type":"sumi_connector","message":"该飞书 CLI 操作不向 Agent 开放，请使用 sumi 的连接器页面"}}' >&2
+    echo '{"ok":false,"error":{"type":"sumi_connector","message":"该飞书 CLI 操作不向 Agent 开放；应用配置请使用 sumi 连接器"}}' >&2
     exit 2
     ;;
 esac

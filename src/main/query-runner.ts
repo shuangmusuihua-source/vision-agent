@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron'
+import { shell, type BrowserWindow } from 'electron'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { ensureWorkspaceSkills, getAppSkillsCwd, getAppSkillsDir } from './skill-init'
@@ -54,7 +54,11 @@ import {
 } from './session-output-metadata'
 import { getGlobalMemoryDirectory } from './memory-policy'
 import { filterOfficeSkillByRuntimeReadiness } from './officecli-runtime'
-import { filterFeishuSkillByConnectorReadiness } from './feishu-connection'
+import {
+  filterFeishuSkillByConnectorReadiness,
+  getFeishuConnectorManager,
+} from './feishu-connection'
+import { createFeishuAgentAuthorizationHook } from './feishu-agent-authorization'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -68,11 +72,32 @@ type HookSessionContext = {
 }
 
 function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext): Partial<Record<string, HookCallbackMatcher[]>> {
-  const preToolUse: HookCallback = async (input, _toolUseID, _options) => {
+  const feishuAuthorization = createFeishuAgentAuthorizationHook({
+    isEnabled: () => getEnabledSkills().includes('feishu'),
+    getConnector: getFeishuConnectorManager,
+    requestPermission: (request, signal, beforeAllow) => sessionRuntime.requestPermissionApproval(
+      mainWindow,
+      {
+        ...hookContext.envelope,
+        sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,
+      },
+      request,
+      signal,
+      beforeAllow,
+    ),
+    openAuthorizationUrl: async (url) => {
+      await shell.openExternal(url)
+    },
+  })
+  const preToolUse: HookCallback = async (input, _toolUseID, options) => {
     const { tool_name, tool_input } = input as PreToolUseHookInput
+    const normalizedToolInput = (tool_input || {}) as Record<string, unknown>
+    const authorizationResult = await feishuAuthorization(input, _toolUseID, options)
+    if ('hookSpecificOutput' in authorizationResult) return authorizationResult
+
     const fileAccess = hookContext.decideFileAccess?.(
       tool_name,
-      (tool_input || {}) as Record<string, unknown>,
+      normalizedToolInput,
     )
     if (fileAccess === 'deny') {
       return {
@@ -125,7 +150,10 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
   }
 
   return {
-    PreToolUse: [{ hooks: [preToolUse] }],
+    // OAuth can legitimately remain pending while the user completes the
+    // official Feishu page. Keep the SDK hook alive slightly longer than
+    // sumi's five-minute interaction timeout.
+    PreToolUse: [{ hooks: [preToolUse], timeout: 330 }],
     PostToolUse: [{ hooks: [postToolUse] }],
     PostToolUseFailure: [{ hooks: [postToolUseFailure] }],
     Notification: [{ hooks: [notificationHook] }]

@@ -96,7 +96,7 @@ function AskZuovis({ onOpenFile, onSelectText }: AskZuovisProps): React.ReactEle
   }, [pendingAskAnswer, askDrawerOpen, respondAskUser])
 
   const handlePermissionRespond = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
-    respondPermission(requestId, behavior, options)
+    return respondPermission(requestId, behavior, options)
   }, [respondPermission])
 
   const handleAskUserRespond = useCallback((answers: Record<string, string>) => {

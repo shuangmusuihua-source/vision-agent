@@ -115,7 +115,7 @@ describe('Feishu CLI managed runtime', () => {
     ]])
     expect(await readFile(getFeishuCliExecutablePath(runtimeRoot))).toEqual(binary)
     const shim = await readFile(getFeishuCliAgentExecutablePath(runtimeRoot), 'utf8')
-    expect(shim).toContain('飞书登录与授权必须在 sumi 的连接器页面完成')
+    expect(shim).toContain('请先执行精确的 auth check 触发对话授权')
     expect(shim).toContain('exec "$script_dir/../bin/lark-cli" "$@"')
   })
 

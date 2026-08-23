@@ -14,7 +14,7 @@ interface AgentPanelProps {
   workspacePath?: string
   permissionRequest: PermissionRequest | null
   permissionQueueLength: number
-  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void
+  onPermissionRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void | Promise<void>
   askUserRequest: AskUserRequest | null
   onAskUserRespond: (requestId: string, answers: Record<string, string>) => void
   onAskUserTextSubmitReady?: (handler: AskUserTextSubmitHandler | null) => void

@@ -91,7 +91,7 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 `file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与去重后的双向 wikilink 关系图。Renderer 使用 `react-force-graph-2d` 在固定视口中显示图谱。
 
-内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者只有在连接器页面完成飞书 CLI 安装、应用配置和账号授权后才进入 Agent 的启用 Skill 集合。
+内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者在连接器完成飞书 CLI 安装和应用配置后进入 Agent 的启用 Skill 集合。Agent 的精确 `auth check` 是会话内增量授权的唯一入口：Main process 在 `PreToolUse` 生命周期暂停该工具调用，因此默认与自动执行模式都会在当前会话立即收到授权卡；系统浏览器完成 OAuth 并验证 Scope 后放行原工具调用，使同一次 SDK 运行从暂停点继续。
 
 ## Renderer
 

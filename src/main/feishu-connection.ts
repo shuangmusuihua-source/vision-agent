@@ -15,14 +15,28 @@ import type {
   FeishuConnectorIdentity,
   FeishuConnectorStatus,
 } from '../shared/feishu-types'
-import { getFeishuCapability } from '../shared/feishu-types'
+import {
+  getFeishuCapability,
+  getFeishuCapabilityForScope,
+} from '../shared/feishu-types'
 
-type FeishuSetupOperation = 'configure' | 'login' | 'grant-capability'
+type FeishuSetupOperation = 'configure' | 'login' | 'grant-capability' | 'grant-scopes'
+
+const DEFAULT_SCOPE_AUTHORIZATION_TIMEOUT_MS = 300_000
+const FEISHU_SCOPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(?::[A-Za-z0-9][A-Za-z0-9._-]*)+$/
+const TRUSTED_FEISHU_AUTHORIZATION_HOSTS = new Set([
+  'accounts.feishu.cn',
+  'open.feishu.cn',
+])
 
 interface CliResult {
   stdout: string
   stderr: string
 }
+
+export type FeishuScopeCheckResult =
+  | { success: true; grantedScopes: string[]; missingScopes: string[] }
+  | { success: false; error: string }
 
 export function buildFeishuCapabilityAuthorizationArgs(
   capabilityId: FeishuCapabilityId,
@@ -31,6 +45,36 @@ export function buildFeishuCapabilityAuthorizationArgs(
   return capability
     ? ['auth', 'login', '--domain', capability.cliDomains.join(','), '--json']
     : null
+}
+
+export function buildFeishuScopeAuthorizationArgs(scopes: readonly string[]): string[] | null {
+  const normalized = [...new Set(scopes.map(scope => scope.trim()).filter(Boolean))]
+  if (
+    normalized.length === 0
+    || normalized.length > 32
+    || normalized.some(scope => (
+      !FEISHU_SCOPE_PATTERN.test(scope) || !getFeishuCapabilityForScope(scope)
+    ))
+  ) {
+    return null
+  }
+  return ['auth', 'login', '--scope', normalized.join(' '), '--json']
+}
+
+export function buildFeishuScopeCheckArgs(scopes: readonly string[]): string[] | null {
+  const authorizationArgs = buildFeishuScopeAuthorizationArgs(scopes)
+  return authorizationArgs
+    ? ['auth', 'check', '--scope', authorizationArgs[3], '--json']
+    : null
+}
+
+export function isTrustedFeishuAuthorizationUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && TRUSTED_FEISHU_AUTHORIZATION_HOSTS.has(url.hostname)
+  } catch {
+    return false
+  }
 }
 
 function stripAnsi(value: string): string {
@@ -87,6 +131,22 @@ function stringArrayValue(value: unknown): string[] | undefined {
     .map(item => item.trim())
     .filter(Boolean)
   return normalized.length > 0 ? [...new Set(normalized)] : undefined
+}
+
+export function parseFeishuScopeCheckResult(
+  payload: Record<string, unknown> | null,
+): Extract<FeishuScopeCheckResult, { success: true }> | null {
+  if (!payload) return null
+  const data = objectValue(payload.data)
+  const root = Object.keys(data).length > 0 ? data : payload
+  if (root.ok !== true && root.ok !== false) return null
+  if (Object.keys(objectValue(root.error)).length > 0) return null
+  if (!Object.hasOwn(root, 'granted') && !Object.hasOwn(root, 'missing')) return null
+  return {
+    success: true,
+    grantedScopes: stringArrayValue(root.granted) || [],
+    missingScopes: stringArrayValue(root.missing) || [],
+  }
 }
 
 function statusIsAvailable(value: unknown): boolean {
@@ -184,6 +244,28 @@ export class FeishuConnectorManager extends EventEmitter {
     })
   }
 
+  private executeAllowingStructuredError(
+    executablePath: string,
+    args: string[],
+    timeoutMs = 20_000,
+  ): Promise<CliResult> {
+    return new Promise((resolveCommand, rejectCommand) => {
+      execFile(executablePath, args, {
+        cwd: getFeishuCliConfigDir(),
+        env: getFeishuCliProcessEnv(),
+        encoding: 'utf8',
+        timeout: timeoutMs,
+        maxBuffer: 2 * 1024 * 1024,
+      }, (error, stdout, stderr) => {
+        if (error && !parseJsonOutput(stdout) && !parseJsonOutput(stderr)) {
+          rejectCommand(new Error(stderr.trim() || stdout.trim() || error.message))
+          return
+        }
+        resolveCommand({ stdout, stderr })
+      })
+    })
+  }
+
   async getStatus(options: { verify?: boolean } = {}): Promise<FeishuConnectorStatus> {
     const runtime = await this.runtime.getStatus()
     if (runtime.state !== 'ready') return { phase: 'runtime-missing', runtime }
@@ -242,9 +324,149 @@ export class FeishuConnectorManager extends EventEmitter {
     return this.startOperation('grant-capability', capabilityId)
   }
 
+  async checkScopes(scopes: readonly string[]): Promise<FeishuScopeCheckResult> {
+    const args = buildFeishuScopeCheckArgs(scopes)
+    if (!args) return { success: false, error: '飞书请求的权限范围无效' }
+    if (this.activeProcess) return { success: false, error: '飞书连接器正在处理其他授权' }
+
+    const runtime = await this.runtime.getStatus()
+    if (runtime.state !== 'ready') {
+      return { success: false, error: '飞书 CLI 运行组件尚未就绪' }
+    }
+    if (!await this.configExists()) {
+      return { success: false, error: '请先在连接器中配置飞书应用' }
+    }
+
+    try {
+      const result = await this.executeAllowingStructuredError(runtime.executablePath, args)
+      const payload = parseJsonOutput(result.stdout) || parseJsonOutput(result.stderr)
+      const parsed = parseFeishuScopeCheckResult(payload)
+      if (parsed) return parsed
+      const errorPayload = objectValue(payload?.error)
+      return {
+        success: false,
+        error: friendlyCliError(
+          stringValue(errorPayload.message, errorPayload.hint)
+            || '飞书未返回可识别的权限检查结果',
+        ),
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: friendlyCliError(error instanceof Error ? error.message : String(error)),
+      }
+    }
+  }
+
+  async authorizeScopes(
+    scopes: readonly string[],
+    options: {
+      signal?: AbortSignal
+      timeoutMs?: number
+      openAuthorizationUrl: (url: string) => Promise<void>
+    },
+  ): Promise<FeishuConnectorActionResult> {
+    const args = buildFeishuScopeAuthorizationArgs(scopes)
+    if (!args) return { success: false, error: '飞书请求的权限范围无效' }
+    if (this.activeProcess) return { success: false, error: '已有飞书连接操作正在进行' }
+
+    const requestedScopes = args[3].split(' ')
+    const initialCheck = await this.checkScopes(requestedScopes)
+    if (!initialCheck.success) return initialCheck
+    if (initialCheck.missingScopes.length === 0) return { success: true }
+
+    return new Promise<FeishuConnectorActionResult>((resolveAuthorization) => {
+      let settled = false
+      let openedAuthorization = false
+      let verifyingScopes = false
+      let timeout: ReturnType<typeof setTimeout>
+
+      const cleanup = () => {
+        clearTimeout(timeout)
+        this.off('auth-challenge', handleChallenge)
+        this.off('status-changed', handleStatus)
+        options.signal?.removeEventListener('abort', handleAbort)
+      }
+      const settle = (
+        result: FeishuConnectorActionResult,
+        cancelOperation = false,
+      ) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        void (async () => {
+          if (cancelOperation) await this.cancelOperation()
+          resolveAuthorization(result)
+        })()
+      }
+      const handleChallenge = (challenge: FeishuAuthChallenge) => {
+        if (challenge.operation !== 'grant-scopes' || openedAuthorization) return
+        if (!isTrustedFeishuAuthorizationUrl(challenge.url)) {
+          settle({ success: false, error: '飞书返回了不受信任的授权地址' }, true)
+          return
+        }
+        openedAuthorization = true
+        void options.openAuthorizationUrl(challenge.url).catch((error: unknown) => {
+          settle({
+            success: false,
+            error: error instanceof Error ? error.message : '无法打开飞书授权页面',
+          }, true)
+        })
+      }
+      const handleStatus = (status: FeishuConnectorStatus) => {
+        if (status.phase === 'authorizing' || status.phase === 'configuring') return
+        if (status.phase === 'connected') {
+          if (verifyingScopes) return
+          verifyingScopes = true
+          void this.checkScopes(requestedScopes).then((check) => {
+            if (!check.success) {
+              settle({ success: false, error: check.error })
+              return
+            }
+            settle(check.missingScopes.length === 0
+              ? { success: true }
+              : { success: false, error: '飞书未授予本次任务需要的全部权限' })
+          })
+          return
+        }
+        if (status.phase === 'error') {
+          settle({ success: false, error: status.error || '飞书授权失败' })
+          return
+        }
+        settle({ success: false, error: '飞书授权未完成' })
+      }
+      const handleAbort = () => {
+        settle({ success: false, error: '飞书授权已取消' }, true)
+      }
+
+      this.on('auth-challenge', handleChallenge)
+      this.on('status-changed', handleStatus)
+      options.signal?.addEventListener('abort', handleAbort, { once: true })
+      timeout = setTimeout(() => {
+        settle({ success: false, error: '飞书授权等待超时' }, true)
+      }, options.timeoutMs ?? DEFAULT_SCOPE_AUTHORIZATION_TIMEOUT_MS)
+
+      if (options.signal?.aborted) {
+        handleAbort()
+        return
+      }
+      void this.startOperation('grant-scopes', undefined, requestedScopes)
+        .then((result) => {
+          if (!result.success) settle(result)
+        })
+        .catch((error: unknown) => {
+          settle({
+            success: false,
+            error: error instanceof Error ? error.message : '飞书授权启动失败',
+          })
+        })
+    })
+  }
+
   private async startOperation(
     operation: FeishuSetupOperation,
     capabilityId?: FeishuCapabilityId,
+    scopes?: readonly string[],
   ): Promise<FeishuConnectorActionResult> {
     if (this.activeProcess) return { success: false, error: '已有飞书连接操作正在进行' }
     const runtime = await this.runtime.getStatus()
@@ -257,10 +479,13 @@ export class FeishuConnectorManager extends EventEmitter {
     const capabilityArgs = capabilityId
       ? buildFeishuCapabilityAuthorizationArgs(capabilityId)
       : null
+    const scopeArgs = scopes ? buildFeishuScopeAuthorizationArgs(scopes) : null
     const args = operation === 'configure'
       ? ['config', 'init', '--new', '--brand', 'feishu', '--lang', 'zh']
       : operation === 'grant-capability' && capabilityArgs
         ? capabilityArgs
+        : operation === 'grant-scopes' && scopeArgs
+          ? scopeArgs
         : ['auth', 'login', '--recommend', '--json']
     const child = spawn(runtime.executablePath, args, {
       cwd: getFeishuCliConfigDir(),

@@ -18,6 +18,7 @@ import { GenerationActivityProjector } from './generation-activity-projector'
 import { toAgentIPCMessage } from './message-converter'
 import {
   PendingInteractionController,
+  type PermissionBeforeAllowResult,
   type PermissionResponseOptions,
 } from './pending-interactions'
 import {
@@ -274,13 +275,15 @@ export class SessionRuntimeController {
     win: BrowserWindow,
     envelope: AgentSessionEnvelope,
     request: PermissionRequestInput,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    beforeAllow?: (signal: AbortSignal) => Promise<PermissionBeforeAllowResult>,
   ): Promise<PermissionResult> {
     return this.pendingInteractions.requestPermission({
       sessionId: envelope.sessionId,
       toolName: request.toolName,
       input: request.input,
       signal,
+      beforeAllow,
       onRequest: (requestId) => this.emitPermissionRequest(win, envelope, {
         id: requestId,
         ...request,
@@ -294,8 +297,8 @@ export class SessionRuntimeController {
     requestId: string,
     behavior: 'allow' | 'deny',
     options?: PermissionResponseOptions
-  ): void {
-    this.pendingInteractions.resolvePermission(requestId, behavior, options)
+  ): Promise<void> {
+    return this.pendingInteractions.resolvePermission(requestId, behavior, options)
   }
 
   resolveAskUser(requestId: string, answers: Record<string, string>): void {
@@ -452,8 +455,8 @@ export function resolvePermission(
   requestId: string,
   behavior: 'allow' | 'deny',
   options?: PermissionResponseOptions
-): void {
-  sessionRuntime.resolvePermission(requestId, behavior, options)
+): Promise<void> {
+  return sessionRuntime.resolvePermission(requestId, behavior, options)
 }
 
 export function resolveAskUser(requestId: string, answers: Record<string, string>): void {

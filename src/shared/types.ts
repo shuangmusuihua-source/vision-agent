@@ -2,6 +2,7 @@
 // All discriminated unions defined here; no `Record<string, unknown>` downstream.
 
 import type { AttachmentConversionDisplayStatus } from './file-attachments'
+import type { FeishuCapabilityId } from './feishu-types'
 
 // ─── Agent Context ────────────────────────────────────────────────────
 
@@ -503,6 +504,13 @@ export type PermissionRequestIPC = {
   displayName?: string
   /** SDK-provided permission suggestions for "always allow" */
   suggestions?: PermissionUpdate[]
+  /** App-owned connector authorization that pauses and resumes this tool call. */
+  connectorAuthorization?: {
+    connector: 'feishu'
+    capabilityIds: FeishuCapabilityId[]
+    capabilityLabels: string[]
+    scopes: string[]
+  }
 }
 
 export type AskUserQuestionOption = {

@@ -163,6 +163,14 @@ export function getFeishuCapability(id: string): typeof FEISHU_CAPABILITIES[numb
   return FEISHU_CAPABILITIES.find(capability => capability.id === id)
 }
 
+export function getFeishuCapabilityForScope(
+  scope: string,
+): typeof FEISHU_CAPABILITIES[number] | undefined {
+  return FEISHU_CAPABILITIES.find(capability => (
+    capability.scopePrefixes.some(prefix => scope.startsWith(prefix))
+  ))
+}
+
 export function getGrantedFeishuCapabilityScopes(
   capability: FeishuCapabilityDefinition,
   scopes: readonly string[] = [],
@@ -224,7 +232,7 @@ export interface FeishuConnectorActionResult {
 }
 
 export interface FeishuAuthChallenge {
-  operation: 'configure' | 'login' | 'grant-capability'
+  operation: 'configure' | 'login' | 'grant-capability' | 'grant-scopes'
   capabilityId?: FeishuCapabilityId
   url: string
 }

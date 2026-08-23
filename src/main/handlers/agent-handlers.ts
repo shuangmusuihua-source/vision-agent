@@ -48,8 +48,8 @@ export function registerAgentHandlers(): void {
     return { started: true }
   })
 
-  ipcMain.handle('agent:permissionResponse', (_event, request: AgentPermissionResponseRequest) => {
-    resolvePermission(request.requestId, request.behavior, request.options as Parameters<typeof resolvePermission>[2])
+  ipcMain.handle('agent:permissionResponse', async (_event, request: AgentPermissionResponseRequest) => {
+    await resolvePermission(request.requestId, request.behavior, request.options as Parameters<typeof resolvePermission>[2])
     return { success: true }
   })
 

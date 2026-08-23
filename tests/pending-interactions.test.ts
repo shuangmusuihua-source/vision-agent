@@ -73,6 +73,58 @@ describe('PendingInteractionController', () => {
     expect(notifications.cancel).toHaveBeenCalledWith(requestId)
   })
 
+  it('keeps the original tool call pending until an app-owned authorization succeeds', async () => {
+    const { controller } = setup()
+    let requestId = ''
+    let finishAuthorization!: (result: { success: true }) => void
+    const beforeAllow = vi.fn((signal: AbortSignal) => new Promise<{ success: true }>((resolve) => {
+      expect(signal.aborted).toBe(false)
+      finishAuthorization = resolve
+    }))
+    const pending = controller.requestPermission({
+      sessionId: 'session-feishu',
+      toolName: 'Bash',
+      input: { command: 'lark-cli auth check --scope calendar:calendar.event:read --json' },
+      beforeAllow,
+      onRequest: (id) => { requestId = id },
+      onTimeout: vi.fn(),
+      onCancelled: vi.fn(),
+    })
+
+    const response = controller.resolvePermission(requestId, 'allow')
+    expect(beforeAllow).toHaveBeenCalledOnce()
+
+    finishAuthorization({ success: true })
+    await response
+    await expect(pending).resolves.toMatchObject({
+      behavior: 'allow',
+      updatedInput: {
+        command: 'lark-cli auth check --scope calendar:calendar.event:read --json',
+      },
+    })
+  })
+
+  it('denies the paused tool call when connector authorization fails', async () => {
+    const { controller } = setup()
+    let requestId = ''
+    const pending = controller.requestPermission({
+      sessionId: 'session-feishu-failed',
+      toolName: 'Bash',
+      input: { command: 'scope check' },
+      beforeAllow: async () => ({ success: false, message: '飞书未授予日历权限' }),
+      onRequest: (id) => { requestId = id },
+      onTimeout: vi.fn(),
+      onCancelled: vi.fn(),
+    })
+
+    await controller.resolvePermission(requestId, 'allow')
+    await expect(pending).resolves.toEqual({
+      behavior: 'deny',
+      message: '飞书未授予日历权限',
+      decisionClassification: 'user_reject',
+    })
+  })
+
   it('settles an already-aborted permission without emitting a request', async () => {
     const { controller, notifications } = setup()
     const signal = new AbortController()

@@ -1,29 +1,116 @@
-import { useEffect } from 'react'
-import { ShieldAlert, Check, X, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import {
+  ShieldAlert,
+  Check,
+  X,
+  ShieldCheck,
+  ExternalLink,
+  LockKeyhole,
+  Loader2,
+} from 'lucide-react'
 import { InputDrawer } from './InputDrawer'
 import type { PermissionRequestIPC as PermissionRequest } from '../../../shared/types'
 
 interface PermissionDialogProps {
   request: PermissionRequest
-  onRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void
+  onRespond: (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => void | Promise<void>
   queuePosition?: number
   queueTotal?: number
 }
 
 function PermissionDialog({ request, onRespond, queuePosition, queueTotal }: PermissionDialogProps): React.ReactElement {
+  const [authorizing, setAuthorizing] = useState(false)
+  const [authorizationError, setAuthorizationError] = useState<string | null>(null)
   const inputSummary = summarizePermissionInput(request.toolName, request.input)
   const showBadge = queueTotal !== undefined && queueTotal > 1
   const hasSuggestions = request.suggestions && request.suggestions.length > 0
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onRespond(request.id, 'deny', { decisionClassification: 'user_reject' })
+      if (e.key === 'Escape' && !authorizing) {
+        void onRespond(request.id, 'deny', { decisionClassification: 'user_reject' })
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [request.id, onRespond])
+  }, [request.id, onRespond, authorizing])
 
   const displayName = request.displayName || request.toolName
+
+  if (request.connectorAuthorization?.connector === 'feishu') {
+    const authorization = request.connectorAuthorization
+    const startAuthorization = async () => {
+      setAuthorizationError(null)
+      setAuthorizing(true)
+      try {
+        await onRespond(request.id, 'allow', { decisionClassification: 'user_temporary' })
+      } catch (error) {
+        setAuthorizing(false)
+        setAuthorizationError(error instanceof Error ? error.message : '无法启动飞书授权')
+      }
+    }
+    return (
+      <InputDrawer key={request.id} open onClose={() => {}}>
+        <div className="feishu-authorization-card">
+          <div className="feishu-authorization-heading">
+            <div className="feishu-authorization-mark" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="feishu-authorization-copy">
+              <div className="feishu-authorization-eyebrow">飞书 · 当前任务</div>
+              <h3>{request.title || '需要飞书授权'}</h3>
+              <p>{request.description || '授权完成后，sumi 会自动继续刚才的任务。'}</p>
+            </div>
+            {showBadge && (
+              <span className="drawer-permission-badge">{queuePosition}/{queueTotal}</span>
+            )}
+          </div>
+
+          <div className="feishu-authorization-capabilities" aria-label="本次请求的飞书能力">
+            {authorization.capabilityLabels.map(label => (
+              <span key={label}><Check size={12} />{label}</span>
+            ))}
+          </div>
+
+          <details className="feishu-authorization-scopes">
+            <summary>查看 {authorization.scopes.length} 项技术权限</summary>
+            <div>
+              {authorization.scopes.map(scope => <code key={scope}>{scope}</code>)}
+            </div>
+          </details>
+
+          <div className="feishu-authorization-privacy">
+            <LockKeyhole size={14} />
+            <span>授权页将在系统浏览器打开；凭据不会写入聊天记录。完成后，本任务会自动续跑。</span>
+          </div>
+
+          {authorizationError ? (
+            <div className="feishu-authorization-error" role="alert">{authorizationError}</div>
+          ) : null}
+
+          <div className="feishu-authorization-actions">
+            <button
+              className="drawer-permission-btn drawer-permission-btn--deny"
+              disabled={authorizing}
+              onClick={() => void onRespond(request.id, 'deny', { decisionClassification: 'user_reject' })}
+            >
+              暂不授权
+            </button>
+            <button
+              className="drawer-permission-btn drawer-permission-btn--allow feishu-authorization-primary"
+              disabled={authorizing}
+              onClick={() => void startAuthorization()}
+            >
+              {authorizing ? <Loader2 className="feishu-authorization-spinner" size={13} /> : <ExternalLink size={13} />}
+              {authorizing ? '等待飞书确认…' : '去飞书授权'}
+            </button>
+          </div>
+        </div>
+      </InputDrawer>
+    )
+  }
 
   return (
     <InputDrawer key={request.id} open onClose={() => {}}>
@@ -45,14 +132,14 @@ function PermissionDialog({ request, onRespond, queuePosition, queueTotal }: Per
           </div>
         )}
         <div className="drawer-permission-actions">
-          <button className="drawer-permission-btn drawer-permission-btn--deny" onClick={() => onRespond(request.id, 'deny', { decisionClassification: 'user_reject' })}>
+          <button className="drawer-permission-btn drawer-permission-btn--deny" onClick={() => void onRespond(request.id, 'deny', { decisionClassification: 'user_reject' })}>
             <X size={14} /> Deny
           </button>
-          <button className="drawer-permission-btn drawer-permission-btn--allow" onClick={() => onRespond(request.id, 'allow', { decisionClassification: 'user_temporary' })}>
+          <button className="drawer-permission-btn drawer-permission-btn--allow" onClick={() => void onRespond(request.id, 'allow', { decisionClassification: 'user_temporary' })}>
             <Check size={14} /> Allow
           </button>
           {hasSuggestions && (
-            <button className="drawer-permission-btn drawer-permission-btn--always" onClick={() => onRespond(request.id, 'allow', { updatedPermissions: request.suggestions as Array<Record<string, unknown>>, decisionClassification: 'user_permanent' })}>
+            <button className="drawer-permission-btn drawer-permission-btn--always" onClick={() => void onRespond(request.id, 'allow', { updatedPermissions: request.suggestions as Array<Record<string, unknown>>, decisionClassification: 'user_permanent' })}>
               <ShieldCheck size={14} /> Always Allow
             </button>
           )}

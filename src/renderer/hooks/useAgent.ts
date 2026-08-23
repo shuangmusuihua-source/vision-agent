@@ -250,9 +250,9 @@ export function useAgent(context: AgentContext = 'editor') {
     })
   }, [context, store])
 
-  const respondPermission = useCallback((requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
+  const respondPermission = useCallback(async (requestId: string, behavior: 'allow' | 'deny', options?: { updatedPermissions?: Array<Record<string, unknown>>; decisionClassification?: 'user_temporary' | 'user_permanent' | 'user_reject' }) => {
+    await window.api.agent.respondPermission(requestId, behavior, options)
     store.getState().handlePermissionResponse(requestId, behavior)
-    window.api.agent.respondPermission(requestId, behavior, options)
   }, [store])
 
   const respondAskUser = useCallback((requestId: string, answers: Record<string, string>) => {
