@@ -54,6 +54,7 @@ import {
 } from './session-output-metadata'
 import { getGlobalMemoryDirectory } from './memory-policy'
 import { filterOfficeSkillByRuntimeReadiness } from './officecli-runtime'
+import { filterFeishuSkillByConnectorReadiness } from './feishu-connection'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -461,9 +462,13 @@ export async function sendMessage(
       outputSnapshot = await captureSessionOutputSnapshot(effectiveWorkingDirectory)
     }
 
-    const enabledSkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
+    const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
+    const enabledSkills = await filterFeishuSkillByConnectorReadiness(runtimeReadySkills)
     if (skillId === 'office-documents' && !enabledSkills.includes(skillId)) {
       throw new Error('Office 文档运行组件需要安装或更新，请在 Skills 中重新启用“Office 文档”。')
+    }
+    if (skillId === 'feishu' && !enabledSkills.includes(skillId)) {
+      throw new Error('请先在“连接器”中安装并连接飞书。')
     }
 
     const getSdkSessionId = () => currentSdkSessionId

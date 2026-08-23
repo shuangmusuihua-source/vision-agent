@@ -52,6 +52,16 @@ export function AutomationIcon(): React.ReactElement {
   )
 }
 
+export function ConnectorsIcon(): React.ReactElement {
+  return (
+    <SidebarPrimaryIcon>
+      <path d="M7.2 3.2v3.1M12.8 3.2v3.1" />
+      <path d="M5.35 6.25h9.3v1.8A4.65 4.65 0 0 1 10 12.7a4.65 4.65 0 0 1-4.65-4.65v-1.8Z" />
+      <path d="M10 12.7v4.1M7.3 16.8h5.4" />
+    </SidebarPrimaryIcon>
+  )
+}
+
 export function KnowledgeIcon(): React.ReactElement {
   return (
     <SidebarPrimaryIcon>

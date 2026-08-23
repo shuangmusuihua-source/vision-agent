@@ -39,6 +39,11 @@ import type {
   OfficeCliRuntimeStatus,
 } from './officecli-runtime'
 import type {
+  FeishuAuthChallenge,
+  FeishuConnectorActionResult,
+  FeishuConnectorStatus,
+} from './feishu-types'
+import type {
   UpdateCheckResult,
   UpdateDownloadProgress,
   UpdateErrorPayload,
@@ -395,6 +400,36 @@ export type IPCChannelMap = {
     response: OfficeCliRuntimeInstallResult
   }
 
+  // Feishu connector
+  'feishu:status': {
+    request: void
+    response: FeishuConnectorStatus
+  }
+  'feishu:installRuntime': {
+    request: void
+    response: FeishuConnectorActionResult
+  }
+  'feishu:startConfigure': {
+    request: void
+    response: FeishuConnectorActionResult
+  }
+  'feishu:startLogin': {
+    request: void
+    response: FeishuConnectorActionResult
+  }
+  'feishu:grantCalendarAccess': {
+    request: void
+    response: FeishuConnectorActionResult
+  }
+  'feishu:cancelOperation': {
+    request: void
+    response: FeishuConnectorActionResult
+  }
+  'feishu:logout': {
+    request: void
+    response: FeishuConnectorActionResult
+  }
+
   // Search
   'search:query': {
     request: string
@@ -442,6 +477,8 @@ export type IPCEventMap = {
   'update:downloaded': void
   'update:download-progress': UpdateDownloadProgress
   'update:error': UpdateErrorPayload
+  'feishu:statusChanged': FeishuConnectorStatus
+  'feishu:authChallenge': FeishuAuthChallenge
 }
 
 // ─── Helper: extract request/response types ─────────────────────────

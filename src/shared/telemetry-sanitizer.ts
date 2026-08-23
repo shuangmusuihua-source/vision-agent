@@ -16,6 +16,7 @@ const SECRET_KEYS = new Set([
   'password',
   'passwd',
   'clientsecret',
+  'appsecret',
   'secretkey',
   'cookie',
   'setcookie',
@@ -52,6 +53,8 @@ function isSecretKey(key: string): boolean {
   const normalized = normalizeKey(key)
   return SECRET_KEYS.has(normalized)
     || normalized.endsWith('apikey')
+    || normalized.endsWith('accesstoken')
+    || normalized.endsWith('refreshtoken')
     || normalized.endsWith('password')
     || normalized.endsWith('secretkey')
 }

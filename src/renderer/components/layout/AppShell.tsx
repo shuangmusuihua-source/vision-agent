@@ -42,6 +42,7 @@ import WorkspaceDialogs from '../workspace/WorkspaceDialogs'
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
 const SkillLibrary = lazy(() => import('../skills/SkillLibrary'))
+const ConnectorPanel = lazy(() => import('../connectors/ConnectorPanel'))
 const AutomationPanel = lazy(() => import('../automation/AutomationPanel'))
 const KnowledgePanel = lazy(() => import('../knowledge/KnowledgePanel'))
 
@@ -516,9 +517,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         }}
       />
       </nav>
-      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' || view === 'automation' || view === 'knowledge' ? ' main-content-module' : ''}`}
+      <main className={`main-content${sidebarCollapsed ? ' main-content-cover-sidebar' : ''}${isChatFirst ? ' main-content-secondary' : ''}${view === 'ask' ? ' main-content-ask-zuovis' : ''}${view === 'skills' || view === 'connectors' || view === 'automation' || view === 'knowledge' ? ' main-content-module' : ''}`}
            style={{ order: isChatFirst ? 2 : 0 }}
-           aria-label={view === 'knowledge' ? '知识库' : view === 'automation' ? '自动化' : view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
+           aria-label={view === 'knowledge' ? '知识库' : view === 'automation' ? '自动化' : view === 'connectors' ? '连接器' : view === 'skills' ? '技能' : view === 'ask' ? 'Ask sumi' : '编辑器'}>
         {view === 'ask' ? (
           <AskZuovis
             onOpenFile={handleFileSelect}
@@ -528,6 +529,12 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
           <ErrorBoundary onReset={() => {}}>
             <Suspense fallback={<div className="skill-library-loading">正在加载技能...</div>}>
               <SkillLibrary />
+            </Suspense>
+          </ErrorBoundary>
+        ) : view === 'connectors' ? (
+          <ErrorBoundary onReset={() => {}}>
+            <Suspense fallback={<div className="skill-library-loading">正在加载连接器...</div>}>
+              <ConnectorPanel />
             </Suspense>
           </ErrorBoundary>
         ) : view === 'automation' ? (

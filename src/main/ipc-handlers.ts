@@ -13,6 +13,7 @@ import { registerSearchHandlers } from './handlers/search-handlers'
 import { registerConnectionHandlers } from './handlers/connection-handlers'
 import { registerAttachmentHandlers } from './handlers/attachment-handlers'
 import { registerOfficeHandlers } from './handlers/office-handlers'
+import { registerFeishuHandlers } from './handlers/feishu-handlers'
 import { createWorkspaceLifecycle } from './workspace-lifecycle-adapter'
 
 // ─── Shared helpers ──────────────────────────────────────────────
@@ -42,4 +43,5 @@ export function registerIpcHandlers(): void {
   registerConnectionHandlers()
   registerAttachmentHandlers()
   registerOfficeHandlers()
+  registerFeishuHandlers()
 }

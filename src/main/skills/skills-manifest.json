@@ -32,6 +32,12 @@
     }
   },
   {
+    "id": "feishu",
+    "hasResources": true,
+    "requiredPaths": ["SKILL.md"],
+    "version": "1.0.0"
+  },
+  {
     "id": "system-cleanup",
     "hasResources": true,
     "requiredPaths": ["SKILL.md", "scan.sh"]

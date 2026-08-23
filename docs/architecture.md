@@ -13,6 +13,7 @@ flowchart LR
   M --> Store[electron-store]
   M --> OS[Notifications / updater / shell]
   M --> Office[Managed OfficeCLI runtime]
+  M --> Feishu[Managed Feishu CLI runtime]
 ```
 
 BrowserWindow 在 `src/main/index.ts` 中创建，启用 sandbox、context isolation 和 web security，关闭 Node integration。主进程是文件系统、SDK、通知、更新与持久化的信任边界。
@@ -43,7 +44,7 @@ seam 验证生命周期行为。
 
 ### IPC 层
 
-`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、office、search 和 connection。
+`src/main/ipc-handlers.ts` 只负责顶层注册。实际处理器按领域拆在 `src/main/handlers/`：workspace、editor、settings、agent、memory、graph、cron、skills、attachments、office、feishu、search 和 connection。
 
 `src/shared/ipc-types.ts` 定义请求、响应和推送事件；`src/shared/preload-api.ts` 是
 `window.api` 的唯一 Interface，`src/preload/index.ts` 的实现必须通过 `satisfies` 完整匹配。
@@ -64,7 +65,8 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
 - `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
 - `officecli-runtime.ts`：固定版本 OfficeCLI 的按需下载、SHA-256 校验、原子安装和能力探测；Agent 环境只获得受管二进制路径，并禁用 OfficeCLI 自更新
-- `managed-runtime-install.ts`：MarkItDown 与 OfficeCLI 共用的原子安装 transaction seam；统一 single-flight、唯一 staging、旧目标 backup、激活后验证、失败 rollback 和残留清理，各 runtime adapter 只负责构建与验证自身产物
+- `feishu-runtime.ts` / `feishu-connection.ts`：固定版本飞书 CLI 的发布包与二进制双重校验、原子安装、独立配置目录、浏览器认证、Scope 补授权和身份状态；连接完成后才向 Agent 暴露飞书 Skill，Agent PATH 只包含会阻止 `auth`/`config`/原始 API 写入口的受管 shim
+- `managed-runtime-install.ts`：MarkItDown、OfficeCLI 与飞书 CLI 共用的原子安装 transaction seam；统一 single-flight、唯一 staging、旧目标 backup、激活后验证、失败 rollback 和残留清理，各 runtime adapter 只负责构建与验证自身产物
 - `src/shared/telemetry-sanitizer.ts`：Sentry `beforeSend` 的统一隐私边界，递归处理结构化字段与字符串中的 API Key、认证信息、session ID、URL 凭据和私有路径；清洗失败时事件不得发送
 
 ### 文件与授权
@@ -89,7 +91,7 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 `file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与去重后的双向 wikilink 关系图。Renderer 使用 `react-force-graph-2d` 在固定视口中显示图谱。
 
-内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”是默认关闭的内置能力；首次启用时由 main process 准备 OfficeCLI 运行时，Skill 只提供 Agent 工作流和质量检查规则。
+内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者只有在连接器页面完成飞书 CLI 安装、应用配置和账号授权后才进入 Agent 的启用 Skill 集合。
 
 ## Renderer
 
@@ -97,6 +99,7 @@ Renderer 是单页 React 应用：
 
 - `App.tsx`：主题、设置缓存、更新订阅和全局 provider
 - `AppShell.tsx`：Workspace、编辑器、Agent panel、搜索和图谱的顶层视图编排
+- `components/connectors/ConnectorPanel.tsx`：连接器安装、配置、浏览器授权、身份状态和断开操作
 - `workflows/editor-session-workflow.ts`：集中 editor session 的持久化顺序、app/SDK ID 删除路由、workspace/session 切换、Overview 激活和新会话草稿生命周期
 - `workflows/session-output-workflow.ts`：集中 session output 的 latest-only 请求投影、文件事件/Agent 完成刷新合并，以及知识库、打开、访达和删除动作
 - `agent-store*`：按 context 与 session 隔离的 Agent 状态；查询是否活跃统一从状态机派生，不保存第二个布尔生命周期；工作区切换会先保存旧 session slot 再清空 live editor slot，绝不改写已有 session 的 workspace 所有权

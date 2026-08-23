@@ -31,6 +31,14 @@ const builtinSkills: BuiltinSkillDefinition[] = [
     defaultEnabled: false,
   },
   {
+    id: 'feishu',
+    name: '飞书连接器',
+    description: '连接飞书文档、知识库、多维表格、日程、任务、会议纪要与消息',
+    icon: 'Cable',
+    promptTemplate: `使用 feishu skill 处理飞书中的资料或操作... {activeFile}`,
+    defaultEnabled: false,
+  },
+  {
     id: 'system-cleanup',
     name: '系统清理',
     description: '扫描系统垃圾文件并安全清理，释放磁盘空间',

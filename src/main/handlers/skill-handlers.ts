@@ -15,6 +15,10 @@ import {
   filterOfficeSkillByRuntimeReadiness,
   getOfficeCliRuntimeManager,
 } from '../officecli-runtime'
+import {
+  filterFeishuSkillByConnectorReadiness,
+  getFeishuConnectorManager,
+} from '../feishu-connection'
 
 function emitSkillsChanged(skillId: string, reason: 'installed' | 'updated' | 'uninstalled' | 'toggled'): void {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -49,9 +53,10 @@ async function getCommunityCatalog(): Promise<CommunitySkillCatalogItem[]> {
 
 export function registerSkillHandlers(): void {
   ipcMain.handle('skills:list', async () => {
+    const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
     const [communityCatalog, enabled] = await Promise.all([
       getCommunityCatalog(),
-      filterOfficeSkillByRuntimeReadiness(getEnabledSkills()),
+      filterFeishuSkillByConnectorReadiness(runtimeReadySkills),
     ])
     const installedCommunity = CURATED_COMMUNITY_SKILLS
       .filter(skill => communityCatalog.some(item => item.id === skill.id && item.installed))
@@ -74,13 +79,20 @@ export function registerSkillHandlers(): void {
         throw new Error('请先安装 Office 文档运行组件')
       }
     }
+    if (skillId === 'feishu' && enabled) {
+      const status = await getFeishuConnectorManager().getStatus()
+      if (status.phase !== 'connected' && status.phase !== 'bot-only') {
+        throw new Error('请先在连接器中连接飞书')
+      }
+    }
     const result = toggleSkill(skillId, enabled)
     emitSkillsChanged(skillId, 'toggled')
     return result
   })
 
   ipcMain.handle('skills:builtins', async () => {
-    const enabled = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
+    const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
+    const enabled = await filterFeishuSkillByConnectorReadiness(runtimeReadySkills)
     return getBuiltinSkills().map(skill => ({
       id: skill.id,
       name: skill.name,

@@ -8,7 +8,7 @@ import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { PrimaryView } from '../../store/ui-slice'
 import SidebarToolDock from './SidebarToolDock'
-import { AskSumiIcon, AutomationIcon, KnowledgeIcon, SkillsIcon } from './SidebarPrimaryIcons'
+import { AskSumiIcon, AutomationIcon, ConnectorsIcon, KnowledgeIcon, SkillsIcon } from './SidebarPrimaryIcons'
 import {
   buildSidebarSessionIndicators,
   getSidebarSessionAttention,
@@ -134,11 +134,13 @@ function Sidebar({
   const onDaydream = tools.openDaydream
   const onAskZuovis = () => navigation.open('ask')
   const onOpenSkills = () => navigation.open('skills')
+  const onOpenConnectors = () => navigation.open('connectors')
   const onOpenAutomation = () => navigation.open('automation')
   const onOpenKnowledge = () => navigation.open('knowledge')
   const onAskZuovisBack = navigation.ask.back
   const isAskZuovisActive = navigation.view === 'ask'
   const isSkillsActive = navigation.view === 'skills'
+  const isConnectorsActive = navigation.view === 'connectors'
   const isAutomationActive = navigation.view === 'automation'
   const isKnowledgeActive = navigation.view === 'knowledge'
   const isAskZuovisInChat = navigation.ask.hasConversation
@@ -238,6 +240,17 @@ function Sidebar({
           >
             <div className="sidebar-ask-zuovis-icon"><SkillsIcon /></div>
             <span className="sidebar-ask-zuovis-label">技能</span>
+          </div>
+
+          <div
+            className={`sidebar-ask-zuovis sidebar-skills-entry${isConnectorsActive ? ' sidebar-ask-zuovis-active' : ''}`}
+            onClick={onOpenConnectors}
+            role="button" tabIndex={0}
+            aria-current={isConnectorsActive ? 'page' : undefined}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenConnectors() } }}
+          >
+            <div className="sidebar-ask-zuovis-icon"><ConnectorsIcon /></div>
+            <span className="sidebar-ask-zuovis-label">连接器</span>
           </div>
 
           <div

@@ -10,6 +10,7 @@
 - 每个会话独立的生成文件目录与产物预览
 - 全局搜索、知识库与双向链接图谱
 - 内置 Skills、社区 Skill 安装/更新/卸载
+- 连接器侧边栏，以及由 sumi 隔离管理、按需安装和授权的飞书 CLI 能力
 - PDF、DOCX、PPTX、XLSX 附件转换
 - 可选的 Office 文档能力：无需安装 Microsoft Office，创建、编辑、渲染并校验 DOCX、XLSX 和 PPTX
 - 持久化定时任务和系统通知
@@ -53,6 +54,8 @@ npm run dist
 知识库默认位于用户 Documents 下的 `sumi/Knowledge`。
 
 首次启用“Office 文档”内置能力时，sumi 会下载并校验固定版本的 OfficeCLI 到应用自己的运行时目录；不会修改其他 Agent 配置，也不会启用 OfficeCLI 自动更新。
+
+飞书连接器同样使用应用自管运行时：sumi 校验固定版本的飞书 CLI，并把应用配置与账号授权保存在独立目录。连接完成前飞书 Skill 不会进入 Agent 的可用能力集合。
 
 ## 架构
 

@@ -21,6 +21,7 @@ import { APP_NAME } from '../shared/branding'
 import { isAllowedExternalUrl, isAllowedRendererNavigation } from './navigation-policy'
 import { sanitizeTelemetryEvent } from '../shared/telemetry-sanitizer'
 import { appUpdateLifecycle } from './app-update-lifecycle'
+import { getFeishuConnectorManager } from './feishu-connection'
 
 // Initialize Sentry before any error handlers
 Sentry.init({
@@ -103,6 +104,7 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     abortActiveQuery()
     inlineRewriteRunner.cancelAll()
+    void getFeishuConnectorManager().cancelOperation()
     handleWindowDestroy()
     setMainWindow(null)
     mainWindow = null
@@ -194,6 +196,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   abortActiveQuery()
   inlineRewriteRunner.cancelAll()
+  void getFeishuConnectorManager().cancelOperation()
   handleWindowDestroy()
   stopAllCronJobs()
 })

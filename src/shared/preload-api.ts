@@ -33,6 +33,7 @@ import type {
   CronTaskRegistration,
 } from './cron-types'
 import type { MarkitdownFormat } from './markitdown-runtime'
+import type { FeishuAuthChallenge, FeishuConnectorStatus } from './feishu-types'
 
 type Unsubscribe = () => void
 type Subscription<K extends keyof import('./ipc-types').IPCEventMap> =
@@ -231,6 +232,18 @@ export interface OfficeApi {
   installRuntime: () => Promise<IPCResponse<'office:installRuntime'>>
 }
 
+export interface FeishuApi {
+  status: () => Promise<IPCResponse<'feishu:status'>>
+  installRuntime: () => Promise<IPCResponse<'feishu:installRuntime'>>
+  startConfigure: () => Promise<IPCResponse<'feishu:startConfigure'>>
+  startLogin: () => Promise<IPCResponse<'feishu:startLogin'>>
+  grantCalendarAccess: () => Promise<IPCResponse<'feishu:grantCalendarAccess'>>
+  cancelOperation: () => Promise<IPCResponse<'feishu:cancelOperation'>>
+  logout: () => Promise<IPCResponse<'feishu:logout'>>
+  onStatusChanged: (callback: (status: FeishuConnectorStatus) => void) => Unsubscribe
+  onAuthChallenge: (callback: (challenge: FeishuAuthChallenge) => void) => Unsubscribe
+}
+
 export interface SearchApi {
   query: (keyword: string) => Promise<SearchResult[]>
 }
@@ -262,6 +275,7 @@ export interface WindowApi {
   skills: SkillsApi
   attachments: AttachmentsApi
   office: OfficeApi
+  feishu: FeishuApi
   search: SearchApi
   menu: MenuApi
   update: UpdateApi

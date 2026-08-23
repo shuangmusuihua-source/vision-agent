@@ -37,6 +37,26 @@ describe('agent options', () => {
     }))
     expect(options.settingSources).toEqual([])
     expect(options.settings).toEqual({ autoMemoryEnabled: false })
+    expect(options.env?.LARKSUITE_CLI_CONFIG_DIR).toBeUndefined()
+    expect(options.env?.PATH).not.toContain('/runtimes/lark-cli/')
+  })
+
+  it('exposes the isolated Feishu runtime only when the ready Skill is enabled', async () => {
+    const { buildAgentOptions } = await loadAgentOptions()
+
+    const options = buildAgentOptions({
+      memoryMode: 'disabled',
+      permissionMode: 'default',
+      allowedTools: ['Bash'],
+      skills: ['feishu'],
+    })
+
+    expect(options.env).toEqual(expect.objectContaining({
+      LARKSUITE_CLI_CONFIG_DIR: '/tmp/sumi-user-data/connectors/feishu',
+      LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1',
+      LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
+    }))
+    expect(options.env?.PATH).toContain('/tmp/sumi-user-data/runtimes/lark-cli/1.0.89/agent-bin')
   })
 
   it('uses one app-global memory directory independent of the Agent cwd', async () => {

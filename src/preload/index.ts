@@ -40,6 +40,8 @@ type CronRegisterRequest = IPCRequest<'cron:register'>
 type CronResolveScheduleRequest = IPCRequest<'cron:resolveSchedule'>
 type CronSetStatusRequest = IPCRequest<'cron:setStatus'>
 type CronTaskCompletedPayload = IPCEventPayload<'cron:taskCompleted'>
+type FeishuStatusChangedPayload = IPCEventPayload<'feishu:statusChanged'>
+type FeishuAuthChallengePayload = IPCEventPayload<'feishu:authChallenge'>
 
 type IPCInvokeArguments<K extends keyof IPCChannelMap> =
   IPCRequest<K> extends void
@@ -293,6 +295,26 @@ const api = {
   office: {
     runtimeStatus: () => invoke('office:runtimeStatus'),
     installRuntime: () => invoke('office:installRuntime'),
+  },
+
+  feishu: {
+    status: () => invoke('feishu:status'),
+    installRuntime: () => invoke('feishu:installRuntime'),
+    startConfigure: () => invoke('feishu:startConfigure'),
+    startLogin: () => invoke('feishu:startLogin'),
+    grantCalendarAccess: () => invoke('feishu:grantCalendarAccess'),
+    cancelOperation: () => invoke('feishu:cancelOperation'),
+    logout: () => invoke('feishu:logout'),
+    onStatusChanged: (callback: (status: FeishuStatusChangedPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: FeishuStatusChangedPayload) => callback(status)
+      ipcRenderer.on('feishu:statusChanged', handler)
+      return () => { ipcRenderer.removeListener('feishu:statusChanged', handler) }
+    },
+    onAuthChallenge: (callback: (challenge: FeishuAuthChallengePayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, challenge: FeishuAuthChallengePayload) => callback(challenge)
+      ipcRenderer.on('feishu:authChallenge', handler)
+      return () => { ipcRenderer.removeListener('feishu:authChallenge', handler) }
+    },
   },
 
   search: {

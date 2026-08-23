@@ -48,7 +48,7 @@ UI 定义示例：
 
 `outputMode: 'write'` 表示主要产物来自会话目录中的文件；`skill-output` 表示 Skill 通过专用围栏输出实时预览。省略时使用普通对话展示。
 
-需要额外下载运行组件的能力应设置 `defaultEnabled: false`。启用操作必须先由 main process 完成受管运行时准备，不能让 Skill 自行运行全局安装器。`office-documents` 使用这一模式：OfficeCLI 固定版本、发布资产哈希和原子安装由 `officecli-runtime.ts` 管理，Skill 只描述调用流程。
+需要额外下载运行组件的能力应设置 `defaultEnabled: false`。启用操作必须先由 main process 完成受管运行时准备，不能让 Skill 自行运行全局安装器。`office-documents` 使用这一模式：OfficeCLI 固定版本、发布资产哈希和原子安装由 `officecli-runtime.ts` 管理，Skill 只描述调用流程。`feishu` 在此基础上还要求连接器状态为已授权：版本、发布包与解压后二进制校验由 `feishu-runtime.ts` 负责，配置、认证和 Scope 补授权由 `feishu-connection.ts` 负责；Agent 只获得受管 CLI shim，Skill 不得自行安装、配置、登录或发起授权。
 
 ## 安装与发现
 

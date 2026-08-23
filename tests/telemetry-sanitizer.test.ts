@@ -10,6 +10,8 @@ describe('sanitizeTelemetryEvent', () => {
           'x-api-key': 'header-secret',
           authorization: 'Bearer credential',
         },
+        appSecret: 'feishu-app-secret',
+        tenant_access_token: 'feishu-tenant-token',
       },
     }
 
@@ -20,6 +22,8 @@ describe('sanitizeTelemetryEvent', () => {
           'x-api-key': '[Filtered]',
           authorization: '[Filtered]',
         },
+        appSecret: '[Filtered]',
+        tenant_access_token: '[Filtered]',
       },
     })
   })
