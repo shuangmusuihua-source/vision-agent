@@ -302,7 +302,7 @@ const api = {
     installRuntime: () => invoke('feishu:installRuntime'),
     startConfigure: () => invoke('feishu:startConfigure'),
     startLogin: () => invoke('feishu:startLogin'),
-    grantCalendarAccess: () => invoke('feishu:grantCalendarAccess'),
+    grantCapability: (capabilityId) => invoke('feishu:grantCapability', capabilityId),
     cancelOperation: () => invoke('feishu:cancelOperation'),
     logout: () => invoke('feishu:logout'),
     onStatusChanged: (callback: (status: FeishuStatusChangedPayload) => void) => {

@@ -40,6 +40,7 @@ import type {
 } from './officecli-runtime'
 import type {
   FeishuAuthChallenge,
+  FeishuCapabilityId,
   FeishuConnectorActionResult,
   FeishuConnectorStatus,
 } from './feishu-types'
@@ -417,8 +418,8 @@ export type IPCChannelMap = {
     request: void
     response: FeishuConnectorActionResult
   }
-  'feishu:grantCalendarAccess': {
-    request: void
+  'feishu:grantCapability': {
+    request: FeishuCapabilityId
     response: FeishuConnectorActionResult
   }
   'feishu:cancelOperation': {

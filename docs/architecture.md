@@ -65,7 +65,7 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 - `session-persistence-adapter.ts`：SDK 会话 materialization 与 app session 元数据之间的桥接
 - `inline-rewrite-runner.ts`：编辑器选区的临时 AI 改写；打开提示框时预热一次性 SDK 进程，提交后执行低推理强度的单轮纯 Markdown 改写；禁用工具与 transcript 持久化，可按 request ID 取消
 - `officecli-runtime.ts`：固定版本 OfficeCLI 的按需下载、SHA-256 校验、原子安装和能力探测；Agent 环境只获得受管二进制路径，并禁用 OfficeCLI 自更新
-- `feishu-runtime.ts` / `feishu-connection.ts`：固定版本飞书 CLI 的发布包与二进制双重校验、原子安装、独立配置目录、浏览器认证、Scope 补授权和身份状态；连接完成后才向 Agent 暴露飞书 Skill，Agent PATH 只包含会阻止 `auth`/`config`/原始 API 写入口的受管 shim
+- `feishu-runtime.ts` / `feishu-connection.ts`：固定版本飞书 CLI 的发布包与二进制双重校验、原子安装、独立配置目录、浏览器认证、按业务域增量授权和身份状态；连接器根据用户 token 中的 Scope 汇总各能力已获权限，但不把部分 Scope 误报为整个业务域完整可用。连接完成后才向 Agent 暴露飞书 Skill，Agent PATH 只包含会阻止 `auth`/`config`/原始 API 写入口的受管 shim
 - `managed-runtime-install.ts`：MarkItDown、OfficeCLI 与飞书 CLI 共用的原子安装 transaction seam；统一 single-flight、唯一 staging、旧目标 backup、激活后验证、失败 rollback 和残留清理，各 runtime adapter 只负责构建与验证自身产物
 - `src/shared/telemetry-sanitizer.ts`：Sentry `beforeSend` 的统一隐私边界，递归处理结构化字段与字符串中的 API Key、认证信息、session ID、URL 凭据和私有路径；清洗失败时事件不得发送
 

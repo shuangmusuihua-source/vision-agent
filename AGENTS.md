@@ -48,7 +48,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `agent-options.ts` — Claude SDK options, environment allowlist, CLI/native binary resolution, and read-only Skill runtime environment guards
 - `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
 - `officecli-runtime.ts` — opt-in, pinned OfficeCLI download, SHA-256 verification, atomic install, and runtime discovery for editable DOCX/XLSX/PPTX work
-- `feishu-runtime.ts`, `feishu-connection.ts` — opt-in pinned Feishu CLI runtime plus app-owned configuration, browser authorization/scope repair, connector status, Agent Skill readiness, and an Agent-only CLI shim that blocks auth/config/raw API commands
+- `feishu-runtime.ts`, `feishu-connection.ts` — opt-in pinned Feishu CLI runtime plus app-owned configuration, browser authorization, per-domain incremental scope grants, connector status, Agent Skill readiness, and an Agent-only CLI shim that blocks auth/config/raw API commands
 - `managed-runtime-install.ts` — shared single-flight staging, backup, activation validation, rollback, and cleanup transaction for app-managed runtimes
 - `memory-policy.ts`, `memory-files.ts` — application-global auto-memory policy and managed Markdown storage; interactive sessions share it, while automation and ephemeral model runs disable auto-memory
 - `session-transcript.ts` — app-owned transcript paging through JSONL and SDK adapters with Main-issued opaque cursors

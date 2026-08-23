@@ -1,42 +1,82 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  AppWindow,
   Bot,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronRight,
   CircleAlert,
-  Cloud,
+  ClipboardCheck,
+  Clock3,
+  Database,
   Download,
   ExternalLink,
   FileText,
+  FolderOpen,
+  Goal,
+  ListTodo,
   Loader2,
   LogOut,
+  Mail,
   MessageSquareText,
+  Presentation,
+  Radio,
   RefreshCw,
   ShieldCheck,
   Table2,
   UserRound,
+  UsersRound,
   Video,
+  type LucideIcon,
 } from 'lucide-react'
 import type {
   FeishuAuthChallenge,
+  FeishuCapabilityGroup,
+  FeishuCapabilityId,
   FeishuConnectorActionResult,
   FeishuConnectorPhase,
   FeishuConnectorStatus,
 } from '../../../shared/feishu-types'
-import { FEISHU_CALENDAR_READ_SCOPE } from '../../../shared/feishu-types'
+import {
+  FEISHU_CAPABILITIES,
+  getFeishuCapability,
+  getGrantedFeishuCapabilityScopes,
+} from '../../../shared/feishu-types'
 import { useModal } from '../common/ModalSystem'
 import './ConnectorPanel.css'
 
-type PendingAction = 'install' | 'configure' | 'login' | 'calendar' | 'cancel' | 'logout' | 'refresh' | null
+type FixedPendingAction = 'install' | 'configure' | 'login' | 'cancel' | 'logout' | 'refresh'
+type PendingAction = FixedPendingAction | `capability:${FeishuCapabilityId}` | null
 
-const capabilityItems = [
-  { icon: FileText, label: '云文档' },
-  { icon: Table2, label: '多维表格' },
-  { icon: Cloud, label: '知识库' },
-  { icon: CalendarDays, label: '日历', scope: FEISHU_CALENDAR_READ_SCOPE },
-  { icon: MessageSquareText, label: '消息' },
-  { icon: Video, label: '妙记' },
+const capabilityIcons: Record<FeishuCapabilityId, LucideIcon> = {
+  docs: FileText,
+  drive: FolderOpen,
+  base: Database,
+  sheets: Table2,
+  slides: Presentation,
+  wiki: BookOpen,
+  calendar: CalendarDays,
+  im: MessageSquareText,
+  task: ListTodo,
+  mail: Mail,
+  meeting: Video,
+  contact: UsersRound,
+  attendance: Clock3,
+  approval: ClipboardCheck,
+  okr: Goal,
+  apps: AppWindow,
+  event: Radio,
+}
+
+const capabilityGroups: Array<{
+  id: FeishuCapabilityGroup
+  label: string
+  description: string
+}> = [
+  { id: 'content', label: '内容与数据', description: '文档、知识和结构化数据' },
+  { id: 'collaboration', label: '沟通与协作', description: '日程、消息与团队工作' },
+  { id: 'organization', label: '组织与业务', description: '审批、目标和企业服务' },
 ]
 
 const phaseCopy: Record<FeishuConnectorPhase, { label: string; summary: string }> = {
@@ -132,8 +172,11 @@ function ConnectorPanel(): React.ReactElement {
   const botOnly = currentStatus.phase === 'bot-only'
   const hasIdentity = connected || botOnly
   const identity = currentStatus.identity
-  const calendarReady = identity?.userScopes?.includes(FEISHU_CALENDAR_READ_SCOPE) === true
-  const calendarNeedsAuthorization = connected && !calendarReady
+  const activeCapabilityId = currentStatus.activeCapabilityId ?? authChallenge?.capabilityId
+  const activeCapability = activeCapabilityId ? getFeishuCapability(activeCapabilityId) : undefined
+  const grantedCapabilityCount = FEISHU_CAPABILITIES.filter(capability => (
+    getGrantedFeishuCapabilityScopes(capability, identity?.userScopes).length > 0
+  )).length
 
   const runtimeNote = useMemo(() => {
     if (!status) return '正在读取本机连接器状态'
@@ -152,7 +195,9 @@ function ConnectorPanel(): React.ReactElement {
   ) => {
     setPending(action)
     setError(null)
-    if (action === 'configure' || action === 'login') setAuthChallenge(null)
+    if (action === 'configure' || action === 'login' || action.startsWith('capability:')) {
+      setAuthChallenge(null)
+    }
     try {
       const result = await operation()
       if (!result.success) throw new Error(result.error || '连接操作失败')
@@ -163,6 +208,13 @@ function ConnectorPanel(): React.ReactElement {
       setPending(null)
     }
   }, [loadStatus])
+
+  const handleGrantCapability = useCallback((capabilityId: FeishuCapabilityId) => {
+    void runAction(
+      `capability:${capabilityId}`,
+      () => window.api.feishu.grantCapability(capabilityId),
+    )
+  }, [runAction])
 
   const handleLogout = useCallback(async () => {
     const confirmed = await modal.confirm({
@@ -209,18 +261,6 @@ function ConnectorPanel(): React.ReactElement {
         >
           {pending === 'configure' ? <Loader2 className="connector-spin" size={15} /> : <ChevronRight size={15} />}
           配置飞书应用
-        </button>
-      )
-    }
-    if (calendarNeedsAuthorization) {
-      return (
-        <button
-          className="connector-primary-button"
-          disabled={disabled}
-          onClick={() => void runAction('calendar', window.api.feishu.grantCalendarAccess)}
-        >
-          {pending === 'calendar' ? <Loader2 className="connector-spin" size={15} /> : <CalendarDays size={15} />}
-          授权日历读取
         </button>
       )
     }
@@ -292,7 +332,7 @@ function ConnectorPanel(): React.ReactElement {
 
           <div className="connector-card-body">
             <div className="connector-status-copy">
-              <h3>{calendarNeedsAuthorization ? '账号已连接；补充日历读取权限后即可查询你的日程。' : copy.summary}</h3>
+              <h3>{copy.summary}</h3>
               <p>{runtimeNote}</p>
               {currentStatus.error || error ? (
                 <div className="connector-inline-error" role="alert">
@@ -306,8 +346,10 @@ function ConnectorPanel(): React.ReactElement {
                   <div>
                     <strong>{authChallenge.operation === 'configure'
                       ? '继续配置'
-                      : authChallenge.operation === 'grant-calendar' ? '完成日历授权' : '完成账号授权'}</strong>
-                    <span>将在系统浏览器打开飞书官方页面</span>
+                      : authChallenge.operation === 'grant-capability'
+                        ? `完成「${activeCapability?.label || '飞书能力'}」授权`
+                        : '完成账号授权'}</strong>
+                    <span>在飞书官方页面确认本次新增的权限范围</span>
                   </div>
                   <button onClick={() => void openAuthorization()}>
                     打开页面
@@ -335,16 +377,14 @@ function ConnectorPanel(): React.ReactElement {
               {primaryAction}
               {connected ? (
                 <>
-                  {!calendarNeedsAuthorization ? (
-                    <button
-                      className="connector-secondary-button"
-                      disabled={pending !== null}
-                      onClick={() => void loadStatus(true)}
-                    >
-                      <RefreshCw className={pending === 'refresh' ? 'connector-spin' : undefined} size={14} />
-                      验证连接
-                    </button>
-                  ) : null}
+                  <button
+                    className="connector-secondary-button"
+                    disabled={pending !== null}
+                    onClick={() => void loadStatus(true)}
+                  >
+                    <RefreshCw className={pending === 'refresh' ? 'connector-spin' : undefined} size={14} />
+                    验证连接
+                  </button>
                   <button
                     className="connector-quiet-button"
                     disabled={pending !== null}
@@ -357,24 +397,79 @@ function ConnectorPanel(): React.ReactElement {
               ) : null}
             </div>
           </div>
+        </section>
 
-          <div className="connector-capabilities" aria-label="飞书能力范围">
-            {capabilityItems.map(item => {
-              const Icon = item.icon
-              const missing = Boolean(item.scope && connected && !identity?.userScopes?.includes(item.scope))
+        {hasIdentity ? (
+          <section className="connector-permissions" aria-labelledby="feishu-permissions-title">
+            <div className="connector-permissions-header">
+              <div>
+                <span>按需开启</span>
+                <h2 id="feishu-permissions-title">能力与权限</h2>
+                <p>一个业务域只需授权一次；后续新增权限时可以再次扩展。</p>
+              </div>
+              <div className="connector-permissions-summary">
+                <strong>{identity?.userAvailable ? grantedCapabilityCount : 0}</strong>
+                <span>/ {FEISHU_CAPABILITIES.length} 个域已有权限</span>
+              </div>
+            </div>
+
+            {capabilityGroups.map(group => {
+              const capabilities = FEISHU_CAPABILITIES.filter(capability => capability.group === group.id)
               return (
-                <span
-                  key={item.label}
-                  className={missing ? 'connector-capability-missing' : undefined}
-                  title={missing ? '需要补充授权' : undefined}
-                >
-                  <Icon size={14} />
-                  {item.label}{missing ? ' · 待授权' : ''}
-                </span>
+                <div className="connector-permission-group" key={group.id}>
+                  <div className="connector-permission-group-heading">
+                    <strong>{group.label}</strong>
+                    <span>{group.description}</span>
+                  </div>
+                  <div className="connector-permission-grid">
+                    {capabilities.map(capability => {
+                      const Icon = capabilityIcons[capability.id]
+                      const grantedScopes = getGrantedFeishuCapabilityScopes(
+                        capability,
+                        identity?.userScopes,
+                      )
+                      const authorized = grantedScopes.length > 0
+                      const authorizing = activeCapabilityId === capability.id && operating
+                      const actionPending = pending === `capability:${capability.id}`
+                      return (
+                        <article
+                          className={`connector-permission-item${authorized ? ' connector-permission-item-authorized' : ''}`}
+                          key={capability.id}
+                        >
+                          <div className="connector-permission-icon"><Icon size={16} /></div>
+                          <div className="connector-permission-copy">
+                            <strong>{capability.label}</strong>
+                            <span>{capability.description}</span>
+                          </div>
+                          <div className="connector-permission-footer">
+                            <span className={`connector-permission-state${authorized ? ' is-authorized' : ''}`}>
+                              <i />
+                              {identity?.userAvailable
+                                ? authorized ? `已有 ${grantedScopes.length} 项权限` : '尚未授权'
+                                : '需要用户身份'}
+                            </span>
+                            {connected ? (
+                              <button
+                                className="connector-capability-action"
+                                disabled={pending !== null || operating}
+                                onClick={() => handleGrantCapability(capability.id)}
+                              >
+                                {actionPending || authorizing
+                                  ? <Loader2 className="connector-spin" size={12} />
+                                  : null}
+                                {authorized ? '扩展' : '授权'}
+                              </button>
+                            ) : null}
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                </div>
               )
             })}
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         <div className="connector-foot-grid">
           <section className="connector-note-card">

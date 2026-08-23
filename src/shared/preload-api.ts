@@ -33,7 +33,11 @@ import type {
   CronTaskRegistration,
 } from './cron-types'
 import type { MarkitdownFormat } from './markitdown-runtime'
-import type { FeishuAuthChallenge, FeishuConnectorStatus } from './feishu-types'
+import type {
+  FeishuAuthChallenge,
+  FeishuCapabilityId,
+  FeishuConnectorStatus,
+} from './feishu-types'
 
 type Unsubscribe = () => void
 type Subscription<K extends keyof import('./ipc-types').IPCEventMap> =
@@ -237,7 +241,9 @@ export interface FeishuApi {
   installRuntime: () => Promise<IPCResponse<'feishu:installRuntime'>>
   startConfigure: () => Promise<IPCResponse<'feishu:startConfigure'>>
   startLogin: () => Promise<IPCResponse<'feishu:startLogin'>>
-  grantCalendarAccess: () => Promise<IPCResponse<'feishu:grantCalendarAccess'>>
+  grantCapability: (
+    capabilityId: FeishuCapabilityId,
+  ) => Promise<IPCResponse<'feishu:grantCapability'>>
   cancelOperation: () => Promise<IPCResponse<'feishu:cancelOperation'>>
   logout: () => Promise<IPCResponse<'feishu:logout'>>
   onStatusChanged: (callback: (status: FeishuConnectorStatus) => void) => Unsubscribe

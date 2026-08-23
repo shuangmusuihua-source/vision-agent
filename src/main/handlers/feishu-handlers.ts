@@ -2,7 +2,11 @@ import { ipcMain } from 'electron'
 import { getFeishuConnectorManager } from '../feishu-connection'
 import { getEnabledSkills, toggleSkill } from '../persistence/settings-store'
 import { getMainWindow } from '../ipc-sender'
-import type { FeishuAuthChallenge, FeishuConnectorStatus } from '../../shared/feishu-types'
+import type {
+  FeishuAuthChallenge,
+  FeishuCapabilityId,
+  FeishuConnectorStatus,
+} from '../../shared/feishu-types'
 
 export function registerFeishuHandlers(): void {
   const connector = getFeishuConnectorManager()
@@ -31,7 +35,10 @@ export function registerFeishuHandlers(): void {
   ipcMain.handle('feishu:installRuntime', () => connector.installRuntime())
   ipcMain.handle('feishu:startConfigure', () => connector.startConfigure())
   ipcMain.handle('feishu:startLogin', () => connector.startLogin())
-  ipcMain.handle('feishu:grantCalendarAccess', () => connector.grantCalendarAccess())
+  ipcMain.handle(
+    'feishu:grantCapability',
+    (_event, capabilityId: FeishuCapabilityId) => connector.grantCapability(capabilityId),
+  )
   ipcMain.handle('feishu:cancelOperation', () => connector.cancelOperation())
   ipcMain.handle('feishu:logout', () => connector.logout())
 }

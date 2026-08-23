@@ -10,17 +10,27 @@ import {
 } from './feishu-runtime'
 import type {
   FeishuAuthChallenge,
+  FeishuCapabilityId,
   FeishuConnectorActionResult,
   FeishuConnectorIdentity,
   FeishuConnectorStatus,
 } from '../shared/feishu-types'
-import { FEISHU_CALENDAR_READ_SCOPE } from '../shared/feishu-types'
+import { getFeishuCapability } from '../shared/feishu-types'
 
-type FeishuSetupOperation = 'configure' | 'login' | 'grant-calendar'
+type FeishuSetupOperation = 'configure' | 'login' | 'grant-capability'
 
 interface CliResult {
   stdout: string
   stderr: string
+}
+
+export function buildFeishuCapabilityAuthorizationArgs(
+  capabilityId: FeishuCapabilityId,
+): string[] | null {
+  const capability = getFeishuCapability(capabilityId)
+  return capability
+    ? ['auth', 'login', '--domain', capability.cliDomains.join(','), '--json']
+    : null
 }
 
 function stripAnsi(value: string): string {
@@ -135,6 +145,7 @@ function friendlyCliError(value: string): string {
 export class FeishuConnectorManager extends EventEmitter {
   private activeProcess: ChildProcess | null = null
   private activeOperation: FeishuSetupOperation | null = null
+  private activeCapabilityId: FeishuCapabilityId | null = null
   private lastError: string | null = null
   private streamBuffer = ''
   private emittedChallengeUrls = new Set<string>()
@@ -180,6 +191,7 @@ export class FeishuConnectorManager extends EventEmitter {
       return {
         phase: this.activeOperation === 'configure' ? 'configuring' : 'authorizing',
         runtime,
+        activeCapabilityId: this.activeCapabilityId ?? undefined,
       }
     }
     if (this.lastError) return { phase: 'error', runtime, error: this.lastError }
@@ -220,18 +232,20 @@ export class FeishuConnectorManager extends EventEmitter {
     return this.startOperation('login')
   }
 
-  async grantCalendarAccess(): Promise<FeishuConnectorActionResult> {
+  async grantCapability(capabilityId: FeishuCapabilityId): Promise<FeishuConnectorActionResult> {
+    const capability = getFeishuCapability(capabilityId)
+    if (!capability) return { success: false, error: '不支持该飞书能力' }
     const status = await this.getStatus({ verify: false })
     if (!status.identity?.userAvailable) {
       return { success: false, error: '请先登录飞书账号' }
     }
-    if (status.identity.userScopes?.includes(FEISHU_CALENDAR_READ_SCOPE)) {
-      return { success: true }
-    }
-    return this.startOperation('grant-calendar')
+    return this.startOperation('grant-capability', capabilityId)
   }
 
-  private async startOperation(operation: FeishuSetupOperation): Promise<FeishuConnectorActionResult> {
+  private async startOperation(
+    operation: FeishuSetupOperation,
+    capabilityId?: FeishuCapabilityId,
+  ): Promise<FeishuConnectorActionResult> {
     if (this.activeProcess) return { success: false, error: '已有飞书连接操作正在进行' }
     const runtime = await this.runtime.getStatus()
     if (runtime.state !== 'ready') return { success: false, error: '请先安装飞书 CLI 运行组件' }
@@ -240,10 +254,13 @@ export class FeishuConnectorManager extends EventEmitter {
     this.lastError = null
     this.streamBuffer = ''
     this.emittedChallengeUrls.clear()
+    const capabilityArgs = capabilityId
+      ? buildFeishuCapabilityAuthorizationArgs(capabilityId)
+      : null
     const args = operation === 'configure'
       ? ['config', 'init', '--new', '--brand', 'feishu', '--lang', 'zh']
-      : operation === 'grant-calendar'
-        ? ['auth', 'login', '--scope', FEISHU_CALENDAR_READ_SCOPE, '--json']
+      : operation === 'grant-capability' && capabilityArgs
+        ? capabilityArgs
         : ['auth', 'login', '--recommend', '--json']
     const child = spawn(runtime.executablePath, args, {
       cwd: getFeishuCliConfigDir(),
@@ -252,8 +269,17 @@ export class FeishuConnectorManager extends EventEmitter {
     })
     this.activeProcess = child
     this.activeOperation = operation
-    child.stdout.on('data', (chunk: Buffer) => this.handleOperationOutput(operation, chunk.toString('utf8')))
-    child.stderr.on('data', (chunk: Buffer) => this.handleOperationOutput(operation, chunk.toString('utf8')))
+    this.activeCapabilityId = operation === 'grant-capability' ? capabilityId ?? null : null
+    child.stdout.on('data', (chunk: Buffer) => this.handleOperationOutput(
+      operation,
+      chunk.toString('utf8'),
+      capabilityId,
+    ))
+    child.stderr.on('data', (chunk: Buffer) => this.handleOperationOutput(
+      operation,
+      chunk.toString('utf8'),
+      capabilityId,
+    ))
     child.once('error', (error) => {
       this.lastError = friendlyCliError(error.message)
     })
@@ -261,6 +287,7 @@ export class FeishuConnectorManager extends EventEmitter {
       if (this.activeProcess !== child) return
       this.activeProcess = null
       this.activeOperation = null
+      this.activeCapabilityId = null
       if (code !== 0 && signal !== 'SIGTERM') {
         this.lastError = friendlyCliError(this.streamBuffer || `飞书 CLI 退出码 ${String(code)}`)
       }
@@ -270,12 +297,16 @@ export class FeishuConnectorManager extends EventEmitter {
     return { success: true }
   }
 
-  private handleOperationOutput(operation: FeishuSetupOperation, output: string): void {
+  private handleOperationOutput(
+    operation: FeishuSetupOperation,
+    output: string,
+    capabilityId?: FeishuCapabilityId,
+  ): void {
     this.streamBuffer = `${this.streamBuffer}${output}`.slice(-16_000)
     for (const url of findHttpsUrls(this.streamBuffer)) {
       if (this.emittedChallengeUrls.has(url)) continue
       this.emittedChallengeUrls.add(url)
-      const challenge: FeishuAuthChallenge = { operation, url }
+      const challenge: FeishuAuthChallenge = { operation, capabilityId, url }
       this.emit('auth-challenge', challenge)
     }
   }
@@ -285,6 +316,7 @@ export class FeishuConnectorManager extends EventEmitter {
     this.activeProcess.kill('SIGTERM')
     this.activeProcess = null
     this.activeOperation = null
+    this.activeCapabilityId = null
     this.lastError = null
     await this.emitStatus()
     return { success: true }
