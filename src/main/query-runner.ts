@@ -22,7 +22,7 @@ import {
 } from './persistence/workspace-store'
 import { getEnabledSkills } from './persistence/settings-store'
 import { notifyAgentComplete } from './notification-manager'
-import { buildAgentOptions } from './agent-options'
+import { buildAgentOptions, INTERACTIVE_TASK_TOOLS } from './agent-options'
 import { buildSumiContextPrompt, buildSumiIdentityPrompt } from './agent-identity'
 import type {
   PreToolUseHookInput,
@@ -217,9 +217,11 @@ function buildOptions(
   return buildAgentOptions({
     memoryMode,
     permissionMode: approvalMode === 'auto' ? 'auto' : 'default',
-    // Bare allow-list entries bypass canUseTool in recent SDK versions. Keep
-    // this empty so every tool request reaches the session authorization gate.
-    allowedTools: [],
+    // SDK 0.3.233+ removes task tracking tools from the default surface on
+    // newer models unless they are named explicitly. These tools only mutate
+    // the SDK's in-memory task list, which drives sumi's progress UI; all
+    // filesystem, network, and connector tools still reach canUseTool.
+    allowedTools: [...INTERACTIVE_TASK_TOOLS],
     includePartialMessages: true,
     settingSources: ['project'],
     managedSettings: {

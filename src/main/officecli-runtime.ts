@@ -22,13 +22,13 @@ export interface OfficeCliReleaseAsset {
 const RELEASE_ASSETS: Record<string, OfficeCliReleaseAsset> = {
   'darwin-arm64': {
     fileName: 'officecli-mac-arm64',
-    size: 33_740_304,
-    sha256: '2f158d46f9b6c5eb0dfe4eb02038114001e17acc47b67347417c56dcf9659096',
+    size: 33_760_816,
+    sha256: '04757163428c5bde8d91e8f838517818e74722157722ca5f3877b6716b77bd45',
   },
   'darwin-x64': {
     fileName: 'officecli-mac-x64',
-    size: 34_680_704,
-    sha256: '693d243db616c74705fec9d92fdfc8a3db36acfcea378edb7264c2a30d339d9c',
+    size: 34_705_536,
+    sha256: '366100643d757b0da24829422897ca74768a894b5ecd1a471a1336f8e2a0787d',
   },
 }
 

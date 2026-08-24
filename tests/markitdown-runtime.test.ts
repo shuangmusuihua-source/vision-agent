@@ -4,6 +4,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   MARKITDOWN_PACKAGE_SPEC,
+  MARKITDOWN_VERSION,
   MarkitdownRuntimeManager,
   buildPythonCandidates,
   isSupportedPythonVersion,
@@ -129,7 +130,7 @@ describe('MarkItDown runtime discovery', () => {
           return {
             stdout: probeOutput({
               executable: command,
-              markitdownVersion: '0.1.6',
+              markitdownVersion: MARKITDOWN_VERSION,
               supportedFormats: ['pdf', 'docx', 'pptx', 'xlsx'],
             }),
             stderr: '',
@@ -158,7 +159,7 @@ describe('MarkItDown runtime discovery', () => {
 
     expect(result).toMatchObject({
       success: true,
-      status: { state: 'ready', source: 'managed', markitdownVersion: '0.1.6' },
+      status: { state: 'ready', source: 'managed', markitdownVersion: MARKITDOWN_VERSION },
     })
     expect(calls.some(call => call.args.includes(MARKITDOWN_PACKAGE_SPEC))).toBe(true)
   })

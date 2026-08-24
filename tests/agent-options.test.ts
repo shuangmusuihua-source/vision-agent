@@ -19,6 +19,17 @@ async function loadAgentOptions() {
 }
 
 describe('agent options', () => {
+  it('keeps interactive task tools explicit for SDK versions that hide them by default', async () => {
+    const { INTERACTIVE_TASK_TOOLS } = await loadAgentOptions()
+
+    expect(INTERACTIVE_TASK_TOOLS).toEqual([
+      'TaskCreate',
+      'TaskGet',
+      'TaskUpdate',
+      'TaskList',
+    ])
+  })
+
   it('always routes through the app profile baseUrl for background runs', async () => {
     const { buildAgentOptions } = await loadAgentOptions()
 

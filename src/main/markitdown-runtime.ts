@@ -12,7 +12,7 @@ import {
   type MarkitdownRuntimeStatus,
 } from '../shared/markitdown-runtime'
 
-export const MARKITDOWN_VERSION = '0.1.6'
+export const MARKITDOWN_VERSION = '0.1.7'
 export const MINIMUM_PYTHON_VERSION = '3.10'
 export const MARKITDOWN_PACKAGE_SPEC = `markitdown[pdf,docx,pptx,xlsx]==${MARKITDOWN_VERSION}`
 

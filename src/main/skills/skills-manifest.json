@@ -24,10 +24,10 @@
     "id": "office-documents",
     "hasResources": true,
     "requiredPaths": ["SKILL.md", "agents/openai.yaml"],
-    "version": "1.0.143",
+    "version": "1.0.144",
     "source": {
       "repositoryUrl": "https://github.com/iOfficeAI/OfficeCLI",
-      "ref": "fd4adab4dbe3283b62e3edcfad124dd648fa74bc",
+      "ref": "1ced45e900782c5083ed550ddf328ee974e425e7",
       "license": "Apache-2.0"
     }
   },

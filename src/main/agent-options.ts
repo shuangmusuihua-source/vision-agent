@@ -7,6 +7,13 @@ import { getAgentMemorySettings, GLOBAL_MEMORY_PROMPT, type AgentMemoryMode } fr
 import { getOfficeCliBinDir } from './officecli-runtime'
 import { getFeishuCliAgentBinDir, getFeishuCliConfigDir } from './feishu-runtime'
 
+export const INTERACTIVE_TASK_TOOLS = [
+  'TaskCreate',
+  'TaskGet',
+  'TaskUpdate',
+  'TaskList',
+] as const
+
 // ─── CLI path resolution (moved from agent-manager) ────────────────────
 
 let _cachedCliPath: string | undefined | null = null
