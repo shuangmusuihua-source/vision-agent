@@ -1718,23 +1718,30 @@
 
 /* --- Skill Status Bar --- */
 
-.skill-status-bar {
-  position: sticky;
+.skill-status-layer {
+  position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 10;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.skill-status-bar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  margin: 0 auto;
-  align-self: center;
   width: fit-content;
-  background: var(--chat-status-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  max-width: 100%;
+  background: var(--composer-bg);
   border-radius: 24px;
   -electron-corner-smoothing: system-ui;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--skill-status-shadow);
+  pointer-events: auto;
 }
 
 .skill-status-icon {

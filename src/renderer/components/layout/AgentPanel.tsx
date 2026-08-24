@@ -86,14 +86,16 @@ function AgentPanel({ context = 'editor', width, workspacePath, permissionReques
           <div className="agent-panel-content">
             <div className="agent-panel-messages">
             {activeSkillMeta && activeSkillMeta.status === 'running' && !skillDrawerHidden && (
-              <div className="skill-status-bar">
-                <div className="skill-status-icon"><div className="skill-status-spinner" /></div>
-                <span className="skill-status-name">{activeSkillMeta.name}</span>
-                <div className="skill-status-divider" />
-                <span className="skill-status-phase">执行中<span className="skill-status-phase-dots"><span>.</span><span>.</span><span>.</span></span></span>
-                <button className="skill-status-close" onClick={() => setSkillDrawerHidden(true)}>
-                  <X size={14} />
-                </button>
+              <div className="skill-status-layer">
+                <div className="skill-status-bar">
+                  <div className="skill-status-icon"><div className="skill-status-spinner" /></div>
+                  <span className="skill-status-name">{activeSkillMeta.name}</span>
+                  <div className="skill-status-divider" />
+                  <span className="skill-status-phase">执行中<span className="skill-status-phase-dots"><span>.</span><span>.</span><span>.</span></span></span>
+                  <button className="skill-status-close" onClick={() => setSkillDrawerHidden(true)}>
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             )}
             {children}

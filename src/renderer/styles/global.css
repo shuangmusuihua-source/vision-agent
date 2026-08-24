@@ -104,13 +104,13 @@
   /* Agent composer */
   --composer-bg: var(--color-bg-elevated);
   --composer-shadow: 0 10px 30px color-mix(in srgb, var(--color-gray-900) 8%, transparent), 0 2px 8px color-mix(in srgb, var(--color-gray-900) 4%, transparent);
+  --skill-status-shadow: 0 18px 44px color-mix(in srgb, var(--color-gray-900) 16%, transparent), 0 4px 12px color-mix(in srgb, var(--color-gray-900) 8%, transparent);
 
   /* Agent messages */
   --chat-user-bg: var(--color-gray-900);
   --chat-user-text: var(--color-white);
   --chat-assistant-text: var(--color-gray-700);
   --chat-assistant-surface: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
-  --chat-status-surface: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
 
   /* Thinking typewriter */
   --thinking-typewriter-primary: var(--color-action);
@@ -276,6 +276,7 @@
   --sidebar-entry-selected-hover: color-mix(in srgb, var(--color-action) 19%, var(--color-bg-elevated));
   --composer-bg: var(--color-bg-elevated);
   --composer-shadow: 0 12px 32px color-mix(in srgb, var(--color-black) 28%, transparent), 0 2px 8px color-mix(in srgb, var(--color-black) 20%, transparent);
+  --skill-status-shadow: 0 20px 48px color-mix(in srgb, var(--color-black) 42%, transparent), 0 5px 16px color-mix(in srgb, var(--color-black) 28%, transparent);
   --chat-user-bg: var(--color-bg-tertiary);
   --chat-user-text: var(--color-text-primary);
   --chat-assistant-text: var(--color-text-primary);

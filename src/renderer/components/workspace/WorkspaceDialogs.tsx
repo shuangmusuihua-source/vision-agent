@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import type { WorkspaceDeleteResult } from '../../../shared/workspace-lifecycle'
 import type { WorkspaceDialogsController } from '../../hooks/useWorkspace'
+import { useImeEnterGuard } from '../../hooks/useImeEnterGuard'
 import { useModal } from '../common/ModalSystem'
 
 interface WorkspaceDialogsProps {
@@ -31,6 +32,8 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
   const workspaceName = remove.path?.split('/').pop() || ''
   const canDelete = !!remove.path && remove.confirmation === workspaceName && !remove.pending
   const deleteRequestRef = useRef<Promise<void> | null>(null)
+  const createImeEnterGuard = useImeEnterGuard()
+  const deleteImeEnterGuard = useImeEnterGuard()
 
   const handleDelete = (): Promise<void> => {
     if (deleteRequestRef.current) return deleteRequestRef.current
@@ -75,8 +78,10 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
               placeholder="工作区名称"
               value={create.name}
               onChange={(event) => create.setName(event.target.value)}
+              onCompositionStart={createImeEnterGuard.onCompositionStart}
+              onCompositionEnd={createImeEnterGuard.onCompositionEnd}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.isComposing && !create.pending) {
+                if (event.key === 'Enter' && !createImeEnterGuard.isImeConfirm(event) && !create.pending) {
                   void create.submit()
                 }
               }}
@@ -119,9 +124,11 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
               placeholder={workspaceName}
               value={remove.confirmation}
               onChange={(event) => remove.setConfirmation(event.target.value)}
+              onCompositionStart={deleteImeEnterGuard.onCompositionStart}
+              onCompositionEnd={deleteImeEnterGuard.onCompositionEnd}
               onKeyDown={(event) => {
                 if (event.key === 'Escape' && !remove.pending) remove.close()
-                if (event.key === 'Enter' && !event.isComposing && canDelete) {
+                if (event.key === 'Enter' && !deleteImeEnterGuard.isImeConfirm(event) && canDelete) {
                   void handleDelete()
                 }
               }}

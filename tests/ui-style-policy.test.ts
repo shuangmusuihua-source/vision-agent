@@ -18,6 +18,8 @@ const memoryCssPath = fileURLToPath(new URL('../src/renderer/components/settings
 const memoryCss = readFileSync(memoryCssPath, 'utf8')
 const overviewCssPath = fileURLToPath(new URL('../src/renderer/components/layout/OverviewPanel.css', import.meta.url))
 const overviewCss = readFileSync(overviewCssPath, 'utf8')
+const chatCssPath = fileURLToPath(new URL('../src/renderer/styles/chat.css', import.meta.url))
+const chatCss = readFileSync(chatCssPath, 'utf8')
 
 function declarationsFor(css: string, selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -74,6 +76,15 @@ describe('global UI style policy', () => {
     )
     expect(declarationsFor(overviewCss, '.overview-icon-action')).toMatch(
       /width:\s*32px;[\s\S]*height:\s*32px;/,
+    )
+  })
+
+  it('floats the running Skill status without blocking message interactions', () => {
+    expect(declarationsFor(chatCss, '.skill-status-layer')).toMatch(
+      /position:\s*absolute;[\s\S]*pointer-events:\s*none;/,
+    )
+    expect(declarationsFor(chatCss, '.skill-status-bar')).toMatch(
+      /background:\s*var\(--composer-bg\);[\s\S]*box-shadow:\s*var\(--skill-status-shadow\);[\s\S]*pointer-events:\s*auto;/,
     )
   })
 })

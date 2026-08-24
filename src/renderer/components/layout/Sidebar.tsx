@@ -7,6 +7,7 @@ import { ASK_ASSISTANT_NAME } from '../../../shared/branding'
 import { filterUserWorkspacePaths } from '../../../shared/workspace-paths'
 import type { SdkSessionInfo } from '../../../shared/types'
 import type { PrimaryView } from '../../store/ui-slice'
+import { useImeEnterGuard } from '../../hooks/useImeEnterGuard'
 import SidebarToolDock from './SidebarToolDock'
 import { AskSumiIcon, AutomationIcon, ConnectorsIcon, KnowledgeIcon, SkillsIcon } from './SidebarPrimaryIcons'
 import {
@@ -150,7 +151,7 @@ function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameText, setRenameText] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
-  const imeCompositionRef = useRef({ active: false, endedAt: 0 })
+  const imeEnterGuard = useImeEnterGuard()
   const userWorkspacePaths = filterUserWorkspacePaths(workspacePaths, fixedWorkspacePaths)
   const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions])
   // Streaming mutates full cached slots frequently. Subscribe only to primitive
@@ -159,22 +160,6 @@ function Sidebar({
   const sessionIndicators = useAgentStore(useShallow((state) => (
     buildSidebarSessionIndicators(sessionIds, state.sessionSlots)
   )))
-
-  const handleCompositionStart = useCallback(() => {
-    imeCompositionRef.current.active = true
-  }, [])
-
-  const handleCompositionEnd = useCallback(() => {
-    imeCompositionRef.current = { active: false, endedAt: performance.now() }
-  }, [])
-
-  const isImeConfirm = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    const nativeEvent = event.nativeEvent
-    return nativeEvent.isComposing ||
-      nativeEvent.keyCode === 229 ||
-      imeCompositionRef.current.active ||
-      performance.now() - imeCompositionRef.current.endedAt < 100
-  }, [])
 
   const toggleWorkspace = useCallback((path: string) => {
     setCollapsedWorkspaces((prev) => {
@@ -391,10 +376,10 @@ function Sidebar({
                                     className="sidebar-new-file-field sidebar-session-rename-field"
                                     value={renameText}
                                     onChange={(e) => setRenameText(e.target.value)}
-                                    onCompositionStart={handleCompositionStart}
-                                    onCompositionEnd={handleCompositionEnd}
+                                    onCompositionStart={imeEnterGuard.onCompositionStart}
+                                    onCompositionEnd={imeEnterGuard.onCompositionEnd}
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !isImeConfirm(e)) {
+                                      if (e.key === 'Enter' && !imeEnterGuard.isImeConfirm(e)) {
                                         const name = renameText.trim()
                                         if (name) void onRenameSession(session.id, name)
                                         setRenamingId(null)
@@ -460,10 +445,10 @@ function Sidebar({
                               placeholder="会话名称"
                               value={newSessionName}
                               onChange={(e) => onNewSessionNameChange(e.target.value)}
-                              onCompositionStart={handleCompositionStart}
-                              onCompositionEnd={handleCompositionEnd}
+                              onCompositionStart={imeEnterGuard.onCompositionStart}
+                              onCompositionEnd={imeEnterGuard.onCompositionEnd}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !isImeConfirm(e)) onCreateSession(wsPath)
+                                if (e.key === 'Enter' && !imeEnterGuard.isImeConfirm(e)) onCreateSession(wsPath)
                                 if (e.key === 'Escape') { onNewSessionNameChange(''); onCancelNewSession() }
                               }}
                               onBlur={() => {
