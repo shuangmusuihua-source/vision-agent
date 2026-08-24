@@ -112,9 +112,9 @@
   --chat-assistant-surface: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
   --chat-status-surface: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
 
-  /* Thinking typewriter — Nawsome/Uiverse original palette */
-  --thinking-typewriter-blue: #5c86ff;
-  --thinking-typewriter-blue-dark: #275efe;
+  /* Thinking typewriter */
+  --thinking-typewriter-primary: var(--color-action);
+  --thinking-typewriter-primary-hover: var(--color-action-hover);
   --thinking-typewriter-key: #ffffff;
   --thinking-typewriter-paper: #eef0fd;
   --thinking-typewriter-text: #d3d4ec;

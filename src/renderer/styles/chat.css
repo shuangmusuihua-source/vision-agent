@@ -403,26 +403,29 @@
   color: var(--color-text-secondary);
   white-space: nowrap;
   background: linear-gradient(
-    105deg,
+    100deg,
     var(--color-text-secondary) 36%,
-    var(--color-text-primary) 49%,
-    var(--color-text-secondary) 62%
+    color-mix(in srgb, var(--color-action) 48%, var(--color-text-primary)) 46%,
+    var(--color-action) 50%,
+    color-mix(in srgb, var(--color-action) 48%, var(--color-text-primary)) 54%,
+    var(--color-text-secondary) 64%
   );
-  background-size: 250% 100%;
-  background-position: 140% 0;
+  background-size: 280% 100%;
+  background-position: 100% 0;
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: thinking-status-shimmer 2.2s ease-in-out infinite;
+  will-change: background-position;
+  animation: thinking-status-shimmer 1.9s linear infinite;
 }
 
 @keyframes thinking-status-shimmer {
-  0% {
-    background-position: 140% 0;
+  from {
+    background-position: 100% 0;
   }
 
-  70%, 100% {
-    background-position: -100% 0;
+  to {
+    background-position: 0 0;
   }
 }
 
@@ -450,24 +453,24 @@
  */
 .message-thinking-status .typewriter-viewport {
   position: relative;
-  width: 33px;
-  height: 26px;
+  width: 26.4px;
+  height: 20.8px;
   flex: 0 0 auto;
 }
 
 .message-thinking-status .typewriter-scale {
   position: absolute;
-  top: 8px;
+  top: 6.4px;
   left: 0;
   width: 120px;
   height: 66px;
-  transform: scale(0.272);
+  transform: scale(0.2176);
   transform-origin: 0 0;
 }
 
 .message-thinking-status .typewriter {
-  --blue: var(--thinking-typewriter-blue);
-  --blue-dark: var(--thinking-typewriter-blue-dark);
+  --primary: var(--thinking-typewriter-primary);
+  --primary-hover: var(--thinking-typewriter-primary-hover);
   --key: var(--thinking-typewriter-key);
   --paper: var(--thinking-typewriter-paper);
   --text: var(--thinking-typewriter-text);
@@ -485,7 +488,7 @@
   border-radius: 3px;
   margin-left: 14px;
   transform: translateX(14px);
-  background: linear-gradient(var(--blue), var(--blue-dark));
+  background: linear-gradient(var(--primary), var(--primary-hover));
   animation: slide05 var(--duration) ease infinite;
 }
 
@@ -575,7 +578,7 @@
   right: 0;
   bottom: 0;
   border-radius: 7px;
-  background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   transform: perspective(10px) rotateX(2deg);
   transform-origin: 50% 100%;
 }
