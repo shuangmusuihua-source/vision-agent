@@ -1529,16 +1529,32 @@
   right: 10%;
   bottom: 0;
   z-index: 20;
-  padding: 10px 12px 6px;
+  padding: 0;
   margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-task-progress-layer {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  margin: 0 12px -10px;
+}
+
+.agent-composer-surface {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px 6px;
   background: var(--composer-bg);
   border: 1px solid transparent;
   border-radius: 20px;
   box-shadow: var(--composer-shadow);
   -electron-corner-smoothing: system-ui;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .sidebar-toggle-btn:focus-visible,

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronUp, ChevronDown, X, Loader2, Check } from 'lucide-react'
+import { useId, useState } from 'react'
+import { ChevronUp, ChevronDown, X, LoaderCircle, Circle, CircleCheck } from 'lucide-react'
 import type { TodoTaskList } from '../../../shared/types'
 import styles from './TodoPanel.module.css'
 
@@ -9,19 +9,24 @@ interface TodoPanelProps {
 }
 
 function statusIcon(status: string) {
-  if (status === 'completed') return <Check size={12} className={styles.iconDone} />
-  if (status === 'in_progress') return <Loader2 size={12} className={`spin ${styles.iconActive}`} />
-  return <span className={styles.iconPending} />
+  if (status === 'completed') {
+    return <CircleCheck size={15} strokeWidth={1.8} className={styles.iconDone} aria-hidden="true" />
+  }
+  if (status === 'in_progress') {
+    return <LoaderCircle size={15} strokeWidth={1.8} className={`spin ${styles.iconActive}`} aria-hidden="true" />
+  }
+  return <Circle size={15} strokeWidth={1.6} className={styles.iconPending} aria-hidden="true" />
 }
 
-function statusLabel(status: string) {
-  if (status === 'completed') return '✅'
-  if (status === 'in_progress') return '🔧'
-  return '⏳'
+function statusLabel(status: string): string {
+  if (status === 'completed') return '已完成'
+  if (status === 'in_progress') return '执行中'
+  return '等待中'
 }
 
 export default function TodoPanel({ todoList, onClose }: TodoPanelProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
+  const timelineId = useId()
 
   const completed = todoList.tasks.filter((t) => t.status === 'completed').length
   const inProgress = todoList.tasks.find((t) => t.status === 'in_progress')
@@ -33,47 +38,53 @@ export default function TodoPanel({ todoList, onClose }: TodoPanelProps) {
 
   return (
     <div className={`${styles.panel} ${expanded ? styles.expanded : styles.collapsed}`}>
-      {/* Collapsed bar */}
-      <div className={styles.bar} onClick={() => setExpanded(!expanded)}>
-        <span className={styles.barLeft}>
-          {allDone ? (
-            <Check size={14} className={styles.iconDone} />
-          ) : (
-            <Loader2 size={14} className={`spin ${styles.iconActive}`} />
-          )}
-          <span className={styles.barText}>{progressText}</span>
-          <span className={styles.barCount}>({completed}/{total})</span>
-        </span>
-        <span className={styles.barRight}>
-          <button
-            className={styles.btn}
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
-            title={expanded ? '收起' : '展开'}
-          >
-            {expanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </button>
-          <button
-            className={styles.btn}
-            onClick={(e) => { e.stopPropagation(); onClose() }}
-            title="关闭"
-          >
-            <X size={14} />
-          </button>
-        </span>
+      <div className={styles.bar}>
+        <button
+          type="button"
+          className={styles.summaryButton}
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          aria-controls={timelineId}
+          title={expanded ? '收起任务进度' : '展开任务进度'}
+        >
+          <span className={styles.barLeft} aria-live="polite" aria-atomic="true">
+            {allDone ? (
+              <CircleCheck size={16} strokeWidth={1.8} className={styles.iconDone} aria-hidden="true" />
+            ) : (
+              <LoaderCircle size={16} strokeWidth={1.8} className={`spin ${styles.iconActive}`} aria-hidden="true" />
+            )}
+            <span className={styles.barText}>{progressText}</span>
+            <span className={styles.barCount}>{completed}/{total}</span>
+          </span>
+          {expanded
+            ? <ChevronDown size={15} aria-hidden="true" />
+            : <ChevronUp size={15} aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          className={styles.dismissButton}
+          onClick={onClose}
+          title="隐藏任务进度"
+          aria-label="隐藏任务进度"
+        >
+          <X size={14} aria-hidden="true" />
+        </button>
       </div>
 
-      {/* Expanded timeline */}
       {expanded && (
-        <div className={styles.timeline}>
+        <div id={timelineId} className={styles.timeline} role="list" aria-label="任务进度">
           {todoList.tasks.map((task) => (
-            <div key={task.taskId} className={`${styles.task} ${styles[`task-${task.status}`]}`}>
-              <span className={styles.taskIcon}>{statusIcon(task.status)}</span>
-              <span className={styles.taskLabel}>{statusLabel(task.status)}</span>
-              <span className={styles.taskSubject}>
-                {task.subject}
-                {task.description && (
-                  <span className={styles.taskDesc}> — {task.description}</span>
-                )}
+            <div
+              key={task.taskId}
+              className={`${styles.task} ${styles[`task-${task.status}`]}`}
+              role="listitem"
+            >
+              <span className={styles.taskIcon} role="img" aria-label={statusLabel(task.status)}>
+                {statusIcon(task.status)}
+              </span>
+              <span className={styles.taskCopy}>
+                <span className={styles.taskSubject}>{task.subject}</span>
+                {task.description && <span className={styles.taskDesc}>{task.description}</span>}
               </span>
             </div>
           ))}

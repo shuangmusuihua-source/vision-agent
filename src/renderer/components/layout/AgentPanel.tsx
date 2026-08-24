@@ -101,6 +101,15 @@ function AgentPanel({ context = 'editor', width, workspacePath, permissionReques
         </div>
         </div>
         <div className="agent-panel-footer">
+          {todoList && todoList.tasks.length > 0 && (
+            <div className="agent-task-progress-layer">
+              <TodoPanel
+                todoList={todoList}
+                onClose={() => dismissTodo(context)}
+              />
+            </div>
+          )}
+          <div className="agent-composer-surface">
             {permissionRequest && (
               <PermissionDialog
                 request={permissionRequest}
@@ -120,15 +129,8 @@ function AgentPanel({ context = 'editor', width, workspacePath, permissionReques
               />
             )}
             <DrawerZone linkedFile={linkedFile} onUnlinkFile={onUnlinkFile} />
-            {todoList && todoList.tasks.length > 0 && (
-              <div style={{ padding: '0 8px 4px 8px' }}>
-                <TodoPanel
-                  todoList={todoList}
-                  onClose={() => dismissTodo(context)}
-                />
-              </div>
-            )}
             {chatInput}
+          </div>
         </div>
       </div>
     </div>
