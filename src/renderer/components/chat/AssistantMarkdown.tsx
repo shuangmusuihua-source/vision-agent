@@ -7,6 +7,7 @@ import { code } from '@streamdown/code'
 import { math } from '@streamdown/math'
 import remarkGfm from 'remark-gfm'
 import type { BundledTheme } from 'shiki'
+import type { MermaidConfig } from 'mermaid'
 import { createLazyMermaidInstance } from '../../lib/mermaid-renderer'
 import { stripSkillOutputBlock } from './message-text-utils'
 
@@ -17,7 +18,9 @@ const mermaidPlugin: DiagramPlugin = {
   type: 'diagram',
   language: 'mermaid',
   getMermaid(config) {
-    return createLazyMermaidInstance(config)
+    // Streamdown keeps this config intentionally broad to avoid a hard Mermaid
+    // dependency. sumi owns every value passed through this plugin boundary.
+    return createLazyMermaidInstance(config as MermaidConfig | undefined)
   },
 }
 
