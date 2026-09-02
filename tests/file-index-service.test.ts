@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { FileIndexService, shouldIgnoreIndexPath } from '../src/main/file-index-service'
@@ -79,6 +79,31 @@ describe('FileIndexService knowledge graph identity', () => {
       count: 1,
       files: ['/knowledge/newer.md'],
       version: 2,
+      renames: [],
+    })
+  })
+
+  it('reports an inode-preserving markdown rename as an explicit path migration', async () => {
+    const workspacePath = await createWorkspace('A.md', '# Document')
+    const originalPath = join(workspacePath, 'A.md')
+    const renamedPath = join(workspacePath, 'B.md')
+    const service = new FileIndexService()
+    const internals = service as unknown as {
+      indexFile: (filePath: string) => Promise<unknown>
+      handleFileDelete: (filePath: string) => void
+      handleFileChange: (filePath: string, kind: 'add' | 'change') => Promise<void>
+    }
+
+    await internals.indexFile(originalPath)
+    await rename(originalPath, renamedPath)
+    internals.handleFileDelete(originalPath)
+    await internals.handleFileChange(renamedPath, 'add')
+
+    expect(service.getFileChangeSnapshot()).toEqual({
+      count: 2,
+      files: [originalPath, renamedPath],
+      version: 2,
+      renames: [{ from: originalPath, to: renamedPath }],
     })
   })
 })

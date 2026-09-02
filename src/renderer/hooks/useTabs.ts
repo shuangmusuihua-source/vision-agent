@@ -7,6 +7,7 @@ import {
   pendingSaveFor,
   visibleFileContent,
   withPendingSave,
+  withRenamedFile,
   withSavedFile,
   withoutFilePrefixState,
   withoutFileState,
@@ -155,6 +156,19 @@ export function useTabs() {
     })
   }, [])
 
+  const renameFile = useCallback((from: string, to: string) => {
+    setWorkspaceStates((previous) => {
+      let changed = false
+      const next: Record<string, WorkspaceTabState> = {}
+      for (const [key, state] of Object.entries(previous)) {
+        const renamed = withRenamedFile(state, from, to)
+        next[key] = renamed
+        if (renamed !== state) changed = true
+      }
+      return changed ? next : previous
+    })
+  }, [])
+
   const saveFile = useCallback(async (filePath: string, content: string): Promise<SaveFileResult> => {
     // The rendered editor owns this composite key. Keep it stable across the
     // async write so a session switch cannot receive another session's result.
@@ -233,6 +247,7 @@ export function useTabs() {
     switchTab,
     clearTab,
     closeTabsByPrefix,
+    renameFile,
     saveFile,
     retryPendingSave,
     refreshActiveContent,

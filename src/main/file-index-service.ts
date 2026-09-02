@@ -3,13 +3,22 @@ import * as path from 'path'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { getMainWindow } from './ipc-sender'
 import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
+import type { FileChangeSnapshot, FileRenameChange } from '../shared/ipc-types'
 
 interface IndexedFile {
   filePath: string
+  fileId: string
   lines: string[]
   normalizedLines: string[]
   mtimeMs: number
 }
+
+interface RecentFileLocation {
+  filePath: string
+  seenAt: number
+}
+
+const FILE_RENAME_PAIR_WINDOW_MS = 5_000
 
 interface KnowledgeEntry {
   filePath: string
@@ -41,6 +50,9 @@ export class FileIndexService {
   private knowledgeReady = false
   private knowledgeReadyCallbacks: Array<() => void> = []
   private changedFiles = new Map<string, number>()
+  private changedRenames = new Map<string, { change: FileRenameChange; version: number }>()
+  private recentAddedFiles = new Map<string, RecentFileLocation>()
+  private recentRemovedFiles = new Map<string, RecentFileLocation>()
   private changeVersion = 0
   private knowledgeWatcher: FSWatcher | null = null
   private workspaceInitQueue: Promise<void> = Promise.resolve()
@@ -133,27 +145,32 @@ export class FileIndexService {
   }
 
   /** Index a single file */
-  private async indexFile(filePath: string): Promise<void> {
+  private async indexFile(filePath: string): Promise<IndexedFile | null> {
     try {
       const stat = await fs.promises.stat(filePath)
       const existing = this.index.get(filePath)
-      if (existing && existing.mtimeMs === stat.mtimeMs) return
+      const fileId = `${stat.dev}:${stat.ino}`
+      if (existing && existing.mtimeMs === stat.mtimeMs && existing.fileId === fileId) return existing
 
       const content = await fs.promises.readFile(filePath, 'utf-8')
       const lines = content.split('\n')
 
-      this.index.set(filePath, {
+      const indexedFile = {
         filePath,
+        fileId,
         lines,
         normalizedLines: lines.map((line) => line.toLowerCase()),
         mtimeMs: stat.mtimeMs
-      })
+      }
+      this.index.set(filePath, indexedFile)
+      return indexedFile
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException)?.code
       if (code === 'ENOENT') {
         this.index.delete(filePath)
       }
       console.error(`[FileIndexService] failed to index file ${filePath}:`, err)
+      return null
     }
   }
 
@@ -180,10 +197,10 @@ export class FileIndexService {
     })
 
     this.watcher.on('add', (filePath) => {
-      if (filePath.endsWith('.md')) this.handleFileChange(filePath)
+      if (filePath.endsWith('.md')) this.handleFileChange(filePath, 'add')
     })
     this.watcher.on('change', (filePath) => {
-      if (filePath.endsWith('.md')) this.handleFileChange(filePath)
+      if (filePath.endsWith('.md')) this.handleFileChange(filePath, 'change')
     })
     this.watcher.on('unlink', (filePath) => {
       if (filePath.endsWith('.md')) this.handleFileDelete(filePath)
@@ -194,11 +211,12 @@ export class FileIndexService {
   }
 
   /** Handle a single file change event */
-  private async handleFileChange(filePath: string): Promise<void> {
+  private async handleFileChange(filePath: string, kind: 'add' | 'change' = 'change'): Promise<void> {
+    let indexedFile: IndexedFile | null = null
     try {
       const stat = await fs.promises.stat(filePath)
       if (stat.isFile()) {
-        await this.indexFile(filePath)
+        indexedFile = await this.indexFile(filePath)
       } else {
         this.index.delete(filePath)
       }
@@ -210,14 +228,57 @@ export class FileIndexService {
       console.error(`[FileIndexService] handleFileChange failed for ${filePath}:`, err)
     }
     this.markFileChanged(filePath)
+    if (kind === 'add' && indexedFile) this.rememberAddedFile(indexedFile)
     this.notifyFileChange()
   }
 
   /** Handle file deletion */
   private handleFileDelete(filePath: string): void {
+    const indexedFile = this.index.get(filePath)
     this.index.delete(filePath)
     this.markFileChanged(filePath)
+    if (indexedFile) this.rememberRemovedFile(indexedFile)
     this.notifyFileChange()
+  }
+
+  private rememberAddedFile(file: IndexedFile): void {
+    this.pruneRecentFileLocations()
+    const removed = this.recentRemovedFiles.get(file.fileId)
+    if (removed) {
+      this.recentRemovedFiles.delete(file.fileId)
+      this.recordFileRename(removed.filePath, file.filePath)
+      return
+    }
+    this.recentAddedFiles.set(file.fileId, { filePath: file.filePath, seenAt: Date.now() })
+  }
+
+  private rememberRemovedFile(file: IndexedFile): void {
+    this.pruneRecentFileLocations()
+    const added = this.recentAddedFiles.get(file.fileId)
+    if (added) {
+      this.recentAddedFiles.delete(file.fileId)
+      this.recordFileRename(file.filePath, added.filePath)
+      return
+    }
+    this.recentRemovedFiles.set(file.fileId, { filePath: file.filePath, seenAt: Date.now() })
+  }
+
+  private recordFileRename(from: string, to: string): void {
+    if (from === to) return
+    const change = { from, to }
+    this.changedRenames.set(JSON.stringify([from, to]), {
+      change,
+      version: this.changeVersion,
+    })
+  }
+
+  private pruneRecentFileLocations(now = Date.now()): void {
+    for (const [fileId, entry] of this.recentAddedFiles) {
+      if (now - entry.seenAt > FILE_RENAME_PAIR_WINDOW_MS) this.recentAddedFiles.delete(fileId)
+    }
+    for (const [fileId, entry] of this.recentRemovedFiles) {
+      if (now - entry.seenAt > FILE_RENAME_PAIR_WINDOW_MS) this.recentRemovedFiles.delete(fileId)
+    }
   }
 
   private markFileChanged(filePath: string): void {
@@ -229,18 +290,22 @@ export class FileIndexService {
     return this.changeVersion
   }
 
-  acknowledgeChanges(version: number): { count: number; files: string[]; version: number } {
+  acknowledgeChanges(version: number): FileChangeSnapshot {
     for (const [filePath, changedAt] of this.changedFiles) {
       if (changedAt <= version) this.changedFiles.delete(filePath)
+    }
+    for (const [key, rename] of this.changedRenames) {
+      if (rename.version <= version) this.changedRenames.delete(key)
     }
     return this.getFileChangeSnapshot()
   }
 
-  getFileChangeSnapshot(): { count: number; files: string[]; version: number } {
+  getFileChangeSnapshot(): FileChangeSnapshot {
     return {
       count: this.changedFiles.size,
       files: Array.from(this.changedFiles.keys()),
       version: this.changeVersion,
+      renames: Array.from(this.changedRenames.values(), ({ change }) => change),
     }
   }
 
@@ -442,6 +507,8 @@ export class FileIndexService {
       this.watcher = null
     }
     this.index.clear()
+    this.recentAddedFiles.clear()
+    this.recentRemovedFiles.clear()
     this.workspaceDirs = []
     this.ready = false
   }
@@ -464,6 +531,7 @@ export class FileIndexService {
     await this.destroyWorkspaceIndex()
     await this.destroyKnowledgeIndex()
     this.changedFiles.clear()
+    this.changedRenames.clear()
     this.changeVersion = 0
   }
 }

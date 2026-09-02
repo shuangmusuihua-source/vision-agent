@@ -4,6 +4,7 @@ import {
   pendingSaveFor,
   visibleFileContent,
   withPendingSave,
+  withRenamedFile,
   withSavedFile,
   withoutFilePrefixState,
   withoutFileState,
@@ -66,5 +67,28 @@ describe('tab save state', () => {
     expect(withoutPrefix.tabContents['/workspace/folder/b.md']).toBeUndefined()
     expect(pendingSaveFor(withoutPrefix, '/workspace/folder/b.md')).toBeNull()
     expect(pendingSaveFor(withoutPrefix, '/workspace/folder/c.md')).toBeNull()
+  })
+
+  it('migrates open tabs, active state, content, and pending saves after a rename', () => {
+    const originalPath = '/workspace/A.md'
+    const renamedPath = '/workspace/B.md'
+    const state = withPendingSave({
+      ...createWorkspaceTabState(),
+      tabs: [
+        { type: 'file', path: originalPath },
+        { type: 'file', path: renamedPath },
+      ],
+      activeTab: { type: 'file', path: originalPath },
+      tabContents: { [originalPath]: '# A' },
+    }, originalPath, '# unsaved A', 'save failed')
+
+    const renamed = withRenamedFile(state, originalPath, renamedPath)
+
+    expect(renamed.tabs).toEqual([{ type: 'file', path: renamedPath }])
+    expect(renamed.activeTab).toEqual({ type: 'file', path: renamedPath })
+    expect(renamed.tabContents).toEqual({ [renamedPath]: '# A' })
+    expect(renamed.pendingSaves).toEqual({
+      [renamedPath]: { content: '# unsaved A', error: 'save failed' },
+    })
   })
 })

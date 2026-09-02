@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { GraphData } from '../../shared/types'
+import type { FileChangeSnapshot } from '../../shared/ipc-types'
 
 // ─── Graph Store ────────────────────────────────────────────────────
 
@@ -15,7 +16,7 @@ export type GraphStore = {
 
   // Actions
   loadGraphData: () => Promise<void>
-  handleFilesChanged: (data: { count: number; files: string[]; version: number }) => void
+  handleFilesChanged: (data: FileChangeSnapshot) => void
 }
 
 // ─── Store implementation ───────────────────────────────────────────

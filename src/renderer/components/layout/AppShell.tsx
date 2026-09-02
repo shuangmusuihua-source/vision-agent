@@ -85,7 +85,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const {
     openTabs, activeTab, activeContent, activeFilePath, documentOwnerKey,
     openFile, openFixedTab, closeTab, switchTab, clearTab, closeTabsByPrefix,
-    saveFile, retryPendingSave, refreshActiveContent,
+    saveFile, retryPendingSave, refreshActiveContent, renameFile,
     activeSaveError, activeHasPendingSave,
   } = useTabs()
   const [isRetryingSave, setIsRetryingSave] = useState(false)
@@ -218,11 +218,31 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   activeTabRef.current = activeTab
   const refreshActiveContentRef = useRef(refreshActiveContent)
   refreshActiveContentRef.current = refreshActiveContent
+  const renameFileRef = useRef(renameFile)
+  renameFileRef.current = renameFile
+  const setEditorLinkedFileRef = useRef(setEditorLinkedFile)
+  setEditorLinkedFileRef.current = setEditorLinkedFile
 
   useEffect(() => {
     return window.api.graph.onFilesChanged((data) => {
       useGraphStore.getState().handleFilesChanged(data)
+      const renames = data.renames ?? []
       const current = activeTabRef.current
+      const activeRename = current && isFileTab(current)
+        ? renames.find((rename) => rename.from === current.path)
+        : undefined
+      for (const rename of renames) {
+        renameFileRef.current(rename.from, rename.to)
+        const uiLinkedFile = useUiStore.getState().linkedFile
+        const agentLinkedFile = useAgentStore.getState().slots.editor.linkedFile
+        if (uiLinkedFile === rename.from || agentLinkedFile === rename.from) {
+          setEditorLinkedFileRef.current(rename.to)
+        }
+      }
+      if (activeRename) {
+        setTimeout(() => { refreshActiveContentRef.current().catch(() => {}) }, 0)
+        return
+      }
       if (current && isFileTab(current) && data.files.includes(current.path)) {
         refreshActiveContentRef.current()
       }

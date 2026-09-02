@@ -73,3 +73,43 @@ export function withoutFilePrefixState(state: WorkspaceTabState, prefix: string)
   }
   return { ...state, tabContents, pendingSaves }
 }
+
+export function withRenamedFile(
+  state: WorkspaceTabState,
+  from: string,
+  to: string,
+): WorkspaceTabState {
+  if (from === to) return state
+  const hasSource = state.tabs.some((tab) => tab.type === 'file' && tab.path === from)
+    || (state.activeTab?.type === 'file' && state.activeTab.path === from)
+    || Object.prototype.hasOwnProperty.call(state.tabContents, from)
+    || Object.prototype.hasOwnProperty.call(state.pendingSaves, from)
+  if (!hasSource) return state
+
+  const seenFilePaths = new Set<string>()
+  const tabs: TabDescriptor[] = []
+  for (const tab of state.tabs) {
+    const nextTab = tab.type === 'file' && tab.path === from
+      ? { ...tab, path: to }
+      : tab
+    if (nextTab.type === 'file') {
+      if (seenFilePaths.has(nextTab.path)) continue
+      seenFilePaths.add(nextTab.path)
+    }
+    tabs.push(nextTab)
+  }
+  const activeTab = state.activeTab?.type === 'file' && state.activeTab.path === from
+    ? { ...state.activeTab, path: to }
+    : state.activeTab
+  const tabContents = { ...state.tabContents }
+  const pendingSaves = { ...state.pendingSaves }
+  if (Object.prototype.hasOwnProperty.call(tabContents, from)) {
+    tabContents[to] = tabContents[from]
+    delete tabContents[from]
+  }
+  if (Object.prototype.hasOwnProperty.call(pendingSaves, from)) {
+    pendingSaves[to] = pendingSaves[from]
+    delete pendingSaves[from]
+  }
+  return { ...state, tabs, activeTab, tabContents, pendingSaves }
+}

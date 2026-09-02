@@ -36,6 +36,7 @@ type UpdateDownloadProgressPayload = IPCEventPayload<'update:download-progress'>
 type UpdateErrorEventPayload = IPCEventPayload<'update:error'>
 type MainErrorPayload = IPCEventPayload<'main:error'>
 type MenuActionPayload = IPCEventPayload<'menu-action'>
+type FilesChangedPayload = IPCEventPayload<'graph:filesChanged'>
 type CronRegisterRequest = IPCRequest<'cron:register'>
 type CronResolveScheduleRequest = IPCRequest<'cron:resolveSchedule'>
 type CronSetStatusRequest = IPCRequest<'cron:setStatus'>
@@ -246,8 +247,8 @@ const api = {
   graph: {
     getData: () => invoke('graph:getData'),
     acknowledgeChanges: (version: number) => invoke('graph:acknowledgeChanges', version),
-    onFilesChanged: (callback: (data: { count: number; files: string[]; version: number }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { count: number; files: string[]; version: number }) => callback(data)
+    onFilesChanged: (callback: (data: FilesChangedPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: FilesChangedPayload) => callback(data)
       ipcRenderer.on('graph:filesChanged', handler)
       return () => { ipcRenderer.removeListener('graph:filesChanged', handler) }
     }

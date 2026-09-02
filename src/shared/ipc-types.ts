@@ -58,6 +58,18 @@ import type {
   CronTaskRegistration,
 } from './cron-types'
 
+export interface FileRenameChange {
+  from: string
+  to: string
+}
+
+export interface FileChangeSnapshot {
+  count: number
+  files: string[]
+  version: number
+  renames: FileRenameChange[]
+}
+
 export type MenuAction =
   | 'open-settings'
   | 'toggle-sidebar'
@@ -314,7 +326,7 @@ export type IPCChannelMap = {
   }
   'graph:acknowledgeChanges': {
     request: number
-    response: { count: number; files: string[]; version: number }
+    response: FileChangeSnapshot
   }
 
   // Cron
@@ -470,7 +482,7 @@ export type IPCEventMap = {
   'agent:generationActivity': SessionRoutedGenerationActivity
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': AppSettingsSnapshot
-  'graph:filesChanged': { count: number; files: string[]; version: number }
+  'graph:filesChanged': FileChangeSnapshot
   'cron:taskCompleted': CronTaskCompletedEvent
   'menu-action': MenuAction
   'main:error': { type: 'unhandledRejection' | 'uncaughtException'; message: string }
