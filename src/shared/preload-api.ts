@@ -13,6 +13,7 @@ import type {
   MemoryDocument,
   MemoryEntry,
   ModelProfile,
+  ModelUsageRange,
   SessionOutputs,
   SessionRoutedAskUserRequest,
   SessionRoutedGenerationActivity,
@@ -99,6 +100,11 @@ export interface SettingsApi {
   testConnection: (
     options: IPCRequest<'settings:testConnection'>,
   ) => Promise<IPCResponse<'settings:testConnection'>>
+  getModelUsageSummaries: () => Promise<IPCResponse<'settings:getModelUsageSummaries'>>
+  getModelUsageDetail: (
+    profileId: string,
+    range: ModelUsageRange,
+  ) => Promise<IPCResponse<'settings:getModelUsageDetail'>>
 }
 
 export interface AgentApi {

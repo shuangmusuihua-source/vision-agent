@@ -10,6 +10,14 @@ vi.mock('../src/main/agent-options', () => ({
   buildAgentOptions: vi.fn(() => ({})),
 }))
 
+vi.mock('../src/main/persistence/profile-store', () => ({
+  getActiveProfileUsageIdentity: vi.fn(() => null),
+}))
+
+vi.mock('../src/main/persistence/model-usage-store', () => ({
+  recordModelUsage: vi.fn(),
+}))
+
 describe('cron schedule parser', () => {
   it('parses common Chinese recurring schedules without model calls', async () => {
     const workday = await resolveCronSchedule({ input: '每个工作日上午九点' })

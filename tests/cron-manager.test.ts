@@ -51,6 +51,12 @@ async function loadCronManager(options?: {
     getCronTasks: () => options?.persisted || [],
     saveCronTasks: (tasks: CronTask[]) => { savedTasks = tasks },
   }))
+  vi.doMock('../src/main/persistence/profile-store', () => ({
+    getActiveProfileUsageIdentity: () => null,
+  }))
+  vi.doMock('../src/main/persistence/model-usage-store', () => ({
+    recordModelUsage: vi.fn(),
+  }))
   vi.doMock('../src/main/agent-options', () => ({ buildAgentOptions }))
   vi.doMock('../src/main/notification-manager', () => ({ notifyCronTaskComplete }))
   vi.doMock('../src/main/agent-path-utils', () => ({

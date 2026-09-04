@@ -29,6 +29,16 @@ function getActiveProfileRaw(): ModelProfile | null {
   return settings.profiles.find((p) => p.id === settings.activeProfileId) || null
 }
 
+export function getActiveProfileUsageIdentity(): Pick<ModelProfile, 'id' | 'name' | 'model'> | null {
+  const profile = getActiveProfileRaw()
+  if (!profile) return null
+  return { id: profile.id, name: profile.name, model: profile.model }
+}
+
+export function getProfileIds(): string[] {
+  return store.get('profiles').map((profile) => profile.id)
+}
+
 export function getBaseUrl(): string {
   const profile = getActiveProfileRaw()
   return profile?.baseUrl || ''

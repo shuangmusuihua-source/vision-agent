@@ -109,6 +109,7 @@ export class InlineRewriteRunner {
     private readonly buildOptions: InlineRewriteOptionsAdapter,
     private readonly startupQuery?: InlineRewriteStartupAdapter,
     private readonly reportMetrics?: (metrics: InlineRewriteMetrics) => void,
+    private readonly reportResult?: (result: InlineRewriteResultMessage, request: InlineRewriteRequest) => void,
   ) {}
 
   prepare(input: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>): boolean {
@@ -190,6 +191,7 @@ export class InlineRewriteRunner {
         if (message.type === 'result') resultMessage = message
       }
       if (!resultMessage) throw new Error('AI 改写未返回结果')
+      this.reportResult?.(resultMessage, request)
       this.reportMetrics?.({
         requestId: request.requestId,
         prewarmed,

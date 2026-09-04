@@ -5,6 +5,7 @@ import type {
   AgentQueryRequest,
   AgentSessionEnvelope,
   ModelProfile,
+  ModelUsageRange,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   InlineRewriteRequest,
@@ -111,7 +112,10 @@ const api = {
       return () => { ipcRenderer.removeListener('settings:changed', handler) }
     },
     testConnection: (options: { baseUrl: string; apiKey: string; model: string }) =>
-      invoke('settings:testConnection', options)
+      invoke('settings:testConnection', options),
+    getModelUsageSummaries: () => invoke('settings:getModelUsageSummaries'),
+    getModelUsageDetail: (profileId: string, range: ModelUsageRange) =>
+      invoke('settings:getModelUsageDetail', { profileId, range })
   },
 
   // ─── Agent API (typed, unified event channel) ────────────────────────

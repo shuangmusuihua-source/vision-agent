@@ -55,6 +55,7 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 ### Agent 层
 
 - `query-runner.ts`：准备会话目录、构建 prompt/options、执行 `query()`、消费 SDK 流
+- `model-usage-analytics.ts`：将 SDK 终态 `modelUsage` 投影为 Profile 总览、时间趋势、会话排行、Skill 分摊和实际模型分布
 - `agent-options.ts`：模型 Profile、环境变量白名单、Claude CLI 路径、SDK Options
 - `session-runtime.ts`：活跃运行注册、AbortController、权限/AskUser、文本批次、实时生成活动和会话事件
 - `pending-interactions.ts`：权限与 AskUser 的注册、超时、SDK 取消、通知清理、响应和按 session 拒绝
@@ -84,6 +85,8 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 - `profile-store.ts`：Profile、API Key、模型和服务地址
 - `workspace-store.ts`：授权目录、app session 元数据和知识库；删除工作区时以一次 store 提交同步移除授权与会话元数据
 - `settings-store.ts`：主题、Cron、Skill 开关和 compaction IDs
+
+模型用量由独立的 `persistence/model-usage-store.ts` 管理。它只保存有上限的本地分析事件（Profile、会话展示信息、实际模型、Token、费用和 Skill 归因），不保存 prompt、模型回复、API Key 或完整文件路径，避免让设置存储承担持续增长的分析数据。
 
 Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级映射和展示元数据。两者职责不同。
 

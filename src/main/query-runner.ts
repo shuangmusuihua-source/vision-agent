@@ -1,4 +1,5 @@
 import { shell, type BrowserWindow } from 'electron'
+import { basename } from 'path'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
 import type { PermissionMode, PermissionResult, HookCallback, HookCallbackMatcher, CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { ensureWorkspaceSkills, getAppSkillsCwd, getAppSkillsDir } from './skill-init'
@@ -14,6 +15,7 @@ import type {
 } from '../shared/types'
 import {
   getApiKey,
+  getActiveProfileUsageIdentity,
 } from './persistence/profile-store'
 import {
   getAuthorizedDirectories,
@@ -59,6 +61,8 @@ import {
   getFeishuConnectorManager,
 } from './feishu-connection'
 import { createFeishuAgentAuthorizationHook } from './feishu-agent-authorization'
+import { recordModelUsage } from './persistence/model-usage-store'
+import { extractSkillIdFromToolInput } from './model-usage-analytics'
 
 // ─── Hooks ─────────────────────────────────────────────────────────────
 
@@ -69,6 +73,7 @@ type HookSessionContext = {
     toolName: string,
     input: Record<string, unknown>,
   ) => ReturnType<typeof decideSessionFileAccess>
+  onSkillInvoked?: (skillId: string) => void
 }
 
 function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext): Partial<Record<string, HookCallbackMatcher[]>> {
@@ -92,6 +97,10 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
   const preToolUse: HookCallback = async (input, _toolUseID, options) => {
     const { tool_name, tool_input } = input as PreToolUseHookInput
     const normalizedToolInput = (tool_input || {}) as Record<string, unknown>
+    if (tool_name === 'Skill') {
+      const invokedSkillId = extractSkillIdFromToolInput(normalizedToolInput)
+      if (invokedSkillId) hookContext.onSkillInvoked?.(invokedSkillId)
+    }
     const authorizationResult = await feishuAuthorization(input, _toolUseID, options)
     if ('hookSpecificOutput' in authorizationResult) return authorizationResult
 
@@ -175,6 +184,7 @@ function buildOptions(
   explicitExternalPaths: string[] = [],
   approvalMode: AgentApprovalMode = DEFAULT_AGENT_APPROVAL_MODE,
   enabledSkills: string[] = getEnabledSkills(),
+  onSkillInvoked?: (skillId: string) => void,
 ) {
   const dirs = getAuthorizedDirectories()
   const workspacePath = workspacePathOverride || (dirs.length > 0 ? dirs[0] : process.cwd())
@@ -235,6 +245,7 @@ function buildOptions(
       envelope: sessionEnvelope,
       getSdkSessionId,
       decideFileAccess,
+      onSkillInvoked,
     }),
     resume: sdkSessionId || undefined,
     canUseTool: async (
@@ -501,6 +512,9 @@ export async function sendMessage(
       throw new Error('请先在“连接器”中安装并连接飞书。')
     }
 
+    const usageProfile = getActiveProfileUsageIdentity()
+    const invokedSkillIds = new Set<string>(skillId ? [skillId] : [])
+
     const getSdkSessionId = () => currentSdkSessionId
     const options = buildOptions(
       mainWindow,
@@ -515,6 +529,7 @@ export async function sendMessage(
       explicitExternalPaths,
       approvalMode,
       enabledSkills,
+      (invokedSkillId) => invokedSkillIds.add(invokedSkillId),
     )
     const abortController = new AbortController()
     const messageStream = query({
@@ -545,6 +560,19 @@ export async function sendMessage(
       const sdkSessionId = message.session_id || currentSdkSessionId || runtimeEnvelope.sdkSessionId || undefined
       const eventEnvelope = sessionRuntime.resolveEventEnvelope(appSessionId, runtimeEnvelope, sdkSessionId)
       sessionRuntime.emitSdkMessage(mainWindow, appSessionId, eventEnvelope, message)
+
+      if (message.type === 'result') {
+        const sessionRecord = getSessionRecordById(appSessionId)
+        recordModelUsage({
+          result: message,
+          profile: usageProfile,
+          source: 'interactive',
+          sessionId: appSessionId,
+          sessionTitle: sessionRecord?.title || title || '未命名会话',
+          workspaceName: effectiveContext === 'ask' ? 'Ask sumi' : basename(effectiveWorkspacePath),
+          skillIds: invokedSkillIds,
+        })
+      }
 
       // Session creation still gets its own lifecycle channel — tagged with context
       if (!currentSdkSessionId && message.session_id) {

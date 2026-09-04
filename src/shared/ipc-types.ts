@@ -21,6 +21,9 @@ import type {
   InlineRewriteResponse,
   MemoryDocument,
   MemoryEntry,
+  ModelUsageDetail,
+  ModelUsageProfileSummary,
+  ModelUsageRange,
   SessionMessagePage,
   SessionPageCursor,
 } from './types'
@@ -299,6 +302,14 @@ export type IPCChannelMap = {
   'settings:testConnection': {
     request: { baseUrl: string; apiKey: string; model: string }
     response: { success: boolean; message: string }
+  }
+  'settings:getModelUsageSummaries': {
+    request: void
+    response: ModelUsageProfileSummary[]
+  }
+  'settings:getModelUsageDetail': {
+    request: { profileId: string; range: ModelUsageRange }
+    response: ModelUsageDetail
   }
 
   // Memory

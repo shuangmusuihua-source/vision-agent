@@ -1,9 +1,13 @@
 import { ipcMain, nativeTheme } from 'electron'
+import { basename } from 'path'
 import {
-  getSettings, addProfile, updateProfile, removeProfile, setActiveProfile,
+  getSettings, addProfile, updateProfile, removeProfile, setActiveProfile, getProfileIds,
 } from '../persistence/profile-store'
 import { setTheme } from '../persistence/settings-store'
 import type { WorkspaceLifecycle } from '../workspace-lifecycle'
+import type { ModelUsageRange } from '../../shared/types'
+import { getModelUsageDetail, getModelUsageSummaries } from '../persistence/model-usage-store'
+import { getSessionRecordById } from '../persistence/workspace-store'
 
 export function registerSettingsHandlers(
   pushSettingsToRenderer: () => void,
@@ -48,5 +52,31 @@ export function registerSettingsHandlers(
     nativeTheme.themeSource = theme === 'system' ? 'system' : theme
     pushSettingsToRenderer()
     return { success: true }
+  })
+
+  ipcMain.handle('settings:getModelUsageSummaries', () => {
+    return getModelUsageSummaries(getProfileIds())
+  })
+
+  ipcMain.handle('settings:getModelUsageDetail', (_event, request: { profileId: string; range: ModelUsageRange }) => {
+    const profileExists = getProfileIds().includes(request.profileId)
+    if (!profileExists) throw new Error('模型配置不存在')
+    const range: ModelUsageRange = ['7d', '30d', '90d', 'all'].includes(request.range)
+      ? request.range
+      : '30d'
+    const detail = getModelUsageDetail(request.profileId, range)
+    return {
+      ...detail,
+      sessions: detail.sessions.map((session) => {
+        if (session.source !== 'interactive') return session
+        const current = getSessionRecordById(session.sessionId)
+        if (!current) return session
+        return {
+          ...session,
+          title: current.title || session.title,
+          workspaceName: current.context === 'ask' ? 'Ask sumi' : basename(current.workspacePath),
+        }
+      }),
+    }
   })
 }

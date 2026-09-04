@@ -41,6 +41,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
 - `workspace-lifecycle.ts` / `workspace-lifecycle-adapter.ts` — serialized workspace creation, ordering, and deletion; coordinates Agent shutdown, automation suspension, Trash, persistence, and indexing, then returns the canonical workspace projection
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
+- `model-usage-analytics.ts`, `persistence/model-usage-store.ts` — aggregate and retain a bounded local ledger of SDK-reported model usage by profile, session, actual model, and attributed Skill
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
 - `pending-interactions.ts` — permission and AskUser registration, timeout, SDK cancellation, notification cleanup, resolution, and session-scoped rejection
 - `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
@@ -83,6 +84,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `components/chat/AssistantMarkdown.tsx` — Streamdown chat rendering with Shiki, KaTeX, GFM, and Mermaid
 - `components/graph/GraphView.tsx` — `react-force-graph-2d` visualization
 - `components/connectors/ConnectorPanel.tsx` — connector setup, browser authorization, identity health, and disconnect controls
+- `components/settings/ModelUsageAnalytics.tsx` — per-profile token, cache, cost, session-ranking, Skill-attribution, and actual-model analysis
 
 ## Agent and session rules
 
@@ -98,7 +100,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 
 ## Persistence
 
-`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
+`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. A separate bounded `model-usage` electron-store file owns analytics events only; it contains no prompts, responses, API keys, or full paths. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
 
 Do not introduce a second store for the same authority without documenting the ownership boundary.
 
