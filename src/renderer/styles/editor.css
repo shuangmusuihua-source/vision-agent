@@ -1563,11 +1563,15 @@
   inset: 0;
   z-index: var(--z-modal);
   display: flex;
-  flex-direction: column;
-  background: var(--color-overlay-heavy);
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: var(--modal-backdrop-bg);
+  backdrop-filter: var(--modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--modal-backdrop-filter);
   user-select: none;
   -webkit-user-select: none;
-  animation: mermaid-overlay-in 0.2s ease-out;
+  animation: mermaid-overlay-in var(--duration-normal) ease-out;
 }
 
 @keyframes mermaid-overlay-in {
@@ -1575,32 +1579,76 @@
   to { opacity: 1; }
 }
 
+.mermaid-overlay-window {
+  display: flex;
+  width: min(1120px, calc(100vw - 56px));
+  height: min(760px, calc(100vh - 56px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dialog-border);
+  border-radius: var(--dialog-radius);
+  background: var(--dialog-surface);
+  box-shadow: var(--dialog-shadow);
+  animation: mermaid-window-in var(--duration-normal) var(--ease-spring);
+}
+
+@keyframes mermaid-window-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .mermaid-overlay-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg);
-  margin: var(--space-lg) auto 0;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  z-index: 1;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 14px 10px 18px;
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--dialog-surface-muted);
   flex-shrink: 0;
-  width: fit-content;
+  z-index: 1;
+}
+
+.mermaid-overlay-title,
+.mermaid-overlay-actions {
+  display: flex;
+  align-items: center;
+}
+
+.mermaid-overlay-title {
+  gap: 8px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: 720;
+}
+
+.mermaid-overlay-title svg {
+  color: var(--color-action);
+}
+
+.mermaid-overlay-actions {
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  background: var(--dialog-surface);
 }
 
 .mermaid-overlay-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 30px;
   height: 30px;
-  padding: 0 var(--space-xs);
-  border-radius: var(--radius-sm);
+  padding: 0 7px;
+  border-radius: 7px;
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
 }
 
 .mermaid-overlay-btn:hover {
@@ -1609,17 +1657,26 @@
 }
 
 .mermaid-overlay-scale {
-  min-width: 44px;
+  min-width: 42px;
   text-align: center;
-  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+.mermaid-overlay-reset {
+  font-family: var(--font-mono);
+  font-size: 10px;
 }
 
 .mermaid-overlay-canvas {
   flex: 1 !important;
   width: 100% !important;
   height: auto !important;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-border) 54%, transparent) 1px, transparent 0);
+  background-size: 18px 18px;
   cursor: grab;
 }
 
@@ -1635,6 +1692,21 @@
   max-width: none !important;
   max-height: none !important;
   pointer-events: none !important;
+}
+
+@media (max-width: 680px) {
+  .mermaid-overlay {
+    padding: 14px;
+  }
+
+  .mermaid-overlay-window {
+    width: calc(100vw - 28px);
+    height: calc(100vh - 28px);
+  }
+
+  .mermaid-overlay-title {
+    font-size: var(--font-size-sm);
+  }
 }
 
 .mermaid-error {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, X, FileText } from 'lucide-react'
+import { Search, X, FileText, FileSearch } from 'lucide-react'
 import type { SearchResult } from '../../../shared/ipc-types'
 
 interface SearchPanelProps {
@@ -142,6 +142,13 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
         </div>
 
         <div className="search-results" id="search-results" role="listbox" aria-label="搜索结果">
+          {!searching && !keyword.trim() && (
+            <div className="search-empty search-idle">
+              <FileSearch size={20} />
+              <span>输入关键词，搜索工作区文件内容</span>
+              <small>使用 ↑ ↓ 选择结果，按 Enter 打开</small>
+            </div>
+          )}
           {!searching && keyword.trim() && results.length > 0 && (
             <div className="search-count">{results.length} 个结果</div>
           )}

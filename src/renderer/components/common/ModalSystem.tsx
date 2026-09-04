@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Trash2, AlertTriangle, Info, Download } from 'lucide-react'
+import { Trash2, AlertTriangle, Info, Download, X } from 'lucide-react'
 
 type ModalVariant = 'confirm' | 'primary' | 'danger' | 'info' | 'danger-input'
 
@@ -163,10 +163,10 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   }, [handleCancel, modal.open, visible])
 
   const iconMap: Record<ModalVariant, ReactNode> = {
-    confirm:    <div className="modal-icon-circle danger"><Trash2 size={16} /></div>,
+    confirm:    <div className="modal-icon-circle danger"><AlertTriangle size={16} /></div>,
     primary:    <div className="modal-icon-circle primary"><Download size={16} /></div>,
     danger:     <div className="modal-icon-circle danger"><AlertTriangle size={16} /></div>,
-    'danger-input': <div className="modal-icon-circle danger"><AlertTriangle size={16} /></div>,
+    'danger-input': <div className="modal-icon-circle danger"><Trash2 size={16} /></div>,
     info:       <div className="modal-icon-circle info"><Info size={16} /></div>,
   }
 
@@ -188,6 +188,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             <div className="modal-icon-row">
               {iconMap[modal.variant]}
               <div className="modal-title" id="app-modal-title">{modal.title}</div>
+              <button type="button" className="modal-close-btn" onClick={handleCancel} aria-label="关闭弹窗">
+                <X size={15} />
+              </button>
             </div>
             <div className="modal-body" id="app-modal-description">{modal.message}</div>
             {modal.variant === 'danger-input' && (
@@ -205,7 +208,11 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               </>
             )}
             <div className="modal-actions">
-              <button className="btn-modal btn-modal-cancel" onClick={handleCancel} data-modal-initial-focus={modal.variant === 'danger-input' ? undefined : true}>
+              <button
+                className={`btn-modal ${modal.variant === 'info' ? 'btn-modal-primary' : 'btn-modal-cancel'}`}
+                onClick={handleCancel}
+                data-modal-initial-focus={modal.variant === 'danger-input' ? undefined : true}
+              >
                 {modal.variant === 'info' ? '知道了' : '取消'}
               </button>
               {modal.variant !== 'info' && (

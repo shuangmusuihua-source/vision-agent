@@ -7,46 +7,58 @@ import { getMermaidTheme, renderMermaid } from '../../lib/mermaid-renderer'
 
 function MermaidOverlay({ svg, onClose }: { svg: string; onClose: () => void }): React.ReactElement {
   const stableOnClose = useCallback(onClose, [])
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    closeButtonRef.current?.focus()
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') stableOnClose() }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus()
+    }
   }, [stableOnClose])
 
   return createPortal(
-    <div className="mermaid-overlay">
-      <TransformWrapper
-        initialScale={1}
-        minScale={0.2}
-        maxScale={10}
-        centerOnInit
-        limitToBounds={false}
-      >
-        {({ zoomIn, zoomOut, resetTransform, state }) => (
-          <>
-            <div className="mermaid-overlay-toolbar">
-              <button className="mermaid-overlay-btn" onClick={() => zoomIn()} title="放大">
-                <ZoomIn size={16} />
-              </button>
-              <span className="mermaid-overlay-scale">{Math.round(state.scale * 100)}%</span>
-              <button className="mermaid-overlay-btn" onClick={() => zoomOut()} title="缩小">
-                <ZoomOut size={16} />
-              </button>
-              <button className="mermaid-overlay-btn" onClick={() => resetTransform()} title="重置">1:1</button>
-              <button className="mermaid-overlay-btn" onClick={stableOnClose} title="关闭 (Esc)">
-                <X size={16} />
-              </button>
-            </div>
-            <TransformComponent
-                wrapperClass="mermaid-overlay-canvas"
-                contentClass="mermaid-overlay-content"
-              >
-                <div dangerouslySetInnerHTML={{ __html: svg }} />
-              </TransformComponent>
-          </>
-        )}
-      </TransformWrapper>
+    <div className="mermaid-overlay" onClick={stableOnClose}>
+      <div className="mermaid-overlay-window" role="dialog" aria-modal="true" aria-label="Mermaid 图表预览" onClick={(event) => event.stopPropagation()}>
+        <TransformWrapper
+          initialScale={1}
+          minScale={0.2}
+          maxScale={10}
+          centerOnInit
+          limitToBounds={false}
+        >
+          {({ zoomIn, zoomOut, resetTransform, state }) => (
+            <>
+              <div className="mermaid-overlay-toolbar">
+                <div className="mermaid-overlay-title"><ChartBar size={16} />图表预览</div>
+                <div className="mermaid-overlay-actions">
+                  <button type="button" className="mermaid-overlay-btn" onClick={() => zoomIn()} title="放大" aria-label="放大图表">
+                    <ZoomIn size={16} />
+                  </button>
+                  <span className="mermaid-overlay-scale">{Math.round(state.scale * 100)}%</span>
+                  <button type="button" className="mermaid-overlay-btn" onClick={() => zoomOut()} title="缩小" aria-label="缩小图表">
+                    <ZoomOut size={16} />
+                  </button>
+                  <button type="button" className="mermaid-overlay-btn mermaid-overlay-reset" onClick={() => resetTransform()} title="重置">1:1</button>
+                  <button ref={closeButtonRef} type="button" className="mermaid-overlay-btn" onClick={stableOnClose} title="关闭 (Esc)" aria-label="关闭图表预览">
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+              <TransformComponent
+                  wrapperClass="mermaid-overlay-canvas"
+                  contentClass="mermaid-overlay-content"
+                >
+                  <div dangerouslySetInnerHTML={{ __html: svg }} />
+                </TransformComponent>
+            </>
+          )}
+        </TransformWrapper>
+      </div>
     </div>,
     document.body
   )
