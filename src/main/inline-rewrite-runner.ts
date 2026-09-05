@@ -5,6 +5,8 @@ import { INLINE_REWRITE_MAX_TURNS, InlineRewriteRunner } from './inline-rewrite-
 import { getActiveProfileUsageIdentity } from './persistence/profile-store'
 import { recordModelUsage } from './persistence/model-usage-store'
 
+const usageProfiles = new WeakMap<Options, ReturnType<typeof getActiveProfileUsageIdentity>>()
+
 const INLINE_REWRITE_SYSTEM_PROMPT = `你是 Markdown 编辑器中的行内改写引擎。
 严格根据用户的修改要求改写选中内容，并遵守以下规则：
 1. 只返回可直接替换原选区的 Markdown，不解释过程。
@@ -28,6 +30,7 @@ export function createInlineRewriteOptions(
     maxTurns: INLINE_REWRITE_MAX_TURNS,
     canUseTool: async () => ({ behavior: 'deny', message: '行内改写不允许调用工具' }),
   })
+  usageProfiles.set(options, getActiveProfileUsageIdentity())
   options.abortController = abortController
   options.persistSession = false
   options.systemPrompt = INLINE_REWRITE_SYSTEM_PROMPT
@@ -39,9 +42,9 @@ export const inlineRewriteRunner = new InlineRewriteRunner(
   createInlineRewriteOptions,
   (options) => startup({ options }),
   (metrics) => console.info('[InlineRewrite] completed', metrics),
-  (result, request) => recordModelUsage({
+  (result, request, options) => recordModelUsage({
     result,
-    profile: getActiveProfileUsageIdentity(),
+    profile: usageProfiles.get(options) || null,
     source: 'inline-rewrite',
     sessionId: request.filePath,
     sessionTitle: `行内改写 · ${basename(request.filePath)}`,

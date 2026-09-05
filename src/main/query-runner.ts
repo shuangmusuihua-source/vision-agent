@@ -375,7 +375,17 @@ export async function sendMessage(
   } = request
   // Same-session starts are ordered from identity validation through
   // registration. Starts for different sessions use independent leases.
-  const startLease = await sessionRuntime.acquireSessionStart(appSessionId)
+  const initialRecord = getSessionRecordById(appSessionId)
+  const startLease = await sessionRuntime.acquireSessionStart(appSessionId, createSessionEnvelope({
+    sessionId: appSessionId,
+    context: initialRecord?.context || context,
+    workspacePath: initialRecord?.workspacePath || (context === 'ask' ? getAppSkillsCwd() : workspacePath || getAuthorizedDirectories()[0] || ''),
+    sdkSessionId: initialRecord?.sdkSessionId,
+  }))
+  if (startLease.signal.aborted) {
+    startLease.release()
+    return
+  }
   const existingRecord = getSessionRecordById(appSessionId)
   let effectiveContext = context
   let effectiveWorkspacePath: string
@@ -416,9 +426,11 @@ export async function sendMessage(
   }
 
   try {
-    await abortActiveQueryAndWait(appSessionId)
+    await sessionRuntime.abortRunAndWait(appSessionId)
+    startLease.signal.throwIfAborted()
   } catch (error) {
     startLease.release()
+    if (startLease.signal.aborted) return
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
       context: effectiveContext,
       sessionId: appSessionId,
@@ -442,6 +454,7 @@ export async function sendMessage(
       effectiveWorkingDirectory = await ensureAskSessionWorkingDirectory(effectiveWorkspacePath, appSessionId)
     }
 
+    startLease.signal.throwIfAborted()
     updateSessionRecord(appSessionId, {
       workspacePath: effectiveWorkspacePath,
       workingDirectory: effectiveWorkingDirectory,
@@ -452,6 +465,7 @@ export async function sendMessage(
     })
   } catch (error) {
     startLease.release()
+    if (startLease.signal.aborted) return
     sessionRuntime.emitExecutionError(mainWindow, createSessionEnvelope({
       context: effectiveContext,
       sessionId: appSessionId,
@@ -486,12 +500,16 @@ export async function sendMessage(
         effectiveWorkingDirectory,
         appSessionId,
         convertRequests,
+        startLease.signal,
       )
+      startLease.signal.throwIfAborted()
       processedPrompt = appendAttachmentConversionSummary(processedPrompt, conversion)
     }
 
+    startLease.signal.throwIfAborted()
     try {
       const sessionSkillLinks = await ensureWorkspaceSkills(effectiveWorkingDirectory)
+      startLease.signal.throwIfAborted()
       if (skillId && sessionSkillLinks.conflicts.includes(skillId)) {
         throw new Error(`工作区中存在同名 Skill，无法确认实际来源: ${skillId}`)
       }
@@ -504,6 +522,7 @@ export async function sendMessage(
     }
 
     const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
+    startLease.signal.throwIfAborted()
     const enabledSkills = await filterFeishuSkillByConnectorReadiness(runtimeReadySkills)
     if (skillId === 'office-documents' && !enabledSkills.includes(skillId)) {
       throw new Error('Office 文档运行组件需要安装或更新，请在 Skills 中重新启用“Office 文档”。')
@@ -512,6 +531,7 @@ export async function sendMessage(
       throw new Error('请先在“连接器”中安装并连接飞书。')
     }
 
+    startLease.signal.throwIfAborted()
     const usageProfile = getActiveProfileUsageIdentity()
     const invokedSkillIds = new Set<string>(skillId ? [skillId] : [])
 
@@ -606,7 +626,7 @@ export async function sendMessage(
     // Send a session-level completion notification only.
     notifyAgentComplete()
   } catch (error) {
-    if (!mainWindow.isDestroyed()) {
+    if (!startLease.signal.aborted && !mainWindow.isDestroyed()) {
       sessionRuntime.emitExecutionError(mainWindow, {
         ...runtimeEnvelope,
         sdkSessionId: currentSdkSessionId || runtimeEnvelope.sdkSessionId,
@@ -614,7 +634,7 @@ export async function sendMessage(
     }
   } finally {
     startLease.release()
-    if (effectiveContext === 'editor' && skillId) {
+    if (queryInstanceId && effectiveContext === 'editor' && skillId) {
       try {
         const changed = await recordSessionOutputProvenance({
           workingDirectory: effectiveWorkingDirectory,

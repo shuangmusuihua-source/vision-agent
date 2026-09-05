@@ -7,7 +7,7 @@ import { setTheme } from '../persistence/settings-store'
 import type { WorkspaceLifecycle } from '../workspace-lifecycle'
 import type { ModelUsageRange } from '../../shared/types'
 import { getModelUsageDetail, getModelUsageSummaries } from '../persistence/model-usage-store'
-import { getSessionRecordById } from '../persistence/workspace-store'
+import { getSessionRecords } from '../persistence/workspace-store'
 
 export function registerSettingsHandlers(
   pushSettingsToRenderer: () => void,
@@ -65,11 +65,14 @@ export function registerSettingsHandlers(
       ? request.range
       : '30d'
     const detail = getModelUsageDetail(request.profileId, range)
+    // electron-store reads and parses the backing file on every get. Join this
+    // request against one snapshot rather than rereading it for every session.
+    const sessionsById = new Map(getSessionRecords().map((session) => [session.id, session]))
     return {
       ...detail,
       sessions: detail.sessions.map((session) => {
         if (session.source !== 'interactive') return session
-        const current = getSessionRecordById(session.sessionId)
+        const current = sessionsById.get(session.sessionId)
         if (!current) return session
         return {
           ...session,

@@ -47,7 +47,14 @@ export type SessionRuntimeStart = {
 }
 
 export type SessionStartLease = {
+  signal: AbortSignal
   release: () => void
+}
+
+interface PendingSessionStart {
+  envelope: AgentSessionEnvelope
+  controller: AbortController
+  completion: Promise<void>
 }
 
 type PermissionRequestInput = Omit<PermissionRequestIPC, keyof AgentSessionEnvelope | 'id'>
@@ -60,6 +67,7 @@ export class SessionRuntimeController {
   private pendingInteractions = new PendingInteractionController()
   private generationWindow: BrowserWindow | null = null
   private completionResolvers = new Map<number, () => void>()
+  private pendingStarts = new Set<PendingSessionStart>()
   private startTails = new Map<string, Promise<void>>()
 
   constructor() {
@@ -78,13 +86,18 @@ export class SessionRuntimeController {
     this.generationProjector.reset(envelope.sessionId, envelope, skillId)
   }
 
-  async acquireSessionStart(sessionId: string): Promise<SessionStartLease> {
+  async acquireSessionStart(
+    sessionId: string,
+    envelope: AgentSessionEnvelope = { sessionId, context: 'editor', workspacePath: '' },
+  ): Promise<SessionStartLease> {
     const previous = this.startTails.get(sessionId) ?? Promise.resolve()
     const previousSettled = previous.catch(() => undefined)
     let releaseTurn!: () => void
     const turn = new Promise<void>((resolve) => {
       releaseTurn = resolve
     })
+    const pending: PendingSessionStart = { envelope, controller: new AbortController(), completion: turn }
+    this.pendingStarts.add(pending)
     const tail = previousSettled.then(() => turn)
     this.startTails.set(sessionId, tail)
 
@@ -92,9 +105,11 @@ export class SessionRuntimeController {
 
     let released = false
     return {
+      signal: pending.controller.signal,
       release: () => {
         if (released) return
         released = true
+        this.pendingStarts.delete(pending)
         releaseTurn()
         if (this.startTails.get(sessionId) === tail) {
           this.startTails.delete(sessionId)
@@ -322,7 +337,21 @@ export class SessionRuntimeController {
     win.webContents.send('agent:notification', payload)
   }
 
+  private matchingStarts(queryKey?: string): PendingSessionStart[] {
+    const runKey = queryKey ? this.findRunKey(queryKey) : null
+    return [...this.pendingStarts].filter(({ envelope }) => !queryKey
+      || envelope.sessionId === queryKey
+      || envelope.sessionId === runKey
+      || envelope.sdkSessionId === queryKey
+      || envelope.context === queryKey)
+  }
+
   abort(queryKey?: string): void {
+    for (const start of this.matchingStarts(queryKey)) start.controller.abort()
+    this.abortRun(queryKey)
+  }
+
+  private abortRun(queryKey?: string): void {
     if (queryKey) {
       const matchedKey = this.findRunKey(queryKey)
       if (matchedKey) {
@@ -348,18 +377,14 @@ export class SessionRuntimeController {
     discardAllTextBatches()
   }
 
-  async abortAndWait(queryKey: string, timeoutMs = 6500): Promise<void> {
-    const matchedKey = this.findRunKey(queryKey)
-    const run = matchedKey ? this.activeRuns.get(matchedKey) : undefined
-    this.abort(queryKey)
-    if (!run) return
-
+  private async waitForCompletion(completions: Promise<void>[], timeoutMs: number, message: string): Promise<void> {
+    if (completions.length === 0) return
     let timeout: ReturnType<typeof setTimeout> | undefined
     try {
       await Promise.race([
-        run.completion,
+        Promise.all(completions),
         new Promise<void>((_resolve, reject) => {
-          timeout = setTimeout(() => reject(new Error('Agent run did not stop in time')), timeoutMs)
+          timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
         }),
       ])
     } finally {
@@ -367,32 +392,36 @@ export class SessionRuntimeController {
     }
   }
 
+  // Used by a start lease to replace the previous SDK run without cancelling
+  // itself or subsequent starts waiting for the same session.
+  async abortRunAndWait(queryKey: string, timeoutMs = 6500): Promise<void> {
+    const key = this.findRunKey(queryKey)
+    const run = key ? this.activeRuns.get(key) : undefined
+    this.abortRun(queryKey)
+    await this.waitForCompletion(run ? [run.completion] : [], timeoutMs, 'Agent run did not stop in time')
+  }
+
+  async abortAndWait(queryKey: string, timeoutMs = 6500): Promise<void> {
+    const starts = this.matchingStarts(queryKey)
+    const key = this.findRunKey(queryKey)
+    const run = key ? this.activeRuns.get(key) : undefined
+    this.abort(queryKey)
+    await this.waitForCompletion([
+      ...starts.map((start) => start.completion),
+      ...(run ? [run.completion] : []),
+    ], timeoutMs, 'Agent run did not stop in time')
+  }
+
   async abortWorkspaceAndWait(workspacePath: string, timeoutMs = 6500): Promise<string[]> {
-    const matchingRuns = Array.from(this.activeRuns.entries())
-      .filter(([, run]) => isSameWorkspacePath(run.envelope.workspacePath, workspacePath))
-      .map(([sessionId, run]) => ({ sessionId, completion: run.completion }))
-    if (matchingRuns.length === 0) return []
-
-    for (const { sessionId } of matchingRuns) {
-      this.abort(sessionId)
-    }
-
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    try {
-      await Promise.race([
-        Promise.all(matchingRuns.map(({ completion }) => completion)).then(() => undefined),
-        new Promise<void>((_resolve, reject) => {
-          timeout = setTimeout(
-            () => reject(new Error('Workspace Agent runs did not stop in time')),
-            timeoutMs,
-          )
-        }),
-      ])
-    } finally {
-      if (timeout) clearTimeout(timeout)
-    }
-
-    return matchingRuns.map(({ sessionId }) => sessionId)
+    const starts = [...this.pendingStarts]
+      .filter(({ envelope }) => isSameWorkspacePath(envelope.workspacePath, workspacePath))
+    const runs = [...this.activeRuns.values()]
+      .filter(({ envelope }) => isSameWorkspacePath(envelope.workspacePath, workspacePath))
+    const sessionIds = [...new Set([...runs, ...starts].map(({ envelope }) => envelope.sessionId))]
+    for (const id of sessionIds) this.abort(id)
+    await this.waitForCompletion([...runs, ...starts].map((item) => item.completion), timeoutMs,
+      'Workspace Agent runs did not stop in time')
+    return sessionIds
   }
 
   async setPermissionMode(queryKey: string | undefined, mode: PermissionMode): Promise<boolean> {

@@ -138,4 +138,156 @@ describe('SourceSaveController', () => {
 
     await expect(controller.flushAsync()).rejects.toThrow('disk full')
   })
+
+  it.each(['result', 'rejection'] as const)('keeps the latest draft retryable when an older save fails via %s', async (failure) => {
+    vi.useFakeTimers()
+    let failOldSave!: () => void
+    const oldSave = new Promise<unknown>((resolve, reject) => {
+      failOldSave = () => failure === 'result'
+        ? resolve({ success: false, error: 'disk full' })
+        : reject(new Error('disk full'))
+    })
+    const save = vi.fn().mockReturnValueOnce(oldSave).mockResolvedValue({ success: true })
+    const controller = new SourceSaveController(save)
+    controller.schedule('/workspace/a.md', 'old')
+    controller.flush()
+    controller.schedule('/workspace/a.md', 'latest')
+
+    const flushing = controller.flushAsync()
+    const failureAssertion = expect(flushing).rejects.toThrow('disk full')
+    expect(controller.hasPendingSave()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(save).toHaveBeenCalledTimes(1)
+    failOldSave()
+    await failureAssertion
+
+    expect(controller.hasPendingSave()).toBe(true)
+    await expect(controller.flushAsync()).resolves.toBe(true)
+    expect(save).toHaveBeenLastCalledWith('/workspace/a.md', 'latest')
+    expect(controller.hasPendingSave()).toBe(false)
+  })
+
+  it('saves the newest edit with its original owner after waiting for an earlier save', async () => {
+    vi.useFakeTimers()
+    let finishOldSave!: () => void
+    const oldSave = new Promise<void>((resolve) => { finishOldSave = resolve })
+    const ownerSave = vi.fn().mockReturnValueOnce(oldSave).mockResolvedValue({ success: true })
+    const otherOwnerSave = vi.fn()
+    const controller = new SourceSaveController(ownerSave)
+    controller.schedule('/workspace/a.md', 'old')
+    controller.flush()
+    controller.schedule('/workspace/a.md', 'draft')
+
+    const flushing = controller.flushAsync()
+    controller.schedule('/workspace/a.md', 'newest')
+    controller.setSaveHandler(otherOwnerSave)
+    finishOldSave()
+    await expect(flushing).resolves.toBe(true)
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(ownerSave.mock.calls).toEqual([
+      ['/workspace/a.md', 'old'], ['/workspace/a.md', 'newest'],
+    ])
+    expect(otherOwnerSave).not.toHaveBeenCalled()
+  })
+
+  it('does not revive a discarded draft after an earlier save settles', async () => {
+    vi.useFakeTimers()
+    let finishOldSave!: () => void
+    const save = vi.fn(() => new Promise<void>((resolve) => { finishOldSave = resolve }))
+    const controller = new SourceSaveController(save)
+    controller.schedule('/workspace/a.md', 'old')
+    controller.flush()
+    controller.schedule('/workspace/a.md', 'discarded')
+
+    const flushing = controller.flushAsync()
+    controller.discard()
+    finishOldSave()
+
+    await expect(flushing).resolves.toBe(false)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(controller.hasPendingSave()).toBe(false)
+  })
+
+  it('makes concurrent explicit saves wait for the latest draft without writing it twice', async () => {
+    vi.useFakeTimers()
+    let finishOldSave!: () => void
+    let finishLatestSave!: () => void
+    const save = vi.fn()
+      .mockReturnValueOnce(new Promise<void>((resolve) => { finishOldSave = resolve }))
+      .mockReturnValueOnce(new Promise<void>((resolve) => { finishLatestSave = resolve }))
+    const controller = new SourceSaveController(save)
+    controller.schedule('/workspace/a.md', 'old')
+    controller.flush()
+    controller.schedule('/workspace/a.md', 'latest')
+
+    let settled = 0
+    const first = controller.flushAsync().then(() => { settled++ })
+    const second = controller.flushAsync().then(() => { settled++ })
+    finishOldSave()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(settled).toBe(0)
+
+    finishLatestSave()
+    await Promise.all([first, second])
+    expect(settled).toBe(2)
+    expect(save).toHaveBeenLastCalledWith('/workspace/a.md', 'latest')
+  })
+})
+
+it('serializes automatic flushes and preserves each captured document owner', async () => {
+  let finish!: () => void
+  const first = new Promise<void>((resolve) => { finish = resolve })
+  const save = vi.fn().mockReturnValueOnce(first).mockResolvedValue({ success: true })
+  const controller = new SourceSaveController(save)
+  controller.schedule('/workspace/a.md', 'old')
+  controller.flush()
+  controller.schedule('/workspace/a.md', 'latest')
+  controller.flush()
+  controller.schedule('/workspace/b.md', 'other document')
+  controller.flush()
+  expect(save).toHaveBeenCalledTimes(1)
+  finish()
+  await controller.flushAsync()
+  expect(save.mock.calls).toEqual([
+    ['/workspace/a.md', 'old'], ['/workspace/a.md', 'latest'], ['/workspace/b.md', 'other document'],
+  ])
+})
+
+it('keeps queued edits from an unmounted editor ahead of its replacement', async () => {
+  let finish!: () => void
+  const oldWrite = new Promise<void>((resolve) => { finish = resolve })
+  const writes: string[] = []
+  const previous = new SourceSaveController((_path, content) => {
+    writes.push(content)
+    return content === 'old' ? oldWrite : Promise.resolve()
+  })
+  const replacement = new SourceSaveController((_path, content) => { writes.push(content) })
+  previous.schedule('/workspace/remount.md', 'old')
+  previous.flush()
+  previous.schedule('/workspace/remount.md', 'queued before unmount')
+  previous.flush()
+  replacement.schedule('/workspace/remount.md', 'latest after remount')
+  replacement.flush()
+  expect(writes).toEqual(['old'])
+  finish()
+  await Promise.all([previous.flushAsync(), replacement.flushAsync()])
+  expect(writes).toEqual(['old', 'queued before unmount', 'latest after remount'])
+})
+
+it('keeps queued saves marked unsettled so old content echoes cannot replace the draft', async () => {
+  let finish!: () => void
+  const save = vi.fn().mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve })).mockResolvedValue(undefined)
+  const controller = new SourceSaveController(save)
+  controller.schedule('/workspace/echo.md', 'old')
+  controller.flush()
+  controller.schedule('/workspace/echo.md', 'latest')
+  controller.flush()
+  expect(controller.hasPendingSave()).toBe(false)
+  expect(controller.hasUnsettledSave('/workspace/echo.md')).toBe(true)
+  expect(controller.hasUnsettledSave('/workspace/other.md')).toBe(false)
+  finish()
+  await controller.flushAsync()
+  expect(controller.hasUnsettledSave('/workspace/echo.md')).toBe(false)
 })

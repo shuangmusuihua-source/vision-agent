@@ -1,4 +1,5 @@
 import Store from 'electron-store'
+import { createHash } from 'crypto'
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { ModelUsageRange, ModelUsageSessionBreakdown } from '../../shared/types'
 import {
@@ -54,10 +55,24 @@ function toRecordedModels(result: SDKResultMessage): RecordedModelUsage[] {
   }))
 }
 
+function privateSessionId(source: ModelUsageRun['source'], sessionId: string): string {
+  if (source !== 'inline-rewrite' || sessionId.startsWith('file:sha256:')) return sessionId
+  return `file:sha256:${createHash('sha256').update(sessionId).digest('hex')}`
+}
+
 function getRuns(): ModelUsageRun[] {
   try {
     const runs = usageStore.get('runs')
-    return Array.isArray(runs) ? runs : []
+    if (!Array.isArray(runs)) return []
+    let migrated = false
+    const sanitized = runs.map((run) => {
+      const sessionId = privateSessionId(run.source, run.sessionId)
+      if (sessionId === run.sessionId) return run
+      migrated = true
+      return { ...run, sessionId }
+    })
+    if (migrated) usageStore.set('runs', sanitized)
+    return sanitized
   } catch (error) {
     console.error('[ModelUsage] failed to read local analytics:', error)
     return []
@@ -74,7 +89,7 @@ export function recordModelUsage(options: RecordModelUsageOptions): void {
       profileName: options.profile.name,
       configuredModel: options.profile.model,
       source: options.source,
-      sessionId: options.sessionId,
+      sessionId: privateSessionId(options.source, options.sessionId),
       sessionTitle: options.sessionTitle,
       workspaceName: options.workspaceName,
       skillIds: [...new Set(options.skillIds || [])].filter(Boolean),
@@ -104,3 +119,6 @@ export function getModelUsageSummaries(profileIds: string[]) {
 export function getModelUsageDetail(profileId: string, range: ModelUsageRange) {
   return buildModelUsageDetail(getRuns(), profileId, range)
 }
+
+// Remove paths from ledgers written by earlier versions on first load.
+getRuns()

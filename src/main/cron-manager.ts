@@ -252,7 +252,7 @@ export function registerTask(registration: CronTaskRegistration): CronTask {
 export function removeTask(taskId: string): boolean {
   const entry = tasks.get(taskId)
   if (!entry) return false
-  entry.job.stop()
+  entry.job.destroy()
   runningTasks.get(taskId)?.abortController.abort()
   tasks.delete(taskId)
   persistTasks()

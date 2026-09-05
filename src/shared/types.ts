@@ -409,6 +409,7 @@ export type MessagePhase =
 export type TodoTaskStatus = 'pending' | 'in_progress' | 'completed'
 
 export type TodoTask = {
+  creationToolUseId?: string
   taskId: string
   subject: string
   description?: string

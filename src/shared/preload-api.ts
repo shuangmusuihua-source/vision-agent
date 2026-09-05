@@ -97,6 +97,7 @@ export interface SettingsApi {
     theme: AppSettingsSnapshot['theme'],
   ) => Promise<IPCResponse<'settings:setTheme'>>
   onChanged: Subscription<'settings:changed'>
+  /** profileId selects the stored credential when apiKey is empty. */
   testConnection: (
     options: IPCRequest<'settings:testConnection'>,
   ) => Promise<IPCResponse<'settings:testConnection'>>
@@ -194,6 +195,7 @@ export interface GraphApi {
   acknowledgeChanges: (
     version: number,
   ) => Promise<IPCResponse<'graph:acknowledgeChanges'>>
+  /** Receives incremental path batches with cumulative count/version metadata. */
   onFilesChanged: Subscription<'graph:filesChanged'>
 }
 

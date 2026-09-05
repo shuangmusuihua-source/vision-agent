@@ -1,10 +1,12 @@
 import { ipcMain } from 'electron'
-import { getApiKey, getBaseUrl } from '../persistence/profile-store'
+import type { IPCRequest } from '../../shared/ipc-types'
+import { getApiKey, getBaseUrl, getProfileApiKey } from '../persistence/profile-store'
 
 export function registerConnectionHandlers(): void {
-  ipcMain.handle('settings:testConnection', async (_event, options: { baseUrl: string; apiKey: string; model: string }) => {
+  ipcMain.handle('settings:testConnection', async (_event, options: IPCRequest<'settings:testConnection'>) => {
     try {
-      const apiKey = options.apiKey || getApiKey()
+      const enteredKey = options.apiKey.includes('***') ? '' : options.apiKey
+      const apiKey = enteredKey || (options.profileId ? getProfileApiKey(options.profileId) : getApiKey())
       if (!apiKey) return { success: false, message: '未找到有效的 API Key，请先在设置中配置' }
       const baseUrl = (options.baseUrl || getBaseUrl()).replace(/\/+$/, '')
       const response = await fetch(`${baseUrl}/v1/messages`, {

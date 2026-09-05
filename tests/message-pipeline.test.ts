@@ -117,3 +117,25 @@ describe('reduceAgentMessage', () => {
     })
   })
 })
+
+const assistant=(id:string,content:any[])=>({type:'assistant',uuid:id,message:{content}} as any);
+describe('message projection regression cases',()=>{
+ it('retains independently identified repeated user messages',()=>{
+  const result=buildReplayedMessages([{type:'user',uuid:'u1',message:{content:[{type:'text',text:'继续'}]}},assistant('a1',[{type:'text',text:'response'}]),{type:'user',uuid:'u2',message:{content:[{type:'text',text:'继续'}]}}] as any);
+  expect(result.filter(m=>m.kind==='user').map(m=>m.id)).toEqual(['u1','u2']);
+ });
+ it('keeps all streamed text blocks after completion',()=>{
+  let slot=emptySlot();
+  for(const [index,text] of [[0,'first'],[1,'second']] as const){const result=reduceAgentMessage(slot,{type:'stream_event',event:{type:'content_block_delta',index,delta:{type:'text_delta',text}}} as any,'live');slot={...slot,...result.patch}}
+  expect((slot.messages.at(-1) as any).textContent).toBe('firstsecond');
+  const msg=assistant('a2',[{type:'text',text:'first'},{type:'text',text:'second'}]);
+  const completed=reduceAgentMessage(slot,msg,'live');expect((completed.patch!.messages!.at(-1) as any).textContent).toBe('firstsecond');
+  const replay=buildReplayedMessages([msg]);expect((replay[0] as any).textContent).toBe('firstsecond');
+ });
+ it('binds SDK task creation results before applying updates',()=>{
+  let slot=emptySlot();
+  const messages=[assistant('a1',[{type:'tool_use',id:'tool-create',name:'TaskCreate',input:{subject:'Example'}}]),{type:'user',uuid:'result1',message:{content:[{type:'tool_result',tool_use_id:'tool-create',content:'Task #1 created successfully: Example'}]}},assistant('a2',[{type:'tool_use',id:'tool-update',name:'TaskUpdate',input:{taskId:'1',status:'completed'}}])];
+  for(const msg of messages){slot={...slot,...reduceAgentMessage(slot,msg as any,'live').patch}}
+  expect(slot.todoList!.tasks).toHaveLength(1);expect(slot.todoList!.tasks[0].taskId).toBe('1');expect(slot.todoList!.tasks[0].status).toBe('completed');
+ });
+});

@@ -24,6 +24,11 @@ export function getApiKey(): string {
   return decryptValue(profile.apiKey)
 }
 
+export function getProfileApiKey(profileId: string): string {
+  const profile = store.get('profiles').find((candidate) => candidate.id === profileId)
+  return profile ? decryptValue(profile.apiKey) : ''
+}
+
 function getActiveProfileRaw(): ModelProfile | null {
   const settings = store.store
   return settings.profiles.find((p) => p.id === settings.activeProfileId) || null

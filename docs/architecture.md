@@ -51,6 +51,8 @@ seam 验证生命周期行为。
 Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 
 菜单事件也使用该共享协议。显式保存由菜单或编辑器快捷键触发后，统一 flush 编辑器投影调度器、source-mode save controller 与富文本 save controller，不能只依赖延迟自动保存。
+`SourceSaveController` 在等待已发出的保存请求时保留待提交的新稿；旧请求失败后，
+新稿仍保持 pending，下一次显式保存可以继续提交，并使用编辑时捕获的会话保存回调。
 
 ### Agent 层
 
@@ -86,7 +88,7 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 - `workspace-store.ts`：授权目录、app session 元数据和知识库；删除工作区时以一次 store 提交同步移除授权与会话元数据
 - `settings-store.ts`：主题、Cron、Skill 开关和 compaction IDs
 
-模型用量由独立的 `persistence/model-usage-store.ts` 管理。它只保存有上限的本地分析事件（Profile、会话展示信息、实际模型、Token、费用和 Skill 归因），不保存 prompt、模型回复、API Key 或完整文件路径，避免让设置存储承担持续增长的分析数据。
+模型用量由独立的 `persistence/model-usage-store.ts` 管理。它只保存有上限的本地分析事件（Profile、会话展示信息、实际模型、Token、费用和 Skill 归因），不保存 prompt、模型回复、API Key 或完整文件路径，避免让设置存储承担持续增长的分析数据。行内改写使用文档路径的 SHA-256 标识分组，旧账本在加载时迁移；归属 Profile 在实际运行选项创建时捕获，预热执行沿用同一快照。
 
 Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级映射和展示元数据。两者职责不同。
 
@@ -94,9 +96,19 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 `file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与去重后的双向 wikilink 关系图。Renderer 使用 `react-force-graph-2d` 在固定视口中显示图谱。
 
+文件变化推送每 50 毫秒合并一批：`FileChangeBatch` 的路径与重命名只包含本批变化，
+`count` 与 `version` 表示当前累计未确认状态。图谱确认使用独立的完整
+`FileChangeSnapshot`，不会清除尚未投递的编辑器刷新或重命名通知。索引销毁时清理待发批次与计时器。
+
+`knowledge-curation.ts` 按规范化后的知识库目录串行处理应用内导入。读取来源记录、
+分配文件名、写入文档和更新来源记录属于同一次排队操作，防止并发导入覆盖文档或来源记录；
+失败不会阻塞后续导入，空闲队列会释放。
+
 内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者在连接器完成飞书 CLI 安装和应用配置后进入 Agent 的启用 Skill 集合。Agent 的精确 `auth check` 是会话内增量授权的唯一入口：Main process 在 `PreToolUse` 生命周期暂停该工具调用，因此默认与自动执行模式都会在当前会话立即收到授权卡；系统浏览器完成 OAuth 并验证 Scope 后放行原工具调用，使同一次 SDK 运行从暂停点继续。
 
 ## Renderer
+
+文本保存由编辑器保存控制器排序提交，Main 的 `atomic-write.ts` 再按绝对文件路径串行执行原子替换，确保不同编辑模式和调用方不会让旧写入覆盖新内容。
 
 Renderer 是单页 React 应用：
 

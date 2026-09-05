@@ -267,14 +267,15 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
     try {
       const result = await window.api.settings.testConnection({
         baseUrl: editForm.baseUrl,
-        apiKey: editForm.apiKey,
+        apiKey: !isNewProfile && editForm.apiKey.includes('***') ? '' : editForm.apiKey,
+        profileId: !isNewProfile && editingProfileId ? editingProfileId : undefined,
         model: editForm.model
       })
       setConnectionTest({ status: result.success ? 'success' : 'error', message: result.message })
     } catch (err) {
       setConnectionTest({ status: 'error', message: (err as Error).message })
     }
-  }, [editForm.baseUrl, editForm.apiKey, editForm.model])
+  }, [editForm.baseUrl, editForm.apiKey, editForm.model, editingProfileId, isNewProfile])
 
   const overlayRef = useRef<HTMLDivElement>(null)
 

@@ -73,6 +73,14 @@ export interface FileChangeSnapshot {
   renames: FileRenameChange[]
 }
 
+/** Push payload: paths/renames cover this batch; count/version describe all unacknowledged changes. */
+export interface FileChangeBatch {
+  count: number
+  files: string[]
+  version: number
+  renames: FileRenameChange[]
+}
+
 export type MenuAction =
   | 'open-settings'
   | 'toggle-sidebar'
@@ -300,7 +308,7 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'settings:testConnection': {
-    request: { baseUrl: string; apiKey: string; model: string }
+    request: { baseUrl: string; apiKey: string; model: string; profileId?: string }
     response: { success: boolean; message: string }
   }
   'settings:getModelUsageSummaries': {
@@ -493,7 +501,7 @@ export type IPCEventMap = {
   'agent:generationActivity': SessionRoutedGenerationActivity
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': AppSettingsSnapshot
-  'graph:filesChanged': FileChangeSnapshot
+  'graph:filesChanged': FileChangeBatch
   'cron:taskCompleted': CronTaskCompletedEvent
   'menu-action': MenuAction
   'main:error': { type: 'unhandledRejection' | 'uncaughtException'; message: string }

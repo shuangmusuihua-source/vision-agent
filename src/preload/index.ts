@@ -111,7 +111,7 @@ const api = {
       ipcRenderer.on('settings:changed', handler)
       return () => { ipcRenderer.removeListener('settings:changed', handler) }
     },
-    testConnection: (options: { baseUrl: string; apiKey: string; model: string }) =>
+    testConnection: (options: IPCRequest<'settings:testConnection'>) =>
       invoke('settings:testConnection', options),
     getModelUsageSummaries: () => invoke('settings:getModelUsageSummaries'),
     getModelUsageDetail: (profileId: string, range: ModelUsageRange) =>

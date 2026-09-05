@@ -63,7 +63,7 @@ export function commitAccumulator(acc: StreamingAccumulator, slot: ContextSlot, 
   const updatedMsg: TextMessage = {
     ...existing,
     phase,
-    textContent: hasText ? (content.find(isTextBlock))?.text || textContent : textContent,
+    textContent: hasText ? content.filter(isTextBlock).map((block) => block.text).join('') : textContent,
     content: content.length > 0 ? content : existing.content,
     toolCalls: hasToolUse
       ? content.filter(isToolUseBlock).map((tu) => {
@@ -233,6 +233,15 @@ export function reduceSystemMessage(
 
 // ─── Agent task tracking (TaskCreate / TaskUpdate from SDK) ─────────
 
+function taskIdFromCreationResult(content: string): string | null {
+  try {
+    const data = JSON.parse(content)
+    const id = data?.task?.id ?? data?.taskId ?? data?.id
+    if (typeof id === 'string' || typeof id === 'number') return String(id)
+  } catch { /* SDK text results are handled below. */ }
+  return /Task #([^\s:]+) created successfully/i.exec(content)?.[1] || null
+}
+
 function mergeTasks(existing: TodoTaskList | null, content: ContentBlock[]): TodoTaskList | null {
   const tasks = new Map<string, TodoTask>()
   if (existing) {
@@ -245,9 +254,11 @@ function mergeTasks(existing: TodoTaskList | null, content: ContentBlock[]): Tod
       const input = block.input as Record<string, unknown> | undefined
       const subject = (input?.subject as string) || ''
       if (!subject) continue
-      const tempId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      if ([...tasks.values()].some((task) => task.creationToolUseId === block.id)) continue
+      const tempId = `task-create:${block.id}`
       tasks.set(tempId, {
         taskId: tempId,
+        creationToolUseId: block.id,
         subject,
         description: (input?.description as string) || undefined,
         status: 'pending',
@@ -610,6 +621,7 @@ export function reduceUserMessage(
   const textBlocks = content.filter(isTextBlock)
   const msgs = [...slot.messages]
   let changed = false
+  let todoList = slot.todoList
 
   if (toolResults.length > 0) {
     for (const tr of toolResults) {
@@ -620,6 +632,17 @@ export function reduceUserMessage(
           ? tr.content.map((c) => (typeof c === 'object' && c && 'text' in c ? (c as { text: string }).text : '')).join('')
           : JSON.stringify(tr.content)
       const isError = tr.is_error === true
+      const pendingTask = todoList?.tasks.find((task) => task.creationToolUseId === toolUseId)
+      if (pendingTask && todoList) {
+        const taskId = taskIdFromCreationResult(resultContent)
+        if (isError || taskId) {
+          const tasks = isError
+            ? todoList.tasks.filter((task) => task !== pendingTask)
+            : todoList.tasks.map((task) => task === pendingTask ? { ...task, taskId: taskId! } : task)
+          todoList = tasks.length ? { tasks, totalCount: tasks.length } : null
+          changed = true
+        }
+      }
 
       for (let i = 0; i < msgs.length; i++) {
         if (msgs[i].kind !== 'text') continue
@@ -641,7 +664,9 @@ export function reduceUserMessage(
     const text = getVisibleUserText(rawText)
     const attachmentConversions = parseAttachmentConversionStatuses(rawText)
     const attachmentPatch = attachmentConversions.length > 0 ? { attachmentConversions } : {}
-    const existingUserIndex = text ? findLastUserMessageIndex(msgs, text) : -1
+    const existingUserIndex = isReplay
+      ? msgs.findIndex((message) => message.kind === 'user' && Boolean(msg.uuid) && message.id === msg.uuid)
+      : (text ? findLastUserMessageIndex(msgs, text) : -1)
 
     if (existingUserIndex >= 0 && attachmentConversions.length > 0) {
       const existing = msgs[existingUserIndex]
@@ -651,10 +676,10 @@ export function reduceUserMessage(
       }
     }
 
-    if (isReplay && text && !msgs.some((m) => m.kind === 'user' && m.textContent === text)) {
+    if (isReplay && text && !(msg.uuid && msgs.some((m) => m.id === msg.uuid))) {
       msgs.push({
         kind: 'user',
-        id: msg.uuid || `user-${Date.now()}`,
+        id: msg.uuid || `user-${Date.now()}-${msgs.length}`,
         role: 'user',
         textContent: text,
         createdAt: Date.now(),
@@ -664,7 +689,7 @@ export function reduceUserMessage(
     }
   }
 
-  return changed ? { messages: msgs } : null
+  return changed ? { messages: msgs, todoList } : null
 }
 
 // ─── Result message reducer ────────────────────────────────────────────
