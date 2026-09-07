@@ -1,3 +1,4 @@
+import { useAgentStore } from '../store/agent-store-impl'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import {
   NotificationInbox,
@@ -23,8 +24,16 @@ export function useNotificationInbox() {
   const snapshot = useSyncExternalStore(inbox.subscribe, inbox.getSnapshot, inbox.getSnapshot)
 
   useEffect(() => {
+    const syncPermissions = () => {
+      const state = useAgentStore.getState()
+      inbox.syncPermissions([...Object.values(state.slots), ...Object.values(state.sessionSlots)]
+        .flatMap((slot) => [...(slot.permissionRequest ? [slot.permissionRequest] : []), ...slot.permissionQueue]))
+    }
+    syncPermissions()
+    const unsubscribeStore = useAgentStore.subscribe(syncPermissions)
     const unsubscribe = window.api.agent.onNotification((notification) => inbox.receive(notification))
     return () => {
+      unsubscribeStore()
       unsubscribe()
       inbox.destroy()
     }
@@ -34,6 +43,7 @@ export function useNotificationInbox() {
     ...snapshot,
     openNotification: (notificationId: string) => inbox.open(notificationId),
     dismissToast: () => inbox.dismissToast(),
+    closeList: () => inbox.closeList(),
     toggleList: () => inbox.toggleList(),
     selectNotification: (notificationId: string) => inbox.select(notificationId),
     clearSelection: () => inbox.clearSelection(),

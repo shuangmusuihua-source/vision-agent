@@ -1,4 +1,4 @@
-import type { AgentNotificationEvent } from '../../shared/types'
+import type { AgentNotificationEvent, SessionRoutedPermissionRequest } from '../../shared/types'
 
 const MAX_NOTIFICATIONS = 30
 const TOAST_DISMISS_MS = 5_200
@@ -8,6 +8,7 @@ export type AppNotification = AgentNotificationEvent & {
   id: string
   receivedAt: number
   read: boolean
+  permissionRequestId?: string
 }
 
 export type NotificationInboxSnapshot = {
@@ -43,6 +44,11 @@ function isStoredNotification(value: unknown): value is AppNotification {
     typeof item.message === 'string' &&
     typeof item.receivedAt === 'number' &&
     typeof item.read === 'boolean'
+}
+
+function isPermissionPrompt(notification: AgentNotificationEvent): boolean {
+  return notification.type === 'permission_prompt' ||
+    /^Claude needs your permission to use\b/i.test(notification.message.trim())
 }
 
 export function notificationTimeLabel(timestamp: number): string {
@@ -94,6 +100,7 @@ export class NotificationInbox {
     this.toastDismissMs = options.toastDismissMs ?? TOAST_DISMISS_MS
     this.notifications = this.load()
     this.snapshot = this.buildSnapshot()
+    this.persist()
   }
 
   getSnapshot = (): NotificationInboxSnapshot => this.snapshot
@@ -104,6 +111,7 @@ export class NotificationInbox {
   }
 
   receive(notification: AgentNotificationEvent): void {
+    if (isPermissionPrompt(notification)) return
     this.clearToastTimer()
     const next: AppNotification = {
       ...notification,
@@ -111,7 +119,8 @@ export class NotificationInbox {
       receivedAt: this.now(),
       read: false,
     }
-    this.notifications = [next, ...this.notifications].slice(0, MAX_NOTIFICATIONS)
+    this.notifications = [...this.notifications.filter((item) => item.permissionRequestId), next,
+      ...this.notifications.filter((item) => !item.permissionRequestId).slice(0, MAX_NOTIFICATIONS - 1)]
     this.toast = next
     this.persist()
     this.publish()
@@ -122,6 +131,39 @@ export class NotificationInbox {
       }
       this.toastTimer = null
     }, this.toastDismissMs)
+  }
+
+  // Pending approvals belong to the Agent store; never retain them as history.
+  syncPermissions(requests: SessionRoutedPermissionRequest[]): void {
+    const unique = new Map(requests.map((request) => [request.id, request]))
+    const previous = this.notifications.filter((item) => item.permissionRequestId)
+    if (previous.length === unique.size && previous.every((item) => unique.has(item.permissionRequestId!))) return
+    const pending = [...unique.values()].map((request): AppNotification =>
+      previous.find((item) => item.permissionRequestId === request.id) || {
+        context: request.context,
+        sessionId: request.sessionId,
+        workspacePath: request.workspacePath,
+        sdkSessionId: request.sdkSessionId,
+        type: 'permission_prompt',
+        title: '需要你的确认',
+        message: `${request.toolName} 正在等待授权，请前往会话确认。`,
+        id: `permission:${request.id}`,
+        permissionRequestId: request.id,
+        receivedAt: this.now(),
+        read: false,
+      })
+    this.notifications = [...pending, ...this.notifications.filter((item) => !item.permissionRequestId)]
+    if (this.toast?.permissionRequestId && !unique.has(this.toast.permissionRequestId)) this.clearToast()
+    if (this.selectedId && !this.notifications.some((item) => item.id === this.selectedId)) this.selectedId = null
+    // The inbox badge is sufficient: the session already displays its approval card.
+    this.publish()
+  }
+
+  closeList(): void {
+    if (!this.listOpen) return
+    this.listOpen = false
+    this.selectedId = null
+    this.publish()
   }
 
   open(notificationId: string): AppNotification | null {
@@ -163,6 +205,7 @@ export class NotificationInbox {
   }
 
   markAllRead(): void {
+    this.clearToast()
     this.notifications = this.notifications.map((notification) => ({ ...notification, read: true }))
     this.selectedId = null
     this.listOpen = false
@@ -186,8 +229,9 @@ export class NotificationInbox {
   }
 
   private clearToast(notificationId?: string): void {
+    if (notificationId && this.toast?.id !== notificationId) return
     this.clearToastTimer()
-    if (!notificationId || this.toast?.id === notificationId) this.toast = null
+    this.toast = null
   }
 
   private clearToastTimer(): void {
@@ -202,7 +246,7 @@ export class NotificationInbox {
       if (!raw) return []
       const parsed: unknown = JSON.parse(raw)
       return Array.isArray(parsed)
-        ? parsed.filter(isStoredNotification).slice(0, MAX_NOTIFICATIONS)
+        ? parsed.filter(isStoredNotification).filter((item) => !item.permissionRequestId && !isPermissionPrompt(item)).slice(0, MAX_NOTIFICATIONS)
         : []
     } catch {
       return []
@@ -211,7 +255,7 @@ export class NotificationInbox {
 
   private persist(): void {
     try {
-      this.storage.setItem(STORAGE_KEY, JSON.stringify(this.notifications.slice(0, MAX_NOTIFICATIONS)))
+      this.storage.setItem(STORAGE_KEY, JSON.stringify(this.notifications.filter((item) => !item.permissionRequestId).slice(0, MAX_NOTIFICATIONS)))
     } catch {
       // Notification history is helpful but non-critical.
     }

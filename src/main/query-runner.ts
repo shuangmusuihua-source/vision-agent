@@ -147,6 +147,7 @@ function buildHooks(mainWindow: BrowserWindow, hookContext: HookSessionContext):
 
   const notificationHook: HookCallback = async (input, _toolUseID, _options) => {
     const { message, title, notification_type } = input as NotificationHookInput
+    if (notification_type === 'permission_prompt') return {}
     sessionRuntime.emitNotification(mainWindow, {
       ...hookContext.envelope,
       sdkSessionId: hookContext.getSdkSessionId?.() || hookContext.envelope.sdkSessionId,

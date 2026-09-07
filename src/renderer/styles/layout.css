@@ -1987,116 +1987,6 @@
 
 /* --- App toast / Update banner --- */
 
-.app-toast {
-  position: fixed;
-  top: 18px;
-  right: 22px;
-  z-index: 420;
-  display: flex;
-  width: min(360px, calc(100vw - 44px));
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 12px 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-bg-elevated) 94%, white 6%);
-  box-shadow:
-    0 16px 42px color-mix(in srgb, var(--color-text-primary) 12%, transparent),
-    0 1px 2px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  animation: app-toast-enter 180ms var(--ease-default);
-}
-
-.app-toast:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.app-toast-success {
-  border-color: color-mix(in srgb, var(--color-success) 34%, var(--color-border));
-}
-
-.app-toast-error {
-  border-color: color-mix(in srgb, var(--color-error) 34%, var(--color-border));
-  background: color-mix(in srgb, var(--color-error) 7%, var(--color-bg-elevated));
-}
-
-.app-toast-info {
-  border-color: color-mix(in srgb, var(--color-action) 24%, var(--color-border));
-}
-
-.app-toast-copy {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-  flex: 1;
-}
-
-.app-toast-copy strong {
-  overflow: hidden;
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.app-toast-markdown {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.app-toast-markdown :where(p, ul, ol, table, pre) {
-  margin: 0;
-}
-
-.app-toast-markdown :where(ul, ol) {
-  padding-left: 16px;
-}
-
-.app-toast-markdown :where(table) {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.app-toast-close {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-}
-
-.app-toast-close:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
-
-@keyframes app-toast-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .notification-inbox-area {
   position: fixed;
   top: 18px;
@@ -2107,229 +1997,323 @@
 .notification-inbox-button {
   position: relative;
   display: grid;
+  place-items: center;
   width: 34px;
   height: 34px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-bg-elevated) 94%, white 6%);
-  color: var(--color-action);
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  color: var(--color-text-secondary);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
   cursor: pointer;
-  box-shadow:
-    0 10px 26px color-mix(in srgb, var(--color-text-primary) 9%, transparent),
-    0 1px 2px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
-.notification-inbox-button:hover,
-.notification-inbox-button-active {
-  border-color: color-mix(in srgb, var(--color-action) 30%, var(--color-border));
+.notification-inbox-button:hover {
+  border-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.notification-inbox-button.notification-inbox-button-active {
+  border-color: color-mix(in srgb, var(--color-action) 20%, transparent);
   background: var(--color-action-bg);
+  color: var(--color-action);
 }
 
-.notification-inbox-button span {
+.notification-inbox-button > span {
   position: absolute;
-  top: -5px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border: 2px solid var(--color-bg-primary);
-  border-radius: 999px;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 10px;
   background: var(--color-error);
   color: var(--color-white);
   font-size: 10px;
   font-weight: var(--font-weight-semibold);
   line-height: 14px;
+  border: 1px solid var(--color-bg-elevated);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-inbox-button { transition: none; }
+}
+
+.notification-inbox-panel, .app-toast {
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 96%, transparent);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--color-text-primary) 13%, transparent), 0 4px 14px color-mix(in srgb, var(--color-text-primary) 7%, transparent), inset 0 1px 0 color-mix(in srgb, var(--color-white) 88%, transparent);
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+  color: var(--color-text-primary);
 }
 
 .notification-inbox-panel {
   position: absolute;
-  top: 42px;
   right: 0;
-  width: min(420px, calc(100vw - 44px));
-  max-height: min(520px, calc(100vh - 86px));
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--color-bg-elevated) 96%, white 4%);
-  box-shadow:
-    0 22px 60px color-mix(in srgb, var(--color-text-primary) 13%, transparent),
-    0 1px 2px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  top: 44px;
+  width: min(352px, calc(100vw - 44px));
+  max-height: calc(100vh - 90px);
+  overflow: auto;
 }
 
 .notification-inbox-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 64%, transparent);
+  gap: 10px;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.notification-inbox-head strong {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
+.notification-heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-heading strong, .notification-inbox-item strong, .app-toast-copy strong {
+  font-size: 13px;
   font-weight: var(--font-weight-semibold);
+}
+
+.notification-heading > span {
+  font-size: 11px;
+  color: var(--color-text-secondary);
 }
 
 .notification-inbox-head button {
   display: inline-flex;
-  height: 28px;
   align-items: center;
-  gap: 5px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  gap: 4px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--color-text-secondary);
+  font-size: 11px;
   cursor: pointer;
-  font-size: var(--font-size-xs);
 }
 
-.notification-inbox-head button:hover:not(:disabled) {
+.notification-inbox-head button:last-child {
+  margin-left: auto;
+}
+
+.notification-inbox-head button:hover:enabled {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.notification-inbox-head button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.notification-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+}
+
+.notification-icon-permission_prompt {
   background: var(--color-action-bg);
   color: var(--color-action);
 }
 
-.notification-inbox-head button:disabled {
-  cursor: default;
-  opacity: 0.5;
+.notification-icon-error {
+  color: var(--color-error);
+}
+
+.notification-icon-success {
+  color: var(--color-success);
 }
 
 .notification-inbox-list {
-  display: grid;
-  max-height: 450px;
-  overflow: auto;
-  padding: 8px;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
 }
 
 .notification-inbox-item {
-  padding: 10px 11px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 68%, transparent);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 6px;
+  border: 0;
   border-radius: 14px;
-  background: var(--color-bg-elevated);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: left;
   cursor: pointer;
 }
 
-.notification-inbox-item:hover,
-.notification-inbox-item:focus-visible {
-  border-color: color-mix(in srgb, var(--color-action) 24%, var(--color-border));
-  background: color-mix(in srgb, var(--color-action) 5%, var(--color-bg-elevated));
-  outline: none;
+.notification-inbox-item:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
-.notification-inbox-item-error {
-  border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border));
-}
-
-.notification-inbox-item-success {
-  border-color: color-mix(in srgb, var(--color-success) 26%, var(--color-border));
+.notification-inbox-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .notification-inbox-item-head {
   display: flex;
   align-items: baseline;
+  gap: 8px;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
 }
 
 .notification-inbox-item-head strong {
-  overflow: hidden;
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-.notification-inbox-item-head span {
-  flex: 0 0 auto;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+.notification-inbox-item-head time {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
 }
 
-.notification-inbox-markdown {
+.notification-inbox-copy p, .app-toast-copy > span {
+  margin: 4px 0;
   display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  line-height: 1.55;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.notification-inbox-markdown :where(p, ul, ol) {
-  margin: 0 0 6px;
-}
-
-.notification-inbox-markdown :where(p, ul, ol):last-child {
-  margin-bottom: 0;
-}
-
-.notification-detail {
-  display: grid;
-  min-height: 0;
-}
-
-.notification-detail-head {
-  padding: 10px 12px;
-}
-
-.notification-detail-back,
-.notification-detail-source {
+  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
-.notification-detail-card {
-  display: grid;
-  gap: 12px;
-  max-height: 458px;
-  overflow: auto;
-  padding: 14px;
+.notification-source {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
 }
 
-.notification-detail-title {
-  display: grid;
-  gap: 4px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent);
-}
-
-.notification-detail-title strong {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.35;
-}
-
-.notification-detail-title span {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.notification-detail-markdown {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 1.65;
-}
-
-.notification-detail-markdown :where(p, ul, ol, table, pre) {
-  margin-top: 0;
-}
-
-.notification-detail-markdown :where(p, ul, ol, table, pre):last-child {
-  margin-bottom: 0;
+.notification-chevron {
+  flex-shrink: 0;
+  margin-top: 10px;
+  color: var(--color-text-tertiary);
 }
 
 .notification-inbox-empty {
-  padding: 28px 14px;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 12px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
 }
+
+.notification-inbox-empty strong {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+}
+
+.notification-detail-card {
+  padding: 14px 6px;
+}
+
+.notification-detail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notification-detail-title strong {
+  font-size: 14px;
+}
+
+.notification-detail-title span {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.notification-detail-markdown {
+  margin-top: 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.app-toast {
+  position: fixed;
+  top: 62px;
+  right: 22px;
+  z-index: 411;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  width: min(352px, calc(100vw - 44px));
+}
+
+.app-toast-content {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+  padding: 4px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.app-toast-content:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.app-toast-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.app-toast-close:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.notification-inbox-area button:focus-visible, .app-toast button:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
 
 .update-banner {
   position: fixed;
