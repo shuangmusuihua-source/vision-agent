@@ -41,6 +41,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `ipc-handlers.ts` — top-level IPC registration; concrete handlers live in `handlers/`
 - `workspace-lifecycle.ts` / `workspace-lifecycle-adapter.ts` — serialized workspace creation, ordering, and deletion; coordinates Agent shutdown, automation suspension, Trash, persistence, and indexing, then returns the canonical workspace projection
 - `query-runner.ts` — builds interactive query options and consumes the Claude SDK stream
+- `model-usage-analytics.ts`, `persistence/model-usage-store.ts` — aggregate and retain a bounded local ledger of SDK-reported model usage by profile, session, actual model, and attributed Skill
 - `session-runtime.ts` — active query lifecycle, session envelopes, permissions, AskUser, abort, batching, generation activity routing
 - `pending-interactions.ts` — permission and AskUser registration, timeout, SDK cancellation, notification cleanup, resolution, and session-scoped rejection
 - `generation-activity-projector.ts` — projects SDK content-block streams into session-routed live generation activity
@@ -49,6 +50,7 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `inline-rewrite-runner.ts` — ephemeral, tool-free AI rewrites for editor selections; prewarms a one-shot SDK process while the user types
 - `officecli-runtime.ts` — opt-in, pinned OfficeCLI download, SHA-256 verification, atomic install, and runtime discovery for editable DOCX/XLSX/PPTX work
 - `feishu-runtime.ts`, `feishu-connection.ts` — opt-in pinned Feishu CLI runtime plus app-owned configuration, browser authorization, per-domain incremental scope grants, connector status, Agent Skill readiness, and an Agent-only CLI shim that blocks auth/config/raw API commands
+- `dingtalk-runtime.ts`, `dingtalk-connection.ts` — opt-in pinned DingTalk Workspace CLI, isolated configuration and encrypted token storage, browser login, previewed scope grants, and an Agent product-command shim
 - `managed-runtime-install.ts` — shared single-flight staging, backup, activation validation, rollback, and cleanup transaction for app-managed runtimes
 - `memory-policy.ts`, `memory-files.ts` — application-global auto-memory policy and managed Markdown storage; interactive sessions share it, while automation and ephemeral model runs disable auto-memory
 - `session-transcript.ts` — app-owned transcript paging through JSONL and SDK adapters with Main-issued opaque cursors
@@ -62,7 +64,7 @@ Main-process code imports directly from the owning runtime module or persistence
 
 ### IPC
 
-`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. `src/shared/preload-api.ts` owns the `window.api` Interface, and the preload implementation must satisfy it. Methods are grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `office`, `feishu`, `search`, `menu`, and `update`.
+`src/shared/ipc-types.ts` is the source of truth for request/response and event payloads. `src/shared/preload-api.ts` owns the `window.api` Interface, and the preload implementation must satisfy it. Methods are grouped under `workspace`, `editor`, `settings`, `agent`, `memory`, `graph`, `cron`, `skills`, `attachments`, `office`, `feishu`, `dingtalk`, `search`, `menu`, and `update`.
 
 New session-affecting push events must carry an `AgentSessionEnvelope`; never infer ownership from the currently visible workspace or panel.
 
@@ -83,6 +85,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 - `components/chat/AssistantMarkdown.tsx` — Streamdown chat rendering with Shiki, KaTeX, GFM, and Mermaid
 - `components/graph/GraphView.tsx` — `react-force-graph-2d` visualization
 - `components/connectors/ConnectorPanel.tsx` — connector setup, browser authorization, identity health, and disconnect controls
+- `components/settings/ModelUsageAnalytics.tsx` — per-profile token, cache, cost, session-ranking, Skill-attribution, and actual-model analysis
 
 ## Agent and session rules
 
@@ -98,7 +101,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 
 ## Persistence
 
-`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
+`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. A separate bounded `model-usage` electron-store file owns analytics events only; it contains no prompts, responses, API keys, or full paths. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
 
 Do not introduce a second store for the same authority without documenting the ownership boundary.
 
@@ -123,6 +126,8 @@ Do not introduce a second store for the same authority without documenting the o
 - OfficeCLI remains an app-managed runtime: pin release assets and hashes, disable its self-update, and never invoke its global installer or MCP registration flow.
 - Feishu CLI remains an app-managed runtime: pin release archives and extracted binaries, isolate its config directory, disable self-update notices, and keep configuration/authentication/scope repair in the connector UI. Agent PATH must expose only the guarded shim, never the real CLI bin directory.
 - Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.
+
+DingTalk uses a pinned official `dws` binary with archive and binary verification. Keep `DWS_CONFIG_DIR` and `DWS_KEYCHAIN_DIR` under app user data; retain macOS Keychain protection. Login, account changes and permission grants belong to the connector UI. Scope grants must use a short-lived Main-owned preview plan and explicit UI confirmation. Agent PATH exposes the guarded shim only; never run global installers or `dws upgrade`.
 
 ## Documentation policy
 

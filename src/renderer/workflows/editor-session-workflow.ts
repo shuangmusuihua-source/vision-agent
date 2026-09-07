@@ -116,7 +116,6 @@ export class EditorSessionWorkflow {
   async remove(sessionId: string): Promise<boolean> {
     if (!await this.port.confirmDelete()) return false
 
-    const wasActive = this.port.getActiveSessionId() === sessionId
     const sdkSessionId = this.port.resolveSdkSessionId(sessionId)
     try {
       const result = sdkSessionId
@@ -130,7 +129,7 @@ export class EditorSessionWorkflow {
     }
 
     this.port.removeSessionState(sessionId)
-    if (wasActive) {
+    if (this.port.getActiveSessionId() === sessionId) {
       this.port.switchToSession('')
       this.port.clearSessionOutputs()
       this.port.clearEditorLinkedFile()

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentNotificationEvent } from '../src/shared/types'
+import type { AgentNotificationEvent, SessionRoutedPermissionRequest } from '../src/shared/types'
 import {
   NotificationInbox,
   type NotificationStorageAdapter,
@@ -125,5 +125,65 @@ describe('NotificationInbox', () => {
 
     expect(() => inbox.receive(notification(1))).not.toThrow()
     expect(inbox.getSnapshot().notifications).toHaveLength(1)
+  })
+})
+
+function permission(id: string, sessionId = 'session-a'): SessionRoutedPermissionRequest {
+  return { id, sessionId, context: 'editor', workspacePath: '/workspace', toolName: 'Bash', input: {} }
+}
+
+describe('pending approval notifications', () => {
+  it('removes legacy SDK permission history without deleting ordinary notifications', () => {
+    const base = { id: 'old', receivedAt: 1, read: false, title: '', type: 'info' }
+    const { inbox, readStored } = setup([
+      { ...base, message: 'Claude needs your permission to use Bash' },
+      { ...base, id: 'typed', type: 'permission_prompt', message: 'Approval needed' },
+      { ...base, id: 'keep', message: 'Completed' },
+    ])
+    expect(inbox.getSnapshot().notifications.map((item) => item.id)).toEqual(['keep'])
+    expect(readStored().map((item: { id: string }) => item.id)).toEqual(['keep'])
+    inbox.receive({ type: 'permission_prompt', title: '', message: 'Approval needed' })
+    expect(inbox.getSnapshot().notifications).toHaveLength(1)
+  })
+
+  it('deduplicates mirrored requests while preserving separate session ownership', () => {
+    const { inbox, readStored } = setup()
+    const a = permission('a')
+    const b = permission('b', 'session-b')
+    inbox.syncPermissions([a, a, b])
+    expect(inbox.getSnapshot().unreadCount).toBe(2)
+    const snapshot = inbox.getSnapshot()
+    inbox.syncPermissions([a, b])
+    expect(inbox.getSnapshot()).toBe(snapshot)
+    expect(readStored()).toEqual([])
+    expect(inbox.open('permission:b')).toMatchObject({ sessionId: 'session-b', workspacePath: '/workspace' })
+    inbox.syncPermissions([a, b])
+    expect(inbox.getSnapshot().unreadCount).toBe(1)
+    expect(inbox.getSnapshot().notifications).toHaveLength(2)
+  })
+
+  it('removes completed requests and selected details, preserving unrelated history', () => {
+    const { inbox } = setup()
+    inbox.receive(notification(1))
+    inbox.syncPermissions([permission('a'), permission('b')])
+    inbox.select('permission:a')
+    inbox.syncPermissions([permission('b')])
+    expect(inbox.getSnapshot().selected).toBeNull()
+    expect(inbox.getSnapshot().unreadCount).toBe(2)
+    inbox.syncPermissions([])
+    expect(inbox.getSnapshot().notifications).toHaveLength(1)
+    expect(inbox.getSnapshot().toast?.id).toBe('notification-1')
+  })
+
+  it('marking read does not resolve or persist pending approvals', () => {
+    const { inbox, readStored } = setup()
+    inbox.syncPermissions([permission('a')])
+    inbox.markAllRead()
+    inbox.syncPermissions([permission('a')])
+    expect(inbox.getSnapshot().notifications).toHaveLength(1)
+    expect(inbox.getSnapshot().unreadCount).toBe(0)
+    expect(readStored()).toEqual([])
+    inbox.syncPermissions([])
+    expect(inbox.getSnapshot().notifications).toEqual([])
   })
 })

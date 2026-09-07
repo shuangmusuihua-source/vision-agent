@@ -141,3 +141,16 @@ describe('editor session workflow module', () => {
     expect(harness.alert).toHaveBeenCalledWith('重命名失败', '无法保存会话名称，请稍后重试')
   })
 })
+
+it('keeps the newly selected session when an earlier deletion finishes', async () => {
+  const harness = createHarness()
+  let finish!: (value: { success: boolean }) => void
+  harness.deleteSdkSession.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+  harness.setActiveSessionId('session-a')
+  const deleting = harness.workflow.remove('session-a')
+  await Promise.resolve()
+  harness.setActiveSessionId('session-b')
+  finish({ success: true })
+  await deleting
+  expect(harness.events).toEqual(['remove:session-a'])
+})

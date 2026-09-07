@@ -1,3 +1,4 @@
+import type { DingTalkAuthorizationPlan, DingTalkConnectorStatus, DingTalkConnectorActionResult } from './dingtalk-types'
 // IPC channel type mapping — single source of truth for
 // request/response shapes and event payloads across Main/Preload/Renderer.
 
@@ -21,6 +22,9 @@ import type {
   InlineRewriteResponse,
   MemoryDocument,
   MemoryEntry,
+  ModelUsageDetail,
+  ModelUsageProfileSummary,
+  ModelUsageRange,
   SessionMessagePage,
   SessionPageCursor,
 } from './types'
@@ -64,6 +68,14 @@ export interface FileRenameChange {
 }
 
 export interface FileChangeSnapshot {
+  count: number
+  files: string[]
+  version: number
+  renames: FileRenameChange[]
+}
+
+/** Push payload: paths/renames cover this batch; count/version describe all unacknowledged changes. */
+export interface FileChangeBatch {
   count: number
   files: string[]
   version: number
@@ -297,8 +309,16 @@ export type IPCChannelMap = {
     response: { success: boolean }
   }
   'settings:testConnection': {
-    request: { baseUrl: string; apiKey: string; model: string }
+    request: { baseUrl: string; apiKey: string; model: string; profileId?: string }
     response: { success: boolean; message: string }
+  }
+  'settings:getModelUsageSummaries': {
+    request: void
+    response: ModelUsageProfileSummary[]
+  }
+  'settings:getModelUsageDetail': {
+    request: { profileId: string; range: ModelUsageRange }
+    response: ModelUsageDetail
   }
 
   // Memory
@@ -414,6 +434,14 @@ export type IPCChannelMap = {
   }
 
   // Feishu connector
+  'dingtalk:prepareAuthorization': { request: string; response: DingTalkAuthorizationPlan }
+  'dingtalk:grantAuthorization': { request: string; response: DingTalkConnectorActionResult }
+  'dingtalk:status': { request: void; response: DingTalkConnectorStatus }
+  'dingtalk:installRuntime': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:startLogin': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:reopenAuthorization': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:cancelOperation': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:logout': { request: void; response: DingTalkConnectorActionResult }
   'feishu:status': {
     request: void
     response: FeishuConnectorStatus
@@ -482,7 +510,7 @@ export type IPCEventMap = {
   'agent:generationActivity': SessionRoutedGenerationActivity
   'skills:changed': { skillId: string; reason: 'installed' | 'updated' | 'uninstalled' | 'toggled' }
   'settings:changed': AppSettingsSnapshot
-  'graph:filesChanged': FileChangeSnapshot
+  'graph:filesChanged': FileChangeBatch
   'cron:taskCompleted': CronTaskCompletedEvent
   'menu-action': MenuAction
   'main:error': { type: 'unhandledRejection' | 'uncaughtException'; message: string }
@@ -490,6 +518,7 @@ export type IPCEventMap = {
   'update:downloaded': void
   'update:download-progress': UpdateDownloadProgress
   'update:error': UpdateErrorPayload
+  'dingtalk:statusChanged': DingTalkConnectorStatus
   'feishu:statusChanged': FeishuConnectorStatus
   'feishu:authChallenge': FeishuAuthChallenge
 }

@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto'
 import { chmod, open, rename, stat, unlink } from 'fs/promises'
-import { basename, dirname, join } from 'path'
+import { basename, dirname, join, resolve } from 'path'
+
+const pendingWrites = new Map<string, Promise<void>>()
 
 async function syncDirectoryBestEffort(dirPath: string): Promise<void> {
   let handle: Awaited<ReturnType<typeof open>> | null = null
@@ -23,7 +25,19 @@ async function existingMode(filePath: string): Promise<number | null> {
   }
 }
 
-export async function atomicWriteTextFile(filePath: string, content: string): Promise<void> {
+export function atomicWriteTextFile(filePath: string, content: string): Promise<void> {
+  const key = resolve(filePath)
+  const previous = pendingWrites.get(key) ?? Promise.resolve()
+  const write = previous.catch(() => undefined).then(() => replaceTextFile(key, content))
+  pendingWrites.set(key, write)
+  const cleanup = () => {
+    if (pendingWrites.get(key) === write) pendingWrites.delete(key)
+  }
+  void write.then(cleanup, cleanup)
+  return write
+}
+
+async function replaceTextFile(filePath: string, content: string): Promise<void> {
   const dir = dirname(filePath)
   const tempPath = join(dir, `.${basename(filePath)}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`)
   const mode = await existingMode(filePath)

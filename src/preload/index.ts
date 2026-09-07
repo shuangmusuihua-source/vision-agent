@@ -5,6 +5,7 @@ import type {
   AgentQueryRequest,
   AgentSessionEnvelope,
   ModelProfile,
+  ModelUsageRange,
   SessionRoutedAskUserRequest,
   SessionRoutedPermissionRequest,
   InlineRewriteRequest,
@@ -110,8 +111,11 @@ const api = {
       ipcRenderer.on('settings:changed', handler)
       return () => { ipcRenderer.removeListener('settings:changed', handler) }
     },
-    testConnection: (options: { baseUrl: string; apiKey: string; model: string }) =>
-      invoke('settings:testConnection', options)
+    testConnection: (options: IPCRequest<'settings:testConnection'>) =>
+      invoke('settings:testConnection', options),
+    getModelUsageSummaries: () => invoke('settings:getModelUsageSummaries'),
+    getModelUsageDetail: (profileId: string, range: ModelUsageRange) =>
+      invoke('settings:getModelUsageDetail', { profileId, range })
   },
 
   // ─── Agent API (typed, unified event channel) ────────────────────────
@@ -298,6 +302,21 @@ const api = {
     installRuntime: () => invoke('office:installRuntime'),
   },
 
+  dingtalk: {
+    prepareAuthorization: (product) => invoke('dingtalk:prepareAuthorization', product),
+    grantAuthorization: (planId) => invoke('dingtalk:grantAuthorization', planId),
+    status: () => invoke('dingtalk:status'),
+    installRuntime: () => invoke('dingtalk:installRuntime'),
+    startLogin: () => invoke('dingtalk:startLogin'),
+    reopenAuthorization: () => invoke('dingtalk:reopenAuthorization'),
+    cancelOperation: () => invoke('dingtalk:cancelOperation'),
+    logout: () => invoke('dingtalk:logout'),
+    onStatusChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: IPCEventPayload<'dingtalk:statusChanged'>) => callback(data)
+      ipcRenderer.on('dingtalk:statusChanged', handler)
+      return () => { ipcRenderer.removeListener('dingtalk:statusChanged', handler) }
+    },
+  },
   feishu: {
     status: () => invoke('feishu:status'),
     installRuntime: () => invoke('feishu:installRuntime'),

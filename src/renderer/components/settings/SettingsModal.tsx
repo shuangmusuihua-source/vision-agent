@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   CheckCircle2,
   Brain,
+  BarChart3,
+  ChevronRight,
   Cpu,
   Download,
   Eye,
@@ -24,9 +26,10 @@ import {
 } from 'lucide-react'
 import { useModal } from '../common/ModalSystem'
 import MemorySettingsPage from './MemorySettingsPage'
+import ModelUsageAnalytics from './ModelUsageAnalytics'
 import { useSettings, useSettingsStore } from '../../store/settings-cache'
 import { useUiStore, type AppUpdateState } from '../../store/ui-slice'
-import type { ModelProfile } from '../../../shared/types'
+import type { ModelProfile, ModelUsageProfileSummary } from '../../../shared/types'
 import { getUpdateProgressLabel, performPrimaryUpdateAction } from '../../lib/app-update'
 import { APP_NAME } from '../../../shared/branding'
 import appIcon from '../../../../build/icon_preview.png'
@@ -97,6 +100,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const [memoryDirty, setMemoryDirty] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark' | 'system' | null>(null)
   const [profiles, setProfiles] = useState<ModelProfile[]>([])
+  const [usageSummaries, setUsageSummaries] = useState<ModelUsageProfileSummary[]>([])
+  const [usageProfileId, setUsageProfileId] = useState<string | null>(null)
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({})
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
@@ -120,6 +125,15 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       setTheme(cachedSettings.theme)
     }
   }, [cachedSettings])
+
+  useEffect(() => {
+    if (activePage !== 'profiles') return
+    let cancelled = false
+    window.api.settings.getModelUsageSummaries()
+      .then((summaries) => { if (!cancelled) setUsageSummaries(summaries) })
+      .catch(() => { if (!cancelled) setUsageSummaries([]) })
+    return () => { cancelled = true }
+  }, [activePage, profiles])
 
   useEffect(() => {
     let cancelled = false
@@ -151,7 +165,8 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
       setActiveProfileId(s.activeProfileId)
     }
     if (editingProfileId === id) setEditingProfileId(null)
-  }, [editingProfileId])
+    if (usageProfileId === id) setUsageProfileId(null)
+  }, [editingProfileId, usageProfileId])
 
   const handleSetActive = useCallback(async (id: string) => {
     await window.api.settings.setActiveProfile(id)
@@ -252,14 +267,15 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
     try {
       const result = await window.api.settings.testConnection({
         baseUrl: editForm.baseUrl,
-        apiKey: editForm.apiKey,
+        apiKey: !isNewProfile && editForm.apiKey.includes('***') ? '' : editForm.apiKey,
+        profileId: !isNewProfile && editingProfileId ? editingProfileId : undefined,
         model: editForm.model
       })
       setConnectionTest({ status: result.success ? 'success' : 'error', message: result.message })
     } catch (err) {
       setConnectionTest({ status: 'error', message: (err as Error).message })
     }
-  }, [editForm.baseUrl, editForm.apiKey, editForm.model])
+  }, [editForm.baseUrl, editForm.apiKey, editForm.model, editingProfileId, isNewProfile])
 
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -281,6 +297,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
   const requestPageChange = useCallback(async (page: SettingsPage) => {
     if (page === activePage) return
     if (activePage === 'memory' && !await confirmDiscardMemory('切换设置页面后，当前记忆中尚未保存的内容会丢失。')) return
+    setUsageProfileId(null)
     setActivePage(page)
   }, [activePage, confirmDiscardMemory])
 
@@ -321,7 +338,10 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
     return () => el.removeEventListener('keydown', handleTab)
   }, [])
 
-  const activePageMeta = PAGES.find((page) => page.id === activePage) || PAGES[0]
+  const selectedUsageProfile = profiles.find((profile) => profile.id === usageProfileId) || null
+  const activePageMeta = selectedUsageProfile
+    ? { label: '用量分析', description: `${selectedUsageProfile.name} · ${selectedUsageProfile.model}` }
+    : PAGES.find((page) => page.id === activePage) || PAGES[0]
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId)
   const themeLabel = THEME_OPTIONS.find((option) => option.id === theme)?.label || '未设置'
 
@@ -420,7 +440,9 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
           )}
 
           {activePage === 'profiles' && (
-            <div className="settings-page">
+            selectedUsageProfile ? (
+              <ModelUsageAnalytics profile={selectedUsageProfile} onBack={() => setUsageProfileId(null)} />
+            ) : <div className="settings-page">
               <div className="settings-toolbar">
                 <div>
                   <div className="settings-section-title">模型连接</div>
@@ -440,6 +462,7 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                 const displayModel = (isEditing ? editForm.model : profile.model) || profile.model || '未设置模型'
                 const displayProvider = (isEditing ? editForm.apiProvider : profile.apiProvider) || profile.apiProvider || '未填写'
                 const displayBaseUrl = (isEditing ? editForm.baseUrl : profile.baseUrl) || profile.baseUrl || '未填写'
+                const usageSummary = usageSummaries.find((summary) => summary.profileId === profile.id)
 
                 return (
                   <section className={`profile-card ${isEditing ? 'profile-card-editing' : ''}`} key={profile.id}>
@@ -489,6 +512,31 @@ function SettingsModal({ onClose }: SettingsModalProps): React.ReactElement {
                         </div>
                       </div>
                     </div>
+
+                    {!isEditing && !isNewProfile && (
+                      <button
+                        type="button"
+                        className="profile-usage-summary"
+                        onClick={() => setUsageProfileId(profile.id)}
+                        aria-label={`查看 ${displayName} 的用量分析`}
+                      >
+                        <span className="profile-usage-summary-icon"><BarChart3 size={16} /></span>
+                        <span className="profile-usage-summary-copy">
+                          <span>累计用量</span>
+                          <strong>
+                            {usageSummary?.recordingSince
+                              ? `${usageSummary.totals.totalTokens.toLocaleString('zh-CN')} tokens`
+                              : '尚无记录'}
+                          </strong>
+                        </span>
+                        <span className="profile-usage-summary-meta">
+                          {usageSummary?.totals.requestCount || 0} 次请求
+                        </span>
+                        <span className="profile-usage-summary-action">
+                          查看分析 <ChevronRight size={14} />
+                        </span>
+                      </button>
+                    )}
 
                     {isEditing ? (
                       <>

@@ -58,3 +58,35 @@ describe('SessionRuntimeController Skill activity', () => {
     runtime.cleanupRun('session-b', workspaceBInstance)
   })
 })
+
+it('cancels queued preparation by SDK identity and waits for cleanup', async () => {
+  const runtime = new SessionRuntimeController()
+  const envelope = createSessionEnvelope({ context: 'editor', sessionId: 'a', sdkSessionId: 'sdk-a', workspacePath: '/a' })
+  const first = await runtime.acquireSessionStart('a', envelope)
+  const queued = runtime.acquireSessionStart('a', envelope)
+  let stopped = false
+  const stopping = runtime.abortAndWait('sdk-a').then(() => { stopped = true })
+  expect(first.signal.aborted).toBe(true)
+  first.release()
+  const second = await queued
+  expect(second.signal.aborted).toBe(true)
+  expect(stopped).toBe(false)
+  second.release()
+  await stopping
+  expect(stopped).toBe(true)
+  const retry = await runtime.acquireSessionStart('a', envelope)
+  expect(retry.signal.aborted).toBe(false)
+  retry.release()
+})
+
+it('cancels preparation only in the workspace being deleted', async () => {
+  const runtime = new SessionRuntimeController()
+  const first = await runtime.acquireSessionStart('a', createSessionEnvelope({ context: 'editor', sessionId: 'a', workspacePath: '/a' }))
+  const second = await runtime.acquireSessionStart('b', createSessionEnvelope({ context: 'editor', sessionId: 'b', workspacePath: '/b' }))
+  const stopping = runtime.abortWorkspaceAndWait('/a')
+  expect(first.signal.aborted).toBe(true)
+  expect(second.signal.aborted).toBe(false)
+  first.release()
+  await expect(stopping).resolves.toEqual(['a'])
+  second.release()
+})

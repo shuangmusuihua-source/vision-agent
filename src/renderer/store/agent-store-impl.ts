@@ -80,6 +80,7 @@ function getErrorMessage(error: unknown): string {
 // ─── Store ─────────────────────────────────────────────────────────────
 
 export const useAgentStore = create<AgentStore>((set, get) => {
+  const transcriptLoads = new Map<string, symbol>()
   return {
     context: 'editor',
     slots: { editor: emptySlot(), ask: emptySlot() },
@@ -587,9 +588,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     removeSessionState(sessionId: string) {
+      transcriptLoads.delete(sessionId)
       set((state) => {
         return {
           sessionList: sessionListReducer(state.sessionList, { type: 'DELETE', sessionId }),
+          sessionLoadError: state.sessionLoadError?.sessionId === sessionId ? null : state.sessionLoadError,
           ...removeSessionSlotPatch(state, sessionId),
         }
       })
@@ -617,6 +620,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       const sdkSessionId = getSdkSessionIdForAppSession(get(), sessionId)
       if (!sdkSessionId) return
 
+      const loadToken = Symbol(sessionId)
+      transcriptLoads.set(sessionId, loadToken)
+      const isCurrent = () => transcriptLoads.get(sessionId) === loadToken && Boolean(get().sessionSlots[sessionId])
       set((state) => ({
         sessionSlots: {
           ...state.sessionSlots,
@@ -636,17 +642,18 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         const { messages, cursor, hasMore } = await window.api.agent.loadSessionMessagesPaginated(
           sessionId, INITIAL_LIMIT, null
         )
+        if (!isCurrent()) return
         const loadedMessages = buildReplayedMessages(messages)
 
         set((state) => {
           const isActive = state.activeSessionId[context] === sessionId
           const currentSlot = isActive
             ? state.slots[context]
-            : (state.sessionSlots[sessionId] || emptySlot())
+            : state.sessionSlots[sessionId]
           const finalSlot: ContextSlot = {
             ...currentSlot,
             messages: mergeLoadedMessages(loadedMessages, currentSlot.messages),
-            workspacePath: currentSlot.workspacePath || (context === 'editor' ? state.activeWorkspacePath : null),
+            workspacePath: currentSlot.workspacePath || slot.workspacePath,
             currentSessionId: sessionId,
             sdkSessionId,
             _needsSdkLoad: hasMore,
@@ -660,6 +667,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           }
         })
       } catch (err) {
+        if (!isCurrent()) return
         console.error('[AgentStore] loadInitialSessionMessages failed:', err)
         const message = getErrorMessage(err)
         set((state) => ({
@@ -679,6 +687,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             slots: { ...state.slots, [context]: { ...state.slots[context], _isLoadingMoreMessages: false } },
           } : {}),
         }))
+      } finally {
+        if (transcriptLoads.get(sessionId) === loadToken) transcriptLoads.delete(sessionId)
       }
     },
 
@@ -698,6 +708,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         stateBefore.activeSessionId.ask === sessionId ? 'ask' :
         null
 
+      const loadToken = Symbol(sessionId)
+      transcriptLoads.set(sessionId, loadToken)
+      const isCurrent = () => transcriptLoads.get(sessionId) === loadToken && Boolean(get().sessionSlots[sessionId])
       set((state) => ({
         sessionSlots: {
           ...state.sessionSlots,
@@ -715,6 +728,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           sessionId, LOAD_MORE_LIMIT, nextCursor
         )
 
+        if (!isCurrent()) return
         // Guard: if the session is no longer active in any context, write only
         // to sessionSlots (cache), not to any live context slot.
         const stateAfter = get()
@@ -762,6 +776,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           }
         })
       } catch (err) {
+        if (!isCurrent()) return
         console.error('[AgentStore] loadMoreSessionMessages failed:', err)
         const message = getErrorMessage(err)
         const stateErr = get()
@@ -785,6 +800,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             slots: { ...state.slots, [activeCtxErr]: { ...state.slots[activeCtxErr], _isLoadingMoreMessages: false } },
           } : {}),
         }))
+      } finally {
+        if (transcriptLoads.get(sessionId) === loadToken) transcriptLoads.delete(sessionId)
       }
     },
 

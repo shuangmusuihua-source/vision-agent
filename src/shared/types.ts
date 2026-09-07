@@ -28,6 +28,76 @@ export interface ModelProfile {
   model: string
 }
 
+export type ModelUsageRange = '7d' | '30d' | '90d' | 'all'
+
+export interface ModelUsageTotals {
+  inputTokens: number
+  outputTokens: number
+  cacheReadInputTokens: number
+  cacheCreationInputTokens: number
+  thinkingTokens: number
+  totalTokens: number
+  requestCount: number
+  sessionCount: number
+  costUSD: number
+}
+
+export interface ModelUsageProfileSummary {
+  profileId: string
+  totals: ModelUsageTotals
+  recordingSince: number | null
+}
+
+export interface ModelUsageDailyPoint {
+  date: string
+  totalTokens: number
+  requestCount: number
+  costUSD: number
+}
+
+export interface ModelUsageSessionBreakdown {
+  sessionId: string
+  title: string
+  workspaceName: string
+  source: 'interactive' | 'automation' | 'inline-rewrite' | 'automation-planning'
+  totalTokens: number
+  requestCount: number
+  costUSD: number
+  lastUsedAt: number
+}
+
+export interface ModelUsageSkillBreakdown {
+  skillId: string
+  totalTokens: number
+  requestCount: number
+  sessionCount: number
+  costUSD: number
+  lastUsedAt: number
+}
+
+export interface ModelUsageModelBreakdown {
+  modelId: string
+  inputTokens: number
+  outputTokens: number
+  cacheReadInputTokens: number
+  cacheCreationInputTokens: number
+  thinkingTokens: number
+  totalTokens: number
+  requestCount: number
+  costUSD: number
+}
+
+export interface ModelUsageDetail {
+  profileId: string
+  range: ModelUsageRange
+  totals: ModelUsageTotals
+  recordingSince: number | null
+  daily: ModelUsageDailyPoint[]
+  sessions: ModelUsageSessionBreakdown[]
+  skills: ModelUsageSkillBreakdown[]
+  models: ModelUsageModelBreakdown[]
+}
+
 // ─── Curated community Skills ────────────────────────────────────────
 
 export interface CommunitySkillAudit {
@@ -339,6 +409,7 @@ export type MessagePhase =
 export type TodoTaskStatus = 'pending' | 'in_progress' | 'completed'
 
 export type TodoTask = {
+  creationToolUseId?: string
   taskId: string
   subject: string
   description?: string

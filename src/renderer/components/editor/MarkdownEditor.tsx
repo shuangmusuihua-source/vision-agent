@@ -127,8 +127,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const [sourceText, setSourceText] = useState('')
   const frontmatterRef = useRef('')
   const localChangeIdentityRef = useRef<string | null>(null)
-  const sourceSaveControllerRef = useRef<SourceSaveController | null>(null)
-  const editorSaveControllerRef = useRef<SourceSaveController | null>(null)
+  const saveControllerRef = useRef<SourceSaveController | null>(null)
   const editorProjectionSchedulerRef = useRef<EditorProjectionScheduler<ProseMirrorNode> | null>(null)
   const currentDocumentIdentity = editorDocumentIdentity(documentOwnerKey, filePath)
   const currentDocumentIdentityRef = useRef(currentDocumentIdentity)
@@ -145,47 +144,40 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const inlineRequestSequenceRef = useRef(0)
   const beginInlineRewriteRef = useRef<(() => void) | null>(null)
   const inlineDocumentIdentityRef = useRef(currentDocumentIdentity)
-  if (!sourceSaveControllerRef.current) {
-    sourceSaveControllerRef.current = new SourceSaveController(onSave)
+  if (!saveControllerRef.current) {
+    saveControllerRef.current = new SourceSaveController(onSave)
   }
-  if (!editorSaveControllerRef.current) {
-    editorSaveControllerRef.current = new SourceSaveController(onSave)
-  }
-  const sourceSaveController = sourceSaveControllerRef.current
-  const editorSaveController = editorSaveControllerRef.current
+  const saveController = saveControllerRef.current
 
   const flushPendingSave = useCallback(async () => {
     editorProjectionSchedulerRef.current?.flush()
-    const editorFlushed = await editorSaveController.flushAsync()
-    const sourceFlushed = await sourceSaveController.flushAsync()
-    return sourceFlushed || editorFlushed
-  }, [editorSaveController, sourceSaveController])
+    return saveController.flushAsync()
+  }, [saveController])
   const flushPendingSaveRef = useRef(flushPendingSave)
   flushPendingSaveRef.current = flushPendingSave
 
   useImperativeHandle(ref, () => ({ flushPendingSave }), [flushPendingSave])
 
   useEffect(() => {
-    sourceSaveController.setSaveHandler(onSave)
-    editorSaveController.setSaveHandler(onSave)
-  }, [editorSaveController, onSave, sourceSaveController])
+    saveController.setSaveHandler(onSave)
+  }, [onSave, saveController])
 
   // Normalize markdown for comparison: strip trailing whitespace
   const normalizeMd = (md: string) => md.replace(/\n+$/, '')
 
   const clearScheduledSourceSave = useCallback(() => {
-    sourceSaveController.clearScheduledSave()
-  }, [sourceSaveController])
+    saveController.clearScheduledSave()
+  }, [saveController])
 
   const flushSourceSave = useCallback(() => {
-    sourceSaveController.flush()
-  }, [sourceSaveController])
+    saveController.flush()
+  }, [saveController])
 
   const handleSourceTextChange = useCallback((nextText: string) => {
     setSourceText(nextText)
     if (!filePath) return
-    sourceSaveController.schedule(filePath, nextText)
-  }, [filePath, sourceSaveController])
+    saveController.schedule(filePath, nextText)
+  }, [filePath, saveController])
 
   useEffect(() => {
     let cancelled = false
@@ -556,7 +548,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       if (sourceMode) {
         // Entering source mode: save current full markdown to sourceText
         editorProjectionSchedulerRef.current?.flush()
-        editorSaveController.flush()
+        saveController.flush()
         sourceDocumentIdentityRef.current = currentDocumentIdentity
         setSourceText(getFullMarkdown(editor))
       } else {
@@ -572,7 +564,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       }
       setInternalSourceMode(sourceMode)
     }
-  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, currentDocumentIdentity, editorSaveController])
+  }, [sourceMode, internalSourceMode, editor, sourceText, flushSourceSave, currentDocumentIdentity, saveController])
 
   useEffect(() => {
     if (!internalSourceMode) {
@@ -583,15 +575,15 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     if (sourceDocumentIdentityRef.current !== currentDocumentIdentity) {
       flushSourceSave()
       sourceDocumentIdentityRef.current = currentDocumentIdentity
-      sourceSaveController.discard()
+      saveController.discard()
       setSourceText(content)
       return
     }
 
-    if (!sourceSaveController.hasPendingSave()) {
+    if (!saveController.hasUnsettledSave(filePath)) {
       setSourceText(content)
     }
-  }, [content, currentDocumentIdentity, flushSourceSave, internalSourceMode, sourceSaveController])
+  }, [content, currentDocumentIdentity, filePath, flushSourceSave, internalSourceMode, saveController])
 
   useEffect(() => {
     return () => {
@@ -603,7 +595,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
     if (localChangeIdentityRef.current === currentDocumentIdentity) {
-      localChangeIdentityRef.current = null
+      if (!saveController.hasUnsettledSave(filePath)) localChangeIdentityRef.current = null
       return
     }
     localChangeIdentityRef.current = null
@@ -617,7 +609,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
         editor.commands.removeFrontmatter()
       }
     }
-  }, [cancelInlineRewrite, content, currentDocumentIdentity, editor])
+  }, [cancelInlineRewrite, content, currentDocumentIdentity, editor, filePath, saveController])
 
   // Coalesce expensive Markdown/stat projections while retaining the immutable
   // document snapshot so a tab switch flushes the old file, not the new editor state.
@@ -633,7 +625,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     const projection = new EditorProjectionScheduler<ProseMirrorNode>((doc) => {
       localChangeIdentityRef.current = currentDocumentIdentity
       if (editor.isDestroyed) return
-      editorSaveController.schedule(filePath, getFullMarkdown(editor, doc))
+      saveController.schedule(filePath, getFullMarkdown(editor, doc))
       publishStats(doc)
     })
     editorProjectionSchedulerRef.current = projection
@@ -650,9 +642,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
       if (editorProjectionSchedulerRef.current === projection) {
         editorProjectionSchedulerRef.current = null
       }
-      editorSaveController.flush()
+      saveController.flush()
     }
-  }, [currentDocumentIdentity, editor, editorSaveController, filePath, onStatsUpdate])
+  }, [currentDocumentIdentity, editor, saveController, filePath, onStatsUpdate])
 
   const handleInlineAgentAction = useCallback((action: 'explain' | 'review' | 'ask') => {
     if (!editor || editor.isDestroyed) return

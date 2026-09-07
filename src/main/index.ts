@@ -1,3 +1,4 @@
+import { getDingTalkConnectorManager } from './dingtalk-connection'
 import { app, BrowserWindow, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -23,15 +24,18 @@ import { sanitizeTelemetryEvent } from '../shared/telemetry-sanitizer'
 import { appUpdateLifecycle } from './app-update-lifecycle'
 import { getFeishuConnectorManager } from './feishu-connection'
 
+declare const __SUMI_SENTRY_DSN__: string
+const sentryDsn = process.env.SENTRY_DSN || __SUMI_SENTRY_DSN__
+
 // Initialize Sentry before any error handlers
 Sentry.init({
-  dsn: process.env.SENTRY_DSN || '',
+  dsn: sentryDsn,
   environment: app.isPackaged ? 'production' : 'development',
   sendDefaultPii: false,
   beforeSend(event) {
     try {
       return sanitizeTelemetryEvent(event, {
-        secretValues: [getApiKey(), process.env.SENTRY_DSN],
+        secretValues: [getApiKey(), sentryDsn],
         privatePathPrefixes: getAuthorizedDirectories(),
         homeDirectory: homedir(),
       })
@@ -105,6 +109,7 @@ function createWindow(): void {
     abortActiveQuery()
     inlineRewriteRunner.cancelAll()
     void getFeishuConnectorManager().cancelOperation()
+    void getDingTalkConnectorManager().cancelOperation()
     handleWindowDestroy()
     setMainWindow(null)
     mainWindow = null
@@ -197,6 +202,7 @@ app.on('before-quit', () => {
   abortActiveQuery()
   inlineRewriteRunner.cancelAll()
   void getFeishuConnectorManager().cancelOperation()
+  void getDingTalkConnectorManager().cancelOperation()
   handleWindowDestroy()
   stopAllCronJobs()
 })

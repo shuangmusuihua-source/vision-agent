@@ -3,7 +3,7 @@ import * as path from 'path'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { getMainWindow } from './ipc-sender'
 import type { GraphNode, GraphEdge, GraphData } from '../shared/types'
-import type { FileChangeSnapshot, FileRenameChange } from '../shared/ipc-types'
+import type { FileChangeBatch, FileChangeSnapshot, FileRenameChange } from '../shared/ipc-types'
 
 interface IndexedFile {
   filePath: string
@@ -19,6 +19,7 @@ interface RecentFileLocation {
 }
 
 const FILE_RENAME_PAIR_WINDOW_MS = 5_000
+const FILE_CHANGE_BATCH_MS = 50
 
 interface KnowledgeEntry {
   filePath: string
@@ -54,6 +55,9 @@ export class FileIndexService {
   private recentAddedFiles = new Map<string, RecentFileLocation>()
   private recentRemovedFiles = new Map<string, RecentFileLocation>()
   private changeVersion = 0
+  private pendingFiles = new Set<string>()
+  private pendingRenames: FileRenameChange[] = []
+  private notificationTimer: ReturnType<typeof setTimeout> | null = null
   private knowledgeWatcher: FSWatcher | null = null
   private workspaceInitQueue: Promise<void> = Promise.resolve()
 
@@ -266,6 +270,7 @@ export class FileIndexService {
   private recordFileRename(from: string, to: string): void {
     if (from === to) return
     const change = { from, to }
+    this.pendingRenames.push(change)
     this.changedRenames.set(JSON.stringify([from, to]), {
       change,
       version: this.changeVersion,
@@ -284,6 +289,7 @@ export class FileIndexService {
   private markFileChanged(filePath: string): void {
     this.changeVersion += 1
     this.changedFiles.set(filePath, this.changeVersion)
+    this.pendingFiles.add(filePath)
   }
 
   getChangeVersion(): number {
@@ -309,12 +315,24 @@ export class FileIndexService {
     }
   }
 
-  /** Push file change notification to renderer */
+  /** Bound notification frequency without resending previously delivered paths. */
   private notifyFileChange(): void {
-    const window = getMainWindow()
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('graph:filesChanged', this.getFileChangeSnapshot())
-    }
+    if (this.notificationTimer) return
+    this.notificationTimer = setTimeout(() => {
+      this.notificationTimer = null
+      const batch: FileChangeBatch = {
+        count: this.changedFiles.size,
+        version: this.changeVersion,
+        files: [...this.pendingFiles],
+        renames: this.pendingRenames,
+      }
+      this.pendingFiles.clear()
+      this.pendingRenames = []
+      const window = getMainWindow()
+      if (window && !window.isDestroyed()) {
+        window.webContents.send('graph:filesChanged', batch)
+      }
+    }, FILE_CHANGE_BATCH_MS)
   }
 
   /** Initialize knowledge base watcher and index (separate from main workspace) */
@@ -530,6 +548,10 @@ export class FileIndexService {
     await this.workspaceInitQueue
     await this.destroyWorkspaceIndex()
     await this.destroyKnowledgeIndex()
+    if (this.notificationTimer) clearTimeout(this.notificationTimer)
+    this.notificationTimer = null
+    this.pendingFiles.clear()
+    this.pendingRenames = []
     this.changedFiles.clear()
     this.changedRenames.clear()
     this.changeVersion = 0

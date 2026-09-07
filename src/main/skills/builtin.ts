@@ -31,6 +31,14 @@ const builtinSkills: BuiltinSkillDefinition[] = [
     defaultEnabled: false,
   },
   {
+    id: 'dingtalk',
+    name: '钉钉连接器',
+    description: '连接钉钉文档、钉盘、多维表格、日程、待办与消息',
+    icon: 'Cable',
+    promptTemplate: `使用 dingtalk skill 处理钉钉中的资料或操作... {activeFile}`,
+    defaultEnabled: false,
+  },
+  {
     id: 'feishu',
     name: '飞书连接器',
     description: '连接飞书文档、知识库、多维表格、日程、任务、会议纪要与消息',

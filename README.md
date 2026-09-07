@@ -68,4 +68,6 @@ npm run dist
 
 ## 发布说明
 
+`npm run release` 仅上传当前版本 `latest-mac.yml` 引用的安装包及其关联 blockmap，上传前校验安装包大小和 SHA-512；旧版本文件可以保留在 `dist` 中。`SENTRY_DSN` 在构建时注入主进程产物，桌面启动无需另设环境变量；运行时显式提供的值可覆盖构建配置。
+
 Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程完成 hardened runtime、签名和 notarization。签名使用 `CSC_LINK`、`CSC_KEY_PASSWORD`；notarization 使用 `APPLE_API_KEY`、`APPLE_API_KEY_ID`、`APPLE_API_ISSUER`，或 Apple ID 方式的 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`。仓库本地缺少发布证书时，`npm run pack` 仍会生成未签名的验证包；完整变量见 `.env.example`。

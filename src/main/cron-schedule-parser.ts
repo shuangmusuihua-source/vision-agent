@@ -1,6 +1,8 @@
 import cron from 'node-cron'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { buildAgentOptions } from './agent-options'
+import { getActiveProfileUsageIdentity } from './persistence/profile-store'
+import { recordModelUsage } from './persistence/model-usage-store'
 import type { CronScheduleParseRequest, CronScheduleParseResponse } from '../shared/cron-types'
 
 const DEFAULT_HOUR = 9
@@ -201,6 +203,7 @@ function extractJson(text: string): Record<string, unknown> | null {
 async function resolveWithModel(request: CronScheduleParseRequest): Promise<CronScheduleParseResponse> {
   const timezone = request.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
   const now = new Date(request.now || Date.now()).toISOString()
+  const usageProfile = getActiveProfileUsageIdentity()
   const options = buildAgentOptions({
     memoryMode: 'disabled',
     cwd: process.cwd(),
@@ -235,8 +238,16 @@ async function resolveWithModel(request: CronScheduleParseRequest): Promise<Cron
 
   let result = ''
   for await (const message of query({ prompt, options })) {
-    if (message.type === 'result' && message.subtype === 'success') {
-      result = message.result || ''
+    if (message.type === 'result') {
+      recordModelUsage({
+        result: message,
+        profile: usageProfile,
+        source: 'automation-planning',
+        sessionId: 'automation-schedule-planning',
+        sessionTitle: '自动化时间解析',
+        workspaceName: '自动化',
+      })
+      if (message.subtype === 'success') result = message.result || ''
     }
   }
 

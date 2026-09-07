@@ -945,7 +945,7 @@ describe('session runtime event routing', () => {
     const startRun = async (skillId: string) => {
       const lease = await runtime.acquireSessionStart(envelope.sessionId)
       try {
-        await runtime.abortAndWait(envelope.sessionId, 1000)
+        await runtime.abortRunAndWait(envelope.sessionId, 1000)
         const abortController = new AbortController()
         const instanceId = runtime.registerRun({
           query: {} as never,

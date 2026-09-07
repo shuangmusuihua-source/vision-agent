@@ -10,17 +10,22 @@ type LoadedCronManager = {
   notifyCronTaskComplete: ReturnType<typeof vi.fn>
   sentEvents: unknown[][]
   isToolUsePathAuthorized: ReturnType<typeof vi.fn>
+  scheduledTaskCount: () => number
 }
 
 async function loadCronManager(options?: {
   persisted?: CronTask[]
   authorizedDirectories?: string[]
   queryImpl?: (args: any) => AsyncGenerator<any, void, unknown>
+  realScheduler?: boolean
 }): Promise<LoadedCronManager> {
   vi.resetModules()
 
   let savedTasks: CronTask[] = []
-  const schedule = vi.fn(() => ({ stop: vi.fn(), start: vi.fn() }))
+  const cron = options?.realScheduler ? await vi.importActual<typeof import('node-cron')>('node-cron') : null
+  const schedule = cron
+    ? vi.fn(cron.default.schedule)
+    : vi.fn(() => ({ stop: vi.fn(), start: vi.fn(), destroy: vi.fn() }))
   const query = vi.fn(options?.queryImpl || async function* queryMock() {
     yield { type: 'result', subtype: 'success', result: 'done' }
   })
@@ -51,6 +56,12 @@ async function loadCronManager(options?: {
     getCronTasks: () => options?.persisted || [],
     saveCronTasks: (tasks: CronTask[]) => { savedTasks = tasks },
   }))
+  vi.doMock('../src/main/persistence/profile-store', () => ({
+    getActiveProfileUsageIdentity: () => null,
+  }))
+  vi.doMock('../src/main/persistence/model-usage-store', () => ({
+    recordModelUsage: vi.fn(),
+  }))
   vi.doMock('../src/main/agent-options', () => ({ buildAgentOptions }))
   vi.doMock('../src/main/notification-manager', () => ({ notifyCronTaskComplete }))
   vi.doMock('../src/main/agent-path-utils', () => ({
@@ -77,12 +88,28 @@ async function loadCronManager(options?: {
     notifyCronTaskComplete,
     sentEvents,
     isToolUsePathAuthorized,
+    scheduledTaskCount: () => cron?.default.getTasks().size ?? 0,
   }
 }
 
 describe('cron manager automation tasks', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('releases deleted jobs from the real scheduler registry', async () => {
+    const { manager, scheduledTaskCount } = await loadCronManager({ realScheduler: true })
+    const baseline = scheduledTaskCount()
+    try {
+      for (let i = 0; i < 20; i++) {
+        const task = manager.registerTask({ cronExpression: '0 0 1 1 *', prompt: 'registry cleanup' })
+        expect(scheduledTaskCount()).toBe(baseline + 1)
+        manager.removeTask(task.id)
+        expect(scheduledTaskCount()).toBe(baseline)
+      }
+    } finally {
+      for (const task of manager.listTasks()) manager.removeTask(task.id)
+    }
   })
 
   it('registers automation metadata and persists the task', async () => {
@@ -274,7 +301,7 @@ describe('cron manager automation tasks', () => {
         args.options.abortController.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
       })
     }
-    const { manager } = await loadCronManager({ queryImpl })
+    const { manager, schedule, savedTasks } = await loadCronManager({ queryImpl })
     const task = manager.registerTask({ cronExpression: '*/5 * * * *', prompt: 'watch files' })
     const pending = manager.executeTaskById(task.id)
     await ready
@@ -282,6 +309,9 @@ describe('cron manager automation tasks', () => {
     expect(manager.removeTask(task.id)).toBe(true)
     await pending
     expect(manager.listTasks()).toEqual([])
+    expect(savedTasks()).toEqual([])
+    expect(schedule.mock.results[0].value.destroy).toHaveBeenCalledOnce()
+    expect(manager.removeTask(task.id)).toBe(false)
   })
 
   it('isolates untargeted tasks in separate scratch directories', async () => {
@@ -311,6 +341,7 @@ describe('cron manager automation tasks', () => {
     expect(paused.status).toBe('paused')
     expect(job.stop).toHaveBeenCalled()
     expect(savedTasks()[0].status).toBe('paused')
+    expect(job.destroy).not.toHaveBeenCalled()
 
     const active = manager.setTaskStatus(task.id, 'active')
     expect(active.status).toBe('active')

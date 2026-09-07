@@ -70,6 +70,18 @@ describe('agent options', () => {
     expect(options.env?.PATH).toContain('/tmp/sumi-user-data/runtimes/lark-cli/1.0.89/agent-bin')
   })
 
+  it('exposes only the DingTalk shim with isolated config and encrypted token storage', async () => {
+    const { buildAgentOptions } = await loadAgentOptions()
+    const options = buildAgentOptions({ memoryMode: 'disabled', permissionMode: 'default', skills: ['dingtalk'] })
+    expect(options.env?.DWS_CONFIG_DIR).toBe('/tmp/sumi-user-data/connectors/dingtalk')
+    expect(options.env?.DWS_KEYCHAIN_DIR).toBe('/tmp/sumi-user-data/connectors/dingtalk/keychain')
+    expect(options.env?.DWS_DISABLE_KEYCHAIN).toBeUndefined()
+    expect(options.env?.PATH).toContain('/runtimes/dws/1.0.61/agent-bin')
+    expect(options.env?.PATH).not.toContain('/runtimes/dws/1.0.61/bin')
+    const withoutSkill = buildAgentOptions({ memoryMode: 'disabled', permissionMode: 'default', skills: [] })
+    expect(withoutSkill.env?.DWS_CONFIG_DIR).toBeUndefined()
+  })
+
   it('uses one app-global memory directory independent of the Agent cwd', async () => {
     const { buildAgentOptions } = await loadAgentOptions()
 

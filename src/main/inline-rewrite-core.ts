@@ -35,6 +35,7 @@ type InlineRewriteMetrics = {
   inputCharacters: number
 }
 type PreparedRewrite = {
+  options?: Options
   filePath: string
   controller: AbortController
   startedAt: number
@@ -109,6 +110,7 @@ export class InlineRewriteRunner {
     private readonly buildOptions: InlineRewriteOptionsAdapter,
     private readonly startupQuery?: InlineRewriteStartupAdapter,
     private readonly reportMetrics?: (metrics: InlineRewriteMetrics) => void,
+    private readonly reportResult?: (result: InlineRewriteResultMessage, request: InlineRewriteRequest, options: Options) => void,
   ) {}
 
   prepare(input: Pick<InlineRewriteRequest, 'requestId' | 'filePath'>): boolean {
@@ -128,7 +130,10 @@ export class InlineRewriteRunner {
     prepared.expiryTimer.unref?.()
     prepared.warmQuery = Promise.resolve()
       .then(() => this.buildOptions(filePath, controller))
-      .then((options) => this.startupQuery!(options))
+      .then((options) => {
+        prepared.options = options
+        return this.startupQuery!(options)
+      })
       .then((warmQuery) => {
         prepared.readyAt = performance.now()
         if (controller.signal.aborted || (!prepared.claimed && this.preparedRequests.get(requestId) !== prepared)) {
@@ -161,6 +166,7 @@ export class InlineRewriteRunner {
     try {
       const prompt = buildInlineRewritePrompt(request)
       let messages: AsyncIterable<SDKMessage> | null = null
+      let executionOptions: Options | undefined
       let prewarmed = false
       let submitWaitForWarmMs: number | undefined
 
@@ -169,6 +175,7 @@ export class InlineRewriteRunner {
         const warmQuery = await prepared.warmQuery
         submitWaitForWarmMs = performance.now() - waitStartedAt
         if (warmQuery && !abortController.signal.aborted) {
+          executionOptions = prepared.options
           messages = warmQuery.query(prompt)
           prewarmed = true
         } else {
@@ -178,6 +185,8 @@ export class InlineRewriteRunner {
 
       if (!messages) {
         const options = await this.buildOptions(request.filePath, abortController)
+        abortController.signal.throwIfAborted()
+        executionOptions = options
         messages = this.runQuery({ prompt, options })
       }
 
@@ -190,6 +199,7 @@ export class InlineRewriteRunner {
         if (message.type === 'result') resultMessage = message
       }
       if (!resultMessage) throw new Error('AI 改写未返回结果')
+      if (executionOptions) this.reportResult?.(resultMessage, request, executionOptions)
       this.reportMetrics?.({
         requestId: request.requestId,
         prewarmed,

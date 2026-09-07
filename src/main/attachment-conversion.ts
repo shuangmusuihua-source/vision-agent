@@ -144,7 +144,7 @@ function convertedMarkdownPath(workspaceCwd: string, sessionKey: string, filePat
   return join(workspaceCwd, '.sumi', 'attachments', safeAttachmentSegment(sessionKey), outName)
 }
 
-async function runMarkitdown(filePath: string): Promise<string> {
+async function runMarkitdown(filePath: string, signal?: AbortSignal): Promise<string> {
   const format = extname(filePath).slice(1).toLowerCase() as MarkitdownFormat
   if (!MARKITDOWN_FORMATS.includes(format)) {
     throw new Error('不支持的附件格式')
@@ -154,21 +154,30 @@ async function runMarkitdown(filePath: string): Promise<string> {
     throw new Error('附件解析组件尚未安装')
   }
 
+  signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
-    execFile(runtime.pythonPath, ['-m', 'markitdown', filePath], {
+    let closed = false
+    let outcome: { error: Error | null; markdown: string } | undefined
+    const finish = () => {
+      if (!closed || !outcome) return
+      if (outcome.error) reject(outcome.error)
+      else resolve(outcome.markdown)
+    }
+    const child = execFile(runtime.pythonPath, ['-m', 'markitdown', filePath], {
+      signal,
       encoding: 'utf-8',
       timeout: MARKITDOWN_TIMEOUT_MS,
       maxBuffer: MARKITDOWN_MAX_BUFFER_BYTES,
     }, (err, stdout, stderr) => {
-      if (err) {
-        if (stderr) {
-          err.message = `${err.message}\n${stderr}`
-        }
-        reject(err)
-        return
-      }
-
-      resolve(stdout)
+      if (err && stderr) err.message = `${err.message}\n${stderr}`
+      outcome = { error: err, markdown: stdout }
+      finish()
+    })
+    // AbortSignal can invoke the callback before the subprocess exits. Keep
+    // deletion waiting until it can no longer access the session directory.
+    child.once('close', () => {
+      closed = true
+      finish()
     })
   })
 }
@@ -176,20 +185,25 @@ async function runMarkitdown(filePath: string): Promise<string> {
 export async function convertAttachmentsToMarkdown(
   workspaceCwd: string,
   sessionKey: string,
-  requests: AttachmentConversionRequest[]
+  requests: AttachmentConversionRequest[],
+  signal?: AbortSignal,
 ): Promise<AttachmentConversionResult> {
   const result: AttachmentConversionResult = { converted: [], failed: [] }
   const outDir = join(workspaceCwd, '.sumi', 'attachments', safeAttachmentSegment(sessionKey))
+  signal?.throwIfAborted()
   await mkdir(outDir, { recursive: true })
 
   for (const request of requests) {
+    signal?.throwIfAborted()
     const filePath = request.sourcePath
     try {
       const markdownPath = convertedMarkdownPath(workspaceCwd, sessionKey, filePath)
-      const markdown = await runMarkitdown(filePath)
+      const markdown = await runMarkitdown(filePath, signal)
+      signal?.throwIfAborted()
       await writeFile(markdownPath, markdown, 'utf-8')
       result.converted.push({ sourcePath: filePath, markdownPath })
     } catch (err) {
+      signal?.throwIfAborted()
       const error = err instanceof Error ? err.message : String(err)
       console.error(`[FileConvert] ${filePath}:`, error)
       result.failed.push({ sourcePath: filePath, error })

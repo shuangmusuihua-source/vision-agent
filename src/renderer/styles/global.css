@@ -187,6 +187,11 @@
   --color-overlay-heavy: rgba(0, 0, 0, 0.5);
   --modal-backdrop-bg: rgba(255, 255, 255, 0.08);
   --modal-backdrop-filter: blur(64px) saturate(1.08);
+  --dialog-surface: var(--color-bg-primary);
+  --dialog-surface-muted: color-mix(in srgb, var(--color-bg-secondary) 82%, var(--color-bg-primary));
+  --dialog-border: color-mix(in srgb, var(--color-border) 82%, transparent);
+  --dialog-radius: 18px;
+  --dialog-shadow: 0 22px 70px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.32) inset;
 
   /* ── Motion ────────────────────────────────────────────────── */
 
@@ -289,6 +294,10 @@
   --color-overlay-heavy: rgba(0, 0, 0, 0.7);
   --modal-backdrop-bg: rgba(0, 0, 0, 0.18);
   --modal-backdrop-filter: blur(64px) saturate(1.04);
+  --dialog-surface: color-mix(in srgb, var(--color-bg-primary) 92%, #000 8%);
+  --dialog-surface-muted: color-mix(in srgb, var(--color-bg-secondary) 88%, #000 12%);
+  --dialog-border: rgba(255, 255, 255, 0.08);
+  --dialog-shadow: 0 24px 76px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 
 
   --graph-node-file: #60a5fa;

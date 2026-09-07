@@ -1,7 +1,11 @@
-import { dirname } from 'path'
+import { basename, dirname } from 'path'
 import { query, startup, type Options } from '@anthropic-ai/claude-agent-sdk'
 import { buildAgentOptions } from './agent-options'
 import { INLINE_REWRITE_MAX_TURNS, InlineRewriteRunner } from './inline-rewrite-core'
+import { getActiveProfileUsageIdentity } from './persistence/profile-store'
+import { recordModelUsage } from './persistence/model-usage-store'
+
+const usageProfiles = new WeakMap<Options, ReturnType<typeof getActiveProfileUsageIdentity>>()
 
 const INLINE_REWRITE_SYSTEM_PROMPT = `你是 Markdown 编辑器中的行内改写引擎。
 严格根据用户的修改要求改写选中内容，并遵守以下规则：
@@ -26,6 +30,7 @@ export function createInlineRewriteOptions(
     maxTurns: INLINE_REWRITE_MAX_TURNS,
     canUseTool: async () => ({ behavior: 'deny', message: '行内改写不允许调用工具' }),
   })
+  usageProfiles.set(options, getActiveProfileUsageIdentity())
   options.abortController = abortController
   options.persistSession = false
   options.systemPrompt = INLINE_REWRITE_SYSTEM_PROMPT
@@ -37,4 +42,12 @@ export const inlineRewriteRunner = new InlineRewriteRunner(
   createInlineRewriteOptions,
   (options) => startup({ options }),
   (metrics) => console.info('[InlineRewrite] completed', metrics),
+  (result, request, options) => recordModelUsage({
+    result,
+    profile: usageProfiles.get(options) || null,
+    source: 'inline-rewrite',
+    sessionId: request.filePath,
+    sessionTitle: `行内改写 · ${basename(request.filePath)}`,
+    workspaceName: basename(dirname(request.filePath)),
+  }),
 )

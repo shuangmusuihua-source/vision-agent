@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
+    define: { __SUMI_SENTRY_DSN__: JSON.stringify(process.env.SENTRY_DSN || '') },
     plugins: [
       externalizeDepsPlugin({
         exclude: ['@anthropic-ai/claude-agent-sdk', 'electron-store']

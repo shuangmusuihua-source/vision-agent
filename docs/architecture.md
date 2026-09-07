@@ -51,10 +51,13 @@ seam 验证生命周期行为。
 Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 
 菜单事件也使用该共享协议。显式保存由菜单或编辑器快捷键触发后，统一 flush 编辑器投影调度器、source-mode save controller 与富文本 save controller，不能只依赖延迟自动保存。
+`SourceSaveController` 在等待已发出的保存请求时保留待提交的新稿；旧请求失败后，
+新稿仍保持 pending，下一次显式保存可以继续提交，并使用编辑时捕获的会话保存回调。
 
 ### Agent 层
 
 - `query-runner.ts`：准备会话目录、构建 prompt/options、执行 `query()`、消费 SDK 流
+- `model-usage-analytics.ts`：将 SDK 终态 `modelUsage` 投影为 Profile 总览、时间趋势、会话排行、Skill 分摊和实际模型分布
 - `agent-options.ts`：模型 Profile、环境变量白名单、Claude CLI 路径、SDK Options
 - `session-runtime.ts`：活跃运行注册、AbortController、权限/AskUser、文本批次、实时生成活动和会话事件
 - `pending-interactions.ts`：权限与 AskUser 的注册、超时、SDK 取消、通知清理、响应和按 session 拒绝
@@ -85,15 +88,27 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 - `workspace-store.ts`：授权目录、app session 元数据和知识库；删除工作区时以一次 store 提交同步移除授权与会话元数据
 - `settings-store.ts`：主题、Cron、Skill 开关和 compaction IDs
 
+模型用量由独立的 `persistence/model-usage-store.ts` 管理。它只保存有上限的本地分析事件（Profile、会话展示信息、实际模型、Token、费用和 Skill 归因），不保存 prompt、模型回复、API Key 或完整文件路径，避免让设置存储承担持续增长的分析数据。行内改写使用文档路径的 SHA-256 标识分组，旧账本在加载时迁移；归属 Profile 在实际运行选项创建时捕获，预热执行沿用同一快照。
+
 Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级映射和展示元数据。两者职责不同。
 
 ### 搜索、图谱与 Skills
 
 `file-index-service.ts` 为工作区提供全文搜索，并为知识库维护文件节点与去重后的双向 wikilink 关系图。Renderer 使用 `react-force-graph-2d` 在固定视口中显示图谱。
 
+文件变化推送每 50 毫秒合并一批：`FileChangeBatch` 的路径与重命名只包含本批变化，
+`count` 与 `version` 表示当前累计未确认状态。图谱确认使用独立的完整
+`FileChangeSnapshot`，不会清除尚未投递的编辑器刷新或重命名通知。索引销毁时清理待发批次与计时器。
+
+`knowledge-curation.ts` 按规范化后的知识库目录串行处理应用内导入。读取来源记录、
+分配文件名、写入文档和更新来源记录属于同一次排队操作，防止并发导入覆盖文档或来源记录；
+失败不会阻塞后续导入，空闲队列会释放。
+
 内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者在连接器完成飞书 CLI 安装和应用配置后进入 Agent 的启用 Skill 集合。Agent 的精确 `auth check` 是会话内增量授权的唯一入口：Main process 在 `PreToolUse` 生命周期暂停该工具调用，因此默认与自动执行模式都会在当前会话立即收到授权卡；系统浏览器完成 OAuth 并验证 Scope 后放行原工具调用，使同一次 SDK 运行从暂停点继续。
 
 ## Renderer
+
+文本保存由编辑器保存控制器排序提交，Main 的 `atomic-write.ts` 再按绝对文件路径串行执行原子替换，确保不同编辑模式和调用方不会让旧写入覆盖新内容。
 
 Renderer 是单页 React 应用：
 
@@ -123,3 +138,9 @@ React 组件错误由 ErrorBoundary 隔离；全局同步错误和未处理 Prom
 Renderer 依赖由 Vite 打入静态资源；只有 main/preload 运行时依赖保留在生产 `node_modules`。Claude 原生二进制及 CLI 相关文件通过 `asarUnpack` 放入 `app.asar.unpacked`。Skills 作为 `extraResources` 打包；pack/dist 后同时校验 Skill 完整性和 `app.asar` 顶层运行时 allowlist。
 
 当前 macOS 构建目标为 arm64 DMG/ZIP。Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程执行 hardened runtime、签名和 notarization；本地没有发布凭据时生成未签名验证包。Renderer CSP 只为 Shiki 的 WebAssembly 开放 `wasm-unsafe-eval`；macOS entitlement 只保留 Electron hardened runtime 所需的 JIT、unsigned executable memory、library validation 例外及用户选择文件读写，不声明未使用的 network server/client 或 DYLD 环境权限。
+
+### 钉钉连接器
+
+`dingtalk-runtime.ts` 固定官方 dws 版本与 macOS 发布哈希，通过 Managed Runtime Install Transaction 安装。`dingtalk-connection.ts` 拥有登录进程、五分钟超时、取消、状态与权限预览；授权 URL 只接受官方登录入口，预览的权限由 Main 保存并在 UI 确认后精确提交。配置和加密凭据使用 app user-data 下独立目录，密钥仍由 macOS Keychain 管理。
+
+Renderer 通过 `window.api.dingtalk` 和带状态事件的连接器卡片操作；内置 dingtalk Skill 默认关闭，连接成功后启用。Agent 只获得产品命令 shim，账号配置、CLI 升级和 PAT 授权均由宿主管理。业务权限取决于钉钉组织策略，登录不等同于取得全部产品权限。

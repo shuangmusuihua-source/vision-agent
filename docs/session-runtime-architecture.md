@@ -69,8 +69,8 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 - 文本 delta 批处理、flush 和丢弃
 - GenerationActivityProjector 生命周期
 - 权限与 AskUser pending Promise、五分钟超时和 abort 清理
-- session-scoped abort 与 completion 等待
-- workspace-scoped abort 与 completion 等待；工作区删除必须等待该 workspace 的所有 run 结束
+- session-scoped abort 与 completion 等待，覆盖排队中和准备中的启动；启动 lease 从申请时持有取消信号，准备阶段每个异步边界检查取消，附件转换把信号传给子进程
+- workspace-scoped abort 与 completion 等待；工作区删除必须等待该 workspace 的所有 run 和准备中的启动结束
 - 按 app session ID 隔离的启动所有权；封装 abort / prepare / register 的有序 seam
 - 带 envelope 的 main-to-renderer 事件
 
@@ -91,7 +91,7 @@ SDK 的 `cwd` 和会话 transcript 查询都绑定到该 working directory。生
 `workspace-lifecycle.ts` 是注册工作区变更的唯一 Main-process Module。删除工作区按以下顺序：
 
 1. 校验请求对应已注册且非系统 Workspace。
-2. `SessionRuntimeController` 按稳定 envelope 中的 `workspacePath` 终止并等待所有 run。
+2. `SessionRuntimeController` 按稳定 envelope 中的 `workspacePath` 终止并等待所有 run 和启动准备。
 3. `cron-manager.ts` 暂停并等待关联 Workspace、Workspace session 或其子目录的自动化。
 4. 将 Workspace 移入废纸篓；失败时恢复此前活动的自动化计划。
 5. 一次性移除授权目录和 app session metadata。

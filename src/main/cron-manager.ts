@@ -24,8 +24,10 @@ import { normalizeCronLinkedUrls, sanitizeCronLinkedUrls } from '../shared/cron-
 import { isSameWorkspacePath } from '../shared/workspace-paths'
 import { canonicalGrantedDirectory, consumeSelectedDirectoryGrant } from './directory-grants'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { mkdir } from 'fs/promises'
+import { getActiveProfileUsageIdentity } from './persistence/profile-store'
+import { recordModelUsage } from './persistence/model-usage-store'
 
 const MAX_RUN_HISTORY = 10
 
@@ -250,7 +252,7 @@ export function registerTask(registration: CronTaskRegistration): CronTask {
 export function removeTask(taskId: string): boolean {
   const entry = tasks.get(taskId)
   if (!entry) return false
-  entry.job.stop()
+  entry.job.destroy()
   runningTasks.get(taskId)?.abortController.abort()
   tasks.delete(taskId)
   persistTasks()
@@ -286,6 +288,7 @@ export async function executeTask(task: CronTask): Promise<CronTaskExecutionOutc
       ? ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'WebSearch', 'WebFetch']
       : ['Read', 'Glob', 'Grep', 'Write', 'Edit']
     const allowedToolNames = new Set(allowedTools)
+    const usageProfile = getActiveProfileUsageIdentity()
 
     const options = buildAgentOptions({
       memoryMode: 'disabled',
@@ -329,6 +332,14 @@ export async function executeTask(task: CronTask): Promise<CronTaskExecutionOutc
       throw new Error('Task aborted')
     }
     if (!terminalResult) throw new Error('Agent did not return a terminal result')
+    recordModelUsage({
+      result: terminalResult,
+      profile: usageProfile,
+      source: 'automation',
+      sessionId: task.id,
+      sessionTitle: task.name,
+      workspaceName: basename(cwd),
+    })
     if (terminalResult.subtype !== 'success') {
       throw new Error(describeAutomationResultError(terminalResult))
     }

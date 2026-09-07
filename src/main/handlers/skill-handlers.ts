@@ -1,3 +1,4 @@
+import { filterDingTalkSkillByConnectorReadiness, getDingTalkConnectorManager } from '../dingtalk-connection'
 import { BrowserWindow, ipcMain } from 'electron'
 import { getEnabledSkills, toggleSkill } from '../persistence/settings-store'
 import { getBuiltinSkills } from '../skills/builtin'
@@ -56,7 +57,7 @@ export function registerSkillHandlers(): void {
     const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
     const [communityCatalog, enabled] = await Promise.all([
       getCommunityCatalog(),
-      filterFeishuSkillByConnectorReadiness(runtimeReadySkills),
+      filterFeishuSkillByConnectorReadiness(runtimeReadySkills).then(filterDingTalkSkillByConnectorReadiness),
     ])
     const installedCommunity = CURATED_COMMUNITY_SKILLS
       .filter(skill => communityCatalog.some(item => item.id === skill.id && item.installed))
@@ -79,6 +80,9 @@ export function registerSkillHandlers(): void {
         throw new Error('请先安装 Office 文档运行组件')
       }
     }
+    if (skillId === 'dingtalk' && enabled && (await getDingTalkConnectorManager().getStatus()).phase !== 'connected') {
+      throw new Error('请先在连接器中连接钉钉')
+    }
     if (skillId === 'feishu' && enabled) {
       const status = await getFeishuConnectorManager().getStatus()
       if (status.phase !== 'connected' && status.phase !== 'bot-only') {
@@ -92,7 +96,7 @@ export function registerSkillHandlers(): void {
 
   ipcMain.handle('skills:builtins', async () => {
     const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
-    const enabled = await filterFeishuSkillByConnectorReadiness(runtimeReadySkills)
+    const enabled = await filterDingTalkSkillByConnectorReadiness(await filterFeishuSkillByConnectorReadiness(runtimeReadySkills))
     return getBuiltinSkills().map(skill => ({
       id: skill.id,
       name: skill.name,

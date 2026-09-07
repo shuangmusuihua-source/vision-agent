@@ -30,6 +30,13 @@ export interface KnowledgeSyncState {
 }
 
 const PROVENANCE_RELATIVE_PATH = join('.sumi', 'knowledge-provenance.json')
+const importQueues = new Map<string, Promise<void>>()
+
+type KnowledgeImportOptions = {
+  sourcePath: string
+  knowledgeDir: string
+  sessionId?: string
+}
 
 function contentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex')
@@ -85,15 +92,26 @@ export async function getKnowledgeSyncStates(
   return states
 }
 
-export async function addMarkdownToKnowledge(options: {
-  sourcePath: string
-  knowledgeDir: string
-  sessionId?: string
-}): Promise<KnowledgeImportResult> {
+export async function addMarkdownToKnowledge(options: KnowledgeImportOptions): Promise<KnowledgeImportResult> {
   if (extname(options.sourcePath).toLowerCase() !== '.md') {
     return { success: false, error: '只有 Markdown 文档可以放入知识库' }
   }
 
+  // Naming and provenance belong to one read-modify-write operation. Atomic
+  // file writes alone cannot prevent two imports from choosing the same name.
+  const knowledgeDir = resolve(options.knowledgeDir)
+  const previous = importQueues.get(knowledgeDir) ?? Promise.resolve()
+  const run = previous.then(() => importMarkdown({ ...options, knowledgeDir }))
+  const settled = run.then(() => {}, () => {})
+  importQueues.set(knowledgeDir, settled)
+  try {
+    return await run
+  } finally {
+    if (importQueues.get(knowledgeDir) === settled) importQueues.delete(knowledgeDir)
+  }
+}
+
+async function importMarkdown(options: KnowledgeImportOptions): Promise<KnowledgeImportResult> {
   try {
     const content = await readFile(options.sourcePath, 'utf8')
     await mkdir(options.knowledgeDir, { recursive: true })

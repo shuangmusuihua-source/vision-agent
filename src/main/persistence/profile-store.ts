@@ -24,9 +24,24 @@ export function getApiKey(): string {
   return decryptValue(profile.apiKey)
 }
 
+export function getProfileApiKey(profileId: string): string {
+  const profile = store.get('profiles').find((candidate) => candidate.id === profileId)
+  return profile ? decryptValue(profile.apiKey) : ''
+}
+
 function getActiveProfileRaw(): ModelProfile | null {
   const settings = store.store
   return settings.profiles.find((p) => p.id === settings.activeProfileId) || null
+}
+
+export function getActiveProfileUsageIdentity(): Pick<ModelProfile, 'id' | 'name' | 'model'> | null {
+  const profile = getActiveProfileRaw()
+  if (!profile) return null
+  return { id: profile.id, name: profile.name, model: profile.model }
+}
+
+export function getProfileIds(): string[] {
+  return store.get('profiles').map((profile) => profile.id)
 }
 
 export function getBaseUrl(): string {

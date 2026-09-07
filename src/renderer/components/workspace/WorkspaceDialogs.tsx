@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { FolderPlus, Trash2, X } from 'lucide-react'
 import { DOCUMENTS_DIR_NAME } from '../../../shared/branding'
 import type { WorkspaceDeleteResult } from '../../../shared/workspace-lifecycle'
 import type { WorkspaceDialogsController } from '../../hooks/useWorkspace'
@@ -65,13 +66,20 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
             role="dialog"
             aria-modal="true"
             aria-label="新建工作区"
+            aria-labelledby="create-workspace-title"
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
               trapFocus(event)
               if (event.key === 'Escape') create.close()
             }}
           >
-            <div className="modal-title">新建工作区</div>
+            <div className="modal-icon-row">
+              <div className="modal-icon-circle primary"><FolderPlus size={17} /></div>
+              <div className="modal-title" id="create-workspace-title">新建工作区</div>
+              <button type="button" className="modal-close-btn" onClick={create.close} disabled={create.pending} aria-label="关闭弹窗">
+                <X size={15} />
+              </button>
+            </div>
             <div className="modal-subtitle">将创建在 ~/Documents/{DOCUMENTS_DIR_NAME}/ 下</div>
             <input
               className="modal-input"
@@ -112,9 +120,27 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
             aria-modal="true"
             aria-busy={remove.pending}
             aria-label="删除工作区"
+            aria-labelledby="delete-workspace-title"
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              trapFocus(event)
+              if (event.key === 'Escape' && !remove.pending) remove.close()
+            }}
           >
-            <div className="modal-title">删除工作区</div>
+            <div className="modal-icon-row">
+              <div className="modal-icon-circle danger"><Trash2 size={17} /></div>
+              <div className="modal-title" id="delete-workspace-title">删除工作区</div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => { if (!remove.pending) remove.close() }}
+                aria-disabled={remove.pending}
+                tabIndex={remove.pending ? -1 : 0}
+                aria-label="关闭弹窗"
+              >
+                <X size={15} />
+              </button>
+            </div>
             <div className="modal-body">
               此操作会将工作区 <strong>{workspaceName}</strong> 及其所有文件移到废纸篓。
             </div>
@@ -127,7 +153,6 @@ function WorkspaceDialogs({ controller, onDeleted }: WorkspaceDialogsProps): Rea
               onCompositionStart={deleteImeEnterGuard.onCompositionStart}
               onCompositionEnd={deleteImeEnterGuard.onCompositionEnd}
               onKeyDown={(event) => {
-                if (event.key === 'Escape' && !remove.pending) remove.close()
                 if (event.key === 'Enter' && !deleteImeEnterGuard.isImeConfirm(event) && canDelete) {
                   void handleDelete()
                 }

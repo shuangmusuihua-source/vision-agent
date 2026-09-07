@@ -1,10 +1,15 @@
 export type SourceSaveHandler = (filePath: string, content: string) => void | Promise<unknown>
 
+type SaveTarget = { filePath: string; content: string; save: SourceSaveHandler }
+// Also order saves captured by an editor that is unmounting against saves
+// from its replacement. Entries disappear as soon as their writes settle.
+const fileSaves = new Map<string, Promise<unknown>>()
+
 export class SourceSaveController {
   private dirty = false
   private timer: ReturnType<typeof setTimeout> | null = null
-  private target: { filePath: string; content: string; save: SourceSaveHandler } | null = null
-  private inFlightSaves = new Set<Promise<unknown>>()
+  private target: SaveTarget | null = null
+  private inFlightSaves = new Map<Promise<unknown>, string>()
 
   constructor(
     private save: SourceSaveHandler,
@@ -17,6 +22,11 @@ export class SourceSaveController {
 
   hasPendingSave(): boolean {
     return this.dirty && this.target !== null
+  }
+
+  hasUnsettledSave(filePath: string): boolean {
+    return (this.hasPendingSave() && this.target?.filePath === filePath)
+      || [...this.inFlightSaves.values()].includes(filePath)
   }
 
   schedule(filePath: string, content: string): void {
@@ -34,23 +44,25 @@ export class SourceSaveController {
   flush(): boolean {
     const target = this.takePendingTarget()
     if (!target) return false
-    const save = this.trackSave(target.save(target.filePath, target.content))
+    const save = this.submit(target)
     void save.catch(() => {})
     return true
   }
 
   async flushAsync(): Promise<boolean> {
-    const target = this.takePendingTarget()
-    const inFlight = Array.from(this.inFlightSaves)
-    if (inFlight.length > 0) {
-      const settled = await Promise.allSettled(inFlight)
+    // Keep the latest draft pending while an older save can still fail. Taking
+    // it here would lose an unsubmitted edit on the error path below.
+    this.clearScheduledSave()
+    while (this.inFlightSaves.size > 0) {
+      const settled = await Promise.allSettled(Array.from(this.inFlightSaves.keys()))
       for (const outcome of settled) {
         if (outcome.status === 'rejected') throw outcome.reason
         this.assertSaveSucceeded(outcome.value)
       }
     }
+    const target = this.takePendingTarget()
     if (!target) return false
-    const result = await this.trackSave(target.save(target.filePath, target.content))
+    const result = await this.submit(target)
     this.assertSaveSucceeded(result)
     return true
   }
@@ -67,7 +79,7 @@ export class SourceSaveController {
     this.timer = null
   }
 
-  private takePendingTarget(): { filePath: string; content: string; save: SourceSaveHandler } | null {
+  private takePendingTarget(): SaveTarget | null {
     if (!this.hasPendingSave() || !this.target) return null
     const target = this.target
     this.clearScheduledSave()
@@ -76,9 +88,33 @@ export class SourceSaveController {
     return target
   }
 
-  private trackSave(result: void | Promise<unknown>): Promise<unknown> {
+  private submit(target: SaveTarget): Promise<unknown> {
+    const previous = new Set(this.inFlightSaves.keys())
+    const fileSave = fileSaves.get(target.filePath)
+    if (fileSave) previous.add(fileSave)
+    let result: void | Promise<unknown>
+    try {
+      result = previous.size > 0
+        ? Promise.allSettled([...previous]).then(() => target.save(target.filePath, target.content))
+        : target.save(target.filePath, target.content)
+    } catch (error) {
+      result = Promise.reject(error)
+    }
+    const save = this.trackSave(result, target.filePath)
+    if (result !== undefined) {
+      fileSaves.set(target.filePath, save)
+      const cleanup = () => {
+        if (fileSaves.get(target.filePath) === save) fileSaves.delete(target.filePath)
+      }
+      void save.then(cleanup, cleanup)
+    }
+    return save
+  }
+
+  private trackSave(result: void | Promise<unknown>, filePath: string): Promise<unknown> {
     const save = Promise.resolve(result)
-    this.inFlightSaves.add(save)
+    if (result === undefined) return save
+    this.inFlightSaves.set(save, filePath)
     void save.then(
       () => this.inFlightSaves.delete(save),
       () => this.inFlightSaves.delete(save),

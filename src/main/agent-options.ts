@@ -1,3 +1,4 @@
+import { getDingTalkCliAgentBinDir, getDingTalkCliIsolationEnv } from './dingtalk-runtime'
 import type { Options, HookCallbackMatcher, SettingSource } from '@anthropic-ai/claude-agent-sdk'
 import { createRequire } from 'module'
 import { existsSync } from 'fs'
@@ -105,9 +106,11 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
 
   // Prepend user-level bin paths so tools like pip/brew/npm are findable
   if (profile.prependUserBinPaths !== false) {
+    const dingtalkEnabled = profile.skills?.includes('dingtalk') === true
     const feishuEnabled = profile.skills?.includes('feishu') === true
     const userBinPaths = [
       getOfficeCliBinDir(),
+      ...(dingtalkEnabled ? [getDingTalkCliAgentBinDir()] : []),
       ...(feishuEnabled ? [getFeishuCliAgentBinDir()] : []),
       '/opt/homebrew/bin',
       '/opt/homebrew/sbin',
@@ -118,6 +121,7 @@ export function buildAgentOptions(profile: AgentOptionsProfile): Options {
     env.PATH = `${userBinPaths}:${process.env.PATH}`
     env.LC_ALL = process.env.LC_ALL
     env.OFFICECLI_SKIP_UPDATE = '1'
+    if (dingtalkEnabled) Object.assign(env, getDingTalkCliIsolationEnv())
     if (feishuEnabled) {
       env.LARKSUITE_CLI_CONFIG_DIR = getFeishuCliConfigDir()
       env.LARKSUITE_CLI_NO_UPDATE_NOTIFIER = '1'
