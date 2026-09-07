@@ -16,6 +16,41 @@ export function isTrustedDingTalkAuthorizationUrl(value: string): boolean {
   } catch { return false }
 }
 
+export function normalizeDingTalkPermissionUrl(value: string): string | null {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' || url.username || url.password || url.port ||
+      url.hostname !== 'open-dev.dingtalk.com' || url.pathname !== '/fe/old') return null
+    const route = decodeURIComponent(url.hash.slice(1))
+    if (!route.startsWith('/personalAuthorization?')) return null
+    const query = new URLSearchParams(route.slice(route.indexOf('?') + 1))
+    if (!query.get('flowId') || !query.get('userCode')) return null
+    url.hash = route
+    if (!url.searchParams.has('hash')) url.searchParams.set('hash', `#${route}`)
+    return url.toString()
+  } catch { return null }
+}
+
+export class DingTalkPermissionError extends Error {
+  constructor(readonly authorizationUrl: string | null, readonly code: string) {
+    super(authorizationUrl ? '需要在钉钉页面确认授权，完成后请重新选择该能力。' :
+      code === 'PAT_ORG_POLICY_DENIED' ? '组织策略禁止此权限，请联系钉钉管理员。' : '钉钉尚未授予此权限，请检查组织授权策略。')
+  }
+}
+
+export function parseDingTalkPermissionError(raw: string): DingTalkPermissionError | null {
+  // The pinned CLI emits one JSON object on stderr; accept formatted JSON too.
+  for (const candidate of [raw.trim(), ...raw.split('\n')]) {
+    try {
+      const value = JSON.parse(candidate) as { success?: boolean; code?: unknown; data?: Record<string, unknown> }
+      if (value?.success !== false || typeof value.code !== 'string' || !/^PAT_[A-Z_]+$/.test(value.code)) continue
+      const uri = value.data?.uri ?? value.data?.authUrl ?? value.data?.authorizationUrl
+      return new DingTalkPermissionError(typeof uri === 'string' ? normalizeDingTalkPermissionUrl(uri) : null, value.code)
+    } catch { /* Ignore non-JSON diagnostics without exposing raw output. */ }
+  }
+  return null
+}
+
 export function parseDingTalkIdentity(raw: string): DingTalkConnectorStatus['identity'] {
   const value = JSON.parse(raw) as Record<string, unknown>
   if (!value || value.authenticated !== true) return undefined
@@ -39,6 +74,7 @@ export class DingTalkConnectorManager extends EventEmitter {
   private plan: { id: string; scopes: string[]; expires: number } | null = null
   private active: ChildProcess | null = null
   private operation: 'installing' | 'authorizing' | 'logout' | 'permissions' | null = null
+  private permissionChallenge: DingTalkConnectorStatus['permissionChallenge']
   private authorizationUrl: string | undefined
   private error: string | undefined
   private loginDone: Promise<void> | null = null
@@ -55,12 +91,13 @@ export class DingTalkConnectorManager extends EventEmitter {
   private async readStatus(): Promise<DingTalkConnectorStatus> {
     const runtime = await this.runtime.getStatus()
     if (runtime.state !== 'ready') return { phase: this.operation === 'installing' ? 'installing' : 'runtime-missing', runtime, error: this.error }
-    if (this.operation) return { phase: this.operation === 'installing' ? 'installing' : 'authorizing', runtime, authorizationUrl: this.authorizationUrl }
+    if (this.operation) return { phase: this.operation === 'logout' ? 'disconnecting' : this.operation, runtime, authorizationUrl: this.authorizationUrl, error: this.error }
     if (this.error) return { phase: 'error', runtime, error: this.error }
     try {
       const raw = await this.execute(runtime.executablePath, ['auth', 'status', '--format', 'json'])
       const identity = parseDingTalkIdentity(raw)
-      return { phase: identity ? 'connected' : 'unauthorized', runtime, identity }
+      if (this.permissionChallenge && this.permissionChallenge.expiresAt <= Date.now()) this.permissionChallenge = undefined
+      return { phase: identity ? 'connected' : 'unauthorized', runtime, identity, permissionChallenge: this.permissionChallenge }
     } catch {
       return { phase: 'error', runtime, error: '无法验证钉钉登录状态，请检查网络或重新登录。' }
     }
@@ -68,7 +105,9 @@ export class DingTalkConnectorManager extends EventEmitter {
 
   private execute(executable: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      execFile(executable, args, { env: getDingTalkCliProcessEnv(), encoding: 'utf8', timeout: 25_000, maxBuffer: 512 * 1024 }, (error, stdout) => {
+      execFile(executable, args, { env: getDingTalkCliProcessEnv(), encoding: 'utf8', timeout: 25_000, maxBuffer: 512 * 1024 }, (error, stdout, stderr) => {
+        const permissionError = args[0] === 'pat' ? parseDingTalkPermissionError(stderr || '') || parseDingTalkPermissionError(stdout) : null
+        if (permissionError) { reject(permissionError); return }
         // auth status can return a structured unauthenticated result with nonzero exit.
         if (error && !(args[1] === 'status' && stdout.trim().startsWith('{'))) reject(new Error('钉钉命令未完成'))
         else resolve(stdout)
@@ -98,6 +137,7 @@ export class DingTalkConnectorManager extends EventEmitter {
   async startLogin(): Promise<DingTalkConnectorActionResult> {
     if (this.operation) return { success: false, error: '钉钉连接器正在处理其他操作' }
     this.plan = null
+    this.permissionChallenge = undefined
     this.operation = 'authorizing'
     this.cancelled = false
     this.error = undefined
@@ -129,6 +169,7 @@ export class DingTalkConnectorManager extends EventEmitter {
               this.authorizationUrl = value
               void this.publish().catch(() => undefined)
               void shell.openExternal(value).catch(() => {
+                if (this.active !== child || this.cancelled) return
                 this.error = '无法打开浏览器，请点击重新打开授权页。'
                 void this.publish().catch(() => undefined)
               })
@@ -144,6 +185,7 @@ export class DingTalkConnectorManager extends EventEmitter {
           this.active = null
           this.operation = null
           this.authorizationUrl = undefined
+          if (code === 0 || this.cancelled) this.error = undefined
           if (!this.cancelled && (code !== 0 || timedOut)) this.error = timedOut ? '授权已超时，请重新登录。' : '登录未完成，请确认组织已开通 CLI 访问后重试。'
           resolve()
           void this.publish().catch(() => undefined)
@@ -160,9 +202,25 @@ export class DingTalkConnectorManager extends EventEmitter {
   }
 
   async reopenAuthorization(): Promise<DingTalkConnectorActionResult> {
-    if (!this.authorizationUrl || !isTrustedDingTalkAuthorizationUrl(this.authorizationUrl)) return { success: false, error: '当前没有等待中的授权' }
-    try { await shell.openExternal(this.authorizationUrl); return { success: true } }
-    catch { return { success: false, error: '无法打开授权页' } }
+    const loginUrl = this.authorizationUrl
+    const challenge = this.permissionChallenge
+    const url = loginUrl && isTrustedDingTalkAuthorizationUrl(loginUrl) ? loginUrl :
+      challenge && challenge.expiresAt > Date.now() ? normalizeDingTalkPermissionUrl(challenge.url) : null
+    if (!url) return { success: false, error: '授权链接已过期，请重新发起授权' }
+    try {
+      await shell.openExternal(url)
+      if (loginUrl && this.authorizationUrl === loginUrl) this.error = undefined
+      await this.publish()
+      return { success: true }
+    } catch { return { success: false, error: '无法打开授权页，请检查默认浏览器后重试' } }
+  }
+
+  private permissionFailure(error: unknown, fallback: string): { success: false; error: string } {
+    if (error instanceof DingTalkPermissionError) {
+      if (error.authorizationUrl) this.permissionChallenge = { url: error.authorizationUrl, expiresAt: Date.now() + 300_000 }
+      return { success: false, error: error.message }
+    }
+    return { success: false, error: fallback }
   }
 
   async cancelOperation(): Promise<DingTalkConnectorActionResult> {
@@ -179,6 +237,7 @@ export class DingTalkConnectorManager extends EventEmitter {
     if (!DINGTALK_CAPABILITIES.some((item) => item.id === product)) return { success: false, error: '不支持该钉钉能力' }
     if (this.operation) return { success: false, error: '连接器正在处理其他操作' }
     this.operation = 'permissions'
+    this.permissionChallenge = undefined
     this.plan = null
     try {
       const runtime = await this.runtime.getStatus()
@@ -188,8 +247,8 @@ export class DingTalkConnectorManager extends EventEmitter {
       const id = randomUUID()
       this.plan = { id, scopes, expires: Date.now() + 300_000 }
       return { success: true, planId: id, scopes }
-    } catch { return { success: false, error: '无法获取授权范围，请确认已登录且组织已开通此能力。' } }
-    finally { this.operation = null }
+    } catch (error) { return this.permissionFailure(error, '无法获取授权范围，请确认已登录且组织已开通此能力。') }
+    finally { this.operation = null; await this.publish() }
   }
 
   async grantAuthorization(planId: string): Promise<DingTalkConnectorActionResult> {
@@ -198,6 +257,7 @@ export class DingTalkConnectorManager extends EventEmitter {
     this.plan = null
     if (!plan.scopes.length) return { success: true }
     this.operation = 'permissions'
+    this.permissionChallenge = undefined
     try {
       const runtime = await this.runtime.getStatus()
       if (runtime.state !== 'ready') throw new Error('组件未就绪')
@@ -209,13 +269,14 @@ export class DingTalkConnectorManager extends EventEmitter {
         throw new Error('授权未完成')
       }
       return { success: true }
-    } catch { return { success: false, error: '授权未完成，组织策略可能需要管理员处理；尚未确认的权限不会视为已授权。' } }
-    finally { this.operation = null }
+    } catch (error) { return this.permissionFailure(error, '授权未完成，组织策略可能需要管理员处理；尚未确认的权限不会视为已授权。') }
+    finally { this.operation = null; await this.publish() }
   }
 
   async logout(): Promise<DingTalkConnectorActionResult> {
     if (this.operation) return { success: false, error: '请先结束当前操作' }
     this.plan = null
+    this.permissionChallenge = undefined
     this.operation = 'logout'
     this.error = undefined
     try {

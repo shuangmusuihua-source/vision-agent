@@ -8,9 +8,10 @@ export type DingTalkRuntimeInstallResult =
   | { success: true; status: DingTalkRuntimeStatus }
   | { success: false; error: string }
 export type DingTalkConnectorStatus = {
-  phase: 'runtime-missing' | 'installing' | 'unauthorized' | 'authorizing' | 'connected' | 'error'
+  phase: 'runtime-missing' | 'installing' | 'unauthorized' | 'authorizing' | 'permissions' | 'disconnecting' | 'connected' | 'error'
   runtime: DingTalkRuntimeStatus
   identity?: { userName: string; corpName: string }
+  permissionChallenge?: { url: string; expiresAt: number }
   authorizationUrl?: string
   error?: string
 }

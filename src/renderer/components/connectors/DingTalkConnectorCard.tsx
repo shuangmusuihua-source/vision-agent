@@ -51,10 +51,10 @@ export default function DingTalkConnectorCard(): React.ReactElement {
     if (result.success) await modal.alert({ title: '授权完成', message: `可以回到会话继续处理${label}任务。` })
     return result
   })
-  const busy = pending || status?.phase === 'installing' || status?.phase === 'authorizing'
+  const busy = pending || status?.phase === 'installing' || status?.phase === 'authorizing' || status?.phase === 'permissions' || status?.phase === 'disconnecting'
   const connected = status?.phase === 'connected'
   const missing = status?.runtime.state === 'not-installed'
-  const label = !status ? '检查中' : ({ 'runtime-missing': '未安装', installing: '安装中', unauthorized: '未连接', authorizing: '等待授权', connected: '已连接', error: '需要处理' })[status.phase]
+  const label = !status ? '检查中' : ({ 'runtime-missing': '未安装', installing: '安装中', unauthorized: '未连接', authorizing: '等待登录授权', permissions: '处理权限中', disconnecting: '断开连接中', connected: '已连接', error: '需要处理' })[status.phase]
   return <section className="connector-card dingtalk-connector-card" aria-label="钉钉连接器">
     <div className="connector-card-topline">
       <div className="connector-brand">
@@ -68,6 +68,7 @@ export default function DingTalkConnectorCard(): React.ReactElement {
     <div className="dingtalk-capabilities"><span><FileText size={14} />文档与钉盘</span><span><CalendarDays size={14} />日程与待办</span><span><MessageSquare size={14} />团队消息</span></div>
     {connected && status.identity && <div className="dingtalk-identity"><strong>{status.identity.userName}</strong><span>{status.identity.corpName}</span></div>}
     {status?.phase === 'authorizing' && <p className="dingtalk-description">请在浏览器完成钉钉授权。若组织尚未开通 CLI 访问，请在官方页面申请管理员开通后重试。</p>}
+    {status?.permissionChallenge && <div className="dingtalk-permissions" role="status"><strong>需要钉钉网页确认</strong><p>在官方页面完成授权后，重新选择下方能力，获取最新权限清单并继续。打开页面不代表授权已完成。</p><button className="connector-secondary-button" disabled={busy} onClick={() => void run(window.api.dingtalk.reopenAuthorization)}><ArrowUpRight size={15} />打开钉钉授权页</button></div>}
     {(error || status?.error) && <div className="dingtalk-error" role="alert"><span>{error || status?.error}</span>{error && <button onClick={() => setError(null)} aria-label="关闭钉钉错误提示">×</button>}</div>}
     <div className="dingtalk-actions">
       {status?.runtime.state === 'unsupported' ? <span>当前系统暂不支持</span> : missing || status?.phase === 'installing' ?
