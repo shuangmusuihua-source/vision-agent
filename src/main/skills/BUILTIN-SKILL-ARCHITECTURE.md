@@ -105,3 +105,5 @@ Renderer 通过 `window.api.agent.onGenerationActivity` 接收事件，`useAgent
 `electron-builder.yml` 将 `src/main/skills` 作为 `extraResources` 放入应用。`scripts/verify-packaged-skills.mjs` 在 `pack`、`dist` 和 `release` 后逐文件比较大小和 SHA-256，并检查 manifest 的 `requiredPaths`。
 
 不要通过扩大 `files` 中的 Node 依赖来打包 Skill；Skill 资源和应用 JavaScript 依赖是两条独立链路。
+
+`dingtalk` 同样默认关闭：由应用托管固定版本 dws，连接后才向 Agent 暴露。Skill 只记录产品命令发现和用户授权规则，不运行上游全局安装器。配置、钥匙串文件、登录和 PAT 权限预览由钉钉连接器拥有。

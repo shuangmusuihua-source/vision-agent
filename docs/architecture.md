@@ -138,3 +138,9 @@ React 组件错误由 ErrorBoundary 隔离；全局同步错误和未处理 Prom
 Renderer 依赖由 Vite 打入静态资源；只有 main/preload 运行时依赖保留在生产 `node_modules`。Claude 原生二进制及 CLI 相关文件通过 `asarUnpack` 放入 `app.asar.unpacked`。Skills 作为 `extraResources` 打包；pack/dist 后同时校验 Skill 完整性和 `app.asar` 顶层运行时 allowlist。
 
 当前 macOS 构建目标为 arm64 DMG/ZIP。Tag Release 通过 GitHub Actions 导入 Developer ID 证书，并使用 electron-builder 内置流程执行 hardened runtime、签名和 notarization；本地没有发布凭据时生成未签名验证包。Renderer CSP 只为 Shiki 的 WebAssembly 开放 `wasm-unsafe-eval`；macOS entitlement 只保留 Electron hardened runtime 所需的 JIT、unsigned executable memory、library validation 例外及用户选择文件读写，不声明未使用的 network server/client 或 DYLD 环境权限。
+
+### 钉钉连接器
+
+`dingtalk-runtime.ts` 固定官方 dws 版本与 macOS 发布哈希，通过 Managed Runtime Install Transaction 安装。`dingtalk-connection.ts` 拥有登录进程、五分钟超时、取消、状态与权限预览；授权 URL 只接受官方登录入口，预览的权限由 Main 保存并在 UI 确认后精确提交。配置和加密凭据使用 app user-data 下独立目录，密钥仍由 macOS Keychain 管理。
+
+Renderer 通过 `window.api.dingtalk` 和带状态事件的连接器卡片操作；内置 dingtalk Skill 默认关闭，连接成功后启用。Agent 只获得产品命令 shim，账号配置、CLI 升级和 PAT 授权均由宿主管理。业务权限取决于钉钉组织策略，登录不等同于取得全部产品权限。

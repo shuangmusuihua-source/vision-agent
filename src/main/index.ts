@@ -1,3 +1,4 @@
+import { getDingTalkConnectorManager } from './dingtalk-connection'
 import { app, BrowserWindow, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -108,6 +109,7 @@ function createWindow(): void {
     abortActiveQuery()
     inlineRewriteRunner.cancelAll()
     void getFeishuConnectorManager().cancelOperation()
+    void getDingTalkConnectorManager().cancelOperation()
     handleWindowDestroy()
     setMainWindow(null)
     mainWindow = null
@@ -200,6 +202,7 @@ app.on('before-quit', () => {
   abortActiveQuery()
   inlineRewriteRunner.cancelAll()
   void getFeishuConnectorManager().cancelOperation()
+  void getDingTalkConnectorManager().cancelOperation()
   handleWindowDestroy()
   stopAllCronJobs()
 })

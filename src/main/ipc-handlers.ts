@@ -1,3 +1,4 @@
+import { registerDingTalkHandlers } from './handlers/dingtalk-handlers'
 import { app, ipcMain } from 'electron'
 import { getMainWindow } from './ipc-sender'
 import { getSettings } from './persistence/profile-store'
@@ -44,4 +45,5 @@ export function registerIpcHandlers(): void {
   registerAttachmentHandlers()
   registerOfficeHandlers()
   registerFeishuHandlers()
+  registerDingTalkHandlers()
 }

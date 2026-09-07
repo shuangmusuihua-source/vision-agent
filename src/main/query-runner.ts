@@ -1,3 +1,4 @@
+import { filterDingTalkSkillByConnectorReadiness } from './dingtalk-connection'
 import { shell, type BrowserWindow } from 'electron'
 import { basename } from 'path'
 import { query, Query } from '@anthropic-ai/claude-agent-sdk'
@@ -524,7 +525,7 @@ export async function sendMessage(
 
     const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
     startLease.signal.throwIfAborted()
-    const enabledSkills = await filterFeishuSkillByConnectorReadiness(runtimeReadySkills)
+    const enabledSkills = await filterDingTalkSkillByConnectorReadiness(await filterFeishuSkillByConnectorReadiness(runtimeReadySkills))
     if (skillId === 'office-documents' && !enabledSkills.includes(skillId)) {
       throw new Error('Office 文档运行组件需要安装或更新，请在 Skills 中重新启用“Office 文档”。')
     }

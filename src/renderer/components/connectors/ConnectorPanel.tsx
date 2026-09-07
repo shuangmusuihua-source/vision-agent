@@ -1,3 +1,4 @@
+import DingTalkConnectorCard from './DingTalkConnectorCard'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AppWindow,
@@ -310,6 +311,8 @@ function ConnectorPanel(): React.ReactElement {
             <RefreshCw className={pending === 'refresh' ? 'connector-spin' : undefined} size={16} />
           </button>
         </header>
+
+        <DingTalkConnectorCard />
 
         <section className={`connector-card connector-card-${currentStatus.phase}`}>
           <div className="connector-card-topline">

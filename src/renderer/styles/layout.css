@@ -2487,3 +2487,24 @@
     width: 36px;
   }
 }
+
+/* DingTalk uses the same connector surfaces and actions as Feishu. */
+.dingtalk-connector-card { margin-bottom: 20px; }
+.dingtalk-brand-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: var(--color-action); background: var(--color-action-bg); }
+.dingtalk-status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-text-secondary); }
+.dingtalk-description { margin: 18px 0; font-size: 13px; line-height: 1.7; color: var(--color-text-secondary); }
+.dingtalk-capabilities { display: flex; flex-wrap: wrap; gap: 10px; }
+.dingtalk-capabilities > span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 10px; background: var(--color-bg-secondary); color: var(--color-text-secondary); font-size: 12px; }
+.dingtalk-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.dingtalk-identity { display: flex; gap: 10px; align-items: center; padding-top: 18px; font-size: 13px; }
+.dingtalk-identity > span { color: var(--color-text-secondary); }
+.dingtalk-note { margin: 14px 0 0; color: var(--color-text-tertiary); font-size: 11px; line-height: 1.6; }
+.dingtalk-error { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; color: var(--color-error); font-size: 12px; }
+.dingtalk-error button { color: var(--color-error); background: transparent; border: 0; cursor: pointer; }
+.connector-secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-elevated); color: var(--color-text-secondary); font-size: 12px; cursor: pointer; }
+.connector-secondary-button:hover:enabled { color: var(--color-text-primary); background: var(--color-bg-secondary); }
+.connector-secondary-button:disabled { opacity: .5; cursor: default; }
+.dingtalk-permissions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border); font-size: 12px; }
+.dingtalk-permissions > p { margin: 6px 0 12px; color: var(--color-text-secondary); }
+
+.dingtalk-card-body { padding: 0 20px 20px; }

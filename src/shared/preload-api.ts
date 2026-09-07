@@ -1,3 +1,4 @@
+import type { DingTalkConnectorStatus } from './dingtalk-types'
 import type {
   AgentApprovalMode,
   AgentIPCMessageWithContext,
@@ -244,6 +245,18 @@ export interface OfficeApi {
   installRuntime: () => Promise<IPCResponse<'office:installRuntime'>>
 }
 
+export interface DingTalkApi {
+  prepareAuthorization: (product: string) => Promise<IPCResponse<'dingtalk:prepareAuthorization'>>
+  grantAuthorization: (planId: string) => Promise<IPCResponse<'dingtalk:grantAuthorization'>>
+  status: () => Promise<IPCResponse<'dingtalk:status'>>
+  installRuntime: () => Promise<IPCResponse<'dingtalk:installRuntime'>>
+  startLogin: () => Promise<IPCResponse<'dingtalk:startLogin'>>
+  reopenAuthorization: () => Promise<IPCResponse<'dingtalk:reopenAuthorization'>>
+  cancelOperation: () => Promise<IPCResponse<'dingtalk:cancelOperation'>>
+  logout: () => Promise<IPCResponse<'dingtalk:logout'>>
+  onStatusChanged: (callback: (status: DingTalkConnectorStatus) => void) => () => void
+}
+
 export interface FeishuApi {
   status: () => Promise<IPCResponse<'feishu:status'>>
   installRuntime: () => Promise<IPCResponse<'feishu:installRuntime'>>
@@ -289,6 +302,7 @@ export interface WindowApi {
   skills: SkillsApi
   attachments: AttachmentsApi
   office: OfficeApi
+  dingtalk: DingTalkApi
   feishu: FeishuApi
   search: SearchApi
   menu: MenuApi

@@ -1,3 +1,4 @@
+import type { DingTalkAuthorizationPlan, DingTalkConnectorStatus, DingTalkConnectorActionResult } from './dingtalk-types'
 // IPC channel type mapping — single source of truth for
 // request/response shapes and event payloads across Main/Preload/Renderer.
 
@@ -433,6 +434,14 @@ export type IPCChannelMap = {
   }
 
   // Feishu connector
+  'dingtalk:prepareAuthorization': { request: string; response: DingTalkAuthorizationPlan }
+  'dingtalk:grantAuthorization': { request: string; response: DingTalkConnectorActionResult }
+  'dingtalk:status': { request: void; response: DingTalkConnectorStatus }
+  'dingtalk:installRuntime': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:startLogin': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:reopenAuthorization': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:cancelOperation': { request: void; response: DingTalkConnectorActionResult }
+  'dingtalk:logout': { request: void; response: DingTalkConnectorActionResult }
   'feishu:status': {
     request: void
     response: FeishuConnectorStatus
@@ -509,6 +518,7 @@ export type IPCEventMap = {
   'update:downloaded': void
   'update:download-progress': UpdateDownloadProgress
   'update:error': UpdateErrorPayload
+  'dingtalk:statusChanged': DingTalkConnectorStatus
   'feishu:statusChanged': FeishuConnectorStatus
   'feishu:authChallenge': FeishuAuthChallenge
 }
