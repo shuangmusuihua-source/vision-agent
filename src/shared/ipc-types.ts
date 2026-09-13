@@ -1,3 +1,4 @@
+import type { KnowledgeCatalog, KnowledgePrepareRequest, CurationDraft, CurationSaveRequest, CurationResult, PersonalSkillSummary, PersonalSkillPrepareRequest } from './curation-types'
 import type { DingTalkAuthorizationPlan, DingTalkConnectorStatus, DingTalkConnectorActionResult } from './dingtalk-types'
 // IPC channel type mapping — single source of truth for
 // request/response shapes and event payloads across Main/Preload/Renderer.
@@ -339,6 +340,13 @@ export type IPCChannelMap = {
     response: { success: boolean; error?: string }
   }
 
+  'graph:knowledgeCatalog': { request: void; response: CurationResult<KnowledgeCatalog> }
+  'graph:prepareKnowledge': { request: KnowledgePrepareRequest; response: CurationResult<CurationDraft> }
+  'graph:saveKnowledge': { request: CurationSaveRequest; response: CurationResult<string[]> }
+  'graph:undoKnowledge': { request: void; response: CurationResult<void> }
+  'graph:cancelPreparation': { request: string; response: CurationResult<void> }
+  'graph:discardDraft': { request: string; response: CurationResult<void> }
+
   // Graph
   'graph:getData': {
     request: void
@@ -384,6 +392,14 @@ export type IPCChannelMap = {
   }
 
   // Skills
+  'skills:listPersonal': { request: void; response: CurationResult<PersonalSkillSummary[]> }
+  'skills:preparePersonal': { request: PersonalSkillPrepareRequest; response: CurationResult<CurationDraft> }
+  'skills:editPersonal': { request: string; response: CurationResult<CurationDraft> }
+  'skills:savePersonal': { request: CurationSaveRequest; response: CurationResult<string> }
+  'skills:deletePersonal': { request: string; response: CurationResult<void> }
+  'skills:cancelPreparation': { request: string; response: CurationResult<void> }
+  'skills:discardDraft': { request: string; response: CurationResult<void> }
+
   'skills:list': {
     request: void
     response: SkillDefinition[]

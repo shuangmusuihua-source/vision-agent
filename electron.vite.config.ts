@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
@@ -6,6 +7,14 @@ export default defineConfig({
   main: {
     define: { __SUMI_SENTRY_DSN__: JSON.stringify(process.env.SENTRY_DSN || '') },
     plugins: [
+      {
+        name: 'tencent-agent-memory-license',
+        generateBundle() {
+          for (const name of ['LICENSE', 'SOURCE.json']) {
+            this.emitFile({ type: 'asset', fileName: `licenses/tencent-agent-memory-${name}`, source: readFileSync(resolve(__dirname, 'src/main/vendor/tencent-agent-memory', name)) })
+          }
+        },
+      },
       externalizeDepsPlugin({
         exclude: ['@anthropic-ai/claude-agent-sdk', 'electron-store']
       })

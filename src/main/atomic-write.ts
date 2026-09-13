@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { chmod, open, rename, stat, unlink } from 'fs/promises'
+import { chmod, open, readFile, rename, stat, unlink } from 'fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 
 const pendingWrites = new Map<string, Promise<void>>()
@@ -26,9 +26,28 @@ async function existingMode(filePath: string): Promise<number | null> {
 }
 
 export function atomicWriteTextFile(filePath: string, content: string): Promise<void> {
+  return enqueueFileWrite(filePath, () => replaceTextFile(resolve(filePath), content))
+}
+
+/** Compare inside the same queue used by editor saves, before replacing a draft's source. */
+export function atomicCompareWriteTextFile(filePath: string, expected: string | null, content: string | null): Promise<void> {
+  return enqueueFileWrite(filePath, async () => {
+    let current: string | null
+    try { current = await readFile(filePath, 'utf8') } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      current = null
+    }
+    if (current !== expected) throw new Error('文件已发生变化，请重新生成或合并后再保存')
+    if (content === null) {
+      if (current !== null) await unlink(filePath)
+    } else await replaceTextFile(resolve(filePath), content)
+  })
+}
+
+function enqueueFileWrite(filePath: string, operation: () => Promise<void>): Promise<void> {
   const key = resolve(filePath)
   const previous = pendingWrites.get(key) ?? Promise.resolve()
-  const write = previous.catch(() => undefined).then(() => replaceTextFile(key, content))
+  const write = previous.catch(() => undefined).then(operation)
   pendingWrites.set(key, write)
   const cleanup = () => {
     if (pendingWrites.get(key) === write) pendingWrites.delete(key)

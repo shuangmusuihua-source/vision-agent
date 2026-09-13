@@ -1,3 +1,5 @@
+import type { CurationTarget } from '../knowledge/CurationDialog'
+import '../knowledge/Curation.css'
 import { useCallback, useEffect, useRef, lazy, Suspense, useState } from 'react'
 import { useUiStore, type PrimaryView } from '../../store/ui-slice'
 import { useShallow } from 'zustand/react/shallow'
@@ -41,6 +43,7 @@ import WorkspaceDialogs from '../workspace/WorkspaceDialogs'
 
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'))
 const ChatView = lazy(() => import('../chat/ChatView'))
+const CurationDialog = lazy(() => import('../knowledge/CurationDialog'))
 const SkillLibrary = lazy(() => import('../skills/SkillLibrary'))
 const ConnectorPanel = lazy(() => import('../connectors/ConnectorPanel'))
 const AutomationPanel = lazy(() => import('../automation/AutomationPanel'))
@@ -73,6 +76,9 @@ function SidebarToggleIcon({ collapsed }: { collapsed: boolean }): React.ReactEl
 
 function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
   const modal = useModal()
+  const [curation, setCuration] = useState<{ target: CurationTarget; key: string } | null>(null)
+  const [knowledgeRevision, setKnowledgeRevision] = useState(0)
+  const openCuration = (target: CurationTarget) => setCuration({ target, key: crypto.randomUUID() })
   const setAgentContext = useAgentStore((state) => state.setContext)
   const setAgentLinkedFile = useAgentStore((state) => state.setLinkedFile)
   const clearContextSession = useAgentStore((state) => state.clearContextSession)
@@ -501,6 +507,7 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
 
   return (
     <div className="app-shell" ref={shellRef}>
+      {curation && <Suspense fallback={null}><CurationDialog key={curation.key} target={curation.target} onClose={() => setCuration(null)} onSaved={() => setKnowledgeRevision(value => value + 1)} /></Suspense>}
       <nav aria-label="侧边栏" style={{ display: 'flex', height: '100%' }}>
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -548,7 +555,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
         ) : view === 'skills' ? (
           <ErrorBoundary onReset={() => {}}>
             <Suspense fallback={<div className="skill-library-loading">正在加载技能...</div>}>
-              <SkillLibrary />
+              <SkillLibrary onEditPersonal={skillId => openCuration({ kind: 'edit-skill', skillId })}
+                onUsePersonal={id => { setAgentPrefill('ask', `/${id} `); setAgentContext('ask'); setView('ask') }} />
             </Suspense>
           </ErrorBoundary>
         ) : view === 'connectors' ? (
@@ -578,6 +586,9 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
                 activeFile={activeFilePath}
                 onOpenFile={handleFileSelect}
                 onSearchEntity={openSearch}
+                revision={knowledgeRevision}
+                onCurate={paths => openCuration({ kind: 'knowledge', paths })}
+                onUse={paths => { setAgentPrefill('ask', `请参考以下知识资料处理我的任务：\n${paths.map(path => JSON.stringify(path)).join('\n')}\n\n任务：`); setAgentContext('ask'); setView('ask') }}
               />
             </Suspense>
           </ErrorBoundary>
@@ -620,6 +631,8 @@ function AppShell({ onOpenSettings }: AppShellProps): React.ReactElement {
             onOpenFile={handleFileSelect}
             onOpenOutput={sessionOutputWorkflow.open}
             onAddToKnowledge={sessionOutputWorkflow.addToKnowledge}
+            onCurate={(paths, sessionId) => openCuration({ kind: 'knowledge', paths, sessionId })}
+            onSaveSkill={(sessionId, artifactPath) => openCuration({ kind: 'skill', sessionId, artifactPath })}
             onRevealOutput={sessionOutputWorkflow.reveal}
             onDeleteOutput={sessionOutputWorkflow.delete}
           />

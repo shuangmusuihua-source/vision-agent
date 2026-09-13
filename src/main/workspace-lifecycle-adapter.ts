@@ -1,3 +1,4 @@
+import { curationJobs } from './curation-runtime'
 import { app, shell } from 'electron'
 import { mkdir, rmdir } from 'fs/promises'
 import { join } from 'path'
@@ -39,7 +40,10 @@ export function createWorkspaceLifecycle(): WorkspaceLifecycle {
     addWorkspace: addAuthorizedDirectory,
     removeWorkspace: removeWorkspacePersistence,
     reorderWorkspaces: reorderAuthorizedDirectories,
-    abortWorkspaceRuns: (workspacePath) => sessionRuntime.abortWorkspaceAndWait(workspacePath),
+    abortWorkspaceRuns: async (workspacePath) => {
+      await curationJobs.cancelScope({ workspacePath })
+      return sessionRuntime.abortWorkspaceAndWait(workspacePath)
+    },
     suspendWorkspaceTasks: suspendTasksForWorkspace,
     refreshIndex: (workspacePaths) => fileIndexService.init(workspacePaths),
   })

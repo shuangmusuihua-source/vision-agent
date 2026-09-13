@@ -33,6 +33,7 @@ import { isSameWorkspacePath } from '../shared/workspace-paths'
 interface ActiveSessionRun {
   query: Query
   skillId: string | null
+  invokedSkillIds: Set<string>
   abortController: AbortController
   instanceId: number
   envelope: AgentSessionEnvelope
@@ -133,6 +134,7 @@ export class SessionRuntimeController {
     this.activeRuns.set(input.envelope.sessionId, {
       query: input.query,
       skillId: input.skillId,
+      invokedSkillIds: new Set(input.skillId ? [input.skillId] : []),
       abortController: input.abortController,
       instanceId,
       envelope: input.envelope,
@@ -147,9 +149,13 @@ export class SessionRuntimeController {
 
   isSkillActive(skillId: string): boolean {
     for (const run of this.activeRuns.values()) {
-      if (run.skillId === skillId) return true
+      if (run.invokedSkillIds.has(skillId)) return true
     }
     return false
+  }
+
+  markSkillInvoked(sessionId: string, skillId: string): void {
+    this.activeRuns.get(sessionId)?.invokedSkillIds.add(skillId)
   }
 
   getEnvelope(sessionId: string): AgentSessionEnvelope | null {

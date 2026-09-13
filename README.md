@@ -8,8 +8,8 @@
 - Tiptap Markdown 编辑器、选区 AI 改写审阅、源码模式、自动保存、表格、任务列表、Mermaid 和 KaTeX
 - 流式 AI 对话、操作审批、交互式提问、会话恢复和分页历史
 - 每个会话独立的生成文件目录与产物预览
-- 全局搜索、知识库与双向链接图谱
-- 内置 Skills、社区 Skill 安装/更新/卸载
+- 全局搜索、知识库与双向链接图谱；原始资料可整理成带来源的主题，支持草稿审阅与撤回上次整理
+- 内置 Skills、社区 Skill 安装/更新/卸载；从任务提炼个人 Skill，预览编辑后保存并复用
 - 连接器侧边栏，以及由 sumi 隔离管理、按需安装和授权的飞书 CLI 能力
 - PDF、DOCX、PPTX、XLSX 附件转换
 - 可选的 Office 文档能力：无需安装 Microsoft Office，创建、编辑、渲染并校验 DOCX、XLSX 和 PPTX
@@ -51,7 +51,9 @@ npm run dist
 <workspace>/.sumi/sessions/<session-hash>/
 ```
 
-知识库默认位于用户 Documents 下的 `sumi/Knowledge`。
+知识库默认位于用户 Documents 下的 `sumi/Knowledge`。在任务成果页使用「加入并整理知识」，或在知识库勾选原始资料后点击「整理资料」。主题在预览保存后生效，原文保留；无变化的资料会跳过重复整理。
+
+在任务成果页点击「保存为我的 Skill」，填写想保留的方法，可以新建个人 Skill 或更新已有个人 Skill。保存后在技能页的「我的 Skill」中编辑、启停和用于任务。提炼使用当前模型配置；二进制成果参考任务对话中的制作过程，长任务会提示所采用的最近对话范围。
 
 首次启用“Office 文档”内置能力时，sumi 会下载并校验固定版本的 OfficeCLI 到应用自己的运行时目录；不会修改其他 Agent 配置，也不会启用 OfficeCLI 自动更新。
 

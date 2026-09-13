@@ -1,3 +1,4 @@
+import { curationJobs } from '../curation-runtime'
 import { ipcMain, dialog, shell } from 'electron'
 import { getMainWindow } from '../ipc-sender'
 import { sendMessage, abortActiveQuery, abortActiveQueryAndWait, setPermissionMode } from '../query-runner'
@@ -96,6 +97,7 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:removeSessionRecord', async (_event, request: AgentRemoveSessionRecordRequest) => {
+    await curationJobs.cancelScope({ sessionId: request.sessionId })
     await abortActiveQueryAndWait(request.sessionId)
     const record = getSessionRecordById(request.sessionId)
     if (record) {
@@ -115,6 +117,7 @@ export function registerAgentHandlers(): void {
     // Abort any running query for this session before deletion — prevents
     // resource leaks (orphaned subprocess, pending permissions) and avoids
     // the SDK recreating the session file from a still-running query.
+    await curationJobs.cancelScope({ sessionId: request.sessionId })
     await abortActiveQueryAndWait(request.sessionId)
     await deleteSdkSession(request.sessionId)
     return { success: true }

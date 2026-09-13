@@ -1,14 +1,14 @@
-import { access } from 'fs/promises'
+import { access, readFile } from 'fs/promises'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
-import { listPackage } from '@electron/asar'
+import { extractFile, listPackage } from '@electron/asar'
 
 const repoRoot = join(fileURLToPath(new URL('..', import.meta.url)))
 const appAsarPath = process.env.SUMI_PACKAGED_APP_ASAR
   || join(repoRoot, 'dist', 'mac-arm64', 'sumi.app', 'Contents', 'Resources', 'app.asar')
 
 const allowedTopLevelPaths = new Set(['/node_modules', '/out', '/package.json'])
-const requiredPaths = ['/node_modules', '/out/main/index.js', '/out/preload/index.js', '/out/renderer/index.html', '/package.json']
+const requiredPaths = ['/node_modules', '/out/main/index.js', '/out/preload/index.js', '/out/renderer/index.html', '/package.json', '/out/main/licenses/tencent-agent-memory-LICENSE', '/out/main/licenses/tencent-agent-memory-SOURCE.json']
 const forbiddenPrefixes = ['/.sumi', '/scripts', '/skills-lock.json']
 
 try {
@@ -39,6 +39,12 @@ for (const prefix of forbiddenPrefixes) {
 
 if (packagedPaths.some((path) => path.endsWith('.map'))) {
   failures.push('source map files were packaged')
+}
+
+const thirdPartyLicense = await readFile(join(repoRoot, 'src/main/vendor/tencent-agent-memory/LICENSE'), 'utf8')
+const licensePath = '/out/main/licenses/tencent-agent-memory-LICENSE'
+if (!packagedPathSet.has(licensePath) || extractFile(appAsarPath, licensePath.slice(1)).toString('utf8') !== thirdPartyLicense) {
+  failures.push('TencentDB Agent Memory MIT notice is missing or differs from the source license')
 }
 
 if (failures.length > 0) {

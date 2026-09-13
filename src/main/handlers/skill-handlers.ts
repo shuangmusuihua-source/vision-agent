@@ -1,3 +1,5 @@
+import { PersonalSkills } from '../personal-skills'
+import { registerCurationHandlers } from './curation-handlers'
 import { filterDingTalkSkillByConnectorReadiness, getDingTalkConnectorManager } from '../dingtalk-connection'
 import { BrowserWindow, ipcMain } from 'electron'
 import { getEnabledSkills, toggleSkill } from '../persistence/settings-store'
@@ -53,6 +55,8 @@ async function getCommunityCatalog(): Promise<CommunitySkillCatalogItem[]> {
 }
 
 export function registerSkillHandlers(): void {
+  const personal = new PersonalSkills(getAppSkillsDir(), id => sessionRuntime.isSkillActive(id))
+  registerCurationHandlers(personal, emitSkillsChanged)
   ipcMain.handle('skills:list', async () => {
     const runtimeReadySkills = await filterOfficeSkillByRuntimeReadiness(getEnabledSkills())
     const [communityCatalog, enabled] = await Promise.all([
@@ -69,7 +73,10 @@ export function registerSkillHandlers(): void {
         promptTemplate: skill.promptTemplate,
         outputMode: 'write' as const,
     }))
-    const skills = [...getBuiltinSkills(), ...installedCommunity]
+    const personalDefinitions = (await personal.list(enabled)).map(skill => ({
+      id: skill.id, name: skill.name, description: skill.description, icon: 'WandSparkles', promptTemplate: '', outputMode: 'write' as const,
+    }))
+    const skills = [...getBuiltinSkills(), ...installedCommunity, ...personalDefinitions]
     return skills.map((s) => ({ ...s, enabled: enabled.includes(s.id) }))
   })
 

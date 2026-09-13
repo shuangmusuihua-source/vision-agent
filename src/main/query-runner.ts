@@ -41,7 +41,7 @@ import {
   convertAttachmentsToMarkdown,
   stripFileConvertMarker,
 } from './attachment-conversion'
-import { isSkillAvailableAtInitialization } from '../shared/skill-invocation'
+import { getSkillInvocationId, isSkillAvailableAtInitialization } from '../shared/skill-invocation'
 import { isExactAuthorizedRoot } from './agent-path-utils'
 import { isAuthorizedSessionWorkspace } from './path-validator'
 import {
@@ -370,11 +370,13 @@ export async function sendMessage(
     appSessionId,
     activeFilePath,
     context,
-    skillId,
+    skillId: requestedSkillId,
     workspacePath,
     title,
     approvalMode = DEFAULT_AGENT_APPROVAL_MODE,
   } = request
+  const commandSkillId = getSkillInvocationId(prompt)
+  const skillId = requestedSkillId || (commandSkillId && getEnabledSkills().includes(commandSkillId) ? commandSkillId : undefined)
   // Same-session starts are ordered from identity validation through
   // registration. Starts for different sessions use independent leases.
   const initialRecord = getSessionRecordById(appSessionId)
@@ -551,7 +553,10 @@ export async function sendMessage(
       explicitExternalPaths,
       approvalMode,
       enabledSkills,
-      (invokedSkillId) => invokedSkillIds.add(invokedSkillId),
+      (invokedSkillId) => {
+        invokedSkillIds.add(invokedSkillId)
+        sessionRuntime.markSkillInvoked(appSessionId, invokedSkillId)
+      },
     )
     const abortController = new AbortController()
     const messageStream = query({

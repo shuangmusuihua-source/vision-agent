@@ -1,3 +1,4 @@
+import PersonalSkillLibrary from './PersonalSkillLibrary'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -72,7 +73,7 @@ const filterOptions: Array<{ id: SkillFilter; label: string }> = [
   { id: 'updates', label: '可更新' },
 ]
 
-function SkillLibrary(): React.ReactElement {
+function SkillLibrary({ onEditPersonal, onUsePersonal }: { onEditPersonal: (id: string) => void; onUsePersonal: (id: string) => void }): React.ReactElement {
   const modal = useModal()
   const libraryRef = useRef<HTMLDivElement>(null)
   const catalogScrollTopRef = useRef(0)
@@ -520,6 +521,7 @@ function SkillLibrary(): React.ReactElement {
           )}
         </section>
 
+        <PersonalSkillLibrary query={query} onEdit={onEditPersonal} onUse={onUsePersonal} />
         <section className="skill-builtin-section" aria-labelledby="builtin-skill-title">
           <div className="skill-section-heading">
             <div>

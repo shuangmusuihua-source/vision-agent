@@ -249,6 +249,12 @@ const api = {
   },
 
   graph: {
+    knowledgeCatalog: () => invoke('graph:knowledgeCatalog'),
+    prepareKnowledge: (request) => invoke('graph:prepareKnowledge', request),
+    saveKnowledge: (request) => invoke('graph:saveKnowledge', request),
+    undoKnowledge: () => invoke('graph:undoKnowledge'),
+    cancelPreparation: (request) => invoke('graph:cancelPreparation', request),
+    discardDraft: (request) => invoke('graph:discardDraft', request),
     getData: () => invoke('graph:getData'),
     acknowledgeChanges: (version: number) => invoke('graph:acknowledgeChanges', version),
     onFilesChanged: (callback: (data: FilesChangedPayload) => void) => {
@@ -278,6 +284,13 @@ const api = {
   },
 
   skills: {
+    listPersonal: () => invoke('skills:listPersonal'),
+    preparePersonal: (request) => invoke('skills:preparePersonal', request),
+    editPersonal: (request) => invoke('skills:editPersonal', request),
+    savePersonal: (request) => invoke('skills:savePersonal', request),
+    deletePersonal: (request) => invoke('skills:deletePersonal', request),
+    cancelPreparation: (request) => invoke('skills:cancelPreparation', request),
+    discardDraft: (request) => invoke('skills:discardDraft', request),
     list: () => invoke('skills:list'),
     toggle: (skillId: string, enabled: boolean) => invoke('skills:toggle', skillId, enabled),
     builtins: () => invoke('skills:builtins'),

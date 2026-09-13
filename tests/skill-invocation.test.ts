@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSkillInvocationPrompt,
   getSkillInvocationDisplayText,
+  getSkillInvocationId,
   isSkillAvailableAtInitialization,
   isSkillVisibleInSlashMenu,
 } from '../src/shared/skill-invocation'
@@ -28,6 +29,8 @@ describe('Skill invocation', () => {
   })
 
   it('collapses an internal slash invocation into one stable user-facing label', () => {
+    expect(getSkillInvocationId(' /personal-weekly-review 本周任务')).toBe('personal-weekly-review')
+    expect(getSkillInvocationId('/personal-weekly-review/extra')).toBeNull()
     expect(getSkillInvocationDisplayText('/frontend-design build the page')).toBe('执行 Skill: frontend-design')
     expect(getSkillInvocationDisplayText('普通问题')).toBeNull()
   })

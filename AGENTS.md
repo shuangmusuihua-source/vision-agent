@@ -56,6 +56,9 @@ See `docs/architecture.md` for the current module map and `docs/session-runtime-
 - `session-transcript.ts` — app-owned transcript paging through JSONL and SDK adapters with Main-issued opaque cursors
 - `session-store.ts` — SDK transcript listing, rename, delete, and compaction filtering
 - `persistence/` — electron-store adapters for profiles, settings, workspaces, and app session metadata
+- `knowledge-library.ts`, `knowledge-distiller.ts` — reviewed personal topic extraction, source hashes, conflict checks, and a recoverable last-save journal; original import provenance stays in `knowledge-curation.ts`
+- `personal-skills.ts` — personal Skill drafts, owned installation folders, compare-and-write editing, and removal from discovery; Skill enabled state stays in settings-store
+- `curation-runtime.ts`, `curation-jobs.ts`, `curation-files.ts` — tool-free SDK preparation with auto-memory disabled, window/request/session cancellation, expiring Main-owned drafts, and guarded file snapshots
 - `file-index-service.ts` — workspace search and knowledge graph index
 - `skill-init.ts`, `builtin-skill-installer.ts`, `community-skill-installer.ts` — Skill installation and discovery
 - `cron-manager.ts` — persisted scheduled tasks with a restricted tool set
@@ -128,6 +131,8 @@ Do not introduce a second store for the same authority without documenting the o
 - Add or update tests for session routing, persistence, path authorization, IPC contracts, or error policies when those areas change.
 
 DingTalk uses a pinned official `dws` binary with archive and binary verification. Keep `DWS_CONFIG_DIR` and `DWS_KEYCHAIN_DIR` under app user data; retain macOS Keychain protection. Login, account changes and permission grants belong to the connector UI. Scope grants must use a short-lived Main-owned preview plan and explicit UI confirmation. Agent PATH exposes the guarded shim only; never run global installers or `dws upgrade`.
+
+Personal curation reuses pinned MIT-licensed source under `src/main/vendor/tencent-agent-memory/`; keep `SOURCE.json`, local adaptations, and the shipped license assets aligned. Curation model runs only prepare drafts. Main owns final paths, source versions, and saves. Do not let renderer-provided draft text select write paths or overwrite built-in/community Skills.
 
 ## Documentation policy
 

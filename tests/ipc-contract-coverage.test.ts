@@ -30,7 +30,7 @@ describe('shared IPC contract coverage', () => {
   it('covers every literal ipcMain.handle channel', () => {
     const channels = new Set(collectLiteralChannels(
       mainSource,
-      /ipcMain\.handle\(\s*['"]([^'"]+)['"]/g,
+      /(?:ipcMain\.handle|handleCuration)\(\s*['"]([^'"]+)['"]/g,
     ))
 
     for (const channel of channels) {
@@ -45,7 +45,7 @@ describe('shared IPC contract coverage', () => {
     ))
     const handledChannels = new Set(collectLiteralChannels(
       mainSource,
-      /ipcMain\.handle\(\s*['"]([^'"]+)['"]/g,
+      /(?:ipcMain\.handle|handleCuration)\(\s*['"]([^'"]+)['"]/g,
     ))
     const invokedChannels = new Set(collectLiteralChannels(
       preloadSource,

@@ -18,9 +18,12 @@ describe('SessionRuntimeController Skill activity', () => {
 
     expect(runtime.isSkillActive('frontend-design')).toBe(true)
     expect(runtime.isSkillActive('frontend-slides')).toBe(false)
+    runtime.markSkillInvoked('session-1', 'personal-weekly-review')
+    expect(runtime.isSkillActive('personal-weekly-review')).toBe(true)
 
     runtime.cleanupRun('session-1', instanceId)
     expect(runtime.isSkillActive('frontend-design')).toBe(false)
+    expect(runtime.isSkillActive('personal-weekly-review')).toBe(false)
   })
 
   it('aborts and waits for every run owned by one workspace', async () => {

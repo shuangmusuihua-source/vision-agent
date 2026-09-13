@@ -59,7 +59,7 @@ export interface ModelUsageSessionBreakdown {
   sessionId: string
   title: string
   workspaceName: string
-  source: 'interactive' | 'automation' | 'inline-rewrite' | 'automation-planning'
+  source: 'interactive' | 'automation' | 'inline-rewrite' | 'automation-planning' | 'knowledge-curation' | 'skill-distillation'
   totalTokens: number
   requestCount: number
   costUSD: number

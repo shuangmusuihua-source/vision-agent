@@ -106,6 +106,20 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者在连接器完成飞书 CLI 安装和应用配置后进入 Agent 的启用 Skill 集合。Agent 的精确 `auth check` 是会话内增量授权的唯一入口：Main process 在 `PreToolUse` 生命周期暂停该工具调用，因此默认与自动执行模式都会在当前会话立即收到授权卡；系统浏览器完成 OAuth 并验证 Scope 后放行原工具调用，使同一次 SDK 运行从暂停点继续。
 
+### 个人知识整理与 Skill 提炼
+
+`handlers/curation-handlers.ts` 注册在 `graph` 和 `skills` 分组下的请求/响应接口，使用发起窗口 ID 绑定草稿。任务提炼只接受 app session ID，Main 从会话记录解析 transcript 和工作目录；任务仍在执行、记录变化或工作区失去授权时拒绝生成或保存。选中的成果还必须通过会话产物目录和 `session-file-access.ts` 校验。输入只取可见对话，不包含 thinking、工具原始结果和 meta 消息；长任务采用最近 100 条消息、最多 8 万字符，界面提示该范围。
+
+`knowledge-distiller.ts` 使用分析、生成、逐页合并流程，累计同一主题的所有资料分块。`knowledge-library.ts` 保留知识库原始 Markdown，在 `topics/` 下生成带来源的主题；资料指纹与最近一次可撤回保存记录归 `.sumi/knowledge-curation.json` 所有，与原有导入来源记录分开。文件保存与编辑器共用 `atomic-write.ts` 的路径队列，并在队列内核对原文。多文件保存前先持久化 journal；中断后可撤回，撤回时遇到用户后续编辑会停止。仅保留最近一次整理的撤回记录。
+
+`personal-skills.ts` 在应用 Skills 目录创建 `personal-*` 文件夹，以 `.sumi-personal-skill.json` 标记所有权，正文唯一来源为 `SKILL.md`。提炼只生成工作流程草稿，由用户预览、修改后保存；更新必须显式指定个人 Skill，使用中的 Skill 暂不允许更新或删除。新增 Skill 默认启用，编辑保留开关状态，启停仍由 settings-store 管理。删除将文件夹移到同目录的隐藏恢复副本，SDK 不再发现它；不会改写内置或社区安装内容。
+
+`curation-runtime.ts` 通过现有 Claude Agent SDK 调用模型，禁用工具、auto-memory、项目配置和 transcript 持久化；临时目录在完成或取消时清理，用量记入已有本地账本。`curation-jobs.ts` 负责按窗口、请求和任务取消及 30 分钟草稿有效期；任务/工作区删除和窗口退出也会取消相关模型调用。
+
+提炼核心选择性复用 TencentDB-Agent-Memory 的 MIT 源码，固定版本和适配范围记录在 `src/main/vendor/tencent-agent-memory/SOURCE.json`。复用分块、FILE 协议、frontmatter、slug、合并以及 Skill 格式和评审角色隔离提示；不部署其 Core/Proxy/Hub 服务。适配修复无效合并丢弃旧正文、分块候选互相覆盖和嵌套 FILE 块误解析，并把 Skill 写入工具改为应用持有的草稿保存流程。完整 MIT 声明与来源记录作为主进程构建资源打包，`verify-packaged-app.mjs` 检查其保留情况。
+
+Renderer 的 `KnowledgePanel` 提供原始资料/主题列表、标题摘要筛选、图谱与资料复用；`CurationDialog` 在 AppShell 持有捕获的任务目标，支持取消、预览、编辑与保存，切换会话不会改变草稿来源。`PersonalSkillLibrary` 提供启停、编辑、移除与 slash 命令复用入口。
+
 ## Renderer
 
 文本保存由编辑器保存控制器排序提交，Main 的 `atomic-write.ts` 再按绝对文件路径串行执行原子替换，确保不同编辑模式和调用方不会让旧写入覆盖新内容。

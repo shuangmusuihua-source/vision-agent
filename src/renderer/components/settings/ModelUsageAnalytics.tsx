@@ -29,6 +29,8 @@ const SOURCE_LABELS: Record<ModelUsageDetail['sessions'][number]['source'], stri
   automation: '自动化',
   'inline-rewrite': '行内改写',
   'automation-planning': '自动化规划',
+  'knowledge-curation': '知识整理',
+  'skill-distillation': '个人 Skill',
 }
 
 type DonutDatum = {

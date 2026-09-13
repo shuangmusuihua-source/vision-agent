@@ -192,6 +192,12 @@ export interface MemoryApi {
 }
 
 export interface GraphApi {
+  knowledgeCatalog: () => Promise<IPCResponse<'graph:knowledgeCatalog'>>
+  prepareKnowledge: (request: IPCRequest<'graph:prepareKnowledge'>) => Promise<IPCResponse<'graph:prepareKnowledge'>>
+  saveKnowledge: (request: IPCRequest<'graph:saveKnowledge'>) => Promise<IPCResponse<'graph:saveKnowledge'>>
+  undoKnowledge: () => Promise<IPCResponse<'graph:undoKnowledge'>>
+  cancelPreparation: (request: IPCRequest<'graph:cancelPreparation'>) => Promise<IPCResponse<'graph:cancelPreparation'>>
+  discardDraft: (request: IPCRequest<'graph:discardDraft'>) => Promise<IPCResponse<'graph:discardDraft'>>
   getData: () => Promise<GraphData>
   acknowledgeChanges: (
     version: number,
@@ -220,6 +226,13 @@ export interface CronApi {
 }
 
 export interface SkillsApi {
+  listPersonal: () => Promise<IPCResponse<'skills:listPersonal'>>
+  preparePersonal: (request: IPCRequest<'skills:preparePersonal'>) => Promise<IPCResponse<'skills:preparePersonal'>>
+  editPersonal: (request: IPCRequest<'skills:editPersonal'>) => Promise<IPCResponse<'skills:editPersonal'>>
+  savePersonal: (request: IPCRequest<'skills:savePersonal'>) => Promise<IPCResponse<'skills:savePersonal'>>
+  deletePersonal: (request: IPCRequest<'skills:deletePersonal'>) => Promise<IPCResponse<'skills:deletePersonal'>>
+  cancelPreparation: (request: IPCRequest<'skills:cancelPreparation'>) => Promise<IPCResponse<'skills:cancelPreparation'>>
+  discardDraft: (request: IPCRequest<'skills:discardDraft'>) => Promise<IPCResponse<'skills:discardDraft'>>
   list: () => Promise<SkillDefinition[]>
   toggle: (
     skillId: string,

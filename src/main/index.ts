@@ -1,3 +1,4 @@
+import { curationJobs } from './curation-runtime'
 import { getDingTalkConnectorManager } from './dingtalk-connection'
 import { app, BrowserWindow, shell, nativeTheme } from 'electron'
 import { join } from 'path'
@@ -108,6 +109,7 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     abortActiveQuery()
     inlineRewriteRunner.cancelAll()
+    curationJobs.cancelAll()
     void getFeishuConnectorManager().cancelOperation()
     void getDingTalkConnectorManager().cancelOperation()
     handleWindowDestroy()
@@ -201,6 +203,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   abortActiveQuery()
   inlineRewriteRunner.cancelAll()
+  curationJobs.cancelAll()
   void getFeishuConnectorManager().cancelOperation()
   void getDingTalkConnectorManager().cancelOperation()
   handleWindowDestroy()

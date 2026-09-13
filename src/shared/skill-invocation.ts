@@ -27,8 +27,12 @@ export function isSkillAvailableAtInitialization(
 }
 
 export function getSkillInvocationDisplayText(prompt: string): string | null {
-  const match = SKILL_COMMAND.exec(prompt.trimStart())
-  return match ? `执行 Skill: ${match[1]}` : null
+  const id = getSkillInvocationId(prompt)
+  return id ? `执行 Skill: ${id}` : null
+}
+
+export function getSkillInvocationId(prompt: string): string | null {
+  return SKILL_COMMAND.exec(prompt.trimStart())?.[1] ?? null
 }
 
 export function isSkillVisibleInSlashMenu(skill: SlashMenuSkillState): boolean {

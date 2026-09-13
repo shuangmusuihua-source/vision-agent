@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import {
   ArrowUpRight,
+  Sparkles,
+  WandSparkles,
   CircleCheck,
   FileText,
   FilePenLine,
@@ -20,7 +22,9 @@ interface OverviewPanelProps {
   activeFilePath?: string
   onOpenFile: (path: string) => void
   onOpenOutput: (path: string) => Promise<void>
-  onAddToKnowledge: (path: string) => Promise<{ success: boolean; alreadyExists?: boolean; updated?: boolean; error?: string }>
+  onCurate: (paths: string[], sessionId: string) => void
+  onSaveSkill: (sessionId: string, artifactPath?: string) => void
+  onAddToKnowledge: (path: string) => Promise<{ success: boolean; filePath?: string; alreadyExists?: boolean; updated?: boolean; error?: string }>
   onRevealOutput: (path: string) => Promise<void>
   onDeleteOutput: (file: SessionOutputEntry) => Promise<boolean>
 }
@@ -76,6 +80,8 @@ function OverviewPanel({
   onOpenFile,
   onOpenOutput,
   onAddToKnowledge,
+  onCurate,
+  onSaveSkill,
   onRevealOutput,
   onDeleteOutput,
 }: OverviewPanelProps): React.ReactElement {
@@ -99,6 +105,7 @@ function OverviewPanel({
       <div className="overview-panel">
         <div className="overview-hero overview-hero--compact">
           <p className="overview-subtitle overview-subtitle--solo">本次协作形成的文档与交付产物，会集中归档在这里。</p>
+          <button className="curation-button" type="button" onClick={() => onSaveSkill(sessionId)}><WandSparkles size={14} />保存为我的 Skill</button>
         </div>
         <div className="overview-empty overview-empty--framed">
           <div className="overview-empty-icon"><FileText size={36} /></div>
@@ -113,11 +120,12 @@ function OverviewPanel({
   const skillOutputs = sessionOutputs.files.filter((file) => file.category === 'skill_output')
   const others = sessionOutputs.files.filter((file) => !documents.includes(file) && !skillOutputs.includes(file))
 
-  const handleKnowledgeAction = async (file: SessionOutputEntry): Promise<void> => {
-    if (busyFiles[file.filePath] || file.knowledge?.status === 'synced') return
+  const handleKnowledgeAction = async (file: SessionOutputEntry, organize = false): Promise<void> => {
+    if (busyFiles[file.filePath] || (!organize && file.knowledge?.status === 'synced')) return
     setBusyFiles((current) => ({ ...current, [file.filePath]: 'knowledge' }))
     try {
-      await onAddToKnowledge(file.filePath)
+      const result = await onAddToKnowledge(file.filePath)
+      if (organize && result.success && result.filePath) onCurate([result.filePath], sessionId)
     } finally {
       setBusyFiles((current) => {
         const next = { ...current }
@@ -182,6 +190,7 @@ function OverviewPanel({
         </dl>
 
         <div className="overview-card-toolbar" role="group" aria-label={`${file.fileName} 操作`}>
+          <button className="overview-icon-action" type="button" onClick={() => onSaveSkill(sessionId, file.filePath)} title="保存为我的 Skill" aria-label={`从 ${file.fileName} 提炼 Skill`}><WandSparkles size={16} /></button>
           <button className="overview-icon-action" type="button" onClick={() => onOpenFile(file.filePath)} title="打开文档" aria-label={`打开 ${file.fileName}`}>
             <ArrowUpRight size={16} />
           </button>
@@ -202,6 +211,7 @@ function OverviewPanel({
                   ? <RefreshCw size={16} />
                   : <FileUp size={16} />}
           </button>
+          <button className="overview-icon-action" type="button" disabled={isBusy} onClick={() => void handleKnowledgeAction(file, true)} title="加入并整理知识" aria-label={`加入并整理 ${file.fileName}`}><Sparkles size={16} /></button>
         </div>
       </article>
     )
@@ -246,6 +256,7 @@ function OverviewPanel({
         </dl>
 
         <div className="overview-card-toolbar" role="group" aria-label={`${file.fileName} 操作`}>
+          <button className="overview-icon-action" type="button" onClick={() => onSaveSkill(sessionId, file.filePath)} title="保存为我的 Skill" aria-label={`从 ${file.fileName} 提炼 Skill`}><WandSparkles size={16} /></button>
           <button className="overview-icon-action" type="button" onClick={() => void onOpenOutput(file.filePath)} title="打开产物" aria-label={`打开 ${file.fileName}`}>
             <ArrowUpRight size={16} />
           </button>
@@ -264,6 +275,7 @@ function OverviewPanel({
     <div className="overview-panel">
       <header className="overview-hero overview-hero--compact">
         <p className="overview-subtitle overview-subtitle--solo">从工作文档到最终交付，所有成果都在同一处持续维护。</p>
+        <button className="curation-button" type="button" onClick={() => onSaveSkill(sessionId)}><WandSparkles size={14} />保存为我的 Skill</button>
         <div className="overview-summary" aria-label="会话文件统计">
           <span><strong>{documents.length}</strong> 文档</span>
           <span><strong>{skillOutputs.length}</strong> 产物</span>

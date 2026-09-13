@@ -4,6 +4,7 @@ import { useAgentStore } from '../store/agent-store-impl'
 
 export interface KnowledgeImportResult {
   success: boolean
+  filePath?: string
   alreadyExists?: boolean
   updated?: boolean
   error?: string

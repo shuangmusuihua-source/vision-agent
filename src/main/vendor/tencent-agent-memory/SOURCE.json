@@ -1,0 +1,21 @@
+{
+  "repository": "https://github.com/TencentCloud/TencentDB-Agent-Memory",
+  "commit": "0468a2a5b50eaafc54758ed1e2e6609472e5b6ce",
+  "license": "MIT",
+  "files": {
+    "chunker.ts": "MemoryKnowledge/src/engines/wiki/ingest-v2/chunker.ts",
+    "file-protocol.ts": "MemoryKnowledge/src/engines/wiki/ingest-v2/file-protocol.ts",
+    "frontmatter.ts": "MemoryKnowledge/src/engines/wiki/ingest-v2/frontmatter.ts",
+    "slug.ts": "MemoryKnowledge/src/engines/wiki/ingest-v2/slug.ts",
+    "merge.ts": "MemoryKnowledge/src/engines/wiki/ingest-v2/merge.ts",
+    "prompts.ts": "MemoryKnowledge/src/engines/wiki/ingest-v2/prompts.ts",
+    "skill-format.ts": "MemoryCore/src/core/skill/skill-format.ts",
+    "skill-prompt.ts": "MemoryCore/src/core/skill/prompts/skill-review-prompt.ts"
+  },
+  "changes": [
+    "Uses existing js-yaml dependency and injected Claude Agent SDK calls.",
+    "Rejects invalid merges and preserves all document chunk candidates.",
+    "Personal research templates and draft-only Skill extraction.",
+    "Retains supported Skill frontmatter fields."
+  ]
+}
