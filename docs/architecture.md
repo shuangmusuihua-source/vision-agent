@@ -76,7 +76,7 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 
 每个 workspace session 使用独立的 `.sumi/sessions/<hash>/` 工作目录。`session-file-access.ts` 根据工作目录、交互会话的应用全局记忆目录、内置 Skill 目录、附件授权和用户显式路径决定工具访问；renderer 提供的路径不能直接作为授权依据。
 
-`session-file-catalog.ts` 从受管会话目录实时发现产物，不维护另一份 artifact 数据库。
+`session-file-catalog.ts` 从受管会话目录实时发现产物，不维护另一份 artifact 数据库。扫描跳过隐藏项、符号链接、`node_modules` 和 `__pycache__` 依赖缓存目录，保留 `out`、`dist` 等可能包含交付成果的目录。
 
 `memory-policy.ts` 是 Auto Memory 的策略 Module：交互会话和 Ask 共享应用 user-data 下的全局目录，自动化、行内改写和解析器显式禁用记忆；其系统提示只允许稳定、用户强相关、跨任务有效的信息进入记忆。`memory-files.ts` 管理该目录中的 Markdown 索引与主题文件，并拒绝目录穿越、嵌套文件和符号链接。
 
@@ -90,6 +90,8 @@ Renderer 直接使用该共享类型，不维护第二份 bridge 声明。
 
 模型用量由独立的 `persistence/model-usage-store.ts` 管理。它只保存有上限的本地分析事件（Profile、会话展示信息、实际模型、Token、费用和 Skill 归因），不保存 prompt、模型回复、API Key 或完整文件路径，避免让设置存储承担持续增长的分析数据。行内改写使用文档路径的 SHA-256 标识分组，旧账本在加载时迁移；归属 Profile 在实际运行选项创建时捕获，预热执行沿用同一快照。
 
+账本继续使用原来的 `model-usage.json` 和 `{ runs: [...] }` 格式，由该 Module 独占读写，不再通过 electron-store 同步读写整份文件。首次使用异步加载，内存最多保留 2 万条记录；记账只提交一个事件，异步队列合并待写事件并通过 `atomic-write.ts` 持久化。写入失败保留待写快照供后续重试，读取失败不覆盖原文件；正常退出在 `will-quit` 等待队列完成。
+
 Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级映射和展示元数据。两者职责不同。
 
 ### 搜索、图谱与 Skills
@@ -102,7 +104,7 @@ Claude SDK JSONL 是对话 transcript 的来源；electron-store 保存产品级
 
 `knowledge-curation.ts` 按规范化后的知识库目录串行处理应用内导入。读取来源记录、
 分配文件名、写入文档和更新来源记录属于同一次排队操作，防止并发导入覆盖文档或来源记录；
-失败不会阻塞后续导入，空闲队列会释放。
+失败不会阻塞后续导入，空闲队列会释放。同步会核对知识库目标文件与上次同步的 Hash；用户修改或缺少可验证基线时保留目标并提示合并。最终替换与编辑器共用 compare-and-write 队列，拒绝检查后到达的并发修改。
 
 内置 Skill 由 manifest 驱动并在启动时安装到应用自己的 Claude 配置目录。Workspace 通过轻量链接发现这些 Skills。社区 Skill 通过受控 catalog 安装、更新和卸载。“Office 文档”和“飞书连接器”是默认关闭的内置能力；前者由 main process 准备 OfficeCLI，后者在连接器完成飞书 CLI 安装和应用配置后进入 Agent 的启用 Skill 集合。Agent 的精确 `auth check` 是会话内增量授权的唯一入口：Main process 在 `PreToolUse` 生命周期暂停该工具调用，因此默认与自动执行模式都会在当前会话立即收到授权卡；系统浏览器完成 OAuth 并验证 Scope 后放行原工具调用，使同一次 SDK 运行从暂停点继续。
 

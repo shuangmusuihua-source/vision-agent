@@ -156,7 +156,7 @@ function OverviewPanel({
     const knowledgeTooltip = knowledgeStatus === 'synced'
       ? '知识库已是最新版本'
       : knowledgeStatus === 'update_available'
-        ? '文档已有更新，点击同步最新版本'
+        ? '与知识库版本不同，点击检查并同步'
         : '加入知识库'
     const knowledgeBusyTooltip = knowledgeStatus === 'not_added'
       ? '正在加入知识库…'

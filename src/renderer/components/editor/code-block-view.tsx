@@ -68,9 +68,8 @@ function CodeBlockView({ node }: ReactNodeViewProps): React.ReactElement {
   const [copied, setCopied] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [mermaidError, setMermaidError] = useState<string | null>(null)
+  const [mermaidSvg, setMermaidSvg] = useState('')
   const [overlaySvg, setOverlaySvg] = useState<string | null>(null)
-  const codeRef = useRef<HTMLPreElement>(null)
-  const mermaidRef = useRef<HTMLDivElement>(null)
   const language = node.attrs.language as string | null
   const isMermaid = language === 'mermaid'
 
@@ -89,22 +88,22 @@ function CodeBlockView({ node }: ReactNodeViewProps): React.ReactElement {
   }, [nodeText, isMermaid])
 
   const handleCopy = useCallback(() => {
-    const text = codeRef.current?.textContent ?? ''
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(nodeText).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
-  }, [])
+  }, [nodeText])
 
   // Render mermaid diagram
   useEffect(() => {
-    if (!isMermaid || showSource || !mermaidRef.current) return
+    if (!isMermaid || showSource) return
 
     const code = mermaidCode
+    setMermaidError(null)
+    setMermaidSvg('')
     if (!code.trim()) return
 
     const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-    setMermaidError(null)
 
     let cancelled = false
 
@@ -115,9 +114,7 @@ function CodeBlockView({ node }: ReactNodeViewProps): React.ReactElement {
       })
       .then((result) => {
         if (cancelled || !result) return
-        if (mermaidRef.current) {
-          mermaidRef.current.innerHTML = result.svg
-        }
+        setMermaidSvg(result.svg)
       })
       .catch((err) => {
         if (cancelled) return
@@ -171,20 +168,20 @@ function CodeBlockView({ node }: ReactNodeViewProps): React.ReactElement {
               <pre>{mermaidError}</pre>
             </div>
           ) : (
-            <div ref={mermaidRef} className="mermaid-diagram" onClick={() => {
-              if (mermaidRef.current?.innerHTML) setOverlaySvg(mermaidRef.current.innerHTML)
+            <div className="mermaid-diagram" dangerouslySetInnerHTML={{ __html: mermaidSvg }} onClick={() => {
+              if (mermaidSvg) setOverlaySvg(mermaidSvg)
             }} />
           )}
-          {!mermaidError && !showSource && (
+          {!mermaidError && mermaidSvg && (
             <button className="mermaid-expand-btn" onClick={() => {
-              if (mermaidRef.current?.innerHTML) setOverlaySvg(mermaidRef.current.innerHTML)
+              setOverlaySvg(mermaidSvg)
             }} title="放大预览">
               <Maximize2 size={14} />
             </button>
           )}
         </div>
       ) : (
-        <pre ref={codeRef}>
+        <pre>
           <NodeViewContent className="code-block-content" />
         </pre>
       )}

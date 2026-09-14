@@ -24,6 +24,7 @@ import { isAllowedExternalUrl, isAllowedRendererNavigation } from './navigation-
 import { sanitizeTelemetryEvent } from '../shared/telemetry-sanitizer'
 import { appUpdateLifecycle } from './app-update-lifecycle'
 import { getFeishuConnectorManager } from './feishu-connection'
+import { flushModelUsage } from './persistence/model-usage-store'
 
 declare const __SUMI_SENTRY_DSN__: string
 const sentryDsn = process.env.SENTRY_DSN || __SUMI_SENTRY_DSN__
@@ -208,4 +209,19 @@ app.on('before-quit', () => {
   void getDingTalkConnectorManager().cancelOperation()
   handleWindowDestroy()
   stopAllCronJobs()
+})
+
+let usageFlushed = false
+let usageFlushPending = false
+app.on('will-quit', (event) => {
+  if (usageFlushed) return
+  event.preventDefault()
+  if (usageFlushPending) return
+  usageFlushPending = true
+  void flushModelUsage()
+    .catch(error => console.error('[ModelUsage] shutdown flush failed:', error))
+    .finally(() => {
+      usageFlushed = true
+      app.quit()
+    })
 })

@@ -104,7 +104,7 @@ New session-affecting push events must carry an `AgentSessionEnvelope`; never in
 
 ## Persistence
 
-`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. A separate bounded `model-usage` electron-store file owns analytics events only; it contains no prompts, responses, API keys, or full paths. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
+`electron-store` holds profiles, authorized directories, workspace records, app session metadata, theme, cron tasks, enabled/disabled Skills, and compaction IDs. The separate bounded `model-usage.json` ledger owns analytics events only; `persistence/model-usage-store.ts` preserves its existing JSON format, caches records in memory, serializes asynchronous atomic writes, and flushes pending records before quit. It contains no prompts, responses, API keys, or full paths. Claude SDK JSONL remains the transcript source. Session working directories are the source for generated output discovery. Application-global auto-memory Markdown lives under the app user-data directory and is managed through Settings.
 
 Do not introduce a second store for the same authority without documenting the ownership boundary.
 

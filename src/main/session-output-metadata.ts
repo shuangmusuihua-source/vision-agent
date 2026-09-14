@@ -4,6 +4,7 @@ import { atomicWriteTextFile } from './atomic-write'
 import { artifactCategoryFromFileType, artifactFileTypeFromPath } from './artifact-utils'
 
 const METADATA_FILE_NAME = '.sumi-output-metadata.json'
+const EXCLUDED_OUTPUT_DIRECTORIES = new Set(['node_modules', '__pycache__'])
 
 export interface SessionOutputMetadataEntry {
   createdAt: number
@@ -57,6 +58,7 @@ async function collectSessionOutputs(
     if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue
     const filePath = join(directory, entry.name)
     if (entry.isDirectory()) {
+      if (EXCLUDED_OUTPUT_DIRECTORIES.has(entry.name)) continue
       await collectSessionOutputs(root, filePath, scan)
       continue
     }

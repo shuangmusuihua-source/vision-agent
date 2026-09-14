@@ -1,5 +1,6 @@
-import Store from 'electron-store'
 import { createHash } from 'crypto'
+import { mkdir, readFile } from 'fs/promises'
+import { dirname, join } from 'path'
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { ModelUsageRange, ModelUsageSessionBreakdown } from '../../shared/types'
 import {
@@ -9,12 +10,9 @@ import {
   type RecordedModelUsage,
 } from '../model-usage-analytics'
 import { getAppUserDataDir } from '../app-identity'
+import { atomicWriteTextFile } from '../atomic-write'
 
 const MAX_USAGE_RUNS = 20_000
-
-type ModelUsageLedger = {
-  runs: ModelUsageRun[]
-}
 
 export type ModelUsageProfileIdentity = {
   id: string
@@ -32,12 +30,6 @@ export type RecordModelUsageOptions = {
   skillIds?: Iterable<string>
   recordedAt?: number
 }
-
-const usageStore = new Store<ModelUsageLedger>({
-  cwd: getAppUserDataDir(),
-  name: 'model-usage',
-  defaults: { runs: [] },
-})
 
 function finiteNonNegative(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
@@ -60,24 +52,96 @@ function privateSessionId(source: ModelUsageRun['source'], sessionId: string): s
   return `file:sha256:${createHash('sha256').update(sessionId).digest('hex')}`
 }
 
-function getRuns(): ModelUsageRun[] {
-  try {
-    const runs = usageStore.get('runs')
-    if (!Array.isArray(runs)) return []
-    let migrated = false
-    const sanitized = runs.map((run) => {
+/** Owns the existing model-usage.json ledger; no second persistence authority. */
+export class ModelUsageStore {
+  private runs: Map<string, ModelUsageRun> | null = null
+  private readonly pending = new Map<string, ModelUsageRun>()
+  private dirty = false
+  private flushing: Promise<void> | null = null
+
+  constructor(private readonly filePath: string) {}
+
+  record(run: ModelUsageRun): void {
+    this.pending.set(run.id, run)
+    this.trim(this.pending)
+    // Record one small event synchronously. Loading, batching and disk writes
+    // happen asynchronously, so SDK stream delivery never waits on file I/O.
+    void this.flush().catch(reportPersistenceError)
+  }
+
+  flush(): Promise<void> {
+    if (!this.flushing) {
+      this.flushing = this.persist().then(() => {
+        this.flushing = null
+        // A record can arrive after persist's last check but before this
+        // continuation. Include it in this flush, including during shutdown.
+        if (this.pending.size) return this.flush()
+      }, (error) => {
+        this.flushing = null
+        throw error
+      })
+    }
+    return this.flushing
+  }
+
+  async summaries(profileIds: string[]) {
+    await this.flush()
+    return buildModelUsageSummaries([...this.runs!.values()], profileIds)
+  }
+
+  async detail(profileId: string, range: ModelUsageRange) {
+    await this.flush()
+    return buildModelUsageDetail([...this.runs!.values()], profileId, range)
+  }
+
+  private trim(runs: Map<string, ModelUsageRun>): void {
+    while (runs.size > MAX_USAGE_RUNS) runs.delete(runs.keys().next().value!)
+  }
+
+  private async load(): Promise<void> {
+    if (this.runs) return
+    let content: string
+    try {
+      content = await readFile(this.filePath, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      this.runs = new Map()
+      return
+    }
+    const parsed = JSON.parse(content) as { runs: ModelUsageRun[] }
+    if (!Array.isArray(parsed.runs)) throw new Error('用量记录格式无效，已保留原文件')
+    const runs = new Map<string, ModelUsageRun>()
+    for (const run of parsed.runs) {
       const sessionId = privateSessionId(run.source, run.sessionId)
-      if (sessionId === run.sessionId) return run
-      migrated = true
-      return { ...run, sessionId }
-    })
-    if (migrated) usageStore.set('runs', sanitized)
-    return sanitized
-  } catch (error) {
-    console.error('[ModelUsage] failed to read local analytics:', error)
-    return []
+      if (sessionId !== run.sessionId) this.dirty = true
+      runs.set(run.id, { ...run, sessionId })
+    }
+    this.trim(runs)
+    if (runs.size !== parsed.runs.length) this.dirty = true
+    this.runs = runs
+  }
+
+  private async persist(): Promise<void> {
+    await this.load()
+    while (this.pending.size || this.dirty) {
+      for (const [id, run] of this.pending) this.runs!.set(id, run)
+      this.pending.clear()
+      this.trim(this.runs!)
+      // Keep the dirty snapshot after a failure so the next flush retries it.
+      this.dirty = true
+      await mkdir(dirname(this.filePath), { recursive: true })
+      await atomicWriteTextFile(this.filePath, `${JSON.stringify({ runs: [...this.runs!.values()] })}\n`)
+      this.dirty = false
+    }
   }
 }
+
+function reportPersistenceError(error: unknown): void {
+  // Analytics must never turn a successful Agent run into an execution error.
+  console.error('[ModelUsage] failed to persist local analytics:', error)
+}
+
+const usageStore = new ModelUsageStore(join(getAppUserDataDir(), 'model-usage.json'))
 
 export function recordModelUsage(options: RecordModelUsageOptions): void {
   if (!options.profile) return
@@ -99,12 +163,7 @@ export function recordModelUsage(options: RecordModelUsageOptions): void {
       models: toRecordedModels(options.result),
     }
 
-    const runs = getRuns()
-    const existingIndex = runs.findIndex((item) => item.id === run.id)
-    if (existingIndex >= 0) runs[existingIndex] = run
-    else runs.push(run)
-    if (runs.length > MAX_USAGE_RUNS) runs.splice(0, runs.length - MAX_USAGE_RUNS)
-    usageStore.set('runs', runs)
+    usageStore.record(run)
   } catch (error) {
     // Analytics is observational. A local persistence failure must never turn
     // a successful Agent run into an execution error.
@@ -113,12 +172,13 @@ export function recordModelUsage(options: RecordModelUsageOptions): void {
 }
 
 export function getModelUsageSummaries(profileIds: string[]) {
-  return buildModelUsageSummaries(getRuns(), profileIds)
+  return usageStore.summaries(profileIds)
 }
 
 export function getModelUsageDetail(profileId: string, range: ModelUsageRange) {
-  return buildModelUsageDetail(getRuns(), profileId, range)
+  return usageStore.detail(profileId, range)
 }
 
-// Remove paths from ledgers written by earlier versions on first load.
-getRuns()
+export function flushModelUsage(): Promise<void> {
+  return usageStore.flush()
+}

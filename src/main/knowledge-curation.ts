@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import { existsSync } from 'fs'
 import { mkdir, readFile } from 'fs/promises'
 import { basename, extname, join, parse, resolve } from 'path'
-import { atomicWriteTextFile } from './atomic-write'
+import { atomicCompareWriteTextFile, atomicWriteTextFile } from './atomic-write'
 
 export interface KnowledgeImportResult {
   success: boolean
@@ -76,9 +76,9 @@ export async function getKnowledgeSyncStates(
         readFile(destination, 'utf8'),
       ])
       const currentHash = contentHash(sourceContent)
-      const syncedHash = item.sourceHash || contentHash(destinationContent)
+      const destinationHash = contentHash(destinationContent)
       states.set(sourcePath, {
-        status: currentHash === syncedHash ? 'synced' : 'update_available',
+        status: currentHash === destinationHash ? 'synced' : 'update_available',
         filePath: destination,
         fileName,
         addedAt: item.addedAt,
@@ -144,11 +144,19 @@ async function importMarkdown(options: KnowledgeImportOptions): Promise<Knowledg
       suffix += 1
     }
 
-    const destinationExisted = existsSync(destination)
-    const destinationContent = destinationExisted ? await readFile(destination, 'utf8').catch(() => null) : null
+    const destinationContent = await readFile(destination, 'utf8').catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error
+      return null
+    })
+    const previous = existingSourceEntry?.[1]
+    if (previous && destinationContent !== null && destinationContent !== content
+      && (!previous.sourceHash || contentHash(destinationContent) !== previous.sourceHash)) {
+      throw new Error('知识库文档已被修改，已保留你的内容。请先合并知识库与源文档的修改，再重新同步。')
+    }
     const now = Date.now()
-    await atomicWriteTextFile(destination, content)
-    const previous = provenance[basename(destination)]
+    // Editor saves share this queue, so a change made after the check above
+    // must also prevent replacement. New destinations must still be absent.
+    await atomicCompareWriteTextFile(destination, existingSourceEntry ? destinationContent : null, content)
     provenance[basename(destination)] = {
       sourcePath: resolvedSource,
       sessionId: options.sessionId,
@@ -163,7 +171,7 @@ async function importMarkdown(options: KnowledgeImportOptions): Promise<Knowledg
       filePath: destination,
       fileName: basename(destination),
       alreadyExists: destinationContent === content,
-      updated: destinationExisted && destinationContent !== content,
+      updated: destinationContent !== null && destinationContent !== content,
     }
   } catch (error) {
     return { success: false, error: (error as Error).message }

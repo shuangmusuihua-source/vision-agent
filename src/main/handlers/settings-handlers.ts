@@ -58,13 +58,13 @@ export function registerSettingsHandlers(
     return getModelUsageSummaries(getProfileIds())
   })
 
-  ipcMain.handle('settings:getModelUsageDetail', (_event, request: { profileId: string; range: ModelUsageRange }) => {
+  ipcMain.handle('settings:getModelUsageDetail', async (_event, request: { profileId: string; range: ModelUsageRange }) => {
     const profileExists = getProfileIds().includes(request.profileId)
     if (!profileExists) throw new Error('模型配置不存在')
     const range: ModelUsageRange = ['7d', '30d', '90d', 'all'].includes(request.range)
       ? request.range
       : '30d'
-    const detail = getModelUsageDetail(request.profileId, range)
+    const detail = await getModelUsageDetail(request.profileId, range)
     // electron-store reads and parses the backing file on every get. Join this
     // request against one snapshot rather than rereading it for every session.
     const sessionsById = new Map(getSessionRecords().map((session) => [session.id, session]))

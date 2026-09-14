@@ -34,7 +34,7 @@ function record(id: string, title = 'Current title'): SessionRecord {
   return { id, title, context: 'editor', workspacePath: '/workspace/current', status: 'idle', createdAt: 1, lastModified: 1 }
 }
 
-function requestDetail(): ModelUsageDetail {
+function requestDetail(): Promise<ModelUsageDetail> {
   const request: IPCRequest<'settings:getModelUsageDetail'> = { profileId: 'profile-1', range: 'all' }
   return mocks.handlers.get('settings:getModelUsageDetail')!(null, request)
 }
@@ -45,29 +45,29 @@ describe('model usage detail IPC', () => {
     registerSettingsHandlers(vi.fn(), {} as WorkspaceLifecycle)
   })
 
-  it('reads one session snapshot for a large detail and refreshes it for the next request', () => {
+  it('reads one session snapshot for a large detail and refreshes it for the next request', async () => {
     const sessions = Array.from({ length: 1_000 }, (_, i) => usage(`session-${i}`))
     const records = sessions.map((s) => record(s.sessionId))
     mocks.getSessionRecords.mockReturnValue(records)
-    mocks.getModelUsageDetail.mockReturnValue({ sessions })
+    mocks.getModelUsageDetail.mockResolvedValue({ sessions })
 
-    const detail = requestDetail()
+    const detail = await requestDetail()
     expect(mocks.getSessionRecords).toHaveBeenCalledOnce()
     expect(detail.sessions).toHaveLength(1_000)
     expect(detail.sessions.every((s) => s.title === 'Current title' && s.workspaceName === 'current')).toBe(true)
 
     mocks.getSessionRecords.mockReturnValue([record('session-0', 'Renamed')])
-    expect(requestDetail().sessions[0].title).toBe('Renamed')
+    expect((await requestDetail()).sessions[0].title).toBe('Renamed')
     expect(mocks.getSessionRecords).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves missing and non-interactive session metadata and labels Ask sessions', () => {
+  it('preserves missing and non-interactive session metadata and labels Ask sessions', async () => {
     const sessions = [usage('ask'), usage('untitled'), usage('removed'), usage('cron', 'automation')]
-    mocks.getModelUsageDetail.mockReturnValue({ sessions })
+    mocks.getModelUsageDetail.mockResolvedValue({ sessions })
     mocks.getSessionRecords.mockReturnValue([
       { ...record('ask'), context: 'ask' }, record('untitled', ''), record('cron'),
     ])
-    expect(requestDetail().sessions).toEqual([
+    expect((await requestDetail()).sessions).toEqual([
       { ...sessions[0], title: 'Current title', workspaceName: 'Ask sumi' },
       { ...sessions[1], workspaceName: 'current' }, sessions[2], sessions[3],
     ])

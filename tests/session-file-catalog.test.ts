@@ -117,6 +117,21 @@ describe('session file catalog', () => {
     expect(scan.snapshot[join('.sumi', 'private.md')]).toBeUndefined()
   })
 
+  it('excludes nested dependency caches while retaining deliverable build directories', async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), 'sumi-session-dependencies-'))
+    tempDirs.push(workingDirectory)
+    const ignored = ['node_modules/pkg/README.md', 'site/node_modules/pkg/demo.html', 'scripts/__pycache__/run.pyc']
+    const outputs = ['site/dist/index.html', 'out/report.pdf', 'node_modules-notes.md']
+    for (const file of [...ignored, ...outputs]) {
+      const parts = file.split('/')
+      await mkdir(join(workingDirectory, ...parts.slice(0, -1)), { recursive: true })
+      await writeFile(join(workingDirectory, file), 'content')
+    }
+    const scan = await scanSessionOutputs(workingDirectory)
+    expect(scan.files.map(file => file.relativePath).sort()).toEqual([...outputs].sort())
+    expect(Object.keys(scan.snapshot).sort()).toEqual([...outputs].sort())
+  })
+
   it('serializes metadata reconciliation with Skill provenance updates', async () => {
     const workingDirectory = await mkdtemp(join(tmpdir(), 'sumi-session-catalog-'))
     tempDirs.push(workingDirectory)

@@ -1,16 +1,78 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { addMarkdownToKnowledge, getKnowledgeSyncStates } from '../src/main/knowledge-curation'
+import { atomicWriteTextFile } from '../src/main/atomic-write'
+
+const hooks = vi.hoisted(() => ({ beforeCompare: undefined as undefined | ((path: string) => Promise<void>) }))
+vi.mock('../src/main/atomic-write', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/main/atomic-write')>()
+  return { ...actual, atomicCompareWriteTextFile: async (...args: Parameters<typeof actual.atomicCompareWriteTextFile>) => {
+    await hooks.beforeCompare?.(args[0])
+    return actual.atomicCompareWriteTextFile(...args)
+  } }
+})
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
+  hooks.beforeCompare = undefined
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
 describe('knowledge curation', () => {
+  it.each([false, true])('preserves knowledge edits when the source has changed: %s', async (sourceChanged) => {
+    const root = await mkdtemp(join(tmpdir(), 'sumi-knowledge-conflict-'))
+    tempDirs.push(root)
+    const sourcePath = join(root, 'report.md')
+    const knowledgeDir = join(root, 'Knowledge')
+    await writeFile(sourcePath, '# Original')
+    const first = await addMarkdownToKnowledge({ sourcePath, knowledgeDir })
+    const provenancePath = join(knowledgeDir, '.sumi', 'knowledge-provenance.json')
+    const originalProvenance = await readFile(provenancePath, 'utf8')
+    await writeFile(first.filePath!, '# Original\nMy annotations')
+    if (sourceChanged) await writeFile(sourcePath, '# Revised')
+
+    expect((await getKnowledgeSyncStates([sourcePath], knowledgeDir)).get(sourcePath)?.status).toBe('update_available')
+    const result = await addMarkdownToKnowledge({ sourcePath, knowledgeDir })
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('已被修改') })
+    await expect(readFile(first.filePath!, 'utf8')).resolves.toBe('# Original\nMy annotations')
+    await expect(readFile(provenancePath, 'utf8')).resolves.toBe(originalProvenance)
+
+    await writeFile(sourcePath, '# Original\nMy annotations')
+    await expect(addMarkdownToKnowledge({ sourcePath, knowledgeDir })).resolves.toMatchObject({ success: true, alreadyExists: true })
+  })
+
+  it('refuses to overwrite a legacy entry with no known synchronization hash', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sumi-knowledge-legacy-'))
+    tempDirs.push(root)
+    const sourcePath = join(root, 'report.md')
+    const knowledgeDir = join(root, 'Knowledge')
+    await mkdir(join(knowledgeDir, '.sumi'), { recursive: true })
+    await writeFile(sourcePath, '# New source')
+    await writeFile(join(knowledgeDir, 'report.md'), '# Older knowledge with annotations')
+    await writeFile(join(knowledgeDir, '.sumi', 'knowledge-provenance.json'), JSON.stringify({
+      'report.md': { sourcePath, addedAt: 1 },
+    }))
+    await expect(addMarkdownToKnowledge({ sourcePath, knowledgeDir })).resolves.toMatchObject({ success: false })
+    await expect(readFile(join(knowledgeDir, 'report.md'), 'utf8')).resolves.toBe('# Older knowledge with annotations')
+  })
+
+  it('preserves an editor save queued after the synchronization check', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sumi-knowledge-race-'))
+    tempDirs.push(root)
+    const sourcePath = join(root, 'report.md')
+    const knowledgeDir = join(root, 'Knowledge')
+    await writeFile(sourcePath, '# Original')
+    const first = await addMarkdownToKnowledge({ sourcePath, knowledgeDir })
+    await writeFile(sourcePath, '# Revised')
+    hooks.beforeCompare = async (path) => { await atomicWriteTextFile(path, '# Concurrent editor save') }
+
+    await expect(addMarkdownToKnowledge({ sourcePath, knowledgeDir })).resolves.toMatchObject({ success: false })
+    await expect(readFile(first.filePath!, 'utf8')).resolves.toBe('# Concurrent editor save')
+  })
+
   it('copies markdown, preserves provenance, and updates the same knowledge entry', async () => {
     const root = await mkdtemp(join(tmpdir(), 'sumi-knowledge-'))
     tempDirs.push(root)

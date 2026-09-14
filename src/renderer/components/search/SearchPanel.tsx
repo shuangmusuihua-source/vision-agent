@@ -16,11 +16,21 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
   const inputRef = useRef<HTMLInputElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const searchVersion = useRef(0)
+
+  const changeKeyword = useCallback((value: string) => {
+    searchVersion.current++
+    setKeyword(value)
+    setResults([])
+    setSelectedIndex(-1)
+    setSearching(false)
+  }, [])
 
   useEffect(() => {
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     inputRef.current?.focus()
     return () => {
+      searchVersion.current++
       const target = returnFocusRef.current
       if (target?.isConnected) target.focus()
     }
@@ -54,34 +64,43 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
   }, [])
 
   const handleSearch = useCallback(async () => {
+    const version = ++searchVersion.current
     if (!keyword.trim()) {
       setResults([])
       setSelectedIndex(-1)
+      setSearching(false)
       return
     }
     setSearching(true)
     try {
       const data = await window.api.search.query(keyword.trim())
+      if (version !== searchVersion.current) return
       setResults(data)
       setSelectedIndex(-1)
     } catch {
+      if (version !== searchVersion.current) return
       setResults([])
       setSelectedIndex(-1)
     }
-    setSearching(false)
+    if (version === searchVersion.current) setSearching(false)
   }, [keyword])
 
   // Debounced search
   useEffect(() => {
+    searchVersion.current++
     if (!keyword.trim()) {
       setResults([])
       setSelectedIndex(-1)
+      setSearching(false)
       return
     }
     const timer = setTimeout(() => {
       handleSearch()
     }, 300)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      searchVersion.current++
+    }
   }, [keyword, handleSearch])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -127,7 +146,7 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
             type="text"
             placeholder="搜索文件内容..."
             value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            onChange={(e) => changeKeyword(e.target.value)}
             onKeyDown={handleKeyDown}
             role="combobox"
             aria-controls="search-results"
@@ -135,7 +154,7 @@ function SearchPanel({ onOpenFile, onClose, initialQuery }: SearchPanelProps): R
             aria-activedescendant={selectedIndex >= 0 ? `search-result-${selectedIndex}` : undefined}
           />
           {keyword && (
-            <button className="search-clear-btn" onClick={() => setKeyword('')} aria-label="清空搜索">
+            <button className="search-clear-btn" onClick={() => changeKeyword('')} aria-label="清空搜索">
               <X size={14} />
             </button>
           )}
